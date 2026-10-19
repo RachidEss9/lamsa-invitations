@@ -1,0 +1,207 @@
+/* DO NOT CHANGE */
+@import "tailwindcss";
+@import "tw-animate-css";
+@custom-variant dark (&:is(.dark *));
+
+/* DO NOT CHANGE */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* LAMSA typography tokens (temporary, pending official brand identity) */
+  --font-display: "Cormorant Garamond", "Times New Roman", serif;
+  --font-ui: "Jost", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* CHANGE VALUES FOR THEME — LAMSA temporary brand tokens */
+:root {
+  --radius: 0.25rem;
+  --background: #f4efe5;
+  --foreground: #24211b;
+  --card: #fbf7ee;
+  --card-foreground: #24211b;
+  --popover: #fbf7ee;
+  --popover-foreground: #24211b;
+  --primary: #26271f;
+  --primary-foreground: #f8f3e8;
+  --secondary: #e9e2d3;
+  --secondary-foreground: #2a2721;
+  --muted: #ece5d7;
+  --muted-foreground: #6b6557;
+  --accent: #e7dfcf;
+  --accent-foreground: #2a2721;
+  --destructive: #8f3d33;
+  --border: #ddd3c0;
+  --input: #d6cbb6;
+  --ring: #8d8f76;
+  --chart-1: #8a8f6b;
+  --chart-2: #ab8a52;
+  --chart-3: #6a3a21;
+  --chart-4: #2a3a2d;
+  --chart-5: #5a2f2a;
+  --sidebar: #f7f2e8;
+  --sidebar-foreground: #24211b;
+  --sidebar-primary: #26271f;
+  --sidebar-primary-foreground: #f8f3e8;
+  --sidebar-accent: #e9e2d3;
+  --sidebar-accent-foreground: #2a2721;
+  --sidebar-border: #ddd3c0;
+  --sidebar-ring: #8d8f76;
+  --paper-deep: #eae2d3;
+  --olive: #5c6650;
+  --gold: #ab8a52;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: #d9d2bd;
+    color: #24211b;
+  }
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    font-size: 0.66rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    font-weight: 400;
+  }
+  .paper-grain {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.55'/></svg>");
+    background-size: 180px 180px;
+  }
+  .paper-texture {
+    background-image:
+      radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.55), transparent 42%),
+      radial-gradient(circle at 82% 88%, rgba(171, 138, 82, 0.08), transparent 55%);
+  }
+  .editorial-shadow {
+    box-shadow:
+      0 1px 1px rgba(36, 33, 27, 0.04),
+      0 10px 30px -12px rgba(36, 33, 27, 0.28),
+      0 36px 70px -46px rgba(36, 33, 27, 0.4);
+  }
+  .hairline {
+    height: 1px;
+    background: currentColor;
+    opacity: 0.22;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #lamsa-print,
+  #lamsa-print * {
+    visibility: visible;
+  }
+  #lamsa-print {
+    display: flex !important;
+    position: fixed !important;
+    inset: 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #lamsa-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #lamsa-print > div {
+    width: min(94vw, 72vh) !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+}

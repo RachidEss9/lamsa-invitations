@@ -1,0 +1,9 @@
+{
+  "name": "LAMSA — Digital Invitations",
+  "short_name": "LAMSA",
+  "description": "A quiet studio for considered digital invitations — weddings, engagements, birthdays, graduations, and every occasion in between.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4efe5",
+  "theme_color": "#f4efe5"
+}
