@@ -1,7 +1,6 @@
 import { BrandLink } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
 import {
   formatEventDateShort,
   occasionLabel,
@@ -70,16 +69,13 @@ function Reveal({
 }
 
 export default function Landing() {
-  const { isAuthenticated } = useAuth();
   const reduce = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
   const [occasion, setOccasion] = useState<Occasion>("wedding");
 
-  const studioHref = isAuthenticated ? "/dashboard" : "/auth?returnTo=/dashboard";
+  const studioHref = "/dashboard";
   const templateHref = (templateId: string) =>
-    isAuthenticated
-      ? `/dashboard?template=${templateId}`
-      : `/auth?returnTo=${encodeURIComponent(`/dashboard?template=${templateId}`)}`;
+    `/dashboard?template=${templateId}`;
 
   const occasionTemplateIds: Record<Occasion, string> = {
     wedding: "the-vow",
@@ -238,9 +234,9 @@ export default function Landing() {
               transition={{ duration: 1, delay: 0.5 }}
               className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.66rem] uppercase tracking-[0.16em] text-muted-foreground/75"
             >
-              <span>Email sign-in</span>
+              <span>No account needed</span>
               <span className="size-1 rounded-full bg-muted-foreground/40" />
-              <span>No passwords</span>
+              <span>Saves as you work</span>
               <span className="size-1 rounded-full bg-muted-foreground/40" />
               <span>One link, every guest</span>
             </motion.p>

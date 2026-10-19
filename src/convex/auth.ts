@@ -2,9 +2,10 @@
 
 import { convexAuth } from "@convex-dev/auth/server";
 import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
-import { emailOtp } from "./auth/emailOtp";
 
-
+// LAMSA has no sign-in step. The only provider is an anonymous session that
+// begins automatically, so a host's work still persists and stays private to
+// this browser without an email, password, or code.
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [emailOtp, Anonymous],
+  providers: [Anonymous],
 });

@@ -27,7 +27,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/hooks/use-auth";
 import {
   displayTitle,
   draftFromTemplate,
@@ -49,7 +48,6 @@ import {
   FilePenLine,
   LayoutGrid,
   Loader2,
-  LogOut,
   MoreHorizontal,
   Plus,
   Send,
@@ -72,7 +70,6 @@ function publicUrl(slug: string): string {
 }
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const invitations = useQuery(api.invitations.listMine);
@@ -200,11 +197,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
-
   return (
     <div className="relative min-h-screen bg-background">
       <div
@@ -232,35 +224,6 @@ export default function Dashboard() {
               <span className="hidden sm:inline">New invitation</span>
               <span className="sm:hidden">New</span>
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex size-9 items-center justify-center rounded-full border border-border/80 text-[0.66rem] uppercase tracking-widest text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground"
-                  aria-label="Account menu"
-                >
-                  {(user?.email?.[0] ?? "L").toUpperCase()}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-60 rounded-none">
-                <div className="px-2 py-2">
-                  <p className="text-[0.6rem] uppercase tracking-[0.16em] text-muted-foreground">
-                    Signed in as
-                  </p>
-                  <p className="mt-1 truncate text-[0.78rem]">
-                    {user?.email ?? user?.name ?? "Your account"}
-                  </p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={handleSignOut}
-                  className="rounded-none text-[0.8rem]"
-                >
-                  <LogOut className="size-3.5" />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </header>

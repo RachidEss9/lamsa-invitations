@@ -52,7 +52,9 @@ async function uniqueSlug(
 async function requireUserId(ctx: QueryCtx | MutationCtx): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
   if (!userId) {
-    throw new Error("Please sign in to continue.");
+    throw new Error(
+      "The studio session could not be opened. Reload the page and try again.",
+    );
   }
   return userId;
 }

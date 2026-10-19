@@ -434,7 +434,7 @@ export default function Editor() {
         <Lock className="size-6 text-muted-foreground" />
         <h1 className="mt-5 font-display text-3xl">This invitation is private.</h1>
         <p className="mt-3 max-w-sm text-[0.85rem] leading-relaxed text-muted-foreground">
-          It may have been deleted, or it belongs to another LAMSA account.
+          It may have been deleted, or it belongs to another studio.
         </p>
         <Button
           type="button"
