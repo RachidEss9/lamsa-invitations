@@ -234,9 +234,9 @@ export default function Landing() {
               transition={{ duration: 1, delay: 0.5 }}
               className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.66rem] uppercase tracking-[0.16em] text-muted-foreground/75"
             >
-              <span>No account needed</span>
+              <span>Email verified once</span>
               <span className="size-1 rounded-full bg-muted-foreground/40" />
-              <span>Saves as you work</span>
+              <span>6-digit PIN unlock</span>
               <span className="size-1 rounded-full bg-muted-foreground/40" />
               <span>One link, every guest</span>
             </motion.p>

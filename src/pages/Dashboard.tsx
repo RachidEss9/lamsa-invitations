@@ -1,5 +1,6 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { useStudio } from "@/components/auth/studio-context";
 import { BrandLink } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
 import {
@@ -48,6 +49,7 @@ import {
   FilePenLine,
   LayoutGrid,
   Loader2,
+  Lock,
   MoreHorizontal,
   Plus,
   Send,
@@ -70,6 +72,7 @@ function publicUrl(slug: string): string {
 }
 
 export default function Dashboard() {
+  const { email, lock } = useStudio();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const invitations = useQuery(api.invitations.listMine);
@@ -215,6 +218,15 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
+            <button
+              type="button"
+              onClick={lock}
+              title={email ? `Lock studio · ${email}` : "Lock studio"}
+              className="flex h-9 items-center gap-2 border border-border/80 px-3 text-[0.6rem] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            >
+              <Lock className="size-3.5" />
+              <span className="hidden sm:inline">Lock</span>
+            </button>
             <Button
               type="button"
               onClick={() => setCreateOpen(true)}

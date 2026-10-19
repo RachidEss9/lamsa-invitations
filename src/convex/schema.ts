@@ -34,6 +34,18 @@ const schema = defineSchema(
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
+
+      // Salted Scrypt hash of the everyday six-digit PIN. Never plaintext.
+      pinHash: v.optional(v.string()),
+      pinSetAt: v.optional(v.number()),
+      pinFailures: v.optional(v.number()),
+      pinLockedUntil: v.optional(v.number()),
+
+      // One-time secret used to move a pre-verification studio's invitations
+      // to the account that just verified this email.
+      studioClaimToken: v.optional(v.string()),
+      studioClaimExpiresAt: v.optional(v.number()),
+      claimedBy: v.optional(v.id("users")),
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     // A host's invitation. Every private read and write is scoped to ownerId.

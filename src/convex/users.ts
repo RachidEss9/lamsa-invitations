@@ -11,6 +11,18 @@ export const currentUser = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    return await ctx.db.get(userId);
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    // Never return the whole document: it now carries the PIN hash and the
+    // one-time studio claim secret. Only these fields are safe for the client.
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      image: user.image,
+      isAnonymous: user.isAnonymous,
+      emailVerificationTime: user.emailVerificationTime,
+    };
   },
 });
