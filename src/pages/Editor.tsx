@@ -154,13 +154,19 @@ const inputClass =
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
+  // Convex document ids are 26 lowercase alphanumeric characters. A shorter or
+  // malformed route segment (e.g. a copied link that got truncated) is not an
+  // id at all: the query would fail server-side validation and useQuery would
+  // throw that error through React. Guard here and show the friendly
+  // "this invitation is private" screen instead of crashing the editor.
+  const idIsValid = /^[a-z0-9]{26}$/.test(id ?? "");
   const invitationId = (id ?? "") as Id<"invitations">;
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const invitation = useQuery(
     api.invitations.getMine,
-    id ? { id: invitationId } : "skip",
+    idIsValid ? { id: invitationId } : "skip",
   );
   const guests = useQuery(
     api.invitations.listGuests,
@@ -415,7 +421,7 @@ export default function Editor() {
     return "Saved";
   }, [saveState]);
 
-  if (invitation === undefined) {
+  if (invitation === undefined && idIsValid) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <header className="flex h-16 items-center border-b border-border/70 px-5">
@@ -428,7 +434,7 @@ export default function Editor() {
     );
   }
 
-  if (invitation === null || !draft) {
+  if (!idIsValid || invitation === null || !draft) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
         <Lock className="size-6 text-muted-foreground" />
@@ -1372,6 +1378,19 @@ export default function Editor() {
               >
                 <Download className="size-3" />
                 PNG
+              </Button>
+              {/* Print was previously only reachable from the desktop Export
+                  dropdown; phones only got this preview dialog, so give it a
+                  print entrypoint here too. */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handlePrint}
+                className="h-8 rounded-none text-[0.56rem] uppercase tracking-[0.14em]"
+              >
+                <Printer className="size-3" />
+                PDF
               </Button>
               <Button
                 type="button"
