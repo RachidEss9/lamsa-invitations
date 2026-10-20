@@ -1,8 +1,16 @@
 import { addDays, addHours, format, isValid, parse } from "date-fns";
+import type { Infer } from "convex/values";
+import type { Id } from "@/convex/_generated/dataModel";
+import {
+  motifValidator,
+  occasionValidator,
+  scheduleItemValidator,
+} from "@/convex/validators";
 
 /**
  * Client-side mirror of the invitation validators in src/convex/validators.ts.
- * Keep the unions in sync when adding a new occasion, font, layout, or motif.
+ * Occasion, motif, and content-shape unions are inferred straight from the
+ * server validators so the two sides can never drift apart.
  */
 
 export const OCCASIONS = [
@@ -10,10 +18,13 @@ export const OCCASIONS = [
   { id: "engagement", label: "Engagement" },
   { id: "birthday", label: "Birthday" },
   { id: "graduation", label: "Graduation" },
+  { id: "eid", label: "Eid & festivals" },
+  { id: "baby", label: "New baby" },
   { id: "other", label: "Something else" },
 ] as const;
 
-export type Occasion = (typeof OCCASIONS)[number]["id"];
+export type Occasion = Infer<typeof occasionValidator>;
+export interface ScheduleItem extends Infer<typeof scheduleItemValidator> {}
 
 export const FONT_PAIRS = [
   {
@@ -58,10 +69,19 @@ export const MOTIFS = [
   { id: "sun", label: "Sun" },
   { id: "fan", label: "Fan" },
   { id: "star", label: "Star" },
+  { id: "crescent", label: "Crescent" },
+  { id: "rattle", label: "Rattle" },
   { id: "none", label: "None" },
 ] as const;
 
-export type MotifId = (typeof MOTIFS)[number]["id"];
+export type MotifId = Infer<typeof motifValidator>;
+
+export interface RsvpSettings {
+  enabled: boolean;
+  deadline?: string;
+  askMeal?: boolean;
+  askNote?: boolean;
+}
 
 export interface InvitationPalette {
   background: string;
@@ -69,6 +89,13 @@ export interface InvitationPalette {
   accent: string;
 }
 
+/**
+ * Editor payload shape. Mirrors src/convex/validators.ts field-for-field; the
+ * occasion and motif unions above are inferred from the server so those can
+ * never drift, while the optional detail fields are listed here because the
+ * shared server object is a spread (not a wrapped v.object) and cannot be
+ * Infer'd directly.
+ */
 export interface InvitationContent {
   title: string;
   occasion: Occasion;
@@ -85,6 +112,20 @@ export interface InvitationContent {
   layout: LayoutId;
   motif: MotifId;
   animations: boolean;
+
+  // Event details shown on the public page beneath the invitation.
+  schedule?: ScheduleItem[];
+  dressCode?: string;
+  mapUrl?: string;
+  hostNotes?: string;
+
+  // RSVP settings; personal guest links collect responses.
+  rsvp?: RsvpSettings;
+
+  // Gallery and music are managed through dedicated storage mutations; they
+  // are part of the stored document but never edited by the autosave.
+  photos?: { storageId: Id<"_storage">; caption?: string }[];
+  music?: { storageId: Id<"_storage">; enabled: boolean };
 }
 
 export const PALETTE_PRESETS: { name: string; palette: InvitationPalette }[] = [
@@ -294,6 +335,82 @@ export const TEMPLATES: InvitationTemplate[] = [
       venueAddress: "London, England",
     },
   },
+  {
+    id: "crescent-night",
+    name: "Crescent Night",
+    occasion: "eid",
+    description: "Deep ink under a gold crescent moon.",
+    palette: { background: "#1d2024", ink: "#eee6d7", accent: "#c9a35b" },
+    fontPair: "modern",
+    layout: "centered",
+    motif: "crescent",
+    sample: {
+      primary: "The Hassan Family",
+      secondary: "Open House",
+      eyebrow: "Eid Mubarak",
+      message:
+        "May your days be sweet. Join us after Eid prayer for coffee, dates, and laughter.",
+      venueName: "Dar Hassan",
+      venueAddress: "Amman, Jordan",
+    },
+  },
+  {
+    id: "gold-eid",
+    name: "Gold Eid",
+    occasion: "eid",
+    description: "Ivory, sand, and a quiet gold crescent.",
+    palette: { background: "#f6ecdc", ink: "#4a3524", accent: "#b3872f" },
+    fontPair: "heritage",
+    layout: "classic",
+    motif: "crescent",
+    sample: {
+      primary: "Eid al-Fitr",
+      secondary: "You are invited",
+      eyebrow: "With warm salams",
+      message:
+        "Please join us on the first day of Eid for a family lunch and an open door.",
+      venueName: "The Garden Room",
+      venueAddress: "Kuala Lumpur, Malaysia",
+    },
+  },
+  {
+    id: "little-one",
+    name: "Little One",
+    occasion: "baby",
+    description: "Soft clay tones for a first hello.",
+    palette: { background: "#f4e7df", ink: "#5a2f2a", accent: "#c2765b" },
+    fontPair: "romance",
+    layout: "centered",
+    motif: "rattle",
+    sample: {
+      primary: "Yusuf",
+      secondary: "Aqiqah",
+      eyebrow: "With gratitude to God",
+      message:
+        "Please join us to meet our little one, share a meal, and give thanks together.",
+      venueName: "Casa Lumen",
+      venueAddress: "Lisbon, Portugal",
+    },
+  },
+  {
+    id: "first-hello",
+    name: "First Hello",
+    occasion: "baby",
+    description: "Laurel and cream for a gentle welcome.",
+    palette: { background: "#eef0e5", ink: "#2a3a2d", accent: "#6b7d61" },
+    fontPair: "editorial",
+    layout: "editorial",
+    motif: "sprig",
+    sample: {
+      primary: "Welcome,",
+      secondary: "Baby Noor",
+      eyebrow: "An open house for our daughter",
+      message:
+        "A quiet afternoon, a cradle full of wishes. We would love to see you there.",
+      venueName: "Hillside Hall",
+      venueAddress: "Berkeley, California",
+    },
+  },
 ];
 
 export function templateById(templateId: string): InvitationTemplate {
@@ -335,6 +452,18 @@ export const OCCASION_COPY: Record<
     secondaryLabel: "Class or note",
     eyebrow: "The family of",
     message: "Please join us in celebrating this milestone and the road ahead.",
+  },
+  eid: {
+    nameLabel: "Family name",
+    secondaryLabel: "Gathering",
+    eyebrow: "Eid Mubarak",
+    message: "From our home to yours — please join us after Eid prayer for warmth, sweets, and celebration.",
+  },
+  baby: {
+    nameLabel: "Baby's name",
+    secondaryLabel: "Aqiqah or note",
+    eyebrow: "With gratitude to God",
+    message: "We joyfully invite you to meet our little one and share in our blessing.",
   },
   other: {
     nameLabel: "Name or title",
@@ -390,6 +519,13 @@ export function contentFromInvitation(doc: InvitationContent): InvitationContent
     layout: doc.layout,
     motif: doc.motif,
     animations: doc.animations,
+    schedule: doc.schedule ?? [],
+    dressCode: doc.dressCode ?? "",
+    mapUrl: doc.mapUrl ?? "",
+    hostNotes: doc.hostNotes ?? "",
+    rsvp: doc.rsvp ?? undefined,
+    photos: doc.photos,
+    music: doc.music,
   };
 }
 
@@ -425,8 +561,17 @@ export function displayTitle(content: Pick<InvitationContent, "names" | "occasio
   return content.names.primary || "Your invitation";
 }
 
+/**
+ * Pre-filled WhatsApp share link. `wa.me` works on every platform and opens
+ * the share sheet without needing any service or recipient number.
+ */
+export function whatsappShareHref(text: string, url?: string): string {
+  const body = url ? `${text}\n${url}` : text;
+  return `https://wa.me/?text=${encodeURIComponent(body.slice(0, 1600))}`;
+}
+
 /** Builds an .ics data URL for the event. */
-export function calendarHref(content: InvitationContent): string {
+export function calendarHref(content: Pick<InvitationContent, "date" | "time" | "venueName" | "venueAddress" | "message" | "names" | "occasion">): string {
   const parsedDate = content.date
     ? parse(content.date, "yyyy-MM-dd", new Date())
     : addDays(new Date(), 30);

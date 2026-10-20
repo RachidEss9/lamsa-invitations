@@ -36,6 +36,7 @@ import {
   OCCASIONS,
   TEMPLATES,
   templateById,
+  type InvitationContent,
   type Occasion,
 } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
@@ -361,11 +362,10 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => navigate(`/invitations/${invitation._id}`)}
-                      className="block w-full text-left focus-visible:outline-none"
-                      aria-label={`Edit ${invitation.title || displayTitle(invitation)}`}
+                      className="block w-full text-left focus-visible:outline-none"                        aria-label={`Edit ${invitation.title || displayTitle({ names: invitation.names, occasion: invitation.occasion as Occasion })}`}
                     >
                       <div className="editorial-shadow transition-transform duration-500 ease-out group-hover:-translate-y-1">
-                        <InvitationCanvas content={invitation} />
+                        <InvitationCanvas content={invitation as unknown as InvitationContent} />
                       </div>
                     </button>
                     <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/40 via-transparent to-transparent p-4 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
@@ -405,7 +405,7 @@ export default function Dashboard() {
                           )}
                         />
                         <p className="eyebrow truncate text-[0.5rem] text-muted-foreground">
-                          {occasionLabel(invitation.occasion)}
+                          {occasionLabel(invitation.occasion as Occasion)}
                           <span className="mx-1.5 opacity-50">·</span>
                           {invitation.status === "published"
                             ? "Published"
@@ -419,7 +419,7 @@ export default function Dashboard() {
                         }
                         className="mt-1.5 block truncate text-left font-display text-[1.28rem] leading-tight transition-colors hover:text-[var(--olive)]"
                       >
-                        {invitation.title || displayTitle(invitation)}
+                        {invitation.title || displayTitle({ names: invitation.names, occasion: invitation.occasion as Occasion })}
                       </button>
                       <p className="mt-1 text-[0.68rem] uppercase tracking-[0.12em] text-muted-foreground/80">
                         {formatEventDateShort(invitation.date)}
@@ -431,7 +431,7 @@ export default function Dashboard() {
                         <button
                           type="button"
                           className="flex size-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                          aria-label={`Actions for ${invitation.title || displayTitle(invitation)}`}
+                          aria-label={`Actions for ${invitation.title || displayTitle({ names: invitation.names, occasion: invitation.occasion as Occasion })}`}
                         >
                           {busyId === invitation._id ? (
                             <Loader2 className="size-4 animate-spin" />
@@ -514,7 +514,7 @@ export default function Dashboard() {
                             setDeleteTarget({
                               id: invitation._id,
                               title:
-                                invitation.title || displayTitle(invitation),
+                              invitation.title || displayTitle({ names: invitation.names, occasion: invitation.occasion as Occasion }),
                             })
                           }
                           className="rounded-none"

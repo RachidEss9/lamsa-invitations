@@ -50,11 +50,13 @@ import {
   OCCASIONS,
   PALETTE_PRESETS,
   TEMPLATES,
+  whatsappShareHref,
   type InvitationContent,
   type Occasion,
+  type RsvpSettings,
 } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -63,8 +65,14 @@ import {
   Copy,
   Download,
   Eye,
+  FileDown,
+  ImagePlus,
   Loader2,
   Lock,
+  Mail,
+  MessageCircle,
+  Music,
+  Pencil,
   Plus,
   Printer,
   Send,
@@ -72,6 +80,7 @@ import {
   Trash2,
   Undo2,
   Users,
+  Volume2,
 } from "lucide-react";
 import {
   useCallback,
@@ -85,17 +94,25 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
-type Tab = "words" | "details" | "design" | "guests";
+type Tab = "words" | "details" | "design" | "media" | "guests";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "words", label: "Words" },
   { id: "details", label: "Details" },
   { id: "design", label: "Design" },
+  { id: "media", label: "Media" },
   { id: "guests", label: "Guests" },
 ];
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
+}
+
+function skippedGuestsMessage(skippedNoEmail: number): string {
+  if (skippedNoEmail === 0) {
+    return "No guests in that group have an email address yet.";
+  }
+  return `Not sent. ${skippedNoEmail} guest${skippedNoEmail === 1 ? "" : "s"} in this group ${skippedNoEmail === 1 ? "has" : "have"} no email address — add one next to their name first.`;
 }
 
 function filenameFor(title: string) {
@@ -178,6 +195,15 @@ export default function Editor() {
   const unpublishInvitation = useMutation(api.invitations.unpublish);
   const addGuest = useMutation(api.invitations.addGuest);
   const removeGuest = useMutation(api.invitations.removeGuest);
+  const updateGuest = useMutation(api.invitations.updateGuest);
+  const updateRsvpSettings = useMutation(api.invitations.updateRsvp);
+  const generateUploadUrl = useMutation(api.invitations.generateUploadUrl);
+  const attachPhoto = useMutation(api.invitations.attachPhoto);
+  const removePhotoById = useMutation(api.invitations.removePhoto);
+  const recordShare = useMutation(api.invitations.recordShare);
+  const setMusicFile = useMutation(api.invitations.setMusic);
+  const setMusicOn = useMutation(api.invitations.setMusicEnabled);
+  const sendGuestEmailsAction = useAction(api.invitations.sendGuestEmails);
 
   const [draft, setDraft] = useState<InvitationContent | null>(null);
   const [tab, setTab] = useState<Tab>("words");
@@ -189,11 +215,37 @@ export default function Editor() {
   const [publishing, setPublishing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
   const [addingGuest, setAddingGuest] = useState(false);
   const [guestToDelete, setGuestToDelete] = useState<{
     id: Id<"guests">;
     name: string;
   } | null>(null);
+  const [contactTarget, setContactTarget] = useState<{
+    id: Id<"guests">;
+    name: string;
+    email: string;
+  } | null>(null);
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [savingContact, setSavingContact] = useState(false);
+
+  const [rsvpDraft, setRsvpDraft] = useState<RsvpSettings>(
+    () => invitation?.rsvp ?? { enabled: false },
+  );
+  const [savingRsvp, setSavingRsvp] = useState(false);
+
+  const [composerOpen, setComposerOpen] = useState<"update" | "reminder" | null>(null);
+  const [emailGroup, setEmailGroup] = useState<
+    "all" | "noRsvp" | "attending" | "notAttending"
+  >("all");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingMusic, setUploadingMusic] = useState(false);
+  const [photoCaption, setPhotoCaption] = useState("");
 
   const draftRef = useRef<InvitationContent | null>(null);
   const saveTimer = useRef<number | null>(null);
@@ -204,10 +256,11 @@ export default function Editor() {
   useEffect(() => {
     if (!invitation || hydratedId.current === invitation._id) return;
     hydratedId.current = invitation._id;
-    const content = contentFromInvitation(invitation);
+    const content = contentFromInvitation(invitation as unknown as InvitationContent);
     draftRef.current = content;
     setDraft(content);
     setSaveState("saved");
+    setRsvpDraft(invitation.rsvp ?? { enabled: false });
   }, [invitation]);
 
   const persist = useCallback(
@@ -354,8 +407,9 @@ export default function Editor() {
     if (!name) return;
     setAddingGuest(true);
     try {
-      await addGuest({ invitationId, name });
+      await addGuest({ invitationId, name, email: guestEmail.trim() || undefined });
       setGuestName("");
+      setGuestEmail("");
       toast.success(`${name} added.`);
     } catch (error) {
       toast.error(messageOf(error));
@@ -373,6 +427,190 @@ export default function Editor() {
     } catch (error) {
       toast.error(messageOf(error));
     }
+  };
+
+  // RSVP settings save immediately; the reminder job is rescheduled on the
+  // server with every change.
+  const saveRsvp = async (partial: Partial<RsvpSettings>) => {
+    const next: RsvpSettings = {
+      ...rsvpDraft,
+      ...partial,
+      deadline:
+        ("deadline" in partial ? partial.deadline : rsvpDraft.deadline) ||
+        undefined,
+    };
+    setRsvpDraft(next);
+    setSavingRsvp(true);
+    try {
+      await updateRsvpSettings({ id: invitationId, rsvp: next });
+    } catch (error) {
+      toast.error(messageOf(error));
+    } finally {
+      setSavingRsvp(false);
+    }
+  };
+
+  const uploadFile = async (file: File): Promise<Id<"_storage">> => {
+    const uploadUrl = await generateUploadUrl({ invitationId });
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!response.ok) {
+      throw new Error(`The upload failed (${response.status}). Please try again.`);
+    }
+    const result = (await response.json()) as { storageId: Id<"_storage"> };
+    return result.storageId;
+  };
+
+  const handlePhotoUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Choose a photo under 10 MB.");
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const storageId = await uploadFile(file);
+      await attachPhoto({
+        invitationId,
+        storageId,
+        caption: photoCaption.trim().slice(0, 80) || undefined,
+      });
+      setPhotoCaption("");
+      toast.success("Photo added to the gallery.");
+    } catch (error) {
+      toast.error(messageOf(error));
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleMusicUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Choose an audio file under 8 MB.");
+      return;
+    }
+    setUploadingMusic(true);
+    try {
+      setExporting(true);
+      const storageId = await uploadFile(file);
+      await setMusicFile({ invitationId, storageId });
+      toast.success("Guests can now play this music on the invitation.");
+    } catch (error) {
+      toast.error(messageOf(error));
+    } finally {
+      setUploadingMusic(false);
+      setExporting(false);
+    }
+  };
+
+  const openComposer = (intent: "update" | "reminder", group: "all" | "noRsvp") => {
+    setComposerOpen(intent);
+    setEmailGroup(group);
+    setEmailSubject(
+      intent === "reminder"
+        ? "A gentle reminder about our invitation"
+        : "An update about our invitation",
+    );
+    setEmailBody("");
+  };
+
+  const handleSendEmails = async () => {
+    if (!emailSubject.trim() || !emailBody.trim()) {
+      toast.error("Write a subject and a short message first.");
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const result = await sendGuestEmailsAction({
+        invitationId,
+        group: emailGroup,
+        subject: emailSubject,
+        message: emailBody,
+        origin: window.location.origin,
+      });
+      if (result.missingKey) {
+        toast.error(
+          "Email delivery isn't connected yet. Add a RESEND_API_KEY in the keys panel and try again.",
+          { duration: 7000 },
+        );
+      } else if (result.sent === 0) {
+        toast.info(
+          skippedGuestsMessage(result.skippedNoEmail),
+          { duration: 6000 },
+        );
+      } else {
+        toast.success(`Sent to ${result.sent} guest${result.sent === 1 ? "" : "s"}.`);
+      }
+      setComposerOpen(null);
+    } catch (error) {
+      toast.error(messageOf(error));
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    if (!contactTarget) return;
+    setSavingContact(true);
+    try {
+      await updateGuest({
+        id: contactTarget.id,
+        name: contactName,
+        email: contactEmail,
+      });
+      toast.success("Guest updated.");
+      setContactTarget(null);
+    } catch (error) {
+      toast.error(messageOf(error));
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const exportGuestsCsv = () => {
+    if (!guests || guests.length === 0) return;
+    const rows = [
+      ["Name", "Email", "RSVP", "Attending people", "Meal", "Note", "Opens", "Added"],
+      ...guests.map((guest) => [
+        guest.name,
+        guest.email ?? "",
+        guest.rsvpAttending === true
+          ? "Yes"
+          : guest.rsvpAttending === false
+            ? "No"
+            : "Awaiting reply",
+        guest.rsvpCount != null ? String(guest.rsvpCount) : "",
+        guest.rsvpMeal ?? "",
+        guest.rsvpNote ?? "",
+        String(guest.views),
+        new Date(guest.createdAt).toISOString().slice(0, 10),
+      ]),
+    ];
+    const csv = rows
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+          .join(","),
+      )
+      .join("\n");
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filenameFor(draft?.title ?? "invitation")}-guests.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   const handleExportPng = async () => {
@@ -408,6 +646,13 @@ export default function Editor() {
 
   const guestLink = (token: string) =>
     invitation ? `${window.location.origin}/i/${invitation.slug}/${token}` : "";
+
+  // Resolved media URLs from getMine; storage ids alone can't be displayed.
+  const photoUrls = invitation?.photoUrls ?? {};
+  const musicUrl = invitation?.musicUrl ?? "";
+  const photos = invitation?.photos ?? [];
+  const musicFile = invitation?.music;
+  void musicUrl;
 
   const published = invitation?.status === "published";
   const paired = draft ? isPairedOccasion(draft.occasion) : false;
@@ -783,6 +1028,122 @@ export default function Editor() {
                       </div>
                     </Group>
 
+                    <Group label="Programme">
+                      <p className="text-[0.72rem] leading-relaxed text-muted-foreground">
+                        Optional timeline for the day — it appears on the
+                        invitation's details page for guests.
+                      </p>
+                      {(draft.schedule ?? []).map((item, index) => (
+                        <div
+                          key={index}
+                          className="mt-3 flex items-center gap-2"
+                        >
+                          <Input
+                            type="time"
+                            value={item.time}
+                            onChange={(event) => {
+                              if (!draft.schedule) return;
+                              const next = [...draft.schedule];
+                              next[index] = {
+                                ...next[index],
+                                time: event.target.value,
+                              };
+                              patch({ schedule: next });
+                            }}
+                            className={cn(inputClass, "[color-scheme:light] w-[7.5rem] shrink-0")}
+                            aria-label={`Programme time ${index + 1}`}
+                          />
+                          <Input
+                            value={item.label}
+                            onChange={(event) => {
+                              if (!draft.schedule) return;
+                              const next = [...draft.schedule];
+                              next[index] = {
+                                ...next[index],
+                                label: event.target.value.slice(0, 70),
+                              };
+                              patch({ schedule: next });
+                            }}
+                            placeholder="Dinner is served"
+                            maxLength={70}
+                            className={inputClass}
+                            aria-label={`Programme item ${index + 1}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              patch({
+                                schedule: (draft.schedule ?? []).filter(
+                                  (_, i) => i !== index,
+                                ),
+                              })
+                            }
+                            className="flex size-9 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
+                            aria-label={`Remove programme item ${index + 1}`}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patch({
+                            schedule: [
+                              ...(draft.schedule ?? []),
+                              { time: "16:00", label: "" },
+                            ],
+                          })
+                        }
+                        disabled={(draft.schedule ?? []).length >= 8}
+                        className="mt-3 inline-flex items-center gap-2 text-[0.6rem] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                      >
+                        <Plus className="size-3.5" />
+                        Add programme item
+                      </button>
+                    </Group>
+
+                    <Group label="For your guests">
+                      <Field label="Dress code" hint="Optional">
+                        <Input
+                          value={draft.dressCode ?? ""}
+                          onChange={(event) =>
+                            patch({ dressCode: event.target.value.slice(0, 120) })
+                          }
+                          className={inputClass}
+                          placeholder="Formal, earth tones"
+                          maxLength={120}
+                        />
+                      </Field>
+                      <div className="mt-5">
+                        <Field label="Map link" hint="Google Maps or similar">
+                          <Input
+                            type="url"
+                            value={draft.mapUrl ?? ""}
+                            onChange={(event) =>
+                              patch({ mapUrl: event.target.value.slice(0, 300) })
+                            }
+                            className={inputClass}
+                            placeholder="https://maps.google.com/…"
+                            maxLength={300}
+                          />
+                        </Field>
+                      </div>
+                      <div className="mt-5">
+                        <Field label="A note from the hosts" hint="Optional">
+                          <Textarea
+                            value={draft.hostNotes ?? ""}
+                            onChange={(event) =>
+                              patch({ hostNotes: event.target.value.slice(0, 400) })
+                            }
+                            rows={3}
+                            placeholder="Parking is limited — the side gate will be open. Children are very welcome."
+                            className="resize-none rounded-none border-border bg-transparent text-[0.86rem] leading-relaxed shadow-none focus-visible:ring-1 focus-visible:ring-foreground/30"
+                          />
+                        </Field>
+                      </div>
+                    </Group>
+
                     <Group label="On the invitation">
                       <div className="space-y-3 text-[0.78rem] leading-relaxed text-muted-foreground">
                         <p>
@@ -1076,6 +1437,157 @@ export default function Editor() {
                   </div>
                 )}
 
+                {tab === "media" && (
+                  <div className="space-y-7">
+                    <Group label="Photo gallery" className="border-t-0 pt-0">
+                      <p className="text-[0.72rem] leading-relaxed text-muted-foreground">
+                        Up to 12 photos appear on the invitation's page. Photos
+                        keep the invitation's own layout — nothing is watermarked.
+                      </p>
+
+                      {photos.length > 0 && (
+                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          {photos.map((photo) => (
+                            <div
+                              key={photo.storageId}
+                              className="group relative overflow-hidden border border-border"
+                            >
+                              <img
+                                src={photoUrls[photo.storageId] ?? ""}
+                                alt={photo.caption ?? "Invitation gallery photo"}
+                                className="aspect-square w-full object-cover"
+                                loading="lazy"
+                              />
+                              {photo.caption && (
+                                <p className="absolute inset-x-0 bottom-0 bg-black/45 px-2 py-1 text-[0.55rem] uppercase tracking-[0.14em] text-white">
+                                  {photo.caption}
+                                </p>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void removePhotoById({
+                                    invitationId,
+                                    storageId: photo.storageId,
+                                  })
+                                    .then(() => toast.success("Photo removed."))
+                                    .catch((error: unknown) =>
+                                      toast.error(messageOf(error)),
+                                    );
+                                }}
+                                className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center bg-black/50 text-white opacity-0 transition-opacity hover:bg-destructive group-hover:opacity-100"
+                                aria-label="Remove photo"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <Input
+                          value={photoCaption}
+                          onChange={(event) => setPhotoCaption(event.target.value)}
+                          placeholder="Caption (optional)"
+                          maxLength={80}
+                          className={cn(inputClass, "h-9 w-full max-w-[14rem]")}
+                        />
+                        <label
+                          className={cn(
+                            "inline-flex h-9 cursor-pointer items-center gap-2 border border-border px-3 text-[0.58rem] uppercase tracking-[0.16em] transition-colors hover:border-foreground/40",
+                            uploadingPhoto && "opacity-60",
+                          )}
+                        >
+                          {uploadingPhoto ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <ImagePlus className="size-3.5" />
+                          )}
+                          Add photo
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoUpload}
+                            disabled={uploadingPhoto}
+                            className="sr-only"
+                          />
+                        </label>
+                      </div>
+                    </Group>
+
+                    <Group label="Background music">
+                      <p className="text-[0.72rem] leading-relaxed text-muted-foreground">
+                        Guests get a small play button on their invitation.
+                        Nothing plays until they choose to.
+                      </p>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        {musicFile ? (
+                          <>
+                            <span className="inline-flex items-center gap-2 border border-border px-3 py-2 text-[0.62rem]">
+                              <Music className="size-3.5 text-[var(--olive)]" />
+                              <span className="uppercase tracking-[0.14em] text-muted-foreground">
+                                {musicFile.enabled ? "Active" : "Muted"}
+                              </span>
+                            </span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                void setMusicOn({
+                                  invitationId,
+                                  enabled: !musicFile?.enabled,
+                                })
+                              }
+                              className="h-9 rounded-none text-[0.58rem] uppercase tracking-[0.16em]"
+                            >
+                              {invitation.music?.enabled ? "Mute" : "Unmute"}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                void setMusicFile({ invitationId, storageId: null })
+                                  .then(() => toast.success("Music removed."))
+                                  .catch((error: unknown) => toast.error(messageOf(error)))
+                              }
+                              className="h-9 rounded-none text-[0.58rem] uppercase tracking-[0.16em] text-muted-foreground"
+                            >
+                              Remove
+                            </Button>
+                          </>
+                        ) : (
+                          <p className="text-[0.68rem] uppercase tracking-[0.14em] text-muted-foreground">
+                            No music uploaded yet
+                          </p>
+                        )}
+                        <label
+                          className={cn(
+                            "inline-flex h-9 cursor-pointer items-center gap-2 border border-border px-3 text-[0.58rem] uppercase tracking-[0.16em] transition-colors hover:border-foreground/40",
+                            uploadingMusic && "opacity-60",
+                          )}
+                        >
+                          {uploadingMusic ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Volume2 className="size-3.5" />
+                          )}
+                          {musicFile ? "Replace music" : "Upload music (mp3)"}
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            onChange={handleMusicUpload}
+                            disabled={uploadingMusic}
+                            className="sr-only"
+                          />
+                        </label>
+                      </div>
+                    </Group>
+                  </div>
+                )}
+
                 {tab === "guests" && (
                   <div className="space-y-7">
                     <Group label="Sharing" className="border-t-0 pt-0">
@@ -1145,6 +1657,124 @@ export default function Editor() {
                       </div>
                     </Group>
 
+                    <Group label="RSVP replies">
+                      <div className="flex items-start justify-between gap-6">
+                        <div>
+                          <p className="text-[0.8rem] text-foreground">
+                            Collect replies on personal links
+                          </p>
+                          <p className="mt-1 max-w-[19rem] text-[0.7rem] leading-relaxed text-muted-foreground">
+                            Guests open their own link and answer in one tap.
+                            When a deadline is set, one reminder email goes out
+                            automatically seven days before it, and you can
+                            send more anytime from here.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={rsvpDraft.enabled}
+                          disabled={savingRsvp}
+                          onCheckedChange={(checked) =>
+                            void saveRsvp({ enabled: checked })
+                          }
+                          aria-label="Collect RSVP replies"
+                        />
+                      </div>
+
+                      {rsvpDraft.enabled && (
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <Field label="Reply deadline" hint="Optional">
+                            <Input
+                              type="date"
+                              value={rsvpDraft.deadline ?? ""}
+                              onChange={(event) =>
+                                void saveRsvp({ deadline: event.target.value || undefined })
+                              }
+                              className={cn(inputClass, "[color-scheme:light]")}
+                            />
+                          </Field>
+                          <div className="flex flex-col justify-end gap-3 pb-1">
+                            <label className="flex items-center gap-2 text-[0.72rem] text-muted-foreground">
+                              <Switch
+                                checked={rsvpDraft.askMeal ?? false}
+                                disabled={savingRsvp}
+                                onCheckedChange={(checked) =>
+                                  void saveRsvp({ askMeal: checked })
+                                }
+                                aria-label="Ask for meal preferences"
+                              />
+                              Ask for meal preferences
+                            </label>
+                            <label className="flex items-center gap-2 text-[0.72rem] text-muted-foreground">
+                              <Switch
+                                checked={rsvpDraft.askNote ?? false}
+                                disabled={savingRsvp}
+                                onCheckedChange={(checked) =>
+                                  void saveRsvp({ askNote: checked })
+                                }
+                                aria-label="Ask guests for a note"
+                              />
+                              Ask guests for a note
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {rsvpDraft.enabled && (
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-[0.58rem] uppercase tracking-[0.14em] text-[var(--olive)]">
+                            <Check className="size-3" /> {guests?.filter((g) => g.rsvpAttending === true).length ?? 0} yes
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-[0.58rem] uppercase tracking-[0.14em] text-destructive">
+                            {guests?.filter((g) => g.rsvpAttending === false).length ?? 0} no
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-[0.58rem] uppercase tracking-[0.14em] text-muted-foreground">
+                            {guests?.filter((g) => g.rsvpAttending === undefined).length ?? 0} awaiting
+                          </span>
+                        </div>
+                      )}
+                    </Group>
+
+                    <Group label="Guest updates">
+                      <p className="text-[0.72rem] leading-relaxed text-muted-foreground">
+                        Send a short note to a chosen group over email. Guests
+                        without an address are skipped and listed, so nothing
+                        is silently lost.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openComposer("reminder", "noRsvp")}
+                          className="h-8 rounded-none text-[0.56rem] uppercase tracking-[0.16em]"
+                        >
+                          <Mail className="size-3" />
+                          Remind non-responders
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openComposer("update", "all")}
+                          className="h-8 rounded-none text-[0.56rem] uppercase tracking-[0.16em]"
+                        >
+                          <Send className="size-3" />
+                          Email all guests
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={!guests || guests.length === 0}
+                          onClick={exportGuestsCsv}
+                          className="h-8 rounded-none text-[0.56rem] uppercase tracking-[0.16em] text-muted-foreground"
+                        >
+                          <FileDown className="size-3" />
+                          Export guest list (CSV)
+                        </Button>
+                      </div>
+                    </Group>
+
                     <Group label="Personal guests">
                       <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                         Add a name and LAMSA creates a unique link for that
@@ -1152,13 +1782,22 @@ export default function Editor() {
                         open it.
                       </p>
 
-                      <form onSubmit={handleAddGuest} className="mt-4 flex gap-2">
+                      <form onSubmit={handleAddGuest} className="mt-4 flex flex-wrap gap-2">
                         <Input
                           value={guestName}
                           onChange={(event) => setGuestName(event.target.value)}
                           placeholder="Guest or family name"
                           maxLength={80}
-                          className={cn(inputClass, "flex-1")}
+                          className={cn(inputClass, "min-w-[9rem] flex-1")}
+                          disabled={addingGuest}
+                        />
+                        <Input
+                          type="email"
+                          value={guestEmail}
+                          onChange={(event) => setGuestEmail(event.target.value)}
+                          placeholder="Email (optional)"
+                          maxLength={120}
+                          className={cn(inputClass, "h-11 w-full max-w-[13rem] sm:w-40")}
                           disabled={addingGuest}
                         />
                         <Button
@@ -1207,6 +1846,14 @@ export default function Editor() {
                                   {guest.name}
                                 </p>
                                 <p className="mt-0.5 text-[0.56rem] uppercase tracking-[0.14em] text-muted-foreground/70">
+                                  {guest.rsvpAttending === true
+                                    ? `Coming${guest.rsvpCount ? ` · ${guest.rsvpCount} people` : ""}`
+                                    : guest.rsvpAttending === false
+                                      ? "Will not attend"
+                                      : "Awaiting reply"}
+                                  <span className="mx-1 opacity-40">·</span>
+                                  {guest.email || "no email yet"}
+                                  <span className="mx-1 opacity-40">·</span>
                                   {guest.views} {guest.views === 1 ? "open" : "opens"}
                                   {!published && " · pending publish"}
                                 </p>
@@ -1226,6 +1873,39 @@ export default function Editor() {
                                   aria-label={`Copy personal link for ${guest.name}`}
                                 >
                                   <Copy className="size-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    window.open(
+                                      whatsappShareHref(
+                                        `Hello ${guest.name}, you are warmly invited.`,
+                                        guestLink(guest.token),
+                                      ),
+                                      "_blank",
+                                      "noopener,noreferrer",
+                                    )
+                                  }
+                                  className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-[var(--olive)]"
+                                  aria-label={`Share on WhatsApp with ${guest.name}`}
+                                >
+                                  <MessageCircle className="size-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setContactTarget({
+                                      id: guest._id,
+                                      name: guest.name,
+                                      email: guest.email ?? "",
+                                    });
+                                    setContactName(guest.name);
+                                    setContactEmail(guest.email ?? "");
+                                  }}
+                                  className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                                  aria-label={`Edit contact details for ${guest.name}`}
+                                >
+                                  <Pencil className="size-3.5" />
                                 </button>
                                 <button
                                   type="button"
@@ -1424,14 +2104,36 @@ export default function Editor() {
             <p className="break-all border border-border bg-muted/40 px-3 py-2.5 font-mono text-[0.68rem] text-muted-foreground">
               {publicLink}
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <Button
                 type="button"
                 onClick={() => copyText(publicLink, "Public link copied.")}
                 className="h-10 rounded-none text-[0.58rem] uppercase tracking-[0.16em]"
               >
                 <Copy className="size-3.5" />
-                Copy link
+                Copy
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (!invitation?.slug) return;
+                  void recordShare({
+                    slug: invitation.slug,
+                  });
+                  window.open(
+                    whatsappShareHref(
+                      `${draft.title || "You are invited"}`,
+                      publicLink,
+                    ),
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                }}
+                className="h-10 rounded-none text-[0.58rem] uppercase tracking-[0.16em]"
+              >
+                <MessageCircle className="size-3.5" />
+                WhatsApp
               </Button>
               <Button
                 type="button"
@@ -1472,6 +2174,150 @@ export default function Editor() {
               Unpublishing pauses the public link but keeps your invitation and
               guest list intact.
             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Guest update email composer */}
+      <Dialog
+        open={composerOpen !== null}
+        onOpenChange={(open) => !open && setComposerOpen(null)}
+      >
+        <DialogContent className="rounded-none border-border sm:max-w-md">
+          <DialogHeader className="text-left">
+            <p className="eyebrow text-muted-foreground">Guest updates</p>
+            <DialogTitle className="mt-2 font-display text-2xl font-normal leading-tight">
+              {composerOpen === "reminder"
+                ? "Remind guests who haven't replied"
+                : "Write to your guests"}
+            </DialogTitle>
+            <DialogDescription className="leading-relaxed">
+              Each guest receives their own personal link at the end of the
+              message. Guests without an email address are skipped and counted.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Field label="To">
+              <Select
+                value={emailGroup}
+                onValueChange={(value) =>
+                  setEmailGroup(value as "all" | "noRsvp" | "attending" | "notAttending")
+                }
+              >
+                <SelectTrigger className="h-10 w-full rounded-none border-border bg-transparent text-[0.8rem]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-none">
+                  <SelectItem value="all">All guests with an email</SelectItem>
+                  <SelectItem value="noRsvp">Awaiting reply</SelectItem>
+                  <SelectItem value="attending">Attending</SelectItem>
+                  <SelectItem value="notAttending">Not attending</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Subject">
+              <Input
+                value={emailSubject}
+                onChange={(event) => setEmailSubject(event.target.value.slice(0, 120))}
+                className={inputClass}
+                maxLength={120}
+              />
+            </Field>
+            <Field label="Message" hint={`${emailBody.length}/600`}>
+              <Textarea
+                value={emailBody}
+                onChange={(event) => setEmailBody(event.target.value.slice(0, 600))}
+                rows={5}
+                placeholder="We moved the ceremony an hour earlier — see you at 3pm instead."
+                className="resize-none rounded-none border-border bg-transparent text-[0.86rem] leading-relaxed shadow-none focus-visible:ring-1 focus-visible:ring-foreground/30"
+              />
+            </Field>
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setComposerOpen(null)}
+              className="h-10 rounded-none text-[0.6rem] uppercase tracking-[0.18em]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleSendEmails()}
+              disabled={sendingEmail}
+              className="h-10 rounded-none px-5 text-[0.6rem] uppercase tracking-[0.18em]"
+            >
+              {sendingEmail ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <MessageCircle className="size-3.5" />
+              )}
+              {composerOpen === "reminder" ? "Send reminders" : "Send update"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit guest name / email */}
+      <Dialog
+        open={contactTarget !== null}
+        onOpenChange={(open) => !open && setContactTarget(null)}
+      >
+        <DialogContent className="rounded-none border-border sm:max-w-sm">
+          <DialogHeader className="text-left">
+            <p className="eyebrow text-muted-foreground">Guest details</p>
+            <DialogTitle className="mt-2 font-display text-2xl font-normal">
+              {contactTarget?.name}
+            </DialogTitle>
+            <DialogDescription className="leading-relaxed">
+              The email lets you send updates and reminders. Nothing is shared
+              beyond that, and the personal link does not change.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Field label="Name">
+              <Input
+                value={contactName}
+                onChange={(event) => setContactName(event.target.value.slice(0, 80))}
+                className={inputClass}
+                maxLength={80}
+              />
+            </Field>
+            <Field label="Email" hint="Optional">
+              <Input
+                type="email"
+                value={contactEmail}
+                onChange={(event) => setContactEmail(event.target.value.slice(0, 120))}
+                className={inputClass}
+                maxLength={120}
+              />
+            </Field>
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setContactTarget(null)}
+              className="h-10 rounded-none text-[0.6rem] uppercase tracking-[0.18em]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleSaveContact()}
+              disabled={savingContact || !contactName.trim()}
+              className="h-10 rounded-none px-5 text-[0.6rem] uppercase tracking-[0.18em]"
+            >
+              {savingContact ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Check className="size-3.5" />
+              )}
+              Save
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

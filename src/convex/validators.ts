@@ -13,6 +13,8 @@ export const occasionValidator = v.union(
   v.literal("engagement"),
   v.literal("birthday"),
   v.literal("graduation"),
+  v.literal("eid"),
+  v.literal("baby"),
   v.literal("other"),
 );
 
@@ -28,6 +30,8 @@ export const motifValidator = v.union(
   v.literal("sun"),
   v.literal("fan"),
   v.literal("star"),
+  v.literal("crescent"),
+  v.literal("rattle"),
   v.literal("none"),
 );
 
@@ -44,7 +48,33 @@ export const paletteValidator = v.object({
   accent: v.string(),
 });
 
-/** Fields the host can edit. Shared by schema + create/update mutations. */
+/** Structured programme for the event-details section of the public page. */
+export const scheduleItemValidator = v.object({
+  time: v.string(),
+  label: v.string(),
+});
+
+export const scheduleValidator = v.array(scheduleItemValidator);
+
+/** RSVP settings the host controls from the editor. */
+export const rsvpSettingsValidator = v.object({
+  enabled: v.boolean(),
+  deadline: v.optional(v.string()),
+  askMeal: v.optional(v.boolean()),
+  askNote: v.optional(v.boolean()),
+});
+
+/** One photo in the public invitation's gallery (stored in Convex storage). */
+export const photoValidator = v.object({
+  storageId: v.id("_storage"),
+  caption: v.optional(v.string()),
+});
+
+/**
+ * Fields the host can edit. Shared by schema + create/update mutations.
+ * Everything after `animations` is optional so existing invitations and old
+ * drafts keep validating untouched.
+ */
 export const invitationContent = {
   title: v.string(),
   occasion: occasionValidator,
@@ -64,6 +94,24 @@ export const invitationContent = {
   layout: layoutValidator,
   motif: motifValidator,
   animations: v.boolean(),
+
+  // Event details shown on the public page beneath the invitation.
+  schedule: v.optional(scheduleValidator),
+  dressCode: v.optional(v.string()),
+  mapUrl: v.optional(v.string()),
+  hostNotes: v.optional(v.string()),
+
+  // RSVP settings; personal guest links collect responses.
+  rsvp: v.optional(rsvpSettingsValidator),
+
+  // Public photo gallery and optional background music.
+  photos: v.optional(v.array(photoValidator)),
+  music: v.optional(
+    v.object({
+      storageId: v.id("_storage"),
+      enabled: v.boolean(),
+    }),
+  ),
 } as const;
 
 export const invitationStatusValidator = v.union(

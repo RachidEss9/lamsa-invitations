@@ -80,6 +80,30 @@ export function Motif({
           <circle cx="50" cy="82" r="1" fill="currentColor" stroke="none" />
         </g>
       )}
+
+      {id === "crescent" && (
+        <g {...shared}>
+          <path d="M62 14a38 38 0 1 0 0 72 33 33 0 0 1 0-72Z" />
+          <path
+            d="M60 20a31 31 0 1 0 0 60 25 25 0 0 1 0-60Z"
+            opacity="0.45"
+          />
+          <circle cx="72" cy="26" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="80" cy="40" r="1" fill="currentColor" stroke="none" opacity="0.7" />
+          <circle cx="84" cy="56" r="0.9" fill="currentColor" stroke="none" opacity="0.5" />
+        </g>
+      )}
+
+      {id === "rattle" && (
+        <g {...shared}>
+          <circle cx="50" cy="42" r="21" />
+          <circle cx="50" cy="42" r="15" opacity="0.4" />
+          <circle cx="43" cy="36" r="1.6" fill="currentColor" stroke="none" opacity="0.7" />
+          <circle cx="55" cy="45" r="1.4" fill="currentColor" stroke="none" opacity="0.6" />
+          <path d="M50 63v16" />
+          <path d="M44 84c2-3 10-3 12 0-2 2-10 2-12 0Z" />
+        </g>
+      )}
     </svg>
   );
 }

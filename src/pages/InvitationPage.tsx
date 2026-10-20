@@ -3,24 +3,31 @@ import { BrandLink, Wordmark } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
 import { Button } from "@/components/ui/button";
 import {
+  CalendarDays,
+  Check,
+  Copy,
+  Heart,
+  MapPin,
+  MessageCircle,
+  Music,
+  Pause,
+  Play,
+  Share2,
+} from "lucide-react";
+import {
   calendarHref,
   displayTitle,
   fontPairById,
   formatEventDate,
   formatEventTime,
   isPairedOccasion,
+  whatsappShareHref,
   type InvitationContent,
+  type Occasion,
 } from "@/lib/invitation";
 import { useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowUpRight,
-  CalendarPlus,
-  Check,
-  Copy,
-  Share2,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -60,7 +67,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-2 text-[0.58rem] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
           >
             <span className="hidden sm:inline">Create your own</span>
-            <ArrowUpRight className="size-3.5" />
+            <Share2 className="size-3.5" />
           </Link>
         </div>
       </header>
@@ -77,6 +84,57 @@ function PageShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function Countdown({ target }: { target: Date }) {
+  const [now, setNow] = useState(() => Date.now());
+  const remains = target.getTime() > now;
+
+  useEffect(() => {
+    if (!remains && now - target.getTime() > 90_000) return;
+    const step = 1000;
+    const timer = window.setInterval(() => setNow(Date.now()), step);
+    return () => window.clearInterval(timer);
+  });
+
+  const full = target.getTime() - now;
+  if (full <= 0) {
+    // Show a gentle "today" marker for up to a day after the start.
+    return null;
+  }
+
+  const days = Math.floor(full / 86_400_000);
+  const hours = Math.floor((full % 86_400_000) / 3_600_000);
+  const minutes = Math.floor((full % 3_600_000) / 60_000);
+  const seconds = Math.floor((full % 60_000) / 1000);
+
+  const cells: { value: number; label: string }[] =
+    days > 0
+      ? [
+          { value: days, label: "days" },
+          { value: hours, label: "hours" },
+          { value: minutes, label: "minutes" },
+        ]
+      : [
+          { value: hours, label: "hours" },
+          { value: minutes, label: "minutes" },
+          { value: seconds, label: "seconds" },
+        ];
+
+  return (
+    <div className="mt-6 flex items-center justify-center gap-5">
+      {cells.map((cell) => (
+        <div key={cell.label} className="text-center">
+          <p className="font-display text-3xl leading-none tracking-[-0.02em] sm:text-4xl">
+            {String(cell.value).padStart(2, "0")}
+          </p>
+          <p className="eyebrow mt-1.5 text-[0.44rem] text-muted-foreground">
+            {cell.label}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function InvitationPage() {
   const { slug, guestToken } = useParams<{
     slug: string;
@@ -89,6 +147,8 @@ export default function InvitationPage() {
       : "skip",
   );
   const recordView = useMutation(api.invitations.recordView);
+  const recordShare = useMutation(api.invitations.recordShare);
+  const recordRsvp = useMutation(api.invitations.recordRsvp);
   const reducedMotion = usePrefersReducedMotion();
   const [opened, setOpened] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -121,6 +181,48 @@ export default function InvitationPage() {
       document.body.style.overflow = previous;
     };
   }, [coverVisible]);
+
+  // Music: only present when the host enabled it, and never auto-plays.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const toggleMusic = () => {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      void audioRef.current
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => toast.error("This browser cannot play the music file."));
+    }
+  };
+
+  // RSVP form state.
+  const [attending, setAttending] = useState<boolean | null>(null);
+  const [attendeeCount, setAttendeeCount] = useState(2);
+  const [meal, setMeal] = useState("");
+  const [note, setNote] = useState("");
+  const [rsvpBusy, setRsvpBusy] = useState(false);
+
+  useEffect(() => {
+    if (!data?.rsvpState) return;
+    setAttending(data.rsvpState.attending);
+    if (data.rsvpState.count) setAttendeeCount(data.rsvpState.count);
+    setMeal(data.rsvpState.meal ?? "");
+    setNote(data.rsvpState.note ?? "");
+  }, [data?.rsvpState]);
+
+  const eventTarget = useMemo(() => {
+    if (!data?.date) return null;
+    const parsed = new Date(
+      data.date.length === 10
+        ? `${data.date}${data.time ? `T${data.time}` : "T12:00:00"}`
+        : data.date,
+    );
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, [data?.date, data?.time]);
 
   if (data === undefined) {
     return (
@@ -160,7 +262,7 @@ export default function InvitationPage() {
             >
               <Link to="/">
                 Visit LAMSA
-                <ArrowUpRight className="size-4" />
+                <Share2 className="size-4" />
               </Link>
             </Button>
           </div>
@@ -185,13 +287,23 @@ export default function InvitationPage() {
     layout: data.layout,
     motif: data.motif,
     animations: data.animations,
+    rsvp: data.rsvp ?? undefined,
   };
 
   const display = fontPairById(data.fontPair).family;
-  const paired = isPairedOccasion(data.occasion);
+  const paired = isPairedOccasion(data.occasion as Occasion);
   const cleanUrl = `${window.location.origin}/i/${data.slug}`;
+  const trackShare = () => {
+    void recordShare({
+      slug: data.slug,
+      ...(guestToken ? { guestToken } : {}),
+    }).catch(() => {
+      // Sharing must never be blocked by a tracking failure.
+    });
+  };
 
   const handleShare = async () => {
+    trackShare();
     try {
       if (navigator.share) {
         await navigator.share({
@@ -212,6 +324,7 @@ export default function InvitationPage() {
   };
 
   const handleCopy = async () => {
+    trackShare();
     try {
       await navigator.clipboard.writeText(cleanUrl);
       setCopied(true);
@@ -219,6 +332,42 @@ export default function InvitationPage() {
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Could not copy the link.");
+    }
+  };
+
+  const handleWhatsApp = () => {
+    trackShare();
+    window.open(
+      whatsappShareHref(
+        `${displayTitle(content)} — ${formatEventDate(data.date)}`,
+        cleanUrl,
+      ),
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
+
+  const handleRsvpSubmit = async (attendingValue: boolean) => {
+    if (!data.slug || !guestToken) return;
+    setRsvpBusy(true);
+    try {
+      await recordRsvp({
+        slug: data.slug,
+        guestToken,
+        attending: attendingValue,
+        ...(attendingValue ? { count: attendeeCount, meal: meal || undefined } : {}),
+        ...((attendingValue && data.rsvp?.askNote ? note : undefined) as string | undefined),
+      });
+      setAttending(attendingValue);
+      toast.success(
+        attendingValue ? "See you there. Your reply is saved." : "Your reply is saved.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Reply could not be saved.",
+      );
+    } finally {
+      setRsvpBusy(false);
     }
   };
 
@@ -238,43 +387,62 @@ export default function InvitationPage() {
             />
           </div>
 
+          {eventTarget && <Countdown target={eventTarget} />}
+
           <div className="mt-5 flex flex-col items-center gap-4">
-            <div className="flex w-full items-center gap-2">
+            <div className="grid w-full grid-cols-4 gap-2">
               <Button
                 type="button"
                 onClick={handleShare}
-                className="h-11 flex-1 rounded-none text-[0.62rem] uppercase tracking-[0.2em]"
+                className="col-span-2 h-11 rounded-none text-[0.62rem] uppercase tracking-[0.18em]"
               >
-                {copied ? (
-                  <Check className="size-3.5" />
-                ) : (
-                  <Share2 className="size-3.5" />
-                )}
-                {copied ? "Link copied" : "Share invitation"}
+                {copied ? <Check className="size-3.5" /> : <Share2 className="size-3.5" />}
+                {copied ? "Copied" : "Share"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleWhatsApp}
+                className="h-11 rounded-none border-border px-0 text-[0.58rem] uppercase tracking-[0.14em]"
+                aria-label="Share on WhatsApp"
+              >
+                <MessageCircle className="size-3.5" />
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleCopy}
-                className="h-11 rounded-none border-border px-4 text-[0.62rem] uppercase tracking-[0.18em]"
+                className="h-11 rounded-none border-border px-0"
                 aria-label="Copy invitation link"
               >
                 <Copy className="size-3.5" />
               </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="h-11 rounded-none border-border px-4 text-[0.62rem] uppercase tracking-[0.18em]"
-              >
-                <a
-                  href={calendarHref(content)}
-                  download="lamsa-invitation.ics"
-                  aria-label="Add to calendar"
-                >
-                  <CalendarPlus className="size-3.5" />
-                </a>
-              </Button>
             </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              asChild
+              className="h-10 w-full rounded-none border-border text-[0.58rem] uppercase tracking-[0.16em]"
+            >
+              <a
+                href={calendarHref({
+                  names: content.names,
+                  occasion: content.occasion,
+                  date: content.date,
+                  time: content.time,
+                  venueName: content.venueName,
+                  venueAddress: content.venueAddress,
+                  message: content.message,
+                })}
+                download="lamsa-invitation.ics"
+                className="flex items-center gap-2"
+                aria-label="Add to calendar"
+              >
+                <CalendarDays className="size-3.5" />
+                Add to calendar
+              </a>
+            </Button>
 
             <p className="max-w-[26rem] text-center text-[0.66rem] leading-relaxed text-muted-foreground">
               {data.guestName
@@ -283,8 +451,301 @@ export default function InvitationPage() {
               The link is yours to keep.
             </p>
           </div>
+
+          {/* Event details */}
+          {(data.schedule.length > 0 ||
+            data.dressCode ||
+            data.mapUrl ||
+            data.hostNotes) && (
+            <motion.section
+              initial={reducedMotion ? false : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.25 }}
+              className="mt-8 w-full border border-border/70 bg-[#f8f3e9]/70 p-5 sm:p-7"
+            >
+              <p className="eyebrow text-[0.5rem] text-muted-foreground">
+                For the day
+              </p>
+
+              {eventTarget && (
+                <p className="mt-3 font-display text-xl leading-snug">
+                  {formatEventDate(data.date)}
+                  {data.time ? ` · ${formatEventTime(data.time)}` : ""}
+                </p>
+              )}
+
+              {data.venueName && (
+                <p className="mt-1 text-[0.7rem] uppercase tracking-[0.16em] text-muted-foreground">
+                  {data.venueName}
+                  {data.venueAddress ? ` · ${data.venueAddress}` : ""}
+                </p>
+              )}
+
+              {data.schedule.length > 0 && (
+                <div className="mt-5 space-y-2 border-t border-border/60 pt-4">
+                  {data.schedule.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-baseline gap-3 text-[0.78rem]"
+                    >
+                      <span className="w-[4.5rem] shrink-0 text-[0.66rem] uppercase tracking-[0.14em] text-muted-foreground">
+                        {formatEventTime(item.time).replace(/\s?(am|pm)/i, "")}
+                      </span>
+                      <span className="leading-relaxed">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {data.dressCode && (
+                <p className="mt-4 border-t border-border/60 pt-4 text-[0.74rem] leading-relaxed text-muted-foreground">
+                  <span className="text-foreground">Dress code. </span>
+                  {data.dressCode}
+                </p>
+              )}
+
+              {data.hostNotes && (
+                <p className="mt-4 border-t border-border/60 pt-4 text-[0.74rem] italic leading-relaxed text-muted-foreground">
+                  <span className="not-italic text-foreground">The hosts note. </span>
+                  {data.hostNotes}
+                </p>
+              )}
+
+              {data.mapUrl && (
+                <a
+                  href={data.mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 border border-border/80 px-4 py-2 text-[0.56rem] uppercase tracking-[0.18em] text-foreground transition-colors hover:border-foreground/40"
+                >
+                  <MapPin className="size-3.5" />
+                  Open in maps
+                </a>
+              )}
+            </motion.section>
+          )}
+
+          {/* Photo gallery */}
+          {data.photos.length > 0 && (
+            <motion.section
+              initial={reducedMotion ? false : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.3 }}
+              className="mt-6 w-full"
+            >
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {data.photos.map((photo) => (
+                  <a
+                    key={photo.storageId}
+                    href={photo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group block overflow-hidden border border-border/70"
+                    aria-label="Open photo"
+                  >
+                    {/* Plain host-provided photo; opened in a new tab on click. */}
+                    <img
+                      src={photo.url}
+                      alt={photo.caption ?? "Invitation photo"}
+                      className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                      loading="lazy"
+                    />
+                  </a>
+                ))}
+              </div>
+              {data.photos.some((photo) => photo.caption) && (
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                  {data.photos
+                    .filter((photo) => photo.caption)
+                    .map((photo) => (
+                      <p
+                        key={photo.storageId}
+                        className="text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground/70"
+                      >
+                        {photo.caption}
+                      </p>
+                    ))}
+                </div>
+              )}
+            </motion.section>
+          )}
+
+          {/* RSVP */}
+          {data.rsvp?.enabled && (
+            <motion.section
+              initial={reducedMotion ? false : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.35 }}
+              className="mt-6 w-full border border-border/70 bg-[#f8f3e9]/70 p-5 sm:p-7"
+            >
+              {guestToken && data.guestName ? (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="eyebrow text-[0.5rem] text-muted-foreground">
+                      Your reply
+                    </p>
+                    <Heart className="size-3.5 text-[var(--gold)]" />
+                  </div>
+                  <p className="mt-2 font-display text-xl leading-snug">
+                    {attending === true
+                      ? "We can't wait to see you."
+                      : attending === false
+                        ? "You will be missed."
+                        : "Will you join us?"}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleRsvpSubmit(true)}
+                      disabled={rsvpBusy}
+                      className={`h-11 border text-[0.6rem] uppercase tracking-[0.18em] transition-colors disabled:opacity-60 ${
+                        attending === true
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border hover:border-foreground/40"
+                      }`}
+                    >
+                      {rsvpBusy && attending === null ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="size-2 animate-pulse rounded-full bg-current" />
+                          Sending
+                        </span>
+                      ) : (
+                        "Joyfully, yes"
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleRsvpSubmit(false)}
+                      disabled={rsvpBusy}
+                      className={`h-11 border text-[0.6rem] uppercase tracking-[0.18em] transition-colors disabled:opacity-60 ${
+                        attending === false
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border hover:border-foreground/40"
+                      }`}
+                    >
+                      With regret, no
+                    </button>
+                  </div>
+
+                  {attending !== false && (
+                    <>
+                      <p className="mt-5 text-[0.6rem] uppercase tracking-[0.16em] text-muted-foreground">
+                        How many of you are coming?
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {[1, 2, 3, 4, 5].map((count) => (
+                          <button
+                            key={count}
+                            type="button"
+                            onClick={() => setAttendeeCount(count)}
+                            className={`size-9 border text-[0.7rem] transition-colors ${
+                              attendeeCount === count
+                                ? "border-foreground bg-foreground text-background"
+                                : "border-border text-muted-foreground hover:border-foreground/40"
+                            }`}
+                          >
+                            {count}
+                          </button>
+                        ))}
+                        <input
+                          type="number"
+                          min={6}
+                          max={20}
+                          value={attendeeCount > 5 ? attendeeCount : ""}
+                          onChange={(event) =>
+                            setAttendeeCount(
+                              Math.min(Math.max(Number(event.target.value) || 6, 6), 20),
+                            )
+                          }
+                          placeholder="6+"
+                          aria-label="More than five attendees"
+                          className="h-9 w-14 border border-border bg-transparent text-center text-[0.7rem] text-foreground outline-none placeholder:text-muted-foreground/60"
+                        />
+                      </div>
+
+                      {data.rsvp.askMeal && (
+                        <>
+                          <p className="mt-5 text-[0.6rem] uppercase tracking-[0.16em] text-muted-foreground">
+                            Meal preferences or allergies
+                          </p>
+                          <input
+                            type="text"
+                            value={meal}
+                            maxLength={120}
+                            onChange={(event) => setMeal(event.target.value)}
+                            placeholder="e.g. one vegetarian"
+                            className="mt-2 h-11 w-full border border-border bg-transparent px-3 text-[0.8rem] text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-foreground/30"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleRsvpSubmit(true)}
+                            disabled={rsvpBusy}
+                            className="mt-3 h-10 w-full border border-border text-[0.56rem] uppercase tracking-[0.16em] text-foreground transition-colors hover:border-foreground/40 disabled:opacity-60"
+                          >
+                            {attending === true ? "Update these details" : "Save this reply"}
+                          </button>
+                        </>
+                      )}
+
+                      {data.rsvp.askNote && (
+                        <>
+                          <p className="mt-4 text-[0.6rem] uppercase tracking-[0.16em] text-muted-foreground">
+                            A word to the hosts
+                          </p>
+                          <textarea
+                            value={note}
+                            maxLength={400}
+                            onChange={(event) => setNote(event.target.value)}
+                            rows={2}
+                            placeholder="We are bringing the kids, arriving a little late — can't wait!"
+                            className="mt-2 w-full resize-none border border-border bg-transparent px-3 py-2 text-[0.8rem] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-foreground/30"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleRsvpSubmit(true)}
+                            disabled={rsvpBusy}
+                            className="mt-3 h-10 w-full border border-border text-[0.56rem] uppercase tracking-[0.16em] text-foreground transition-colors hover:border-foreground/40 disabled:opacity-60"
+                          >
+                            {attending === true ? "Update these details" : "Save this reply"}
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {data.rsvp.deadline && (
+                    <p className="mt-4 text-[0.62rem] text-muted-foreground/70">
+                      Please reply before {formatEventDate(data.rsvp.deadline)}.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-[0.72rem] leading-relaxed text-muted-foreground">
+                  The hosts are collecting replies on personally addressed
+                  invitation links.
+                </p>
+              )}
+            </motion.section>
+          )}
         </motion.div>
       </main>
+
+      {/* Background music (never auto-plays; only when the host enabled it) */}
+      {data.music?.enabled && data.music.url && (
+        <button
+          type="button"
+          onClick={toggleMusic}
+          aria-pressed={playing}
+          aria-label={playing ? "Pause the invitation music" : "Play the invitation music"}
+          className="fixed bottom-5 right-5 z-40 flex size-11 items-center justify-center rounded-full border border-[#c6b692] bg-black/55 text-[#f6f0e4] shadow-lg backdrop-blur-sm transition-colors hover:bg-black/70"
+        >
+          {playing ? <Pause className="size-4" /> : <Music className="size-4" />}
+        </button>
+      )}
+      {data.music?.enabled && data.music.url && (
+        <audio ref={audioRef} src={data.music.url} loop preload="none" />
+      )}
 
       <AnimatePresence>
         {coverVisible && (

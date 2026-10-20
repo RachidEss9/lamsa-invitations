@@ -82,6 +82,8 @@ export default function Landing() {
     engagement: "amber-hands",
     birthday: "jubilee",
     graduation: "laurel",
+    eid: "crescent-night",
+    baby: "little-one",
     other: "nocturne",
   };
   const occasionContent = sampleContent(occasionTemplateIds[occasion]);
