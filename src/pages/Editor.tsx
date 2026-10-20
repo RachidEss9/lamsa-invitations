@@ -1298,6 +1298,25 @@ export default function Editor() {
                       </div>
                     </Group>
 
+                    <Group label="Direction">
+                      <div className="flex items-start justify-between gap-6">
+                        <div>
+                          <p className="text-[0.8rem] text-foreground">
+                            Right-to-left (Arabic)
+                          </p>
+                          <p className="mt-1 max-w-[19rem] text-[0.7rem] leading-relaxed text-muted-foreground">
+                            Reads and sets right-to-left, with Amiri as the
+                            display face — the LAMSA v5 Arabic preset.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={Boolean(draft.rtl)}
+                          onCheckedChange={(checked) => patch({ rtl: checked })}
+                          aria-label="Right-to-left"
+                        />
+                      </div>
+                    </Group>
+
                     <Group label="Motif">
                       <div className="grid grid-cols-3 gap-2">
                         {MOTIFS.map((motif) => {

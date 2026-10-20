@@ -1,10 +1,11 @@
 /**
- * LAMSA brand tokens — TEMPORARY.
+ * LAMSA brand tokens.
  *
- * The official LAMSA Brand Identity package is not available yet, so these
- * values are deliberately centralised here (and mirrored as CSS tokens in
- * src/index.css) and easy to replace. No logo mark is invented: the wordmark
- * is set in type until the official logo is supplied.
+ * Mirrors the LAMSA v5 Brand & Templates package: crimson, sand, pearl, and
+ * obsidian, with Cormorant Garamond as the display face and IBM Plex Sans as
+ * the UI face. Pinyon Script and Amiri cover the new script/Arabic pairs.
+ * No logo mark is used: the wordmark is set in type (the official logo
+ * arrives later).
  */
 export const brand = {
   name: "LAMSA",
@@ -12,18 +13,24 @@ export const brand = {
   description:
     "A quiet studio for wedding, engagement, birthday, and graduation invitations — designed to be opened, not scrolled past.",
   colors: {
-    paper: "#f4efe5",
-    paperDeep: "#eae2d3",
-    card: "#fbf7ee",
-    ink: "#24211b",
-    inkSoft: "#6b6557",
-    line: "#ddd3c0",
-    olive: "#5c6650",
-    gold: "#ab8a52",
+    crimson: "#710014",
+    sand: "#b38f6f",
+    pearl: "#f2f1ed",
+    obsidian: "#161616",
+    paper: "#f2f1ed",
+    paperDeep: "#e9e6dc",
+    card: "#f7f6f2",
+    ink: "#161616",
+    inkSoft: "#6a665e",
+    line: "#dcd9cf",
+    olive: "#8a6f52",
+    gold: "#b38f6f",
   },
   fonts: {
     display: '"Cormorant Garamond", "Times New Roman", serif',
-    ui: '"Jost", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    ui: '"IBM Plex Sans", system-ui, Helvetica, Arial, sans-serif',
+    script: '"Pinyon Script", "Snell Roundhand", cursive',
+    arabic: '"Amiri", "Times New Roman", serif',
   },
 } as const;
 

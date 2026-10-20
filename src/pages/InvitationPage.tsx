@@ -1,6 +1,7 @@
 import { api } from "@/convex/_generated/api";
 import { BrandLink, Wordmark } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
+import { RevealOpening } from "@/components/invitation/RevealOpening";
 import { Button } from "@/components/ui/button";
 import {
   CalendarDays,
@@ -20,6 +21,7 @@ import {
   formatEventDate,
   formatEventTime,
   isPairedOccasion,
+  isRevealLayout,
   whatsappShareHref,
   type InvitationContent,
   type Occasion,
@@ -151,6 +153,7 @@ export default function InvitationPage() {
   const reducedMotion = usePrefersReducedMotion();
   const [opened, setOpened] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [revealGo, setRevealGo] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -180,6 +183,27 @@ export default function InvitationPage() {
       document.body.style.overflow = previous;
     };
   }, [coverVisible]);
+
+  // LAMSA v5 animated reveal layouts: the cover opens with the touch-to-open
+  // animation before the invitation fades in beneath it.
+  const reveal =
+    data &&
+    !reducedMotion &&
+    Boolean(data.animations) &&
+    isRevealLayout(data.layout)
+      ? data.layout
+      : null;
+
+  const handleOpen = () => {
+    if (reveal && !revealGo) {
+      setRevealGo(true);
+      // Let the opener finish: the envelope flies away a beat after the
+      // flap opens; the arch/ribbons resolve a little faster.
+      window.setTimeout(() => setOpened(true), reveal === "envelope" ? 2100 : 1500);
+    } else {
+      setOpened(true);
+    }
+  };
 
   // Music: only present when the host enabled it, and never auto-plays.
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -318,11 +342,16 @@ export default function InvitationPage() {
     layout: data.layout,
     motif: data.motif,
     animations: data.animations,
+    rtl: Boolean(data.rtl),
     rsvp: data.rsvp ?? undefined,
   };
 
-  const display = fontPairById(data.fontPair).family;
-  const paired = isPairedOccasion(data.occasion as Occasion);
+  // LAMSA v5: RTL invitations read in Amiri, matching the canvas.
+  const display = data.rtl
+    ? '"Amiri", "Times New Roman", serif'
+    : fontPairById(data.fontPair).family;
+  const paired = isPairedOccasion(data.occasion as Occasion);  
+  
   const cleanUrl = `${window.location.origin}/i/${data.slug}`;
   const trackShare = () => {
     void recordShare({
@@ -408,7 +437,10 @@ export default function InvitationPage() {
 
   return (
     <PageShell>
-      <main className="relative z-10 flex flex-1 flex-col items-center px-4 py-8 sm:px-6 sm:py-12">
+      <main
+        dir={data.rtl ? "rtl" : "ltr"}
+        className="relative z-10 flex flex-1 flex-col items-center px-4 py-8 sm:px-6 sm:py-12"
+      >
         <motion.div
           initial={reducedMotion ? false : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -792,8 +824,27 @@ export default function InvitationPage() {
             className="fixed inset-0 z-[60] flex flex-col"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.7, ease: "easeInOut" } }}
-            style={{ backgroundColor: data.palette.ink, color: data.palette.background }}
+            style={
+              reveal
+                ? {
+                    backgroundColor:
+                      reveal === "arch" ? "#161616" : data.palette.background,
+                    color: data.palette.background,
+                  }
+                : { backgroundColor: data.palette.ink, color: data.palette.background }
+            }
           >
+            {reveal ? (
+              <RevealOpening
+                layout={reveal}
+                accent={data.palette.accent}
+                background={data.palette.background}
+                go={revealGo}
+                reducedMotion={reducedMotion}
+                onOpen={handleOpen}
+              />
+            ) : (
+              <>
             <div
               aria-hidden
               className="paper-grain absolute inset-0 opacity-[0.09] mix-blend-screen"
@@ -938,6 +989,8 @@ export default function InvitationPage() {
                 Open to begin
               </span>
             </div>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

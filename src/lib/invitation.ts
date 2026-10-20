@@ -51,6 +51,19 @@ export const FONT_PAIRS = [
     family: '"Marcellus", "Times New Roman", serif',
     note: "Marcellus",
   },
+  // New in LAMSA v5.
+  {
+    id: "script",
+    label: "Script",
+    family: '"Pinyon Script", "Snell Roundhand", cursive',
+    note: "Pinyon Script",
+  },
+  {
+    id: "arabic",
+    label: "Arabic",
+    family: '"Amiri", "Times New Roman", serif',
+    note: "Amiri (RTL)",
+  },
 ] as const;
 
 export type FontPairId = (typeof FONT_PAIRS)[number]["id"];
@@ -59,6 +72,11 @@ export const LAYOUTS = [
   { id: "centered", label: "Centered", note: "A calm, symmetrical card" },
   { id: "editorial", label: "Editorial", note: "Left set, like a magazine" },
   { id: "classic", label: "Classic", note: "Formal double rule" },
+  // LAMSA v5 animated reveal layouts: the public page opens with a
+  // touch-to-reveal animation before showing the card.
+  { id: "arch", label: "Arch", note: "A glowing arch opens for your guests" },
+  { id: "envelope", label: "Envelope", note: "A wax seal cracks the envelope open" },
+  { id: "ribbon", label: "Ribbon", note: "Two ribbons part beneath a bow" },
 ] as const;
 
 export type LayoutId = (typeof LAYOUTS)[number]["id"];
@@ -75,6 +93,21 @@ export const MOTIFS = [
 ] as const;
 
 export type MotifId = Infer<typeof motifValidator>;
+
+/** Layouts that open with an animated touch-to-reveal moment. */
+export const REVEAL_LAYOUTS = ["arch", "envelope", "ribbon"] as const;
+
+export type RevealLayoutId = (typeof REVEAL_LAYOUTS)[number];
+
+export function isRevealLayout(layout: LayoutId): layout is RevealLayoutId {
+  return (REVEAL_LAYOUTS as readonly string[]).includes(layout);
+}
+
+export const REVEAL_HINTS: Record<RevealLayoutId, string> = {
+  arch: "Touch the arch",
+  envelope: "Touch the seal",
+  ribbon: "Touch the bow",
+};
 
 export interface RsvpSettings {
   enabled: boolean;
@@ -112,6 +145,8 @@ export interface InvitationContent {
   layout: LayoutId;
   motif: MotifId;
   animations: boolean;
+  /** Right-to-left (Arabic) presentation, new in LAMSA v5. */
+  rtl?: boolean;
 
   // Event details shown on the public page beneath the invitation.
   schedule?: ScheduleItem[];
@@ -129,6 +164,19 @@ export interface InvitationContent {
 }
 
 export const PALETTE_PRESETS: { name: string; palette: InvitationPalette }[] = [
+  // LAMSA v5 brand palette presets.
+  {
+    name: "Crimson & pearl",
+    palette: { background: "#f2f1ed", ink: "#161616", accent: "#710014" },
+  },
+  {
+    name: "Obsidian glow",
+    palette: { background: "#161616", ink: "#f2f1ed", accent: "#b38f6f" },
+  },
+  {
+    name: "Sand seal",
+    palette: { background: "#e9e5dc", ink: "#710014", accent: "#b38f6f" },
+  },
   {
     name: "Ivory & olive",
     palette: { background: "#f7f2e7", ink: "#2c3226", accent: "#8a8f6b" },
@@ -172,6 +220,8 @@ export interface InvitationTemplate {
   fontPair: FontPairId;
   layout: LayoutId;
   motif: MotifId;
+  /** Templates designed for right-to-left reading start in RTL. */
+  rtl?: boolean;
   sample: {
     primary: string;
     secondary: string;
@@ -183,6 +233,81 @@ export interface InvitationTemplate {
 }
 
 export const TEMPLATES: InvitationTemplate[] = [
+  {
+    // LAMSA v5 animated reveal templates.
+    id: "the-arch",
+    name: "The Arch",
+    occasion: "wedding",
+    description:
+      "Touch a glowing obsidian arch and the invitation ascends in script.",
+    palette: { background: "#161616", ink: "#f2f1ed", accent: "#b38f6f" },
+    fontPair: "script",
+    layout: "arch",
+    motif: "arch",
+    sample: {
+      primary: "Alexandra",
+      secondary: "Omar",
+      eyebrow: "You are invited to the wedding of",
+      message: "Reception to follow.",
+      venueName: "The Garden Pavilion",
+      venueAddress: "Tangier, Morocco",
+    },
+  },
+  {
+    id: "the-seal",
+    name: "The Seal",
+    occasion: "engagement",
+    description: "A crimson envelope cracks open beneath a wax seal.",
+    palette: { background: "#f2f1ed", ink: "#161616", accent: "#710014" },
+    fontPair: "script",
+    layout: "envelope",
+    motif: "star",
+    sample: {
+      primary: "Natasha",
+      secondary: "Karim",
+      eyebrow: "We are getting engaged",
+      message: "Join us for an evening of joy and celebration.",
+      venueName: "The Orchard",
+      venueAddress: "Marrakech, Morocco",
+    },
+  },
+  {
+    id: "the-ribbon",
+    name: "The Ribbon",
+    occasion: "birthday",
+    description: "Two crimson ribbons part beneath a satin bow.",
+    palette: { background: "#f2f1ed", ink: "#161616", accent: "#710014" },
+    fontPair: "script",
+    layout: "ribbon",
+    motif: "fan",
+    sample: {
+      primary: "Nadia",
+      secondary: "Thirty",
+      eyebrow: "You are invited to celebrate",
+      message: "Another year, more dreams, more laughter.",
+      venueName: "The Rooftop",
+      venueAddress: "Casablanca, Morocco",
+    },
+  },
+  {
+    id: "the-arch-ar",
+    name: "The Arch, Arabic",
+    occasion: "wedding",
+    description: "The arch reveal, set right-to-left in Amiri.",
+    palette: { background: "#161616", ink: "#f2f1ed", accent: "#b38f6f" },
+    fontPair: "arabic",
+    layout: "arch",
+    motif: "crescent",
+    rtl: true,
+    sample: {
+      primary: "سلمى",
+      secondary: "عمر",
+      eyebrow: "يتشرّف بدعوتكم لحضور حفل زفاف",
+      message: "يليه حفل استقبال.",
+      venueName: "قاعة الحديقة",
+      venueAddress: "طنجة، المغرب",
+    },
+  },
   {
     id: "the-vow",
     name: "The Vow",
@@ -499,6 +624,7 @@ export function draftFromTemplate(templateId: string): InvitationContent {
     layout: template.layout,
     motif: template.motif,
     animations: true,
+    rtl: template.rtl ?? false,
   };
 }
 
@@ -519,6 +645,7 @@ export function contentFromInvitation(doc: InvitationContent): InvitationContent
     layout: doc.layout,
     motif: doc.motif,
     animations: doc.animations,
+    rtl: doc.rtl ?? false,
     schedule: doc.schedule ?? [],
     dressCode: doc.dressCode ?? "",
     mapUrl: doc.mapUrl ?? "",

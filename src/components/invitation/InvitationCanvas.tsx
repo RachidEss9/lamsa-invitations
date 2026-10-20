@@ -4,6 +4,7 @@ import {
   formatEventTime,
   fontPairById,
   isPairedOccasion,
+  isRevealLayout,
   type InvitationContent,
 } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
@@ -29,22 +30,74 @@ export function InvitationCanvas({
   style,
 }: InvitationCanvasProps) {
   const { palette } = content;
-  const display = fontPairById(content.fontPair).family;
+  // LAMSA v5: right-to-left invitations read in Amiri regardless of the
+  // chosen pair, exactly like the brand-kit Arabic preset.
+  const display = content.rtl
+    ? '"Amiri", "Times New Roman", serif'
+    : fontPairById(content.fontPair).family;
+  const scripted = content.fontPair === "script" || content.fontPair === "arabic" || content.rtl;
   const paired = isPairedOccasion(content.occasion);
   const primary = content.names.primary.trim() || "Your name";
   const secondary = content.names.secondary.trim();
   const date = formatEventDate(content.date);
   const time = formatEventTime(content.time);
   const centered = content.layout !== "editorial";
+  const reveal = isRevealLayout(content.layout);
   const longestName = Math.max(
     primary.length,
     paired ? secondary.length : 0,
     7,
   );
-  const nameSize = Math.min(11.8, Math.max(7.2, 92 / longestName));
+  const baseNameSize = scripted
+    ? Math.max(8.6, 108 / longestName)
+    : Math.max(7.2, 92 / longestName);
+  const nameSize = Math.min(scripted ? 15 : 11.8, baseNameSize);
 
-  const frame =
-    content.layout === "classic" ? (
+  // LAMSA v5 reveal layouts each present a distinct frame: the arch card is
+  // a sand-line arch with a glow, the envelope carries a wax seal in place of
+  // the motif, and the ribbon keeps a centered rule plus crimson bands.
+  const frame = reveal
+    ? content.layout === "arch"
+      ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{
+            inset: "3.4cqw",
+            border: `0.26cqw solid ${palette.accent}`,
+            borderRadius:
+              "999cqw 999cqw 1.6cqw 1.6cqw / 24cqw 24cqw 1.6cqw 1.6cqw",
+            opacity: 0.85,
+            boxShadow: `0 0 7cqw ${palette.accent}2e`,
+          }}
+        />
+      )
+      : content.layout === "ribbon"
+        ? (
+          <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute"
+              style={{
+                inset: "4.2cqw",
+                border: `0.2cqw solid ${palette.accent}`,
+                opacity: 0.45,
+              }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0"
+              style={{ top: 0, height: "2.2cqw", background: palette.accent }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0"
+              style={{ bottom: 0, height: "2.2cqw", background: palette.accent }}
+            />
+          </>
+        )
+        : null
+    : content.layout === "classic" ? (
       <>
         <div
           aria-hidden
@@ -93,12 +146,13 @@ export function InvitationCanvas({
   return (
     <div
       className={cn("relative isolate w-full overflow-hidden", className)}
+      dir={content.rtl ? "rtl" : "ltr"}
       style={{
         aspectRatio: "3 / 4",
         backgroundColor: palette.background,
         color: palette.ink,
         containerType: "inline-size",
-        fontFamily: '"Jost", "Helvetica Neue", sans-serif',
+        fontFamily: '"IBM Plex Sans", system-ui, "Helvetica Neue", sans-serif',
         ...style,
       }}
     >
@@ -112,7 +166,11 @@ export function InvitationCanvas({
       <div
         className={cn(
           "relative flex h-full flex-col",
-          centered ? "items-center text-center" : "items-start text-left",
+          centered
+            ? "items-center text-center"
+            : content.rtl
+              ? "items-end text-right"
+              : "items-start text-left",
         )}
         style={{
           padding: content.layout === "editorial" ? "8cqw 9cqw 8cqw 10.5cqw" : "9cqw 11cqw",
@@ -122,9 +180,29 @@ export function InvitationCanvas({
           <div
             aria-hidden
             className="mb-[2.6cqw]"
-            style={{ width: "13cqw", height: "13cqw", opacity: 0.85 }}
+            style={{
+              width: "13cqw",
+              height: "13cqw",
+              opacity: 0.85,
+            }}
           >
-            <Motif id={content.motif} className="h-full w-full" strokeWidth={0.8} />
+            {content.layout === "envelope" ? (
+              <span
+                className="grid h-full w-full place-items-center rounded-full"
+                style={{
+                  background: palette.accent,
+                  boxShadow: `0 0.6cqw 1.8cqw ${(palette.accent)}59`,
+                }}
+              >
+                <Motif
+                  id={content.motif}
+                  className="h-[62%] w-[62%]"
+                  strokeWidth={1.5}
+                />
+              </span>
+            ) : (
+              <Motif id={content.motif} className="h-full w-full" strokeWidth={0.8} />
+            )}
           </div>
           <p
             className="line-clamp-2"
@@ -200,7 +278,7 @@ export function InvitationCanvas({
                 className="line-clamp-2"
                 style={{
                   fontFamily: display,
-                  fontSize: `${Math.min(11.8, Math.max(7.4, 88 / Math.max(primary.length, 8)))}cqw`,
+                  fontSize: `${Math.min(scripted ? 15 : 11.8, Math.max(scripted ? 8.6 : 7.4, (scripted ? 104 : 88) / Math.max(primary.length, 8)))}cqw`,
                   lineHeight: 1.02,
                   letterSpacing: "-0.01em",
                 }}

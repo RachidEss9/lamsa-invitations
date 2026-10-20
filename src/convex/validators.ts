@@ -22,6 +22,10 @@ export const layoutValidator = v.union(
   v.literal("centered"),
   v.literal("editorial"),
   v.literal("classic"),
+  // LAMSA v5 animated reveal layouts (touch to open on the public page).
+  v.literal("arch"),
+  v.literal("envelope"),
+  v.literal("ribbon"),
 );
 
 export const motifValidator = v.union(
@@ -40,6 +44,9 @@ export const fontPairValidator = v.union(
   v.literal("editorial"),
   v.literal("modern"),
   v.literal("heritage"),
+  // New in LAMSA v5: hand-lettered script and Arabic (RTL) typography.
+  v.literal("script"),
+  v.literal("arabic"),
 );
 
 export const paletteValidator = v.object({
@@ -94,6 +101,9 @@ export const invitationContent = {
   layout: layoutValidator,
   motif: motifValidator,
   animations: v.boolean(),
+
+  // Right-to-left presentation (Arabic presets from the LAMSA v5 kit).
+  rtl: v.optional(v.boolean()),
 
   // Event details shown on the public page beneath the invitation.
   schedule: v.optional(scheduleValidator),

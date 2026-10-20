@@ -41,82 +41,89 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* LAMSA typography tokens (temporary, pending official brand identity) */
+  /* LAMSA v5 typography tokens */
   --font-display: "Cormorant Garamond", "Times New Roman", serif;
-  --font-ui: "Jost", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-ui: "IBM Plex Sans", system-ui, Helvetica, Arial, sans-serif;
+  --font-script: "Pinyon Script", "Snell Roundhand", cursive;
+  --font-arabic: "Amiri", serif;
+  /* Brand colours from the LAMSA v5 brand guide. */
+  --crimson: #710014;
+  --sand: #b38f6f;
+  --pearl: #f2f1ed;
+  --obsidian: #161616;
 }
 
 /* CHANGE VALUES FOR THEME — LAMSA temporary brand tokens */
 :root {
   --radius: 0.25rem;
-  --background: #f4efe5;
-  --foreground: #24211b;
-  --card: #fbf7ee;
-  --card-foreground: #24211b;
-  --popover: #fbf7ee;
-  --popover-foreground: #24211b;
-  --primary: #26271f;
-  --primary-foreground: #f8f3e8;
-  --secondary: #e9e2d3;
-  --secondary-foreground: #2a2721;
-  --muted: #ece5d7;
-  --muted-foreground: #6b6557;
-  --accent: #e7dfcf;
-  --accent-foreground: #2a2721;
-  --destructive: #8f3d33;
-  --border: #ddd3c0;
-  --input: #d6cbb6;
-  --ring: #8d8f76;
-  --chart-1: #8a8f6b;
-  --chart-2: #ab8a52;
-  --chart-3: #6a3a21;
-  --chart-4: #2a3a2d;
-  --chart-5: #5a2f2a;
-  --sidebar: #f7f2e8;
-  --sidebar-foreground: #24211b;
-  --sidebar-primary: #26271f;
-  --sidebar-primary-foreground: #f8f3e8;
-  --sidebar-accent: #e9e2d3;
-  --sidebar-accent-foreground: #2a2721;
-  --sidebar-border: #ddd3c0;
-  --sidebar-ring: #8d8f76;
-  --paper-deep: #eae2d3;
-  --olive: #5c6650;
-  --gold: #ab8a52;
+  --background: #f2f1ed;
+  --foreground: #161616;
+  --card: #f7f6f2;
+  --card-foreground: #161616;
+  --popover: #f7f6f2;
+  --popover-foreground: #161616;
+  --primary: #710014;
+  --primary-foreground: #f2f1ed;
+  --secondary: #e7e5de;
+  --secondary-foreground: #161616;
+  --muted: #e9e7e1;
+  --muted-foreground: #6a665e;
+  --accent: #eae6db;
+  --accent-foreground: #161616;
+  --destructive: #8f1a2b;
+  --border: #dcd9cf;
+  --input: #d2cec2;
+  --ring: #b38f6f;
+  --chart-1: #710014;
+  --chart-2: #b38f6f;
+  --chart-3: #a3182f;
+  --chart-4: #5f5b53;
+  --chart-5: #161616;
+  --sidebar: #f2f1ed;
+  --sidebar-foreground: #161616;
+  --sidebar-primary: #710014;
+  --sidebar-primary-foreground: #f2f1ed;
+  --sidebar-accent: #e7e5de;
+  --sidebar-accent-foreground: #161616;
+  --sidebar-border: #dcd9cf;
+  --sidebar-ring: #b38f6f;
+  --paper-deep: #e9e6dc;
+  --olive: #8a6f52;
+  --gold: #b38f6f;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #161616;
+  --foreground: #f2f1ed;
+  --card: #1e1e1e;
+  --card-foreground: #f2f1ed;
+  --popover: #1e1e1e;
+  --popover-foreground: #f2f1ed;
+  --primary: #8a0318;
+  --primary-foreground: #f2f1ed;
+  --secondary: #2a2a28;
+  --secondary-foreground: #f2f1ed;
+  --muted: #262624;
+  --muted-foreground: #a8a49b;
+  --accent: #2c2c28;
+  --accent-foreground: #f2f1ed;
+  --destructive: #d84a5e;
+  --border: rgba(242, 241, 237, 0.1);
+  --input: rgba(242, 241, 237, 0.15);
+  --ring: #b38f6f;
+  --chart-1: #a3182f;
+  --chart-2: #b38f6f;
+  --chart-3: #710014;
+  --chart-4: #a8a49b;
+  --chart-5: #f2f1ed;
+  --sidebar: #161616;
+  --sidebar-foreground: #f2f1ed;
+  --sidebar-primary: #8a0318;
+  --sidebar-primary-foreground: #f2f1ed;
+  --sidebar-accent: #2a2a28;
+  --sidebar-accent-foreground: #f2f1ed;
+  --sidebar-border: rgba(242, 241, 237, 0.1);
+  --sidebar-ring: #b38f6f;
 }
 
 @layer base {
@@ -130,8 +137,8 @@
     text-rendering: optimizeLegibility;
   }
   ::selection {
-    background: #d9d2bd;
-    color: #24211b;
+    background: #710014;
+    color: #f2f1ed;
   }
   button:not([disabled]),
   [role="button"]:not([disabled]) {
@@ -153,19 +160,111 @@
   .paper-texture {
     background-image:
       radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.55), transparent 42%),
-      radial-gradient(circle at 82% 88%, rgba(171, 138, 82, 0.08), transparent 55%);
+      radial-gradient(circle at 82% 88%, rgba(113, 0, 20, 0.05), transparent 55%);
   }
   .editorial-shadow {
     box-shadow:
-      0 1px 1px rgba(36, 33, 27, 0.04),
-      0 10px 30px -12px rgba(36, 33, 27, 0.28),
-      0 36px 70px -46px rgba(36, 33, 27, 0.4);
+      0 1px 1px rgba(22, 22, 22, 0.05),
+      0 10px 30px -12px rgba(113, 0, 20, 0.22),
+      0 36px 70px -46px rgba(22, 22, 22, 0.4);
   }
   .hairline {
     height: 1px;
     background: currentColor;
     opacity: 0.22;
   }
+}
+
+/* LAMSA v5 animated reveal — ported from the brand-kit prototype. */
+@keyframes lamsa-fall {
+  0% {
+    transform: translateY(0) rotate(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(112vh) translateX(var(--dx)) rotate(540deg);
+    opacity: 0;
+  }
+}
+@keyframes lamsa-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+.lamsa-petal {
+  position: absolute;
+  top: -32px;
+  width: 12px;
+  height: 16px;
+  border-radius: 100% 0 100% 0;
+  opacity: 0;
+  animation: lamsa-fall linear infinite;
+  animation-play-state: paused;
+  z-index: 4;
+}
+[data-lamsa-go="true"] .lamsa-petal {
+  animation-play-state: running;
+}
+.lamsa-hint {
+  animation: lamsa-pulse 2.4s ease-in-out infinite;
+}
+.lamsa-arch {
+  opacity: 0.35;
+  transform: scale(0.94);
+  transition:
+    opacity 1.4s,
+    transform 1.6s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 1.6s;
+}
+[data-lamsa-go="true"] .lamsa-arch {
+  opacity: 1;
+  transform: none;
+}
+.lamsa-env {
+  transition:
+    transform 1s 1.5s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.8s 1.7s;
+}
+[data-lamsa-go="true"] .lamsa-env {
+  transform: translateY(60vh);
+  opacity: 0;
+}
+.lamsa-flap {
+  transform-origin: 50% 0;
+  transition: transform 0.9s 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+[data-lamsa-go="true"] .lamsa-flap {
+  transform: rotateX(180deg);
+}
+.lamsa-seal {
+  transition:
+    transform 0.5s,
+    opacity 0.5s 0.3s;
+}
+[data-lamsa-go="true"] .lamsa-seal {
+  transform: scale(1.5) rotate(20deg);
+  opacity: 0;
+}
+.lamsa-curtain {
+  transition: transform 1.2s 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+[data-lamsa-go="true"] .lamsa-curtain[data-side="left"] {
+  transform: translateX(-108%);
+}
+[data-lamsa-go="true"] .lamsa-curtain[data-side="right"] {
+  transform: translateX(108%);
+}
+.lamsa-bow {
+  transition:
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.6s;
+}
+[data-lamsa-go="true"] .lamsa-bow {
+  transform: scale(0.2) rotate(-25deg);
+  opacity: 0;
 }
 
 @media print {
