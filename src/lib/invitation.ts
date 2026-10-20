@@ -24,7 +24,7 @@ export const OCCASIONS = [
 ] as const;
 
 export type Occasion = Infer<typeof occasionValidator>;
-export interface ScheduleItem extends Infer<typeof scheduleItemValidator> {}
+export type ScheduleItem = Infer<typeof scheduleItemValidator>;
 
 export const FONT_PAIRS = [
   {

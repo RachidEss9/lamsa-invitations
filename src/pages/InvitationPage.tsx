@@ -11,7 +11,6 @@ import {
   MessageCircle,
   Music,
   Pause,
-  Play,
   Share2,
 } from "lucide-react";
 import {
@@ -27,7 +26,7 @@ import {
 } from "@/lib/invitation";
 import { useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -199,30 +198,62 @@ export default function InvitationPage() {
     }
   };
 
-  // RSVP form state.
-  const [attending, setAttending] = useState<boolean | null>(null);
-  const [attendeeCount, setAttendeeCount] = useState(2);
-  const [meal, setMeal] = useState("");
-  const [note, setNote] = useState("");
+  // RSVP form state. Server-confirmed replies are synced via a render-phase
+  // update (same component, settled before paint) rather than an effect, so
+  // the guest never sees a flash of their previous answer.
+  interface RsvpFormState {
+    attending: boolean | null;
+    count: number;
+    meal: string;
+    note: string;
+  }
+  const emptyForm: RsvpFormState = { attending: null, count: 2, meal: "", note: "" };
+  const [form, setForm] = useState<RsvpFormState>(emptyForm);
+  const serverReply = data?.rsvpState ?? null;
+  const [syncedReply, setSyncedReply] = useState(serverReply);
+  if (serverReply !== syncedReply) {
+    setSyncedReply(serverReply);
+    setForm(
+      serverReply
+        ? {
+            attending: serverReply.attending ?? null,
+            count: serverReply.count ?? 2,
+            meal: serverReply.meal ?? "",
+            note: serverReply.note ?? "",
+          }
+        : emptyForm,
+    );
+  }
+  const [attending, setAttending] = [
+    form.attending,
+    (value: boolean | null) =>
+      setForm((previous) => ({ ...previous, attending: value })),
+  ] as const;
+  const [attendeeCount, setAttendeeCount] = [
+    form.count,
+    (value: number) => setForm((previous) => ({ ...previous, count: value })),
+  ] as const;
+  const [meal, setMeal] = [
+    form.meal,
+    (value: string) => setForm((previous) => ({ ...previous, meal: value })),
+  ] as const;
+  const [note, setNote] = [
+    form.note,
+    (value: string) => setForm((previous) => ({ ...previous, note: value })),
+  ] as const;
   const [rsvpBusy, setRsvpBusy] = useState(false);
 
-  useEffect(() => {
-    if (!data?.rsvpState) return;
-    setAttending(data.rsvpState.attending);
-    if (data.rsvpState.count) setAttendeeCount(data.rsvpState.count);
-    setMeal(data.rsvpState.meal ?? "");
-    setNote(data.rsvpState.note ?? "");
-  }, [data?.rsvpState]);
-
-  const eventTarget = useMemo(() => {
-    if (!data?.date) return null;
-    const parsed = new Date(
+  const eventTargetDate = data?.date ?
+    new Date(
       data.date.length === 10
         ? `${data.date}${data.time ? `T${data.time}` : "T12:00:00"}`
         : data.date,
-    );
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }, [data?.date, data?.time]);
+    )
+  : null;
+  const eventTarget =
+    eventTargetDate && !Number.isNaN(eventTargetDate.getTime())
+      ? eventTargetDate
+      : null;
 
   if (data === undefined) {
     return (
@@ -355,8 +386,12 @@ export default function InvitationPage() {
         slug: data.slug,
         guestToken,
         attending: attendingValue,
-        ...(attendingValue ? { count: attendeeCount, meal: meal || undefined } : {}),
-        ...((attendingValue && data.rsvp?.askNote ? note : undefined) as string | undefined),
+        ...(attendingValue
+          ? { count: attendeeCount, meal: meal || undefined }
+          : {}),
+        ...(attendingValue && data.rsvp?.askNote && note
+          ? { note }
+          : {}),
       });
       setAttending(attendingValue);
       toast.success(

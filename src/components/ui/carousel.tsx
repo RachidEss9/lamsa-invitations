@@ -69,6 +69,15 @@ function Carousel({
     api?.scrollPrev()
   }, [api])
 
+  // Initial state is synced during render when the Embla API becomes
+  // available (render-phase update for the same component), so the effect
+  // below only subscribes to external events.
+  const [prevApi, setPrevApi] = React.useState<CarouselApi | null>(null)
+  if (api !== prevApi) {
+    setPrevApi(api)
+    onSelect(api)
+  }
+
   const scrollNext = React.useCallback(() => {
     api?.scrollNext()
   }, [api])
@@ -93,12 +102,12 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
-    onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)
 
     return () => {
-      api?.off("select", onSelect)
+      api.off("select", onSelect)
+      api.off("reInit", onSelect)
     }
   }, [api, onSelect])
 

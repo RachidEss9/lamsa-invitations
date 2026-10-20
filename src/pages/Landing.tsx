@@ -200,9 +200,10 @@ export default function Landing() {
               transition={{ duration: 0.8, delay: 0.18 }}
               className="mt-8 max-w-[29rem] text-[0.95rem] leading-[1.85] text-muted-foreground"
             >
-              For weddings, engagements, birthdays, graduations — and every
-              occasion that deserves more than a group chat. Compose it once,
-              then send each guest their own quietly personal moment.
+              For weddings, engagements, birthdays, graduations, Eid
+              gatherings, and every occasion that deserves more than a group
+              chat. Compose it once, then send each guest their own quietly
+              personal moment.
             </motion.p>
 
             <motion.div
