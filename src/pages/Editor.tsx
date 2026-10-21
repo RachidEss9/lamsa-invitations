@@ -171,12 +171,14 @@ const inputClass =
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
-  // Convex document ids are 26 lowercase alphanumeric characters. A shorter or
-  // malformed route segment (e.g. a copied link that got truncated) is not an
-  // id at all: the query would fail server-side validation and useQuery would
-  // throw that error through React. Guard here and show the friendly
-  // "this invitation is private" screen instead of crashing the editor.
-  const idIsValid = /^[a-z0-9]{26}$/.test(id ?? "");
+  // Convex document ids are lowercase alphanumeric; older documents carry the
+  // legacy 26-character shape and current deployments mint 32-character ids.
+  // A shorter or malformed route segment (e.g. a copied link that got
+  // truncated) is not an id at all: the query would fail server-side
+  // validation and useQuery would throw that error through React. Guard here
+  // and show the friendly "this invitation is private" screen instead of
+  // crashing the editor.
+  const idIsValid = /^[a-z0-9]{26,32}$/.test(id ?? "");
   const invitationId = (id ?? "") as Id<"invitations">;
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
