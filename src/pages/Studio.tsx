@@ -1573,10 +1573,10 @@ export default function Studio() {
     saveState === "saving"
       ? "Saving"
       : saveState === "unsaved"
-        ? "Unsaved"
+        ? "Unsaved changes"
         : saveState === "error"
           ? "Save failed"
-          : "Saved";
+          : "All changes saved";
 
   const openingStagePreview = (
     <Dialog open={showOpeningPreview} onOpenChange={setShowOpeningPreview}>
@@ -1596,14 +1596,14 @@ export default function Studio() {
                 : undefined
             }
             onDone={() => setShowOpeningPreview(false)}
-          />
-          <button
-            type="button"
-            onClick={() => setOpeningPreview((value) => value + 1)}
-            className="absolute right-3 top-3 z-50 border border-ink/20 bg-[var(--paper-light)] px-2 py-1 text-[9px] uppercase tracking-[0.12em]"
-          >
-            Replay
-          </button>
+          />              <button
+                type="button"
+                onClick={() => setOpeningPreview((value) => value + 1)}
+                className="absolute right-3 top-3 z-50 border border-ink/20 bg-[var(--paper-light)] px-2 py-1 text-[9px] uppercase tracking-[0.12em]"
+                aria-label="Replay opening animation"
+              >
+                Replay
+              </button>
         </div>
       </DialogContent>
     </Dialog>
