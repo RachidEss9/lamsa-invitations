@@ -484,6 +484,7 @@ export function Inspector({
             <Row label="Crop X %"><NumberField value={element.imagePosition?.x ?? 50} onChange={(x) => patch({ imagePosition: { x, y: element.imagePosition?.y ?? 50 } })} min={0} max={100} /></Row>
             <Row label="Crop Y %"><NumberField value={element.imagePosition?.y ?? 50} onChange={(y) => patch({ imagePosition: { x: element.imagePosition?.x ?? 50, y } })} min={0} max={100} /></Row>
           </div>
+          <Row label="Border ink"><ColorField value={element.stroke ?? "#b38f6f"} onChange={(stroke) => patch({ stroke })} /></Row>
           <ToggleRow label="Soft shadow" checked={Boolean(element.imageShadow)} onChange={(imageShadow) => patch({ imageShadow })} />
         </Section>
       )}
@@ -503,8 +504,10 @@ export function Inspector({
           <Row label="Fill"><ColorField value={element.fill ?? "#161616"} onChange={(fill) => patch({ fill })} allowTransparent /></Row>
           <Row label="Stroke"><ColorField value={element.stroke ?? "transparent"} onChange={(stroke) => patch({ stroke })} allowTransparent /></Row>
           <div className="grid grid-cols-2 gap-2">
-            <Row label="Width"><NumberField value={element.strokeWidth ?? 0} onChange={(strokeWidth) => patch({ strokeWidth })} min={0} /></Row>
-            <Row label="Radius"><NumberField value={element.radius ?? 0} onChange={(radius) => patch({ radius })} min={0} /></Row>
+            <Row label="Stroke"><NumberField value={element.strokeWidth ?? 0} onChange={(strokeWidth) => patch({ strokeWidth })} min={0} /></Row>
+            {(element.shape === "rect" || element.shape === "frame") && (
+              <Row label="Radius"><NumberField value={element.radius ?? 0} onChange={(radius) => patch({ radius })} min={0} /></Row>
+            )}
           </div>
         </Section>
       )}
@@ -546,19 +549,10 @@ export function Inspector({
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Trigger">
-            <Select
-              value={animation.trigger}
-              onValueChange={(trigger) => patchAnimation({ trigger: trigger as ElementAnimation["trigger"] })}
-            >
-              <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="load">On page load</SelectItem>
-                <SelectItem value="scroll">On scroll</SelectItem>
-                <SelectItem value="tap">On tap</SelectItem>
-              </SelectContent>
-            </Select>
-          </Row>
+          <p className="text-[9px] leading-relaxed text-ink/40">
+            Entry animations run when this page opens. Retime them on the timeline
+            for guest-paced reveals, or add an interactive cover for a tap reveal.
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <Row label="Delay ms"><NumberField value={animation.delay} onChange={(delay) => patchAnimation({ delay })} min={0} step={50} /></Row>
             <Row label="Length ms"><NumberField value={animation.duration} onChange={(duration) => patchAnimation({ duration })} min={100} step={50} /></Row>

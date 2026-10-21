@@ -79,6 +79,7 @@ export function GuestExperience({
   const page = pages[Math.min(pageIndex, pages.length - 1)];
   const duration = timelineDuration(page);
   const frameRef = useRef(0);
+  const timeRef = useRef(0);
 
   useEffect(() => {
     if (phase !== "invitation" || !playing) return;
@@ -86,19 +87,22 @@ export function GuestExperience({
     const tick = (now: number) => {
       const delta = now - last;
       last = now;
-      setTime((previous) => {
-        const next = previous + delta;
-        if (next >= duration) {
-          if (mode === "guest" && pageIndex < pages.length - 1) {
-            setPageIndex((index) => index + 1);
-            setTransition(0);
-            return 0;
-          }
+      const next = timeRef.current + delta;
+      if (next >= duration) {
+        if (mode === "guest" && pageIndex < pages.length - 1) {
+          timeRef.current = 0;
+          setTime(0);
+          setPageIndex((index) => index + 1);
+          setTransition(0);
+        } else {
+          timeRef.current = duration;
+          setTime(duration);
           setPlaying(false);
-          return duration;
         }
-        return next;
-      });
+        return;
+      }
+      timeRef.current = next;
+      setTime(next);
       frameRef.current = requestAnimationFrame(tick);
     };
     frameRef.current = requestAnimationFrame(tick);
@@ -129,6 +133,7 @@ export function GuestExperience({
   const goToPage = (index: number) => {
     const bounded = clamp(index, 0, pages.length - 1);
     if (bounded === pageIndex) return;
+    timeRef.current = 0;
     setPageIndex(bounded);
     setTime(0);
     setTransition(0);
@@ -136,6 +141,7 @@ export function GuestExperience({
   };
 
   const restart = () => {
+    timeRef.current = 0;
     setPageIndex(mode === "timeline" ? clamp(startPage, 0, pages.length - 1) : 0);
     setTime(0);
     setTransition(1);
@@ -235,6 +241,7 @@ export function GuestExperience({
                 }
                 onDone={() => {
                   setPhase("invitation");
+                  timeRef.current = 0;
                   setTime(0);
                   setPlaying(true);
                 }}
@@ -252,7 +259,9 @@ export function GuestExperience({
           step={10}
           value={Math.min(time, duration)}
           onChange={(event) => {
-            setTime(Number(event.target.value));
+            const next = Number(event.target.value);
+            timeRef.current = next;
+            setTime(next);
             setPlaying(false);
           }}
           className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-[#710014]"

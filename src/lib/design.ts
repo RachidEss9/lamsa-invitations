@@ -628,11 +628,15 @@ export function createDefaultDesign(content: InvitationContent): DesignDocument 
       "Names",
       paired
         ? `${content.names.primary || "Your name"}\n& ${content.names.secondary || "their name"}`
-        : content.names.primary || "Your name",
+        : [content.names.primary || "Your name", content.names.secondary]
+            .filter(Boolean)
+            .join("\n"),
       {
         y: 520,
         h: 260,
-        fontSize: paired ? 92 : 96,
+        // A single name gets the display size; a name plus subtitle steps down
+        // so the second line never overflows the card.
+        fontSize: paired ? 92 : content.names.secondary ? 74 : 96,
         letterSpacing: -0.01,
         lineHeight: 1.04,
       },
@@ -793,12 +797,8 @@ export function normalizeDesign(
   const fallback = createDefaultDesign(content);
   return {
     version: 1,
-    pages: value.pages.map((page, index) => ({
-      id: page.id || makeId("page"),
-      name: page.name || `Page ${index + 1}`,
-      background: page.background || fallback.pages[0].background,
-      hidden: Boolean(page.hidden),
-      elements: (page.elements ?? []).map((element) => ({
+    pages: value.pages.map((page, index) => {
+      const elements = (page.elements ?? []).map((element) => ({
         ...makeElement(element.kind ?? "shape"),
         ...element,
         animation: {
@@ -813,11 +813,33 @@ export function normalizeDesign(
               duration: element.reveal.duration ?? 900,
               direction: element.reveal.direction ?? "up",
               effect: element.reveal.effect ?? "fadeAway",
-              trigger: "tap",
+              trigger: "tap" as const,
             }
           : undefined,
-      })),
-    })),
+      }));
+      // Designs generated before the subtitle fix omitted the second name on a
+      // single-name canvas. Backfill only the untouched default: the moment the
+      // host edits the name wording, the text no longer matches and is left
+      // exactly as they set it.
+      const names = elements.find(
+        (element) => element.name === "Names" && element.kind === "text",
+      );
+      if (
+        names &&
+        content.names.secondary.trim() &&
+        names.text?.trim() === content.names.primary.trim()
+      ) {
+        names.text = `${content.names.primary}\n${content.names.secondary}`;
+        names.fontSize = Math.min(names.fontSize ?? 74, 74);
+      }
+      return {
+        id: page.id || makeId("page"),
+        name: page.name || `Page ${index + 1}`,
+        background: page.background || fallback.pages[0].background,
+        hidden: Boolean(page.hidden),
+        elements,
+      };
+    }),
     opening: {
       ...fallback.opening,
       ...(value.opening ?? {}),
