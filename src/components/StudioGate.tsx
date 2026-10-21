@@ -27,10 +27,16 @@ import { toast } from "sonner";
 function StudioLoading() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background">
-      <span className="font-ui text-[0.7rem] uppercase tracking-[0.42em] text-foreground/70">
-        LAMSA
+      <div className="flex items-baseline gap-2">
+        <span className="font-display text-[1.5rem] leading-none tracking-[0.16em]">
+          LAMSA
+        </span>
+        <span className="mb-[0.55em] size-[4px] bg-[var(--red)]" />
+      </div>
+      <span className="mt-4 flex items-center gap-2 font-meta text-[0.52rem] uppercase tracking-[0.16em] text-ink/56">
+        <Loader2 className="size-3 animate-spin" />
+        Opening the studio
       </span>
-      <Loader2 className="mt-5 size-4 animate-spin text-muted-foreground" />
     </main>
   );
 }

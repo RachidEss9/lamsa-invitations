@@ -1,34 +1,33 @@
 /**
  * LAMSA brand tokens.
  *
- * Mirrors the LAMSA v5 Brand & Templates package: crimson, sand, pearl, and
- * obsidian, with Cormorant Garamond as the display face and IBM Plex Sans as
- * the UI face. Pinyon Script and Amiri cover the new script/Arabic pairs.
- * No logo mark is used: the wordmark is set in type (the official logo
- * arrives later).
+ * The atelier palette is paper, ink, and one vermilion. Type is set in
+ * Instrument Serif for display, Archivo for interface, and Space Mono for
+ * folios and file numbers. No logo mark is used: the wordmark is set in type.
  */
 export const brand = {
   name: "LAMSA",
-  tagline: "Invitations, considered.",
+  tagline: "An invitation atelier.",
   description:
-    "A quiet studio for wedding, engagement, birthday, and graduation invitations — designed to be opened, not scrolled past.",
+    "Compose one considered invitation, address it to every guest by name, and send a link worth opening.",
   colors: {
-    crimson: "#710014",
-    sand: "#b38f6f",
-    pearl: "#f2f1ed",
-    obsidian: "#161616",
-    paper: "#f2f1ed",
-    paperDeep: "#e9e6dc",
-    card: "#f7f6f2",
-    ink: "#161616",
-    inkSoft: "#6a665e",
-    line: "#dcd9cf",
-    olive: "#8a6f52",
-    gold: "#b38f6f",
+    crimson: "#c63a17",
+    sand: "#b4864a",
+    pearl: "#ede8dc",
+    obsidian: "#16150f",
+    paper: "#ede8dc",
+    paperDeep: "#e3dccb",
+    card: "#f5f1e6",
+    ink: "#17160f",
+    inkSoft: "#6a6455",
+    line: "#cdc6b3",
+    olive: "#3d4737",
+    gold: "#b4864a",
   },
   fonts: {
-    display: '"Cormorant Garamond", "Times New Roman", serif',
-    ui: '"IBM Plex Sans", system-ui, Helvetica, Arial, sans-serif',
+    display: '"Instrument Serif", "Cormorant Garamond", serif',
+    ui: '"Archivo", system-ui, Helvetica, Arial, sans-serif',
+    meta: '"Space Mono", ui-monospace, monospace',
     script: '"Pinyon Script", "Snell Roundhand", cursive',
     arabic: '"Amiri", "Times New Roman", serif',
   },

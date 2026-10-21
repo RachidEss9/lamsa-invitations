@@ -3,19 +3,23 @@ import { cn } from "@/lib/utils";
 import { brand } from "@/lib/brand";
 
 /**
- * Typographic wordmark placeholder. LAMSA's official logo is still pending;
- * this intentionally does not imitate or invent one.
+ * The wordmark is set in type: LAMSA in the display serif, tracked wide,
+ * with a vermilion register mark. No invented logo.
  */
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "font-ui inline-block text-[0.82rem] font-medium uppercase leading-none tracking-[0.42em] text-foreground",
+        "font-display inline-flex items-baseline gap-[0.18em] text-[1.28rem] leading-none tracking-[0.16em] text-foreground",
         className,
       )}
       aria-label={brand.name}
     >
       {brand.name}
+      <span
+        aria-hidden
+        className="mb-[0.55em] size-[4px] shrink-0 bg-[var(--red)]"
+      />
     </span>
   );
 }
@@ -31,19 +35,25 @@ export function BrandLink({
     <Link
       to="/"
       className={cn(
-        "inline-flex items-baseline gap-2 transition-opacity hover:opacity-70",
-        tone === "paper" ? "text-[#f8f3e8]" : "text-foreground",
+        "group inline-flex flex-col justify-center transition-opacity hover:opacity-70",
+        tone === "paper" ? "text-[#f7f2e5]" : "text-foreground",
         className,
       )}
       aria-label="LAMSA home"
     >
-      <Wordmark className={tone === "paper" ? "text-[#f8f3e8]" : undefined} />
-      <span
+      <Wordmark
         className={cn(
-          "size-[3px] rounded-full",
-          tone === "paper" ? "bg-[#c6b692]" : "bg-[var(--gold)]",
+          tone === "paper" ? "text-[#f7f2e5]" : undefined,
         )}
       />
+      <span
+        className={cn(
+          "eyebrow mt-1 hidden text-[0.48rem] tracking-[0.28em] sm:block",
+          tone === "paper" ? "text-[#f7f2e5]/45" : "text-muted-foreground/80",
+        )}
+      >
+        Atelier
+      </span>
     </Link>
   );
 }

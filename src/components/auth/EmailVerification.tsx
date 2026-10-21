@@ -26,8 +26,8 @@ const COPY: Record<
 > = {
   first: {
     step: "First use · Email",
-    title: "Begin with",
-    accent: "your email.",
+    title: "Your studio",
+    accent: "starts here.",
     description:
       "We'll send a six-digit code once. After that, your own PIN opens the studio — no email needed every time.",
   },
@@ -47,8 +47,8 @@ const COPY: Record<
   },
   migrate: {
     step: "One small step · Email",
-    title: "Carry your",
-    accent: "studio with you.",
+    title: "Bring your",
+    accent: "studio along.",
     description:
       "Confirm your email to protect your work. Any invitations you've already started will move with you, untouched.",
   },
@@ -161,8 +161,8 @@ export function EmailVerification({
   return (
     <StudioShell
       step={step === "email" ? copy.step : "Enter your code"}
-      title={step === "email" ? copy.title : "Six quiet"}
-      accent={step === "email" ? copy.accent : "digits."}
+      title={step === "email" ? copy.title : "Enter the six"}
+      accent={step === "email" ? copy.accent : "digits we sent."}
       description={
         step === "email" ? (
           copy.description

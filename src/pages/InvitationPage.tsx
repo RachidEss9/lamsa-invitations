@@ -56,18 +56,21 @@ function PageShell({ children }: { children: React.ReactNode }) {
         aria-hidden
         className="paper-grain pointer-events-none fixed inset-0 opacity-[0.035]"
       />
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 h-[45vh] bg-gradient-to-b from-[#eae2d3]/45 to-transparent"
-      />
-      <header className="relative z-10">
-        <div className="mx-auto flex h-20 w-full max-w-[1200px] items-center justify-between px-5 sm:px-8">
+      <div className="relative z-10 border-b border-ink/15 bg-[var(--paper-deep)]/60">
+        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-5 py-2 font-meta text-[0.5rem] uppercase tracking-[0.14em] text-ink/60 sm:px-8">
+          <span>An invitation</span>
+          <span className="hidden sm:inline">Sent by hand</span>
+          <span>LAMSA</span>
+        </div>
+      </div>
+      <header className="relative z-10 border-b border-ink/15">
+        <div className="mx-auto flex h-[68px] w-full max-w-[1200px] items-center justify-between px-5 sm:px-8">
           <BrandLink />
           <Link
             to="/"
-            className="flex items-center gap-2 text-[0.58rem] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+            className="flex items-center gap-2 text-[0.6rem] uppercase tracking-[0.14em] text-ink/68 transition-colors hover:text-ink"
           >
-            <span className="hidden sm:inline">Create your own</span>
+            <span className="hidden sm:inline">Compose your own</span>
             <Share2 className="size-3.5" />
           </Link>
         </div>
@@ -75,9 +78,9 @@ function PageShell({ children }: { children: React.ReactNode }) {
       {children}
       <footer className="relative z-10 mt-auto border-t border-border/60">
         <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center justify-between gap-3 px-5 py-6 sm:flex-row sm:px-8">
-          <Wordmark className="text-[0.6rem] tracking-[0.34em] text-muted-foreground/60" />
-          <p className="text-[0.56rem] uppercase tracking-[0.18em] text-muted-foreground/60">
-            Invitations, considered · © 2026
+          <Wordmark className="text-[0.95rem] tracking-[0.2em] text-ink/62" />
+          <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-ink/56">
+            Composed once · Kept by you · © 2026
           </p>
         </div>
       </footer>
@@ -121,13 +124,13 @@ function Countdown({ target }: { target: Date }) {
         ];
 
   return (
-    <div className="mt-6 flex items-center justify-center gap-5">
+    <div className="mt-6 grid grid-cols-3 divide-x divide-ink/15 border-y border-ink/20">
       {cells.map((cell) => (
-        <div key={cell.label} className="text-center">
-          <p className="font-display text-3xl leading-none tracking-[-0.02em] sm:text-4xl">
+        <div key={cell.label} className="py-3 text-center">
+          <p className="font-display text-[2rem] leading-none tabular-nums tracking-[-0.01em]">
             {String(cell.value).padStart(2, "0")}
           </p>
-          <p className="eyebrow mt-1.5 text-[0.44rem] text-muted-foreground">
+          <p className="mt-1.5 font-meta text-[0.46rem] uppercase tracking-[0.14em] text-ink/56">
             {cell.label}
           </p>
         </div>
@@ -528,11 +531,16 @@ export default function InvitationPage() {
               initial={reducedMotion ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.25 }}
-              className="mt-8 w-full border border-border/70 bg-[#f8f3e9]/70 p-5 sm:p-7"
+              className="mt-8 w-full border border-ink/20 bg-[var(--paper-light)] p-5 sm:p-7"
             >
-              <p className="eyebrow text-[0.5rem] text-muted-foreground">
-                For the day
-              </p>
+              <div className="flex items-baseline justify-between border-b border-ink/15 pb-2">
+                <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-ink/60">
+                  For the day
+                </p>
+                <p className="font-meta text-[0.5rem] uppercase tracking-[0.12em] text-ink/48">
+                  Details
+                </p>
+              </div>
 
               {eventTarget && (
                 <p className="mt-3 font-display text-xl leading-snug">
@@ -643,15 +651,15 @@ export default function InvitationPage() {
               initial={reducedMotion ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.35 }}
-              className="mt-6 w-full border border-border/70 bg-[#f8f3e9]/70 p-5 sm:p-7"
+              className="mt-6 w-full border border-ink/20 bg-[var(--paper-light)] p-5 sm:p-7"
             >
               {guestToken && data.guestName ? (
                 <>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="eyebrow text-[0.5rem] text-muted-foreground">
+                  <div className="flex items-baseline justify-between gap-3 border-b border-ink/15 pb-2">
+                    <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-ink/60">
                       Your reply
                     </p>
-                    <Heart className="size-3.5 text-[var(--gold)]" />
+                    <Heart className="size-3.5 text-[var(--red)]" />
                   </div>
                   <p className="mt-2 font-display text-xl leading-snug">
                     {attending === true
@@ -805,7 +813,7 @@ export default function InvitationPage() {
           onClick={toggleMusic}
           aria-pressed={playing}
           aria-label={playing ? "Pause the invitation music" : "Play the invitation music"}
-          className="fixed bottom-5 right-5 z-40 flex size-11 items-center justify-center rounded-full border border-[#c6b692] bg-black/55 text-[#f6f0e4] shadow-lg backdrop-blur-sm transition-colors hover:bg-black/70"
+          className="fixed bottom-5 right-5 z-40 flex size-11 items-center justify-center border border-[#cdc6b3] bg-black/60 text-[#f2ecdd] transition-colors hover:border-[var(--red)] hover:bg-[var(--red)]"
         >
           {playing ? <Pause className="size-4" /> : <Music className="size-4" />}
         </button>

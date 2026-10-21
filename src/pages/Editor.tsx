@@ -96,12 +96,32 @@ import { toast } from "sonner";
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 type Tab = "words" | "details" | "design" | "media" | "guests";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "words", label: "Words" },
-  { id: "details", label: "Details" },
-  { id: "design", label: "Design" },
-  { id: "media", label: "Media" },
-  { id: "guests", label: "Guests" },
+const TABS: { id: Tab; label: string; note: string }[] = [
+  {
+    id: "words",
+    label: "Words",
+    note: "Names, occasion and the invitation's wording.",
+  },
+  {
+    id: "details",
+    label: "Details",
+    note: "Date, venue, schedule, dress code and map.",
+  },
+  {
+    id: "design",
+    label: "Design",
+    note: "Palette, typeface, motif and the opening gesture.",
+  },
+  {
+    id: "media",
+    label: "Media",
+    note: "Photographs and music for the public page.",
+  },
+  {
+    id: "guests",
+    label: "Guests",
+    note: "Names, emails, replies and personal links.",
+  },
 ];
 
 function messageOf(error: unknown): string {
@@ -137,11 +157,11 @@ function Field({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[0.6rem] uppercase tracking-[0.18em] text-foreground/60">
+        <span className="font-meta text-[0.52rem] uppercase tracking-[0.14em] text-ink/68">
           {label}
         </span>
         {hint && (
-          <span className="text-[0.6rem] text-muted-foreground/70">{hint}</span>
+          <span className="text-[0.66rem] leading-none text-ink/52">{hint}</span>
         )}
       </div>
       <div className="mt-2">{children}</div>
@@ -159,15 +179,18 @@ function Group({
   className?: string;
 }) {
   return (
-    <section className={cn("border-t border-border/70 pt-7", className)}>
-      <p className="eyebrow text-[0.52rem] text-muted-foreground">{label}</p>
+    <section className={cn("border-t border-ink/15 pt-7", className)}>
+      <p className="flex items-center gap-2 font-meta text-[0.52rem] uppercase tracking-[0.14em] text-ink/60">
+        <span className="size-1 bg-[var(--red)]" />
+        {label}
+      </p>
       <div className="mt-4">{children}</div>
     </section>
   );
 }
 
 const inputClass =
-  "h-11 rounded-none border-border bg-transparent text-[0.86rem] shadow-none focus-visible:ring-1 focus-visible:ring-foreground/30";
+  "h-11 rounded-none border-input bg-[var(--paper-light)]/40 text-[0.88rem] shadow-none focus-visible:border-ink focus-visible:ring-1 focus-visible:ring-ring/30";
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
@@ -707,19 +730,19 @@ export default function Editor() {
         className="paper-grain pointer-events-none fixed inset-0 opacity-[0.025]"
       />
 
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-3 px-4 sm:px-6 lg:px-10">
+      <header className="sticky top-0 z-40 border-b border-ink/15 bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex h-[68px] w-full max-w-[1560px] items-center gap-3 px-4 sm:px-6 lg:px-8">
           <button
             type="button"
             onClick={handleBack}
-            className="flex size-9 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+            className="flex size-8 shrink-0 items-center justify-center border border-ink/20 text-ink/68 transition-colors hover:border-ink hover:text-ink"
             aria-label="Back to your studio"
           >
-            <ArrowLeft className="size-4" />
+            <ArrowLeft className="size-3.5" />
           </button>
-          <div className="hidden h-4 w-px bg-border sm:block" />
+          <div className="hidden h-7 w-px bg-ink/15 sm:block" />
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-[1.05rem] leading-tight">
+            <p className="truncate font-display text-[1.22rem] leading-tight">
               {draft.title || "Untitled invitation"}
             </p>
             <button
@@ -746,11 +769,25 @@ export default function Editor() {
           </div>
 
           <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "mr-1 hidden items-center gap-1.5 font-meta text-[0.5rem] uppercase tracking-[0.12em] sm:flex",
+                published ? "text-[var(--olive)]" : "text-ink/56",
+              )}
+            >
+              <span
+                className={cn(
+                  "size-1.5",
+                  published ? "rounded-full bg-[var(--olive)]" : "bg-ink/25",
+                )}
+              />
+              {published ? "Published" : "Draft"}
+            </span>
             <Button
               type="button"
               variant="ghost"
               onClick={() => setPreviewOpen(true)}
-              className="h-9 rounded-none px-2.5 text-[0.6rem] uppercase tracking-[0.16em] lg:hidden"
+              className="h-9 px-2.5 xl:hidden"
             >
               <Eye className="size-3.5" />
               <span className="sr-only sm:not-sr-only">Preview</span>
@@ -784,48 +821,126 @@ export default function Editor() {
         </div>
       </header>
 
-      <main className="relative mx-auto w-full max-w-[1500px] px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-10">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,470px)_minmax(0,1fr)] lg:gap-14 xl:gap-20">
-          <div className="min-w-0">
-            {/* Mobile live preview */}
-            <div className="mb-7 flex items-center gap-4 border border-border/70 bg-[#f8f3e9]/70 p-4 lg:hidden">
+      <main className="relative mx-auto w-full max-w-[1560px] px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pt-7">
+        <div className="grid gap-8 lg:grid-cols-[168px_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[184px_minmax(0,1fr)_360px] xl:gap-12 2xl:grid-cols-[196px_minmax(0,1fr)_420px]">
+          {/* Section rail: numbered like the sections of a printed file. */}
+          <nav aria-label="Invitation sections" className="hidden lg:block">
+            <div className="sticky top-[92px]">
+              <p className="eyebrow text-ink/52">Sections</p>
+              <ol className="mt-3 border-t border-ink/15">
+                {TABS.map((item, index) => {
+                  const active = tab === item.id;
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => setTab(item.id)}
+                        aria-current={active ? "true" : undefined}
+                        className={cn(
+                          "flex w-full items-baseline gap-3 border-b border-ink/12 py-2.5 text-left transition-colors",
+                          active ? "text-ink" : "text-ink/60 hover:text-ink/80",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "font-meta text-[0.5rem] tabular-nums",
+                            active ? "text-[var(--red)]" : "text-ink/25",
+                          )}
+                        >
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <span className="font-display text-[1.2rem] leading-none">
+                          {item.label}
+                        </span>
+                        {item.id === "guests" && guestCount > 0 && (
+                          <span className="ml-auto font-meta text-[0.5rem] text-ink/52">
+                            {guestCount}
+                          </span>
+                        )}
+                        {active && (
+                          <span
+                            className={cn(
+                              "size-1.5 shrink-0 bg-[var(--red)]",
+                              item.id === "guests" && guestCount > 0
+                                ? "ml-1"
+                                : "ml-auto",
+                            )}
+                          />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+
+              <div className="mt-5 space-y-1.5 border-t border-ink/15 pt-4 font-meta text-[0.48rem] uppercase leading-relaxed tracking-[0.1em] text-ink/56">
+                <p className="text-ink/68">
+                  {published ? "Published" : "In progress"}
+                </p>
+                <p>
+                  {guestCount} {guestCount === 1 ? "guest" : "guests"} named
+                </p>
+                <p>{saveLabel}</p>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setPreviewOpen(true)}
-                className="w-[86px] shrink-0"
-                aria-label="Open full preview"
+                className="mt-4 flex items-center gap-1.5 border-b border-ink/25 pb-1 font-meta text-[0.5rem] uppercase tracking-[0.1em] text-ink/62 transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
+              >
+                <Eye className="size-3" />
+                Full proof
+              </button>
+            </div>
+          </nav>
+
+          <div className="min-w-0">
+            {/* Compact proof strip below xl */}
+            <div className="mb-6 flex items-stretch gap-3 border border-ink/20 bg-[var(--paper-light)] p-3 xl:hidden">
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
+                className="w-[58px] shrink-0"
+                aria-label="Open full proof"
               >
                 <InvitationCanvas content={draft} />
               </button>
-              <div className="min-w-0 flex-1">
-                <p className="eyebrow text-[0.5rem] text-muted-foreground">
-                  Live preview
-                </p>
-                <p className="mt-1 truncate font-display text-lg leading-tight">
-                  {draft.title || "Untitled invitation"}
-                </p>
-                <div className="mt-2 flex items-center gap-3">
-                  <span className="text-[0.58rem] uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+                <div className="min-w-0">
+                  <p className="font-meta text-[0.48rem] uppercase tracking-[0.12em] text-ink/56">
+                    Live proof
+                  </p>
+                  <p className="mt-1 truncate font-display text-[1.05rem] leading-tight">
+                    {draft.title || "Untitled invitation"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 font-meta text-[0.48rem] uppercase tracking-[0.1em]">
+                  <span
+                    className={
+                      published ? "text-[var(--olive)]" : "text-ink/56"
+                    }
+                  >
                     {published ? "Published" : "Draft"}
                   </span>
                   <button
                     type="button"
                     onClick={() => setPreviewOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-[0.58rem] uppercase tracking-[0.14em] text-foreground underline-offset-4 hover:underline"
+                    className="flex items-center gap-1.5 text-ink/72 transition-colors hover:text-[var(--red)]"
                   >
                     <Eye className="size-3" />
-                    Open
+                    Open proof
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* Section switcher for narrow screens */}
             <div
               role="tablist"
               aria-label="Invitation editor sections"
-              className="flex items-center gap-5 overflow-x-auto border-b border-border/70"
+              className="flex items-center gap-4 overflow-x-auto border-b border-ink/20 lg:hidden"
             >
-              {TABS.map((item) => (
+              {TABS.map((item, index) => (
                 <button
                   key={item.id}
                   role="tab"
@@ -833,23 +948,36 @@ export default function Editor() {
                   type="button"
                   onClick={() => setTab(item.id)}
                   className={cn(
-                    "relative shrink-0 pb-3 text-[0.62rem] uppercase tracking-[0.2em] transition-colors",
+                    "relative -mb-px flex shrink-0 items-baseline gap-1.5 pb-2.5 text-[0.72rem] transition-colors",
                     tab === item.id
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground/80",
+                      ? "text-ink"
+                      : "text-ink/56 hover:text-ink/70",
                   )}
                 >
+                  <span className="font-meta text-[0.46rem] text-ink/48">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
                   {item.label}
-                  {item.id === "guests" && guestCount > 0 && (
-                    <span className="ml-1.5 text-[0.55rem] text-muted-foreground">
-                      {guestCount}
-                    </span>
-                  )}
                   {tab === item.id && (
-                    <span className="absolute inset-x-0 -bottom-px h-px bg-foreground" />
+                    <span className="absolute inset-x-0 bottom-0 h-[2px] bg-[var(--red)]" />
                   )}
                 </button>
               ))}
+            </div>
+
+            {/* Section heading */}
+            <div className="mt-5 flex items-end justify-between gap-6 border-b border-ink/15 pb-3">
+              <div>
+                <p className="eyebrow text-ink/52">
+                  Section {String(TABS.findIndex((item) => item.id === tab) + 1).padStart(2, "0")} / 05
+                </p>
+                <h2 className="mt-1 font-display text-[1.85rem] leading-none">
+                  {TABS.find((item) => item.id === tab)?.label}
+                </h2>
+              </div>
+              <p className="hidden max-w-[17rem] text-right text-[0.72rem] leading-relaxed text-ink/60 sm:block">
+                {TABS.find((item) => item.id === tab)?.note}
+              </p>
             </div>
 
             <AnimatePresence mode="wait" initial={false}>
@@ -859,7 +987,7 @@ export default function Editor() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.18 }}
-                className="pt-8"
+                className="pt-7"
               >
                 {tab === "words" && (
                   <div className="space-y-7">
@@ -1953,81 +2081,127 @@ export default function Editor() {
             </AnimatePresence>
           </div>
 
-          {/* Desktop live preview */}
-          <aside className="hidden lg:block">
-            <div className="sticky top-24">
-              <div className="flex items-center justify-between">
-                <p className="eyebrow text-[0.52rem] text-muted-foreground">
-                  Live preview
-                </p>
-                <div className="flex items-center gap-1">
-                  <span className="mr-2 flex items-center gap-1.5 text-[0.54rem] uppercase tracking-[0.14em] text-muted-foreground">
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        published ? "bg-[var(--olive)]" : "bg-[var(--gold)]/60",
-                      )}
-                    />
-                    {published ? "Published" : "Draft"}
-                  </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={exporting}
-                        className="h-8 rounded-none px-2 text-[0.56rem] uppercase tracking-[0.14em]"
-                      >
-                        {exporting ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <Download className="size-3.5" />
-                        )}
-                        Export
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 rounded-none">
-                      <DropdownMenuItem
-                        onSelect={() => void handleExportPng()}
-                        className="rounded-none"
-                      >
-                        <Download className="size-3.5" />
-                        Download PNG
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={handlePrint}
-                        className="rounded-none"
-                      >
-                        <Printer className="size-3.5" />
-                        Print / save as PDF
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() => setPreviewOpen(true)}
-                        className="rounded-none"
-                      >
-                        <Eye className="size-3.5" />
-                        Full-screen preview
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+          {/* Proof column: the invitation as it will be opened. */}
+          <aside className="hidden xl:block">
+            <div className="sticky top-[92px]">
+              <div className="flex items-baseline justify-between border-b border-ink/20 pb-2 font-meta text-[0.5rem] uppercase tracking-[0.12em]">
+                <span className="text-ink/62">Proof · live</span>
+                <span
+                  className={
+                    published ? "text-[var(--olive)]" : "text-ink/52"
+                  }
+                >
+                  {published ? "Published" : "Draft"}
+                </span>
               </div>
 
-              <div className="mt-3 border border-border/70 bg-[#e9e1d1]/50 p-5 xl:p-7">
+              <div className="proof mt-3 p-4">
                 <button
                   type="button"
                   onClick={() => setPreviewOpen(true)}
-                  className="editorial-shadow mx-auto block w-full max-w-[410px] transition-transform duration-500 hover:-translate-y-0.5"
-                  aria-label="Open full-screen preview"
+                  className="editorial-shadow mx-auto block w-full max-w-[310px] transition-transform duration-500 hover:-translate-y-0.5"
+                  aria-label="Open full-screen proof"
                 >
                   <InvitationCanvas content={draft} />
                 </button>
               </div>
-              <div className="mt-3 flex items-center justify-between text-[0.56rem] uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="mt-2 flex items-baseline justify-between font-meta text-[0.48rem] uppercase tracking-[0.1em] text-ink/52">
                 <span>Updates as you type</span>
-                <span>Saves automatically</span>
+                <span>3 : 4</span>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between border-t border-ink/15 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen(true)}
+                  className="flex items-center gap-1.5 font-meta text-[0.5rem] uppercase tracking-[0.1em] text-ink/62 transition-colors hover:text-[var(--red)]"
+                >
+                  <Eye className="size-3" />
+                  Full screen
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={exporting}
+                      className="h-8 px-2"
+                    >
+                      {exporting ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Download className="size-3.5" />
+                      )}
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem onSelect={() => void handleExportPng()}>
+                      <Download className="size-3.5" />
+                      Download PNG
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={handlePrint}>
+                      <Printer className="size-3.5" />
+                      Print / save as PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => setPreviewOpen(true)}>
+                      <Eye className="size-3.5" />
+                      Full-screen proof
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <div className="mt-4 border border-ink/20 bg-[var(--paper-light)] p-4">
+                <div className="flex items-baseline justify-between">
+                  <p className="font-meta text-[0.48rem] uppercase tracking-[0.12em] text-ink/56">
+                    The link
+                  </p>
+                  <span
+                    className={
+                      published ? "text-[var(--olive)]" : "text-ink/48"
+                    }
+                  >
+                    {published ? "Live" : "Closed"}
+                  </span>
+                </div>
+                {published ? (
+                  <>
+                    <p className="mt-2 break-all font-meta text-[0.58rem] leading-relaxed text-ink/72">
+                      /i/{invitation.slug}
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => setShareOpen(true)}
+                      className="mt-3 h-9 w-full"
+                    >
+                      <Share2 className="size-3.5" />
+                      Share with guests
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-[0.76rem] leading-relaxed text-ink/68">
+                      Publish once to create the public link, then send every guest
+                      their own.
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={handlePublish}
+                      disabled={publishing}
+                      className="mt-3 h-9 w-full"
+                    >
+                      {publishing ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Send className="size-3.5" />
+                      )}
+                      Publish invitation
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </aside>

@@ -1,27 +1,37 @@
-import { BrandLink } from "@/components/brand/Wordmark";
+import { BrandLink, Wordmark } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
 import { Button } from "@/components/ui/button";
 import {
+  fontPairById,
   formatEventDateShort,
   occasionLabel,
   OCCASIONS,
   templateById,
-  type Occasion,
   type InvitationContent,
 } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, ArrowUpRight, Check, Menu, X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Menu, X } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
-const SHOWCASE_IDS = ["the-vow", "jubilee", "laurel", "nocturne"];
-const HERO_DATE_OFFSET = 128;
+const COLLECTION_IDS = [
+  "the-seal",
+  "the-arch",
+  "the-vow",
+  "adeline",
+  "jubilee",
+  "laurel",
+  "nocturne",
+  "the-ribbon",
+] as const;
 
-function sampleContent(templateId: string): InvitationContent {
+const STUDIO_HREF = "/dashboard";
+
+function sampleContent(templateId: string, offsetDays = 96): InvitationContent {
   const template = templateById(templateId);
   const date = new Date();
-  date.setDate(date.getDate() + HERO_DATE_OFFSET);
+  date.setDate(date.getDate() + offsetDays);
   return {
     title: `${template.name} invitation`,
     occasion: template.occasion,
@@ -44,7 +54,10 @@ function sampleContent(templateId: string): InvitationContent {
   };
 }
 
-function Reveal({
+const templateHref = (templateId: string) =>
+  `${STUDIO_HREF}?template=${templateId}`;
+
+function Rise({
   children,
   delay = 0,
   className,
@@ -58,80 +71,100 @@ function Reveal({
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 22 }}
+      initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-70px" }}
-      transition={{ duration: 0.75, delay, ease: [0.16, 1, 0.3, 1] }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
     </motion.div>
   );
 }
 
+function SectionLabel({
+  index,
+  children,
+  className,
+}: {
+  index: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-baseline gap-3", className)}>
+      <span className="folio text-[var(--red)]">{index}</span>
+      <span className="h-px w-6 bg-ink/30" />
+      <span className="eyebrow text-muted-foreground">{children}</span>
+    </div>
+  );
+}
+
 export default function Landing() {
   const reduce = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [occasion, setOccasion] = useState<Occasion>("wedding");
+  const [activeId, setActiveId] = useState<string>("the-seal");
 
-  const studioHref = "/dashboard";
-  const templateHref = (templateId: string) =>
-    `/dashboard?template=${templateId}`;
+  const activeTemplate = templateById(activeId);
+  const activeContent = useMemo(() => sampleContent(activeId), [activeId]);
+  const heroContent = useMemo(() => sampleContent("the-arch", 128), []);
+  const heroTemplate = templateById("the-arch");
 
-  const occasionTemplateIds: Record<Occasion, string> = {
-    wedding: "the-vow",
-    engagement: "amber-hands",
-    birthday: "jubilee",
-    graduation: "laurel",
-    eid: "crescent-night",
-    baby: "little-one",
-    other: "nocturne",
-  };
-  const occasionContent = sampleContent(occasionTemplateIds[occasion]);
+  const ticker = [
+    "One link per guest",
+    "RSVP replies in the studio",
+    "Print-ready proofs",
+    "Arabic & right-to-left",
+    "Eight designs, endlessly editable",
+    "No passwords — a six-digit PIN",
+  ];
 
   const nav = [
     { label: "Collection", href: "#collection" },
-    { label: "Occasions", href: "#occasions" },
-    { label: "The studio", href: "#studio" },
+    { label: "Method", href: "#method" },
+    { label: "Guests", href: "#guests" },
   ];
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background">
       <div
         aria-hidden
-        className="paper-grain pointer-events-none fixed inset-0 z-0 opacity-[0.035]"
+        className="paper-grain pointer-events-none fixed inset-0 z-0 opacity-[0.03]"
       />
 
-      <header className="relative z-40">
-        <div className="mx-auto flex h-20 w-full max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12">
+      {/* Top strip: a printed folio line, then the masthead. */}
+      <div className="relative z-40 border-b border-ink/15 bg-[var(--paper-deep)]/60">
+        <div className="mx-auto flex w-full max-w-[1480px] items-center justify-between gap-4 px-5 py-2 font-meta text-[0.54rem] uppercase tracking-[0.16em] text-ink/68 sm:px-8 lg:px-12">
+          <span>Atelier LAMSA</span>
+          <span className="hidden sm:inline">
+            Invitations, composed and addressed by hand
+          </span>
+          <span className="tabular-nums">Est. 2026 · Tangier</span>
+        </div>
+      </div>
+
+      <header className="relative z-40 border-b border-ink/15">
+        <div className="mx-auto flex h-20 w-full max-w-[1480px] items-center justify-between px-5 sm:px-8 lg:px-12">
           <BrandLink />
-          <nav className="hidden items-center gap-9 md:flex">
+          <nav className="hidden items-center gap-8 md:flex">
             {nav.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
-                className="eyebrow text-foreground/60 transition-colors hover:text-foreground"
+                className="text-[0.7rem] text-ink/65 transition-colors hover:text-ink"
               >
                 {item.label}
               </a>
             ))}
           </nav>
           <div className="flex items-center gap-3">
-            <Button
-              asChild
-              variant="ghost"
-              className="hidden rounded-none px-0 text-[0.7rem] uppercase tracking-[0.22em] hover:bg-transparent sm:inline-flex"
+            <Link
+              to={STUDIO_HREF}
+              className="hidden text-[0.66rem] uppercase tracking-[0.14em] text-ink/70 underline-offset-[6px] transition-colors hover:text-ink hover:underline sm:inline"
             >
-              <Link to={studioHref}>
-                Enter the studio
-                <ArrowUpRight className="size-3.5" />
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              className="rounded-none bg-primary px-5 text-[0.64rem] uppercase tracking-[0.22em]"
-            >
-              <Link to={templateHref("the-vow")}>Begin</Link>
+              Enter the studio
+            </Link>
+            <Button asChild size="sm" className="h-9 px-4">
+              <Link to={STUDIO_HREF}>Start an invitation</Link>
             </Button>
             <button
               type="button"
@@ -144,22 +177,22 @@ export default function Landing() {
           </div>
         </div>
         {menuOpen && (
-          <div className="border-t border-border/70 bg-background px-5 py-5 md:hidden">
-            <div className="flex flex-col gap-4">
+          <div className="border-t border-ink/15 bg-background px-5 py-5 md:hidden">
+            <div className="flex flex-col divide-y divide-ink/10">
               {nav.map((item) => (
                 <a
                   key={item.href}
                   href={item.href}
                   onClick={() => setMenuOpen(false)}
-                  className="eyebrow text-foreground/70"
+                  className="py-3 text-sm text-ink/75"
                 >
                   {item.label}
                 </a>
               ))}
               <Link
-                to={studioHref}
+                to={STUDIO_HREF}
                 onClick={() => setMenuOpen(false)}
-                className="eyebrow text-foreground"
+                className="py-3 text-sm text-ink"
               >
                 Enter the studio
               </Link>
@@ -169,500 +202,578 @@ export default function Landing() {
       </header>
 
       <main className="relative z-10">
-        {/* HERO */}
-        <section className="mx-auto grid w-full max-w-[1440px] items-center gap-16 px-5 pb-20 pt-10 sm:px-8 sm:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:gap-8 lg:px-12 lg:pb-28 lg:pt-20">
-          <div className="max-w-[620px]">
-            <motion.p
-              initial={reduce ? false : { opacity: 0, y: 10 }}
+        {/* ---------------------------------------------------------------- */}
+        {/* Hero: the argument on the left, the specimen board on the right.  */}
+        {/* ---------------------------------------------------------------- */}
+        <section className="mx-auto grid w-full max-w-[1480px] gap-14 px-5 pb-16 pt-12 sm:px-8 sm:pt-16 lg:grid-cols-[1.06fr_0.94fr] lg:gap-16 lg:px-12 lg:pb-24 lg:pt-20">
+          <div className="max-w-[640px]">
+            <motion.div
+              initial={reduce ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7 }}
-              className="eyebrow flex items-center gap-3 text-foreground/55"
+              transition={{ duration: 0.5 }}
+              className="flex items-center gap-3"
             >
-              <span className="h-px w-8 bg-[var(--gold)]" />
-              Digital invitations · Made one by one
-            </motion.p>
+              <span className="flex size-6 items-center justify-center bg-[var(--red)] font-meta text-[0.55rem] text-[#f7f2e5]">
+                01
+              </span>
+              <span className="eyebrow text-ink/68">
+                Invitations for the moments that get a date
+              </span>
+            </motion.div>
 
             <motion.h1
-              initial={reduce ? false : { opacity: 0, y: 24 }}
+              initial={reduce ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.9, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-7 font-display text-[clamp(3.3rem,10.5vw,7.6rem)] leading-[0.88] tracking-[-0.025em] text-foreground"
+              transition={{ duration: 0.8, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-8 font-display text-[clamp(3.6rem,9.6vw,7.4rem)] leading-[0.86] tracking-[-0.015em]"
             >
-              Invitations,
-              <span className="mt-1 block italic text-[var(--olive)]">
-                considered.
+              An invitation
+              <br />
+              is not a{" "}
+              <span className="relative inline-block">
+                <span className="relative z-10">notification.</span>
+                <span
+                  aria-hidden
+                  className="absolute inset-x-0 bottom-[0.1em] z-0 h-[0.09em] bg-[var(--red)]"
+                />
               </span>
             </motion.h1>
 
             <motion.p
-              initial={reduce ? false : { opacity: 0, y: 18 }}
+              initial={reduce ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.18 }}
-              className="mt-8 max-w-[29rem] text-[0.95rem] leading-[1.85] text-muted-foreground"
+              transition={{ duration: 0.7, delay: 0.16 }}
+              className="mt-8 max-w-[30rem] text-[0.98rem] leading-[1.75] text-ink/70"
             >
-              For weddings, engagements, birthdays, graduations, Eid
-              gatherings, and every occasion that deserves more than a group
-              chat. Compose it once, then send each guest their own quietly
-              personal moment.
+              LAMSA is an atelier for the invitations that deserve more than a
+              group chat. Compose it once — names, venue, words, type — then send
+              each guest their own quiet link. No app to install. No account for
+              them to make.
             </motion.p>
 
             <motion.div
-              initial={reduce ? false : { opacity: 0, y: 18 }}
+              initial={reduce ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.28 }}
-              className="mt-10 flex flex-col items-start gap-5 sm:flex-row sm:items-center"
+              transition={{ duration: 0.7, delay: 0.24 }}
+              className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center"
             >
-              <Button
-                asChild
-                size="lg"
-                className="h-12 w-full rounded-none bg-primary px-8 text-[0.68rem] uppercase tracking-[0.24em] sm:w-auto"
-              >
-                <Link to={studioHref}>
-                  Create an invitation
+              <Button asChild size="lg" className="h-12 px-7">
+                <Link to={STUDIO_HREF}>
+                  Compose an invitation
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
               <a
                 href="#collection"
-                className="group inline-flex items-center gap-3 text-[0.68rem] uppercase tracking-[0.24em] text-foreground/65 transition-colors hover:text-foreground"
+                className="group inline-flex h-12 items-center justify-center gap-2 border border-ink/25 px-6 text-[0.66rem] uppercase tracking-[0.14em] text-ink/80 transition-colors hover:border-ink hover:text-ink"
               >
                 See the collection
-                <span className="h-px w-9 bg-foreground/30 transition-all group-hover:w-12 group-hover:bg-foreground/60" />
+                <ArrowDownRight className="size-4 transition-transform group-hover:translate-y-0.5" />
               </a>
             </motion.div>
 
-            <motion.p
+            <motion.div
               initial={reduce ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 1, delay: 0.5 }}
-              className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.66rem] uppercase tracking-[0.16em] text-muted-foreground/75"
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-ink/15 pt-4 font-meta text-[0.56rem] uppercase tracking-[0.12em] text-ink/64"
             >
-              <span>Email verified once</span>
-              <span className="size-1 rounded-full bg-muted-foreground/40" />
-              <span>6-digit PIN unlock</span>
-              <span className="size-1 rounded-full bg-muted-foreground/40" />
-              <span>One link, every guest</span>
-            </motion.p>
+              <span>Verified email once</span>
+              <span className="size-[3px] bg-[var(--red)]" />
+              <span>Six-digit PIN after that</span>
+              <span className="size-[3px] bg-[var(--red)]" />
+              <span>Free to compose</span>
+            </motion.div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-[520px] lg:max-w-none">
-            <div
-              aria-hidden
-              className="absolute left-1/2 top-[6%] h-[88%] w-[80%] -translate-x-1/2 rounded-t-full border border-[var(--olive)]/20 bg-[var(--paper-deep)]/50"
-            />
-            <div className="relative mx-auto flex h-[430px] max-w-[430px] items-center justify-center sm:h-[540px] lg:h-[610px]">
-              <motion.div
-                aria-hidden
-                className="absolute left-0 top-[15%] w-[52%] max-w-[250px] rotate-[-9deg]"
-                animate={reduce ? undefined : { y: [0, -8, 0] }}
-                transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <div className="editorial-shadow">
-                  <InvitationCanvas content={sampleContent("amber-hands")} />
-                </div>
-              </motion.div>
+          {/* Specimen board */}
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+            className="relative mx-auto w-full max-w-[560px] lg:mx-0 lg:max-w-none"
+          >
+            <div className="flex items-baseline justify-between border-b border-ink/25 pb-2 font-meta text-[0.54rem] uppercase tracking-[0.12em] text-ink/68">
+              <span>Specimen no. 02</span>
+              <span className="hidden sm:inline">{heroTemplate.name}</span>
+              <span>3 : 4</span>
+            </div>
 
-              <motion.div
-                className="absolute right-0 top-[4%] w-[62%] max-w-[300px] rotate-[5deg]"
-                animate={reduce ? undefined : { y: [0, -13, 0] }}
-                transition={{
-                  duration: 9,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 0.6,
-                }}
-              >
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_132px]">
+              <div className="proof p-4 sm:p-5">
                 <div className="editorial-shadow">
-                  <InvitationCanvas content={sampleContent("the-vow")} />
+                  <InvitationCanvas content={heroContent} />
                 </div>
-              </motion.div>
+              </div>
 
-              <motion.div
-                className="absolute bottom-[1%] left-[6%] w-[48%] max-w-[224px] rotate-[-4deg]"
-                animate={reduce ? undefined : { y: [0, -6, 0] }}
-                transition={{
-                  duration: 13,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 1.2,
-                }}
-              >
-                <div className="editorial-shadow">
-                  <InvitationCanvas content={sampleContent("jubilee")} />
+              <div className="flex flex-col gap-3">
+                <div className="border border-ink/25 bg-[var(--paper-light)] p-3">
+                  <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-ink/60">
+                    Guest link
+                  </p>
+                  <p className="mt-2 font-display text-[1.15rem] leading-tight">
+                    For Amara &amp; Julian
+                  </p>
+                  <p className="mt-2 truncate font-meta text-[0.5rem] text-ink/60">
+                    lamsa.studio/i/arch/9f2c
+                  </p>
+                  <div className="mt-3 h-px w-full bg-ink/15" />
+                  <p className="mt-2 flex items-center gap-1.5 font-meta text-[0.5rem] uppercase tracking-[0.1em] text-[var(--olive)]">
+                    <span className="size-1.5 rounded-full bg-[var(--olive)]" />
+                    Opened once
+                  </p>
                 </div>
-              </motion.div>
 
-              <div className="absolute bottom-[5%] right-0 hidden max-w-[180px] border border-border/70 bg-card/90 px-4 py-3 backdrop-blur-sm sm:block">
-                <p className="eyebrow text-[0.52rem] text-muted-foreground">
-                  Personal guest link
-                </p>
-                <p className="mt-1.5 font-display text-lg italic leading-tight">
-                  For Amara & Julian
-                </p>
+                <div className="hidden flex-1 flex-col justify-between border border-ink/25 bg-[var(--red)] p-3 text-[#f7f2e5] sm:flex">
+                  <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-[#f7f2e5]/70">
+                    The reveal
+                  </p>
+                  <p className="mt-2 font-display text-[1.35rem] leading-[1.05]">
+                    A seal,
+                    <br />
+                    a touch,
+                    <br />
+                    then the card.
+                  </p>
+                  <p className="mt-3 font-meta text-[0.5rem] uppercase tracking-[0.1em] text-[#f7f2e5]/60">
+                    3s · one gesture
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
 
-        {/* MANIFESTO */}
-        <section id="studio" className="border-y border-border/70 bg-[#f8f3e9]/60">
-          <div className="mx-auto grid w-full max-w-[1440px] gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20 lg:px-12 lg:py-24">
-            <Reveal>
-              <p className="eyebrow text-foreground/50">A quieter way to invite</p>
-              <h2 className="mt-6 max-w-[24rem] font-display text-[clamp(2.3rem,4.5vw,3.6rem)] leading-[1.02] tracking-[-0.02em]">
-                Some moments ask for more than an{" "}
-                <span className="italic text-[var(--olive)]">email.</span>
-              </h2>
-            </Reveal>
-            <div className="grid gap-10 sm:grid-cols-3 lg:gap-8">
-              {[
-                {
-                  title: "Composed, not templated",
-                  copy: "Choose a design and make it entirely your own — type, colour, motif, and words.",
-                },
-                {
-                  title: "Every guest, named",
-                  copy: "Each invitation carries one guest's name and one private link they can keep.",
-                },
-                {
-                  title: "A moment, not a feed",
-                  copy: "A cinematic opening, elegant details, and nothing that looks like social media.",
-                },
-              ].map((item, index) => (
-                <Reveal key={item.title} delay={index * 0.08}>
-                  <p className="font-display text-2xl italic text-[var(--gold)]">
-                    0{index + 1}
-                  </p>
-                  <div className="mt-4 h-px w-full bg-border" />
-                  <h3 className="mt-5 font-display text-[1.35rem] leading-tight">
-                    {item.title}
-                  </h3>
-                  <p className="mt-3 text-[0.83rem] leading-[1.8] text-muted-foreground">
-                    {item.copy}
-                  </p>
-                </Reveal>
-              ))}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-meta text-[0.52rem] uppercase tracking-[0.12em] text-ink/64">
+              <span>Shown at 100%</span>
+              <span>{fontPairById(heroContent.fontPair).note}</span>
+              <span>{occasionLabel(heroContent.occasion)}</span>
+              <span className="text-[var(--red)]">Proof, not a mockup</span>
             </div>
-          </div>
+          </motion.div>
         </section>
 
-        {/* COLLECTION */}
+        {/* Ticker */}
+        <div className="overflow-hidden border-y border-ink/20 bg-[var(--ink)] py-3 text-[#f2ecdd]">
+          <div className="lamsa-ticker flex w-max items-center">
+            {[0, 1].map((copy) => (
+              <div
+                key={copy}
+                aria-hidden={copy === 1}
+                className="flex shrink-0 items-center"
+              >
+                {ticker.map((item) => (
+                  <span
+                    key={`${copy}-${item}`}
+                    className="flex items-center gap-6 whitespace-nowrap px-6 font-meta text-[0.6rem] uppercase tracking-[0.14em]"
+                  >
+                    {item}
+                    <span className="text-[var(--red)]">✳</span>
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Collection: a type-foundry index, not a card wall.                */}
+        {/* ---------------------------------------------------------------- */}
         <section
           id="collection"
-          className="mx-auto w-full max-w-[1440px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+          className="mx-auto w-full max-w-[1480px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
         >
-          <Reveal className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
-            <div>
-              <p className="eyebrow text-foreground/50">The collection</p>
-              <h2 className="mt-5 font-display text-[clamp(2.4rem,5vw,4.2rem)] leading-[0.98] tracking-[-0.02em]">
-                Designs with a point of view.
+          <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+            <Rise>
+              <SectionLabel index="02">The collection</SectionLabel>
+              <h2 className="mt-6 max-w-[26rem] font-display text-[clamp(2.6rem,5.4vw,4.4rem)] leading-[0.94] tracking-[-0.015em]">
+                Eight designs.
+                <br />
+                Every one editable
+                <br />
+                to the last comma.
               </h2>
-            </div>
-            <p className="max-w-[21rem] text-[0.84rem] leading-[1.8] text-muted-foreground">
-              Eight starting points, each one a complete composition. Every
-              detail remains yours to change.
-            </p>
-          </Reveal>
-
-          <div className="mt-12 grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:mt-16 lg:grid-cols-4">
-            {SHOWCASE_IDS.map((templateId, index) => {
-              const template = templateById(templateId);
-              const content = sampleContent(templateId);
-              return (
-                <Reveal key={templateId} delay={index * 0.06}>
-                  <Link
-                    to={templateHref(templateId)}
-                    className="group block focus-visible:outline-none"
-                  >
-                    <div className="relative overflow-hidden">
-                      <div className="transition-transform duration-700 ease-out group-hover:scale-[1.018]">
-                        <InvitationCanvas content={content} />
-                      </div>
-                      <span className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/35 to-transparent px-4 pb-3 pt-10 text-[0.6rem] uppercase tracking-[0.2em] text-white opacity-0 transition-opacity duration-500 group-hover:opacity-100">
-                        Make it yours
-                        <ArrowUpRight className="size-3.5" />
-                      </span>
-                    </div>
-                    <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border/70 pt-3">
-                      <span className="font-display text-xl">{template.name}</span>
-                      <span className="eyebrow text-[0.55rem] text-muted-foreground">
-                        {occasionLabel(template.occasion)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[0.72rem] text-muted-foreground/80">
-                      {formatEventDateShort(content.date)}
-                    </p>
-                  </Link>
-                </Reveal>
-              );
-            })}
+            </Rise>
+            <Rise delay={0.08} className="lg:pb-2">
+              <p className="max-w-[30rem] text-[0.92rem] leading-[1.8] text-ink/65 lg:ml-auto">
+                Each design is a complete composition — palette, typeface, motif,
+                and opening gesture. Change any of it. Nothing is locked, and
+                nothing looks like everyone else&rsquo;s.
+              </p>
+            </Rise>
           </div>
-        </section>
 
-        {/* OCCASIONS */}
-        <section
-          id="occasions"
-          className="border-y border-border/70 bg-[var(--paper-deep)]/60"
-        >
-          <div className="mx-auto grid w-full max-w-[1440px] gap-14 px-5 py-20 sm:px-8 lg:grid-cols-2 lg:gap-24 lg:px-12 lg:py-28">
+          <div className="mt-12 grid gap-10 border-t border-ink/20 pt-4 lg:mt-16 lg:grid-cols-[1.02fr_0.98fr] lg:gap-16">
+            {/* index */}
             <div>
-              <Reveal>
-                <p className="eyebrow text-foreground/50">For every occasion</p>
-                <h2 className="mt-5 max-w-[26rem] font-display text-[clamp(2.4rem,5vw,4rem)] leading-[1] tracking-[-0.02em]">
-                  One studio, every kind of celebration.
-                </h2>
-              </Reveal>
-              <div className="mt-10 border-t border-border/80">
-                {OCCASIONS.map((item, index) => {
-                  const active = occasion === item.id;
+              <div className="hidden grid-cols-[2.5rem_1fr_7rem_5rem] gap-3 pb-2 font-meta text-[0.5rem] uppercase tracking-[0.14em] text-ink/56 sm:grid">
+                <span>No.</span>
+                <span>Design</span>
+                <span>Occasion</span>
+                <span className="text-right">Type</span>
+              </div>
+              <ul className="border-t border-ink/12">
+                {COLLECTION_IDS.map((templateId, index) => {
+                  const template = templateById(templateId);
+                  const active = activeId === templateId;
                   return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setOccasion(item.id)}
-                      className={cn(
-                        "group flex w-full items-center justify-between border-b border-border/80 py-5 text-left transition-colors",
-                        active ? "text-foreground" : "text-foreground/55 hover:text-foreground",
-                      )}
-                    >
-                      <span className="flex items-baseline gap-4">
-                        <span className="font-display text-sm italic text-[var(--gold)]">
-                          0{index + 1}
-                        </span>
-                        <span className="font-display text-[clamp(1.5rem,2.6vw,2rem)] leading-none">
-                          {item.label}
-                        </span>
-                      </span>
-                      <ArrowRight
+                    <li key={templateId}>
+                      <button
+                        type="button"
+                        onMouseEnter={() => setActiveId(templateId)}
+                        onFocus={() => setActiveId(templateId)}
+                        onClick={() => setActiveId(templateId)}
+                        aria-pressed={active}
                         className={cn(
-                          "size-4 transition-all",
+                          "group grid w-full grid-cols-[2.5rem_1fr_auto] items-center gap-3 border-b border-ink/12 py-4 text-left transition-colors sm:grid-cols-[2.5rem_1fr_7rem_5rem]",
                           active
-                            ? "translate-x-0 opacity-100"
-                            : "-translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-60",
+                            ? "bg-[var(--paper-light)]"
+                            : "hover:bg-[var(--paper-light)]/60",
                         )}
-                      />
-                    </button>
+                      >
+                        <span
+                          className={cn(
+                            "font-meta text-[0.6rem] tabular-nums",
+                            active ? "text-[var(--red)]" : "text-ink/52",
+                          )}
+                        >
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <span className="flex min-w-0 items-baseline gap-2">
+                          <span className="truncate font-display text-[1.45rem] leading-tight">
+                            {template.name}
+                          </span>
+                          <span
+                            className={cn(
+                              "shrink-0 text-[0.6rem] text-[var(--red)] transition-opacity",
+                              active ? "opacity-100" : "opacity-0",
+                            )}
+                            aria-hidden
+                          >
+                            ✳
+                          </span>
+                        </span>
+                        <span className="hidden text-[0.68rem] text-ink/68 sm:block">
+                          {occasionLabel(template.occasion)}
+                        </span>
+                        <span className="hidden text-right font-meta text-[0.52rem] uppercase tracking-[0.1em] text-ink/56 sm:block">
+                          {fontPairById(template.fontPair).note.split(" ")[0]}
+                        </span>
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
-              <p className="mt-6 max-w-[24rem] text-[0.8rem] leading-[1.8] text-muted-foreground">
-                Wedding vows and first birthdays. Graduation mornings and
-                anniversary dinners. If it matters to you, it belongs here.
+              </ul>
+              <p className="mt-5 max-w-[26rem] text-[0.78rem] leading-relaxed text-ink/64">
+                Hover a design to see it on the board. Every design also exists in
+                Arabic, set right-to-left in Amiri.
               </p>
             </div>
 
-            <Reveal className="mx-auto w-full max-w-[400px] lg:max-w-[440px]">
-              <motion.div
-                key={occasion}
-                initial={reduce ? false : { opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease: "easeOut" }}
-                className="editorial-shadow"
-              >
-                <InvitationCanvas content={occasionContent} />
-              </motion.div>
-              <div className="mt-4 flex items-center justify-between">
-                <p className="eyebrow text-[0.55rem] text-muted-foreground">
-                  {templateById(occasionTemplateIds[occasion]).name}
-                </p>
-                <Link
-                  to={templateHref(occasionTemplateIds[occasion])}
-                  className="text-[0.62rem] uppercase tracking-[0.2em] text-foreground/70 underline-offset-4 hover:underline"
-                >
-                  Start with this design
-                </Link>
+            {/* board */}
+            <div className="order-first lg:order-none">
+              <div className="lg:sticky lg:top-8">
+                <div className="flex items-baseline justify-between border-b border-ink/25 pb-2 font-meta text-[0.52rem] uppercase tracking-[0.12em] text-ink/64">
+                  <span>On the board</span>
+                  <span>{activeTemplate.name}</span>
+                </div>
+                <div className="proof mt-4 p-5 sm:p-7">
+                  <motion.div
+                    key={activeId}
+                    initial={reduce ? false : { opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35 }}
+                    className="editorial-shadow mx-auto max-w-[400px]"
+                  >
+                    <InvitationCanvas content={activeContent} />
+                  </motion.div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="font-display text-2xl leading-none">
+                      {activeTemplate.name}
+                    </p>
+                    <p className="mt-2 max-w-[22rem] text-[0.8rem] leading-relaxed text-ink/68">
+                      {activeTemplate.description}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="text-right font-meta text-[0.52rem] uppercase leading-relaxed tracking-[0.1em] text-ink/60">
+                      <p>{occasionLabel(activeTemplate.occasion)}</p>
+                      <p>{formatEventDateShort(activeContent.date)}</p>
+                      <p>{fontPairById(activeTemplate.fontPair).note}</p>
+                    </div>
+                    <Link
+                      to={templateHref(activeId)}
+                      className="inline-flex items-center gap-2 border-b border-ink/40 pb-1 text-[0.64rem] uppercase tracking-[0.14em] text-ink transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
+                    >
+                      Compose with this design
+                      <ArrowUpRight className="size-3.5" />
+                    </Link>
+                  </div>
+                </div>
               </div>
-            </Reveal>
+            </div>
           </div>
         </section>
 
-        {/* PERSONAL */}
-        <section className="mx-auto w-full max-w-[1440px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
-          <div className="grid items-center gap-14 lg:grid-cols-[1fr_0.9fr] lg:gap-24">
-            <Reveal>
-              <p className="eyebrow text-foreground/50">Personally addressed</p>
-              <h2 className="mt-5 max-w-[30rem] font-display text-[clamp(2.5rem,5.2vw,4.4rem)] leading-[0.98] tracking-[-0.02em]">
-                Every guest should feel like the{" "}
-                <span className="italic text-[var(--olive)]">only guest.</span>
-              </h2>
-              <p className="mt-7 max-w-[27rem] text-[0.9rem] leading-[1.9] text-muted-foreground">
-                Add names to your guest list and LAMSA creates a unique link for
-                each one — a private door into the same beautiful invitation.
-                Their name appears as they open it.
-              </p>
-              <div className="mt-8 flex items-center gap-5">
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-11 rounded-none border-foreground/25 bg-transparent px-6 text-[0.64rem] uppercase tracking-[0.22em]"
-                >
-                  <Link to={studioHref}>
-                    Try a guest list
-                    <ArrowRight className="size-3.5" />
-                  </Link>
-                </Button>
-                <span className="text-[0.66rem] uppercase tracking-[0.16em] text-muted-foreground">
-                  Included, always
-                </span>
-              </div>
-            </Reveal>
+        {/* ---------------------------------------------------------------- */}
+        {/* Method: numbered ledger, no feature cards.                        */}
+        {/* ---------------------------------------------------------------- */}
+        <section
+          id="method"
+          className="border-y border-ink/20 bg-[var(--paper-deep)]/55"
+        >
+          <div className="mx-auto w-full max-w-[1480px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
+            <div className="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20">
+              <Rise>
+                <SectionLabel index="03">The method</SectionLabel>
+                <h2 className="mt-6 max-w-[22rem] font-display text-[clamp(2.5rem,4.8vw,3.9rem)] leading-[0.95] tracking-[-0.015em]">
+                  Three sittings,
+                  <br />
+                  then it&rsquo;s
+                  <br />
+                  sent.
+                </h2>
+                <p className="mt-6 max-w-[21rem] text-[0.88rem] leading-[1.8] text-ink/72">
+                  No dashboards to learn, no setup wizard. The studio is one page
+                  per invitation, and it saves as you write.
+                </p>
+              </Rise>
 
-            <Reveal delay={0.1} className="relative mx-auto w-full max-w-[420px]">
-              <div className="border border-border/80 bg-card/70 p-6 sm:p-8">
-                <div className="flex items-center justify-between">
-                  <p className="eyebrow text-[0.55rem] text-muted-foreground">
-                    Guest list
-                  </p>
-                  <p className="eyebrow text-[0.55rem] text-muted-foreground">
-                    Example · 14 named
-                  </p>
-                </div>
-                <div className="mt-5">
-                  {[
-                    "Amara & Julian",
-                    "The Bennett family",
-                    "Noor Haddad",
-                    "Sofia & Elias",
-                    "Ines Moreau",
-                  ].map((name, index) => (
-                    <div
-                      key={name}
-                      className="flex items-center justify-between border-b border-border/60 py-3.5 last:border-0"
-                    >
-                      <span className="font-display text-lg leading-none">{name}</span>
-                      <span className="flex items-center gap-2 text-[0.58rem] uppercase tracking-[0.16em] text-muted-foreground">
-                        {index < 2 ? (
-                          <>
-                            <Check className="size-3 text-[var(--olive)]" />
-                            Opened
-                          </>
-                        ) : (
-                          "Private link"
-                        )}
+              <div>
+                {[
+                  {
+                    title: "Choose a design",
+                    copy: "Start from the collection, or from your occasion. The palette, type, motif, and opening gesture are all changeable later.",
+                    meta: "≈ 1 minute",
+                  },
+                  {
+                    title: "Compose the details",
+                    copy: "Names, date, venue, schedule, dress code, photographs, a note to your guests. A live proof sits beside you the whole time.",
+                    meta: "≈ 15 minutes",
+                  },
+                  {
+                    title: "Address it, then publish",
+                    copy: "Paste your guest list and LAMSA writes a personal link for each name. Publish once; replies land back in the studio.",
+                    meta: "≈ 5 minutes",
+                  },
+                ].map((step, index) => (
+                  <Rise key={step.title} delay={index * 0.06}>
+                    <div className="grid grid-cols-[2.75rem_1fr] gap-4 border-t border-ink/20 py-7 first:border-t-0 first:pt-0 sm:grid-cols-[3.5rem_1fr_7rem] sm:gap-6">
+                      <span className="font-display text-[2rem] leading-none text-[var(--red)]">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <div>
+                        <h3 className="font-display text-[1.6rem] leading-tight">
+                          {step.title}
+                        </h3>
+                        <p className="mt-2 max-w-[30rem] text-[0.86rem] leading-[1.75] text-ink/72">
+                          {step.copy}
+                        </p>
+                      </div>
+                      <span className="col-start-2 font-meta text-[0.52rem] uppercase tracking-[0.12em] text-ink/56 sm:col-start-3 sm:text-right">
+                        {step.meta}
                       </span>
                     </div>
-                  ))}
-                </div>
+                  </Rise>
+                ))}
               </div>
-              <div className="absolute -bottom-5 -right-2 hidden border border-border/80 bg-background px-4 py-3 sm:block">
-                <p className="eyebrow text-[0.5rem] text-muted-foreground">
-                  Personal note
-                </p>
-                <p className="mt-1 font-display text-base italic">
-                  &ldquo;For Amara, with love.&rdquo;
-                </p>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-
-        {/* HOW IT WORKS */}
-        <section className="border-t border-border/70">
-          <div className="mx-auto w-full max-w-[1440px] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
-            <Reveal>
-              <p className="eyebrow text-foreground/50">The process</p>
-              <h2 className="mt-5 max-w-[32rem] font-display text-[clamp(2.2rem,4.4vw,3.5rem)] leading-[1.04] tracking-[-0.02em]">
-                From a name to an heirloom in three quiet steps.
-              </h2>
-            </Reveal>
-            <div className="mt-12 grid gap-10 md:grid-cols-3 lg:mt-16">
-              {[
-                {
-                  title: "Choose a design",
-                  copy: "Begin with a template for your occasion, or make one entirely your own.",
-                },
-                {
-                  title: "Compose the details",
-                  copy: "Names, date, venue, words, type, and colour — saved as you go, previewed live.",
-                },
-                {
-                  title: "Publish & share",
-                  copy: "Publish once, then share the main link or a personal link for every guest.",
-                },
-              ].map((step, index) => (
-                <Reveal key={step.title} delay={index * 0.08}>
-                  <div className="flex items-center gap-3">
-                    <span className="font-display text-4xl italic text-[var(--gold)]">
-                      0{index + 1}
-                    </span>
-                    <span className="h-px flex-1 bg-border" />
-                  </div>
-                  <h3 className="mt-6 font-display text-2xl">{step.title}</h3>
-                  <p className="mt-3 max-w-[19rem] text-[0.84rem] leading-[1.8] text-muted-foreground">
-                    {step.copy}
-                  </p>
-                </Reveal>
-              ))}
             </div>
           </div>
         </section>
 
-        {/* CLOSING */}
-        <section className="px-3 pb-3 sm:px-5 sm:pb-5">
-          <div className="relative overflow-hidden bg-[#26271f] text-[#f5efe2]">
-            <div
-              aria-hidden
-              className="paper-grain absolute inset-0 opacity-[0.08] mix-blend-screen"
-            />
-            <div
-              aria-hidden
-              className="absolute -right-24 -top-24 size-[420px] rounded-full border border-[#c6b692]/15"
-            />
-            <div
-              aria-hidden
-              className="absolute -right-10 -top-10 size-[240px] rounded-full border border-[#c6b692]/15"
-            />
-            <div className="relative mx-auto flex w-full max-w-[1440px] flex-col gap-12 px-6 py-20 sm:px-10 lg:flex-row lg:items-end lg:justify-between lg:px-16 lg:py-28">
-              <div>
-                <p className="eyebrow text-[#f5efe2]/45">Begin here</p>
-                <h2 className="mt-6 max-w-[38rem] font-display text-[clamp(3rem,7vw,5.6rem)] leading-[0.92] tracking-[-0.025em]">
-                  Invite them
-                  <span className="block italic text-[#c6b692]">beautifully.</span>
-                </h2>
-                <p className="mt-7 max-w-[26rem] text-[0.88rem] leading-[1.85] text-[#f5efe2]/60">
-                  One studio for the moments that matter. Create your first
-                  invitation in a few quiet minutes.
-                </p>
-              </div>
-              <div className="flex flex-col items-start gap-4">
-                <Button
-                  asChild
-                  size="lg"
-                  className="h-12 rounded-none bg-[#f5efe2] px-8 text-[0.66rem] uppercase tracking-[0.24em] text-[#26271f] hover:bg-white"
+        {/* ---------------------------------------------------------------- */}
+        {/* Guests: a real guest ledger, addressed by name.                   */}
+        {/* ---------------------------------------------------------------- */}
+        <section
+          id="guests"
+          className="mx-auto w-full max-w-[1480px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+        >
+          <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20">
+            <Rise>
+              <SectionLabel index="04">Addressed by name</SectionLabel>
+              <h2 className="mt-6 max-w-[34rem] font-display text-[clamp(2.6rem,5.2vw,4.3rem)] leading-[0.93] tracking-[-0.015em]">
+                One invitation.
+                <br />
+                <span className="text-[var(--red)]">Fourteen names</span> on the
+                envelope.
+              </h2>
+              <p className="mt-7 max-w-[29rem] text-[0.92rem] leading-[1.8] text-ink/65">
+                Add your guests once and every one of them receives a private door
+                into the same invitation. Their name is on it when it opens. You
+                can see who has looked, who has replied, and who needs a gentle
+                reminder — without a spreadsheet.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
+                <Link
+                  to={STUDIO_HREF}
+                  className="inline-flex items-center gap-2 border-b border-ink pb-1 text-[0.66rem] uppercase tracking-[0.14em] transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
                 >
-                  <Link to={studioHref}>
-                    Enter the studio
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-                <p className="text-[0.62rem] uppercase tracking-[0.18em] text-[#f5efe2]/35">
-                  Free to begin · Publish in minutes
-                </p>
+                  Open a guest list
+                  <ArrowRight className="size-3.5" />
+                </Link>
+                <span className="font-meta text-[0.54rem] uppercase tracking-[0.12em] text-ink/56">
+                  Included · no extra cost
+                </span>
+              </div>
+            </Rise>
+
+            <Rise delay={0.08}>
+              <div className="border border-ink/25 bg-[var(--paper-light)] p-5 press sm:p-7">
+                <div className="flex items-baseline justify-between border-b border-ink/20 pb-3">
+                  <p className="font-meta text-[0.54rem] uppercase tracking-[0.14em] text-ink/60">
+                    Guest ledger
+                  </p>
+                  <p className="font-meta text-[0.54rem] uppercase tracking-[0.14em] text-ink/60">
+                    A &amp; J · 09.05
+                  </p>
+                </div>
+                <ul className="divide-y divide-ink/10">
+                  {[
+                    ["Amara & Julian", "Replied · yes", "2"],
+                    ["The Bennett family", "Opened", "4"],
+                    ["Noor Haddad", "Replied · yes", "1"],
+                    ["Sofia & Elias", "Not yet opened", "2"],
+                    ["Ines Moreau", "Replied · yes", "2"],
+                    ["The Haddad cousins", "Not yet opened", "5"],
+                  ].map(([name, status, seats], index) => (
+                    <li
+                      key={name}
+                      className="grid grid-cols-[1.5rem_1fr_auto] items-center gap-3 py-3"
+                    >
+                      <span className="font-meta text-[0.55rem] text-ink/48">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-display text-[1.15rem] leading-tight">
+                          {name}
+                        </span>
+                        <span className="mt-0.5 block font-meta text-[0.48rem] uppercase tracking-[0.1em] text-ink/60">
+                          {status}
+                        </span>
+                      </span>
+                      <span className="font-meta text-[0.55rem] text-ink/64">
+                        {seats} <span className="text-ink/48">seats</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-4 flex items-center justify-between border-t border-ink/20 pt-3 font-meta text-[0.52rem] uppercase tracking-[0.12em]">
+                  <span className="text-ink/60">3 replies · 14 seats</span>
+                  <span className="text-[var(--olive)]">Live</span>
+                </div>
+              </div>
+            </Rise>
+          </div>
+        </section>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Occasions: a plain line of alternatives.                         */}
+        {/* ---------------------------------------------------------------- */}
+        <section className="border-t border-ink/20">
+          <div className="mx-auto flex w-full max-w-[1480px] flex-wrap items-center gap-x-6 gap-y-3 px-5 py-7 font-meta text-[0.56rem] uppercase tracking-[0.14em] text-ink/64 sm:px-8 lg:px-12">
+            <span className="text-ink/52">Built for</span>
+            {OCCASIONS.filter((item) => item.id !== "other").map((item) => (
+              <span key={item.id} className="flex items-center gap-6">
+                <Link
+                  to={STUDIO_HREF}
+                  className="transition-colors hover:text-[var(--red)]"
+                >
+                  {item.label}
+                </Link>
+                <span className="text-ink/20">·</span>
+              </span>
+            ))}
+            <Link
+              to={STUDIO_HREF}
+              className="text-[var(--red)] transition-opacity hover:opacity-70"
+            >
+              and everything else
+            </Link>
+          </div>
+        </section>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Closing                                                          */}
+        {/* ---------------------------------------------------------------- */}
+        <section className="relative overflow-hidden bg-[var(--ink)] text-[#f2ecdd]">
+          <div
+            aria-hidden
+            className="paper-grain absolute inset-0 opacity-[0.05] mix-blend-screen"
+          />
+          <div
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-px bg-[#f2ecdd]/15"
+          />
+          <div className="relative mx-auto grid w-full max-w-[1480px] gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end lg:px-12 lg:py-28">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="font-meta text-[0.58rem] text-[var(--red)]">
+                  05
+                </span>
+                <span className="h-px w-6 bg-[#f2ecdd]/30" />
+                <span className="eyebrow text-[#f2ecdd]/50">
+                  The first one is free
+                </span>
+              </div>
+              <h2 className="mt-7 max-w-[42rem] font-display text-[clamp(3rem,6.6vw,5.6rem)] leading-[0.88] tracking-[-0.02em]">
+                Send something
+                <br />
+                worth keeping.
+              </h2>
+              <p className="mt-7 max-w-[26rem] text-[0.9rem] leading-[1.8] text-[#f2ecdd]/60">
+                Compose it tonight. The proof is live, the PIN is yours, and the
+                link is ready when you are.
+              </p>
+            </div>
+            <div className="flex flex-col items-start gap-5 lg:items-end">
+              <Button
+                asChild
+                size="lg"
+                className="h-12 border-[#f2ecdd] bg-[#f2ecdd] px-7 text-[var(--ink)] hover:border-white hover:bg-white hover:text-[var(--ink)]"
+              >
+                <Link to={STUDIO_HREF}>
+                  Enter the studio
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <div className="flex flex-col gap-2 font-meta text-[0.54rem] uppercase leading-relaxed tracking-[0.12em] text-[#f2ecdd]/40 lg:text-right">
+                <span>Email verified once</span>
+                <span>No card to begin</span>
+                <span>Your work is private to your PIN</span>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="relative z-10 border-t border-border/70">
-        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-10 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-12">
-          <div className="flex flex-col gap-3">
-            <BrandLink />
-            <p className="text-[0.68rem] uppercase tracking-[0.16em] text-muted-foreground">
-              Made for the moments that matter.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-[0.64rem] uppercase tracking-[0.18em] text-muted-foreground">
-            <a href="#collection" className="hover:text-foreground">
-              Collection
-            </a>
-            <a href="#occasions" className="hover:text-foreground">
-              Occasions
-            </a>
-            <Link to={studioHref} className="hover:text-foreground">
-              Studio
-            </Link>
-            <span className="text-muted-foreground/50">© 2026 LAMSA</span>
+      <footer className="relative z-10 bg-[var(--ink)] text-[#f2ecdd]">
+        <div className="mx-auto w-full max-w-[1480px] border-t border-[#f2ecdd]/12 px-5 py-10 sm:px-8 lg:px-12">
+          <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
+            <div>
+              <Wordmark className="text-[1.35rem] text-[#f2ecdd]" />
+              <p className="mt-3 max-w-[18rem] text-[0.74rem] leading-relaxed text-[#f2ecdd]/45">
+                An invitation atelier. Composed in Tangier, opened wherever your
+                guests are.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-12 gap-y-3 text-[0.7rem] text-[#f2ecdd]/60 sm:grid-cols-3">
+              <a href="#collection" className="hover:text-[#f2ecdd]">
+                Collection
+              </a>
+              <a href="#method" className="hover:text-[#f2ecdd]">
+                Method
+              </a>
+              <a href="#guests" className="hover:text-[#f2ecdd]">
+                Guest list
+              </a>
+              <Link to={STUDIO_HREF} className="hover:text-[#f2ecdd]">
+                Studio
+              </Link>
+              <Link to={STUDIO_HREF} className="hover:text-[#f2ecdd]">
+                Start
+              </Link>
+              <span className="text-[#f2ecdd]/30">© 2026 LAMSA</span>
+            </div>
           </div>
         </div>
       </footer>
