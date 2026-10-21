@@ -66,7 +66,7 @@ export const ANIMATION_PRESETS: {
   { id: "none", label: "None", group: "Text", note: "Visible from the start" },
 ];
 
-export type AnimationTrigger = "load" | "scroll" | "tap";
+export type AnimationTrigger = "load" | "scroll";
 
 export interface ElementAnimation {
   enabled: boolean;
@@ -220,6 +220,27 @@ export interface OpeningSettings {
   coverStorageId?: string;
 }
 
+export type ClosingStyleId = "message" | "seal" | "curtain" | "fade";
+
+export const CLOSING_STYLES: {
+  id: ClosingStyleId;
+  label: string;
+  note: string;
+}[] = [
+  { id: "message", label: "Closing note", note: "A quiet note and the monogram" },
+  { id: "seal", label: "Wax seal", note: "A seal closes over the last page" },
+  { id: "curtain", label: "Curtain close", note: "Panels draw the invitation shut" },
+  { id: "fade", label: "Fade to ink", note: "The canvas settles into darkness" },
+];
+
+/** The optional ending shown once the last page has finished playing. */
+export interface ClosingSettings {
+  enabled: boolean;
+  style: ClosingStyleId;
+  message: string;
+  duration: number;
+}
+
 export type PageTransitionId = "none" | "fade" | "slide" | "curtain" | "flip";
 
 export const PAGE_TRANSITIONS: {
@@ -243,6 +264,7 @@ export interface DesignDocument {
   version: 1;
   pages: DesignPage[];
   opening: OpeningSettings;
+  closing: ClosingSettings;
   transition: PageTransition;
   startedAt?: number;
 }
@@ -769,6 +791,14 @@ export function createDefaultDesign(content: InvitationContent): DesignDocument 
       autoOpen: false,
       welcome: "For {{guest}}",
     },
+    closing: {
+      enabled: false,
+      style: "message",
+      message: paired
+        ? `${content.names.primary || "With love"}\n& ${content.names.secondary || ""}`.trim()
+        : content.names.primary || "With love",
+      duration: 1800,
+    },
     transition: { preset: "fade", duration: 700 },
     startedAt: Date.now(),
   };
@@ -804,6 +834,10 @@ export function normalizeDesign(
         animation: {
           ...defaultAnimation(),
           ...(element.animation ?? {}),
+          trigger:
+            element.animation?.trigger === "scroll"
+              ? ("scroll" as const)
+              : ("load" as const),
         },
         reveal: element.reveal
           ? {
@@ -844,6 +878,10 @@ export function normalizeDesign(
       ...fallback.opening,
       ...(value.opening ?? {}),
       experience: value.opening?.experience ?? "none",
+    },
+    closing: {
+      ...fallback.closing,
+      ...(value.closing ?? {}),
     },
     transition: {
       ...fallback.transition,

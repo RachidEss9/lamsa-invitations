@@ -1,3 +1,4 @@
+import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import {
@@ -26,6 +27,7 @@ interface GuestExperienceProps {
   rtl?: boolean;
   reducedMotion: boolean;
   palette: { background: string; ink: string; accent: string };
+  names?: string;
   onClose: () => void;
   mode?: "guest" | "timeline";
   startPage?: number;
@@ -47,6 +49,7 @@ export function GuestExperience({
   rtl,
   reducedMotion,
   palette,
+  names,
   onClose,
   mode = "guest",
   startPage = 0,
@@ -76,8 +79,26 @@ export function GuestExperience({
   const [playing, setPlaying] = useState(true);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [transition, setTransition] = useState(1);
+  const [reducedClosingReady, setReducedClosingReady] = useState(false);
   const page = pages[Math.min(pageIndex, pages.length - 1)];
   const duration = timelineDuration(page);
+
+  useEffect(() => {
+    if (!reducedMotion || phase !== "invitation") return;
+    const reset = requestAnimationFrame(() => setReducedClosingReady(false));
+    const timer = window.setTimeout(() => setReducedClosingReady(true), 2200);
+    return () => {
+      cancelAnimationFrame(reset);
+      window.clearTimeout(timer);
+    };
+  }, [pageIndex, phase, reducedMotion]);
+
+  const showClosing =
+    mode === "guest" &&
+    design.closing.enabled &&
+    pageIndex === pages.length - 1 &&
+    phase === "invitation" &&
+    (reducedMotion ? reducedClosingReady : !playing && time >= duration - 5);
   const frameRef = useRef(0);
   const timeRef = useRef(0);
 
@@ -224,6 +245,19 @@ export function GuestExperience({
                 />
               </div>
             </div>
+
+            {showClosing && (
+              <ClosingStage
+                closing={design.closing}
+                accent={palette.accent}
+                background={page.background}
+                ink={palette.ink}
+                guestName={guestName}
+                names={names}
+                reducedMotion={reducedMotion}
+                onReplay={restart}
+              />
+            )}
 
             {phase === "opening" && (
               <OpeningStage

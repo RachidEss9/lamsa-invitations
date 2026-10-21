@@ -389,6 +389,11 @@ export interface DesignPageViewProps {
   revealPreview?: Set<string>;
   /** Studio design view: show exits as still present. */
   ignoreExit?: boolean;
+  /**
+   * Time at which the card entered the viewport, in page milliseconds. Scroll
+   * triggered elements wait for this moment (null) and then animate locally.
+   */
+  scrollActivationTime?: number | null;
   className?: string;
   style?: CSSProperties;
 }
@@ -407,6 +412,7 @@ export function DesignPageView({
   revealed,
   revealPreview,
   ignoreExit,
+  scrollActivationTime = 0,
   className,
   style,
 }: DesignPageViewProps) {
@@ -452,7 +458,16 @@ export function DesignPageView({
         );
         if (isCovered && !isRevealed && !editor) return null;
 
-        const animated = elementStyleAt(element, time, { ignoreExit });
+        // Scroll-triggered layers wait for the card to enter the viewport and
+        // then run their own deferred clock, so they never fire unseen.
+        const scrollTriggered = element.animation.trigger === "scroll";
+        const elementTime = scrollTriggered
+          ? scrollActivationTime == null
+            ? 0
+            : element.animation.delay +
+              Math.max(0, time - scrollActivationTime)
+          : time;
+        const animated = elementStyleAt(element, elementTime, { ignoreExit });
         const selected = selectedIds?.includes(element.id);
         const dimmed = isCovered && !isRevealed && editor;
 

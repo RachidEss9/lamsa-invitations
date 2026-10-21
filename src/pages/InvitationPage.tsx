@@ -477,9 +477,12 @@ export default function InvitationPage() {
               design={designDoc}
               imageUrls={designImageUrls}
               guestName={data.guestName}
+              names={displayTitle(content)}
               rtl={Boolean(data.rtl)}
               reducedMotion={reducedMotion}
               active={opened || !designHasOpening || reducedMotion}
+              accent={data.palette.accent}
+              ink={data.palette.ink}
             />
           ) : (
             <div className="editorial-shadow">

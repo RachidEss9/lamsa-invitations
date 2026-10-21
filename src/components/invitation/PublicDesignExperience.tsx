@@ -1,3 +1,4 @@
+import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, useStageScale } from "@/components/invitation/DesignPageView";
 import {
   DESIGN_HEIGHT,
@@ -15,9 +16,12 @@ interface PublicDesignExperienceProps {
   design: DesignDocument;
   imageUrls: Record<string, string>;
   guestName?: string | null;
+  names?: string;
   rtl?: boolean;
   reducedMotion: boolean;
   active: boolean;
+  accent?: string;
+  ink?: string;
   className?: string;
 }
 
@@ -29,9 +33,12 @@ export function PublicDesignExperience({
   design,
   imageUrls,
   guestName,
+  names,
   rtl,
   reducedMotion,
   active,
+  accent = "#710014",
+  ink = "#161616",
   className,
 }: PublicDesignExperienceProps) {
   const pages = useMemo(() => visiblePages(design), [design]);
@@ -40,11 +47,33 @@ export function PublicDesignExperience({
   const [playing, setPlaying] = useState(true);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [transition, setTransition] = useState(1);
+  const [scrollActivationTime, setScrollActivationTime] = useState<number | null>(
+    null,
+  );
+  const [reducedClosingReady, setReducedClosingReady] = useState(false);
   const timeRef = useRef(0);
   const { ref, scale } = useStageScale();
 
   const page = pages[Math.min(pageIndex, pages.length - 1)];
   const duration = timelineDuration(page);
+  const lastPage = pageIndex === pages.length - 1;
+
+  // Reduced-motion playback is static, so give the last page a short readable
+  // beat before the optional closing instead of hiding it immediately.
+  useEffect(() => {
+    if (!active || !reducedMotion) return;
+    const reset = requestAnimationFrame(() => setReducedClosingReady(false));
+    const timer = window.setTimeout(() => setReducedClosingReady(true), 2200);
+    return () => {
+      cancelAnimationFrame(reset);
+      window.clearTimeout(timer);
+    };
+  }, [active, pageIndex, reducedMotion]);
+
+  const finished = reducedMotion
+    ? reducedClosingReady
+    : !playing && time >= duration - 5;
+  const showClosing = design.closing.enabled && lastPage && finished;
 
   useEffect(() => {
     if (!active || reducedMotion) return;
@@ -58,8 +87,44 @@ export function PublicDesignExperience({
     return () => cancelAnimationFrame(frame);
   }, [active, reducedMotion]);
 
+  // Scroll-triggered layers wait until the card itself is in view. The
+  // observer is re-created per page so a page change re-arms the gate even
+  // while the card remains on screen.
+  useEffect(() => {
+    if (!active) return;
+    if (reducedMotion) {
+      const frame = requestAnimationFrame(() => setScrollActivationTime(0));
+      return () => cancelAnimationFrame(frame);
+    }
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      const frame = requestAnimationFrame(() =>
+        setScrollActivationTime(timeRef.current),
+      );
+      return () => cancelAnimationFrame(frame);
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setScrollActivationTime((previous) => previous ?? timeRef.current);
+        }
+      },
+      { threshold: 0.15 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [active, pageIndex, reducedMotion, ref]);
+
+  const hasScrollLayers = page.elements.some(
+    (element) => element.animation.enabled && element.animation.trigger === "scroll",
+  );
+
   useEffect(() => {
     if (!active || !playing || reducedMotion) return;
+    // Let the page clock wait for the card to be seen before it starts, so
+    // scroll-triggered layers are never skipped and the closing never arrives
+    // before the invitation has actually played.
+    if (hasScrollLayers && scrollActivationTime == null) return;
     let frame = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -78,7 +143,7 @@ export function PublicDesignExperience({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [active, duration, playing, reducedMotion]);
+  }, [active, duration, hasScrollLayers, playing, reducedMotion, scrollActivationTime]);
 
   useEffect(() => {
     if (transition >= 1) return;
@@ -104,6 +169,7 @@ export function PublicDesignExperience({
     timeRef.current = 0;
     setTime(0);
     setPlaying(true);
+    setScrollActivationTime(0);
     setRevealed(new Set());
   };
 
@@ -113,6 +179,8 @@ export function PublicDesignExperience({
     setPageIndex(bounded);
     setTime(0);
     timeRef.current = 0;
+    // The card is already on screen when a guest changes page.
+    setScrollActivationTime(0);
     setTransition(0);
     setPlaying(true);
   };
@@ -147,6 +215,7 @@ export function PublicDesignExperience({
               interactive
               reducedMotion={reducedMotion}
               revealed={revealed}
+              scrollActivationTime={reducedMotion ? 0 : scrollActivationTime}
               onReveal={(targetId, interactionId) =>
                 setRevealed((previous) => {
                   void targetId;
@@ -157,7 +226,28 @@ export function PublicDesignExperience({
           </div>
         </div>
 
-        {pages.length > 1 && (
+        {showClosing && (
+          <ClosingStage
+            closing={design.closing}
+            accent={accent}
+            background={page.background}
+            ink={ink}
+            guestName={guestName}
+            names={names}
+            reducedMotion={reducedMotion}
+            onReplay={() => {
+              setPageIndex(0);
+              timeRef.current = 0;
+              setTime(0);
+              setScrollActivationTime(0);
+              setRevealed(new Set());
+              setTransition(1);
+              setPlaying(true);
+            }}
+          />
+        )}
+
+        {pages.length > 1 && !showClosing && (
           <div className="absolute inset-x-0 bottom-0 z-40 flex items-center justify-between gap-2 bg-gradient-to-t from-black/35 to-transparent px-3 pb-2.5 pt-8">
             <button
               type="button"

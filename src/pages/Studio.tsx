@@ -1,6 +1,7 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import { GuestExperience } from "@/components/studio/GuestExperience";
@@ -26,7 +27,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
+  CLOSING_STYLES,
   OPENING_EXPERIENCES,
   PAGE_TRANSITIONS,
   PAGE_TRANSITIONS as TRANSITIONS,
@@ -38,6 +41,7 @@ import {
   makeId,
   normalizeDesign,
   timelineDuration,
+  type ClosingSettings,
   type DesignDocument,
   type DesignElement,
   type DesignPage,
@@ -238,6 +242,8 @@ export default function Studio() {
   const [publishing, setPublishing] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(0);
   const [showOpeningPreview, setShowOpeningPreview] = useState(false);
+  const [showClosingPreview, setShowClosingPreview] = useState(false);
+  const [closingPreviewKey, setClosingPreviewKey] = useState(0);
   const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
@@ -887,6 +893,10 @@ export default function Studio() {
     apply((current) => ({ ...current, opening }));
   };
 
+  const applyClosing = (closing: ClosingSettings) => {
+    apply((current) => ({ ...current, closing }));
+  };
+
   const applyAnimation = (animation: ElementAnimation) => {
     if (selectedIds.length === 0) return;
     setPageElements((elements) =>
@@ -1182,6 +1192,10 @@ export default function Studio() {
     );
   }
 
+  const namesLabel = content.names.secondary
+    ? `${content.names.primary} & ${content.names.secondary}`
+    : content.names.primary;
+
   const saveLabel =
     saveState === "saving"
       ? "Saving"
@@ -1216,6 +1230,24 @@ export default function Studio() {
           >
             Replay
           </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const closingPreview = (
+    <Dialog open={showClosingPreview} onOpenChange={setShowClosingPreview}>
+      <DialogContent className="max-w-[440px] overflow-hidden p-0">
+        <div className="relative aspect-[3/4] w-full">
+          <ClosingStage
+            key={closingPreviewKey}
+            closing={design.closing}
+            accent={content.palette.accent}
+            background={page.background}
+            ink={content.palette.ink}
+            guestName="Amelia"
+            names={namesLabel}
+          />
         </div>
       </DialogContent>
     </Dialog>
@@ -1459,6 +1491,87 @@ export default function Studio() {
               Envelope, arch, curtain, doors, layered paper, cinematic fade, and a
               personalised welcome. The opening never replays on page navigation.
             </p>
+
+            <div className="mt-2 border-t border-ink/12 pt-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
+                    Closing
+                  </p>
+                  <p className="mt-0.5 text-[9px] leading-relaxed text-ink/35">
+                    Shown once after the last page finishes.
+                  </p>
+                </div>
+                <Switch
+                  checked={design.closing.enabled}
+                  onCheckedChange={(enabled) =>
+                    applyClosing({ ...design.closing, enabled })
+                  }
+                  className="scale-90"
+                />
+              </div>
+              <div className="mt-2 space-y-2">
+                <Select
+                  value={design.closing.style}
+                  onValueChange={(style) =>
+                    applyClosing({
+                      ...design.closing,
+                      style: style as ClosingSettings["style"],
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CLOSING_STYLES.map((style) => (
+                      <SelectItem key={style.id} value={style.id}>
+                        {style.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Textarea
+                  value={design.closing.message}
+                  onChange={(event) =>
+                    applyClosing({ ...design.closing, message: event.target.value })
+                  }
+                  rows={2}
+                  placeholder="With love"
+                  className="rounded-none text-[11px] leading-relaxed"
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-ink/50">Length</span>
+                  <Input
+                    type="number"
+                    min={500}
+                    step={100}
+                    value={design.closing.duration}
+                    onChange={(event) =>
+                      applyClosing({
+                        ...design.closing,
+                        duration: Number(event.target.value) || 500,
+                      })
+                    }
+                    className="h-8 w-24 rounded-none text-[11px]"
+                  />
+                  <span className="text-[9px] text-ink/35">ms</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="ml-auto h-8 rounded-none text-[10px]"
+                    onClick={() => {
+                      setClosingPreviewKey((key) => key + 1);
+                      setShowClosingPreview(true);
+                    }}
+                  >
+                    <Play className="size-3.5" /> Preview
+                  </Button>
+                </div>
+                <p className="text-[9px] leading-relaxed text-ink/35">
+                  Use {"{{names}}"} and {"{{guest}}"} in the note. The closing is
+                  separate from page transitions and never interrupts navigation.
+                </p>
+              </div>
+            </div>
           </div>
         </>
       );
@@ -1987,6 +2100,7 @@ export default function Studio() {
           design={design}
           imageUrls={imageUrls}
           guestName={null}
+          names={namesLabel}
           rtl={Boolean(content.rtl)}
           reducedMotion={reducedMotion}
           palette={content.palette}
@@ -1999,6 +2113,7 @@ export default function Studio() {
           design={design}
           imageUrls={imageUrls}
           guestName={null}
+          names={namesLabel}
           rtl={Boolean(content.rtl)}
           reducedMotion={reducedMotion}
           palette={content.palette}
@@ -2009,6 +2124,7 @@ export default function Studio() {
       )}
 
       {openingStagePreview}
+      {closingPreview}
 
       <Dialog open={Boolean(pendingTemplate)} onOpenChange={(open) => !open && setPendingTemplate(null)}>
         <DialogContent className="max-w-[440px]">

@@ -549,9 +549,24 @@ export function Inspector({
               </SelectContent>
             </Select>
           </Row>
+          <Row label="Play when">
+            <Select
+              value={animation.trigger}
+              onValueChange={(trigger) =>
+                patchAnimation({ trigger: trigger as ElementAnimation["trigger"] })
+              }
+            >
+              <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="load">The page opens</SelectItem>
+                <SelectItem value="scroll">Scrolled into view</SelectItem>
+              </SelectContent>
+            </Select>
+          </Row>
           <p className="text-[9px] leading-relaxed text-ink/40">
-            Entry animations run when this page opens. Retime them on the timeline
-            for guest-paced reveals, or add an interactive cover for a tap reveal.
+            Entry animations run when this page opens, or wait until the card is
+            scrolled into view. Retime them on the timeline, or add an interactive
+            cover for a tap reveal.
           </p>
           <div className="grid grid-cols-2 gap-2">
             <Row label="Delay ms"><NumberField value={animation.delay} onChange={(delay) => patchAnimation({ delay })} min={0} step={50} /></Row>
