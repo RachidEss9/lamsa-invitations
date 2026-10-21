@@ -166,7 +166,7 @@ export default function Dashboard() {
       const id = await createInvitation(draft);
       toast.success("New file opened in the studio.");
       closeCreate();
-      navigate(`/invitations/${id}`);
+      navigate(`/studio/${id}`);
     } catch (error) {
       toast.error(errorMessage(error));
     } finally {
@@ -322,7 +322,7 @@ export default function Dashboard() {
             <div className="mt-3 grid items-center gap-5 border border-ink/25 bg-[var(--paper-light)] p-4 press sm:grid-cols-[96px_minmax(0,1fr)_auto] sm:p-5">
               <button
                 type="button"
-                onClick={() => navigate(`/invitations/${current._id}`)}
+                onClick={() => navigate(`/studio/${current._id}`)}
                 className="hidden w-[96px] shrink-0 sm:block"
                 aria-label={`Open ${titleOf(current)}`}
               >
@@ -366,11 +366,11 @@ export default function Dashboard() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate(`/invitations/${current._id}`)}
+                  onClick={() => navigate(`/studio/${current._id}`)}
                   className="h-9"
                 >
                   <FilePenLine className="size-3.5" />
-                  Continue
+                  Continue in canvas
                 </Button>
                 {current.status === "published" ? (
                   <Button
@@ -509,7 +509,7 @@ export default function Dashboard() {
 
                     <button
                       type="button"
-                      onClick={() => navigate(`/invitations/${invitation._id}`)}
+                      onClick={() => navigate(`/studio/${invitation._id}`)}
                       className="w-[54px] shrink-0 text-left transition-transform duration-300 group-hover:-translate-y-0.5 sm:w-[64px]"
                       aria-label={`Open ${title}`}
                     >
@@ -523,7 +523,7 @@ export default function Dashboard() {
                     <div className="min-w-0">
                       <button
                         type="button"
-                        onClick={() => navigate(`/invitations/${invitation._id}`)}
+                        onClick={() => navigate(`/studio/${invitation._id}`)}
                         className="block max-w-full truncate text-left font-display text-[1.35rem] leading-tight transition-colors group-hover:text-[var(--red)] sm:text-[1.5rem]"
                       >
                         {title}
@@ -598,11 +598,19 @@ export default function Dashboard() {
                         <DropdownMenuContent align="end" className="w-52">
                           <DropdownMenuItem
                             onSelect={() =>
+                              navigate(`/studio/${invitation._id}`)
+                            }
+                          >
+                            <FilePenLine className="size-3.5" />
+                            Open canvas studio
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() =>
                               navigate(`/invitations/${invitation._id}`)
                             }
                           >
                             <FilePenLine className="size-3.5" />
-                            Open in studio
+                            Details, guests & media
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => {

@@ -1,6 +1,8 @@
 import { api } from "@/convex/_generated/api";
 import { BrandLink, Wordmark } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
+import { OpeningStage } from "@/components/invitation/OpeningStage";
+import { PublicDesignExperience } from "@/components/invitation/PublicDesignExperience";
 import { RevealOpening } from "@/components/invitation/RevealOpening";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +28,10 @@ import {
   type InvitationContent,
   type Occasion,
 } from "@/lib/invitation";
+import {
+  normalizeDesign,
+  type OpeningExperienceId,
+} from "@/lib/design";
 import { useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
@@ -176,7 +182,13 @@ export default function InvitationPage() {
     });
   }, [data, guestToken, recordView]);
 
-  const coverVisible = Boolean(data?.animations) && !reducedMotion && !opened;
+  const savedDesign = data?.design ?? null;
+  const savedOpening = (savedDesign as { opening?: { experience?: OpeningExperienceId } } | null)
+    ?.opening?.experience;
+  const designHasOpening = Boolean(savedOpening && savedOpening !== "none");
+  const coverVisible = savedDesign
+    ? designHasOpening && !reducedMotion && !opened
+    : Boolean(data?.animations) && !reducedMotion && !opened;
 
   useEffect(() => {
     if (!coverVisible) return;
@@ -191,6 +203,7 @@ export default function InvitationPage() {
   // animation before the invitation fades in beneath it.
   const reveal =
     data &&
+    !savedDesign &&
     !reducedMotion &&
     Boolean(data.animations) &&
     isRevealLayout(data.layout)
@@ -359,8 +372,11 @@ export default function InvitationPage() {
     data.rtl && !arabicPair
       ? '"Amiri", "Times New Roman", serif'
       : fontPairById(data.fontPair).family;
-  const paired = isPairedOccasion(data.occasion as Occasion);  
-  
+  const paired = isPairedOccasion(data.occasion as Occasion);
+  const designDoc = data.design ? normalizeDesign(data.design, content) : null;
+  const designOpeningSettings = designDoc?.opening ?? null;
+  const designImageUrls = data.designImageUrls ?? {};
+
   const cleanUrl = `${window.location.origin}/i/${data.slug}`;
   const trackShare = () => {
     void recordShare({
@@ -456,12 +472,23 @@ export default function InvitationPage() {
           transition={{ duration: 0.8, delay: opened ? 0.2 : 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="w-full max-w-[540px]"
         >
-          <div className="editorial-shadow">
-            <InvitationCanvas
-              content={content}
-              recipientName={data.guestName}
+          {designDoc ? (
+            <PublicDesignExperience
+              design={designDoc}
+              imageUrls={designImageUrls}
+              guestName={data.guestName}
+              rtl={Boolean(data.rtl)}
+              reducedMotion={reducedMotion}
+              active={opened || !designHasOpening || reducedMotion}
             />
-          </div>
+          ) : (
+            <div className="editorial-shadow">
+              <InvitationCanvas
+                content={content}
+                recipientName={data.guestName}
+              />
+            </div>
+          )}
 
           {eventTarget && <Countdown target={eventTarget} />}
 
@@ -848,7 +875,23 @@ export default function InvitationPage() {
                 : { backgroundColor: data.palette.ink, color: data.palette.background }
             }
           >
-            {reveal ? (
+            {designOpeningSettings && designHasOpening ? (
+              <OpeningStage
+                opening={designOpeningSettings}
+                accent={data.palette.accent}
+                background={data.palette.background}
+                ink={data.palette.ink}
+                guestName={data.guestName}
+                autoOpen={designOpeningSettings.autoOpen}
+                reducedMotion={reducedMotion}
+                coverUrl={
+                  designOpeningSettings.coverStorageId
+                    ? designImageUrls[designOpeningSettings.coverStorageId]
+                    : undefined
+                }
+                onDone={() => setOpened(true)}
+              />
+            ) : reveal ? (
               <RevealOpening
                 layout={reveal}
                 accent={data.palette.accent}

@@ -52,6 +52,10 @@ const schema = defineSchema(
     invitations: defineTable({
       ownerId: v.id("users"),
       ...invitationContent,
+      // Canvas studio document: pages, elements, opening experience, timeline.
+      // Optional so every existing invitation keeps working unchanged.
+      design: v.optional(v.any()),
+      designUpdatedAt: v.optional(v.number()),
       status: invitationStatusValidator,
       slug: v.string(),
       views: v.number(),
@@ -87,6 +91,32 @@ const schema = defineSchema(
     })
       .index("by_invitation", ["invitationId"])
       .index("by_token", ["token"]),
+
+    // Reusable creative library for the single studio owner: saved templates,
+    // opening experiences, animation presets, design assets, and style
+    // presets. Built-in items live in code and are never written here.
+    libraryItems: defineTable({
+      ownerId: v.id("users"),
+      kind: v.union(
+        v.literal("template"),
+        v.literal("opening"),
+        v.literal("animation"),
+        v.literal("asset"),
+        v.literal("style"),
+      ),
+      name: v.string(),
+      category: v.optional(v.string()),
+      description: v.optional(v.string()),
+      // The kind-specific document. Validated by the client model and kept
+      // flexible so new animation/opening fields never require a migration.
+      payload: v.any(),
+      storageId: v.optional(v.id("_storage")),
+      archived: v.boolean(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_owner_kind", ["ownerId", "kind"]),
 
     // Lightweight engagement timeline: one row per tracked event, so hosts
     // see who opened/RSVP'd/shared over time. Kept separate from counters so

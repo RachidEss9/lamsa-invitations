@@ -67,6 +67,7 @@ import {
   Eye,
   FileDown,
   ImagePlus,
+  Layout,
   Loader2,
   Lock,
   Mail,
@@ -783,6 +784,16 @@ export default function Editor() {
               />
               {published ? "Published" : "Draft"}
             </span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(`/studio/${invitationId}`)}
+              className="h-9 rounded-none px-3 text-[0.6rem] uppercase tracking-[0.16em]"
+            >
+              <Layout className="size-3.5" />
+              <span className="hidden sm:inline">Canvas studio</span>
+              <span className="sm:hidden">Canvas</span>
+            </Button>
             <Button
               type="button"
               variant="ghost"

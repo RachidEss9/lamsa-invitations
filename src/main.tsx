@@ -24,6 +24,7 @@ ensureSorgena();
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Editor = lazy(() => import("./pages/Editor.tsx"));
+const Studio = lazy(() => import("./pages/Studio.tsx"));
 const InvitationPage = lazy(() => import("./pages/InvitationPage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -158,6 +159,14 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <StudioGate>
                     <Editor />
+                  </StudioGate>
+                }
+              />
+              <Route
+                path="/studio/:id"
+                element={
+                  <StudioGate>
+                    <Studio />
                   </StudioGate>
                 }
               />

@@ -10,6 +10,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { resolveDesignUrls } from "./lib/designAssets";
 import {
   invitationContent,
   rsvpSettingsValidator,
@@ -132,8 +133,9 @@ export const getMine = query({
     const musicUrl = invitation.music
       ? (await ctx.storage.getUrl(invitation.music.storageId)) ?? ""
       : "";
+    const designImageUrls = await resolveDesignUrls(ctx, invitation.design);
 
-    return { ...invitation, photoUrls, musicUrl };
+    return { ...invitation, photoUrls, musicUrl, designImageUrls };
   },
 });
 
@@ -154,13 +156,16 @@ export const listActivity = query({
 });
 
 export const create = mutation({
-  args: { ...invitationContent },
+  args: { ...invitationContent, design: v.optional(v.any()) },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const now = Date.now();
     const slug = await uniqueSlug(ctx, args);
+    const { design, ...content } = args;
     return await ctx.db.insert("invitations", {
-      ...args,
+      ...content,
+      design,
+      designUpdatedAt: design ? now : undefined,
       ownerId: userId,
       status: "draft",
       slug,
@@ -168,6 +173,29 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+/**
+ * Saves the canvas studio document. Deliberately separate from `update`: the
+ * studio autosaves only design data, so it can never overwrite the host's
+ * words, guests, or photos, and the details editor can never wipe a design.
+ */
+export const saveDesign = mutation({
+  args: { id: v.id("invitations"), design: v.any() },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const invitation = await requireOwnedInvitation(ctx, args.id, userId);
+    const pages = (args.design as { pages?: unknown })?.pages;
+    if (!Array.isArray(pages) || pages.length === 0) {
+      throw new Error("A design needs at least one page.");
+    }
+    await ctx.db.patch(invitation._id, {
+      design: args.design,
+      designUpdatedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    return null;
   },
 });
 
@@ -277,6 +305,8 @@ export const duplicate = mutation({
       rsvp: source.rsvp,
       photos: source.photos ? [...source.photos] : undefined,
       music: source.music,
+      design: source.design,
+      designUpdatedAt: source.designUpdatedAt,
       status: "draft",
       slug,
       views: 0,
@@ -300,6 +330,18 @@ export const publish = mutation({
       throw new Error(
         "Add a name, event date, and venue before publishing this invitation.",
       );
+    }
+    const designPages = (invitation.design as { pages?: unknown[] } | undefined)
+      ?.pages;
+    if (Array.isArray(designPages) && designPages.length > 0) {
+      const empty = designPages.every(
+        (page) =>
+          Array.isArray((page as { elements?: unknown[] }).elements) &&
+          (page as { elements: unknown[] }).elements.length === 0,
+      );
+      if (empty) {
+        throw new Error("Add at least one element to the canvas before publishing.");
+      }
     }
 
     await ctx.db.patch(invitation._id, {
@@ -357,6 +399,9 @@ export const remove = mutation({
         // File may already be gone.
       }
     }
+    // Canvas images are intentionally left in storage: a placed image may be
+    // the same file as a saved library asset, so deleting here could break a
+    // reusable record. Library deletions remove their own unshared files.
     await ctx.db.delete(invitation._id);
     return null;
   },
@@ -586,6 +631,7 @@ export const getPublic = query({
     if (!invitation || invitation.status !== "published") return null;
 
     const gallery = await publicGallery(ctx, invitation);
+    const designImageUrls = await resolveDesignUrls(ctx, invitation.design);
 
     let guestName: string | null = null;
     let rsvpState: {
@@ -637,6 +683,8 @@ export const getPublic = query({
       photos: gallery.photos,
       music: gallery.music,
       views: invitation.views,
+      design: invitation.design ?? null,
+      designImageUrls,
       guestName,
       rsvpState,
     };
