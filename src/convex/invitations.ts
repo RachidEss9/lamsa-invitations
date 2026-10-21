@@ -626,6 +626,7 @@ export const getPublic = query({
       fontPair: invitation.fontPair,
       layout: invitation.layout,
       motif: invitation.motif,
+      cornerMotif: invitation.cornerMotif ?? "none",
       animations: invitation.animations,
       rtl: invitation.rtl ?? false,
       schedule: invitation.schedule ?? [],

@@ -64,7 +64,66 @@ export const FONT_PAIRS = [
     family: '"Amiri", "Times New Roman", serif',
     note: "Amiri (RTL)",
   },
+  // Atelier type library.
+  {
+    id: "didone",
+    label: "Didone",
+    family: '"Bodoni Moda", "Times New Roman", serif',
+    note: "Bodoni Moda",
+  },
+  {
+    id: "book",
+    label: "Book",
+    family: '"Libre Baskerville", "Times New Roman", serif',
+    note: "Libre Baskerville",
+  },
+  {
+    id: "display",
+    label: "Display",
+    family: '"DM Serif Display", "Times New Roman", serif',
+    note: "DM Serif Display",
+  },
+  {
+    id: "engraved",
+    label: "Engraved",
+    family: '"Cinzel", "Times New Roman", serif',
+    note: "Cinzel",
+  },
+  {
+    id: "calligraphy",
+    label: "Calligraphy",
+    family: '"Great Vibes", "Snell Roundhand", cursive',
+    note: "Great Vibes",
+  },
+  {
+    id: "handwritten",
+    label: "Handwritten",
+    family: '"Sacramento", "Snell Roundhand", cursive',
+    note: "Sacramento",
+  },
+  {
+    id: "ruqaa",
+    label: "Ruqaa",
+    family: '"Aref Ruqaa", "Amiri", serif',
+    note: "Aref Ruqaa (RTL)",
+  },
+  {
+    id: "kufi",
+    label: "Kufi",
+    family: '"Reem Kufi", "Amiri", sans-serif',
+    note: "Reem Kufi (RTL)",
+  },
 ] as const;
+
+/** Font pairs set in calligraphy or Arabic, which need display sizing. */
+export const SCRIPT_FONT_PAIRS: readonly FontPairId[] = [
+  "script",
+  "calligraphy",
+  "handwritten",
+  "arabic",
+  "ruqaa",
+  "kufi",
+];
 
 export type FontPairId = (typeof FONT_PAIRS)[number]["id"];
 
@@ -89,6 +148,23 @@ export const MOTIFS = [
   { id: "star", label: "Star" },
   { id: "crescent", label: "Crescent" },
   { id: "rattle", label: "Rattle" },
+  // Botanical
+  { id: "branch", label: "Branch" },
+  { id: "wreath", label: "Wreath" },
+  { id: "vine", label: "Vine" },
+  { id: "palm", label: "Palm" },
+  { id: "peony", label: "Peony" },
+  // Small marks
+  { id: "butterfly", label: "Butterfly" },
+  { id: "shell", label: "Shell" },
+  { id: "gem", label: "Gem" },
+  // Celestial & geometric
+  { id: "compass", label: "Compass" },
+  { id: "sunburst", label: "Sunburst" },
+  { id: "moon", label: "Moons" },
+  { id: "wave", label: "Wave" },
+  { id: "trellis", label: "Trellis" },
+  { id: "frame", label: "Frame" },
   { id: "none", label: "None" },
 ] as const;
 
@@ -144,6 +220,8 @@ export interface InvitationContent {
   fontPair: FontPairId;
   layout: LayoutId;
   motif: MotifId;
+  /** Optional second vector, set quietly in the card's corner. */
+  cornerMotif?: MotifId;
   animations: boolean;
   /** Right-to-left (Arabic) presentation, new in LAMSA v5. */
   rtl?: boolean;
@@ -164,10 +242,26 @@ export interface InvitationContent {
 }
 
 export const PALETTE_PRESETS: { name: string; palette: InvitationPalette }[] = [
-  // LAMSA v5 brand palette presets.
+  // The four inks from the LAMSA brand card, in combination.
   {
     name: "Crimson & pearl",
     palette: { background: "#f2f1ed", ink: "#161616", accent: "#710014" },
+  },
+  {
+    name: "Pearl & sand",
+    palette: { background: "#f2f1ed", ink: "#161616", accent: "#b38f6f" },
+  },
+  {
+    name: "Sand card",
+    palette: { background: "#b38f6f", ink: "#161616", accent: "#f2f1ed" },
+  },
+  {
+    name: "Crimson & obsidian",
+    palette: { background: "#161616", ink: "#f2f1ed", accent: "#710014" },
+  },
+  {
+    name: "Sand & crimson",
+    palette: { background: "#f2f1ed", ink: "#710014", accent: "#b38f6f" },
   },
   {
     name: "Obsidian glow",
@@ -222,6 +316,7 @@ export interface InvitationTemplate {
   motif: MotifId;
   /** Templates designed for right-to-left reading start in RTL. */
   rtl?: boolean;
+  cornerMotif?: MotifId;
   sample: {
     primary: string;
     secondary: string;
@@ -244,6 +339,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "script",
     layout: "arch",
     motif: "arch",
+    cornerMotif: "moon",
     sample: {
       primary: "Alexandra",
       secondary: "Omar",
@@ -262,6 +358,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "script",
     layout: "envelope",
     motif: "star",
+    cornerMotif: "branch",
     sample: {
       primary: "Natasha",
       secondary: "Karim",
@@ -280,6 +377,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "script",
     layout: "ribbon",
     motif: "fan",
+    cornerMotif: "peony",
     sample: {
       primary: "Nadia",
       secondary: "Thirty",
@@ -298,6 +396,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "arabic",
     layout: "arch",
     motif: "crescent",
+    cornerMotif: "frame",
     rtl: true,
     sample: {
       primary: "سلمى",
@@ -317,6 +416,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "romance",
     layout: "centered",
     motif: "arch",
+    cornerMotif: "wreath",
     sample: {
       primary: "Amara",
       secondary: "Julian",
@@ -336,6 +436,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "heritage",
     layout: "classic",
     motif: "star",
+    cornerMotif: "vine",
     sample: {
       primary: "Ines",
       secondary: "Theodore",
@@ -355,6 +456,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "romance",
     layout: "editorial",
     motif: "sun",
+    cornerMotif: "palm",
     sample: {
       primary: "Sofia",
       secondary: "Elias",
@@ -374,6 +476,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "editorial",
     layout: "centered",
     motif: "fan",
+    cornerMotif: "sunburst",
     sample: {
       primary: "Noor",
       secondary: "Thirty",
@@ -393,6 +496,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "modern",
     layout: "classic",
     motif: "star",
+    cornerMotif: "gem",
     sample: {
       primary: "The 10th Year",
       secondary: "Atelier No. 8",
@@ -412,6 +516,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "editorial",
     layout: "editorial",
     motif: "sprig",
+    cornerMotif: "wreath",
     sample: {
       primary: "Maya Bennett",
       secondary: "Class of 2026",
@@ -431,6 +536,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "modern",
     layout: "centered",
     motif: "sprig",
+    cornerMotif: "butterfly",
     sample: {
       primary: "Céleste",
       secondary: "Six",
@@ -469,6 +575,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "modern",
     layout: "centered",
     motif: "crescent",
+    cornerMotif: "moon",
     sample: {
       primary: "The Hassan Family",
       secondary: "Open House",
@@ -488,6 +595,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "heritage",
     layout: "classic",
     motif: "crescent",
+    cornerMotif: "trellis",
     sample: {
       primary: "Eid al-Fitr",
       secondary: "You are invited",
@@ -507,6 +615,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     fontPair: "romance",
     layout: "centered",
     motif: "rattle",
+    cornerMotif: "peony",
     sample: {
       primary: "Yusuf",
       secondary: "Aqiqah",
@@ -623,6 +732,7 @@ export function draftFromTemplate(templateId: string): InvitationContent {
     fontPair: template.fontPair,
     layout: template.layout,
     motif: template.motif,
+    cornerMotif: template.cornerMotif ?? "none",
     animations: true,
     rtl: template.rtl ?? false,
   };
@@ -644,6 +754,7 @@ export function contentFromInvitation(doc: InvitationContent): InvitationContent
     fontPair: doc.fontPair,
     layout: doc.layout,
     motif: doc.motif,
+    cornerMotif: doc.cornerMotif ?? "none",
     animations: doc.animations,
     rtl: doc.rtl ?? false,
     schedule: doc.schedule ?? [],

@@ -5,6 +5,7 @@ import {
   fontPairById,
   isPairedOccasion,
   isRevealLayout,
+  SCRIPT_FONT_PAIRS,
   type InvitationContent,
 } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
@@ -32,10 +33,15 @@ export function InvitationCanvas({
   const { palette } = content;
   // LAMSA v5: right-to-left invitations read in Amiri regardless of the
   // chosen pair, exactly like the brand-kit Arabic preset.
-  const display = content.rtl
-    ? '"Amiri", "Times New Roman", serif'
-    : fontPairById(content.fontPair).family;
-  const scripted = content.fontPair === "script" || content.fontPair === "arabic" || content.rtl;
+  const arabicPair =
+    content.fontPair === "arabic" ||
+    content.fontPair === "ruqaa" ||
+    content.fontPair === "kufi";
+  const display =
+    content.rtl && !arabicPair
+      ? '"Amiri", "Times New Roman", serif'
+      : fontPairById(content.fontPair).family;
+  const scripted = SCRIPT_FONT_PAIRS.includes(content.fontPair) || content.rtl;
   const paired = isPairedOccasion(content.occasion);
   const primary = content.names.primary.trim() || "Your name";
   const secondary = content.names.secondary.trim();
@@ -162,6 +168,28 @@ export function InvitationCanvas({
         className="paper-grain absolute inset-0 opacity-[0.06] mix-blend-multiply"
       />
       {frame}
+
+      {/* Corner vector: a second, quieter mark the host can choose. */}
+      {content.cornerMotif && content.cornerMotif !== "none" && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{
+            top: "5cqw",
+            [content.rtl ? "left" : "right"]: "5cqw",
+            width: "14cqw",
+            height: "14cqw",
+            color: palette.accent,
+            opacity: 0.34,
+          }}
+        >
+          <Motif
+            id={content.cornerMotif}
+            className="h-full w-full"
+            strokeWidth={0.7}
+          />
+        </div>
+      )}
 
       <div
         className={cn(

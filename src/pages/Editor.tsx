@@ -1486,6 +1486,54 @@ export default function Editor() {
                           );
                         })}
                       </div>
+                      <p className="mt-2 text-[0.68rem] leading-relaxed text-muted-foreground">
+                        The main mark sits above the words. Pick a second mark for
+                        the corner when you want the card to feel layered.
+                      </p>
+                    </Group>
+
+                    <Group label="Corner ornament">
+                      <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                        {MOTIFS.map((motif) => {
+                          const selected =
+                            (draft.cornerMotif ?? "none") === motif.id;
+                          return (
+                            <button
+                              key={motif.id}
+                              type="button"
+                              onClick={() => patch({ cornerMotif: motif.id })}
+                              aria-pressed={selected}
+                              title={motif.label}
+                              className={cn(
+                                "flex flex-col items-center gap-1 border px-1 py-2 transition-colors",
+                                selected
+                                  ? "border-foreground bg-foreground/[0.05]"
+                                  : "border-border hover:border-foreground/40",
+                              )}
+                            >
+                              <span
+                                className="flex size-6 items-center justify-center"
+                                style={{ color: draft.palette.accent }}
+                              >
+                                {motif.id === "none" ? (
+                                  <span className="text-[0.55rem] text-muted-foreground">
+                                    —
+                                  </span>
+                                ) : (
+                                  <Motif
+                                    id={motif.id}
+                                    className="size-full"
+                                    strokeWidth={2}
+                                  />
+                                )}
+                              </span>
+                              <span className="text-[0.46rem] uppercase tracking-[0.1em]">
+                                {motif.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </Group>
 
                     <Group label="Palette">

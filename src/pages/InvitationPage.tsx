@@ -344,15 +344,21 @@ export default function InvitationPage() {
     fontPair: data.fontPair,
     layout: data.layout,
     motif: data.motif,
+    cornerMotif: data.cornerMotif ?? "none",
     animations: data.animations,
     rtl: Boolean(data.rtl),
     rsvp: data.rsvp ?? undefined,
   };
 
-  // LAMSA v5: RTL invitations read in Amiri, matching the canvas.
-  const display = data.rtl
-    ? '"Amiri", "Times New Roman", serif'
-    : fontPairById(data.fontPair).family;
+  // RTL invitations use their chosen Arabic pair, or Amiri for Latin pairs.
+  const arabicPair =
+    data.fontPair === "arabic" ||
+    data.fontPair === "ruqaa" ||
+    data.fontPair === "kufi";
+  const display =
+    data.rtl && !arabicPair
+      ? '"Amiri", "Times New Roman", serif'
+      : fontPairById(data.fontPair).family;
   const paired = isPairedOccasion(data.occasion as Occasion);  
   
   const cleanUrl = `${window.location.origin}/i/${data.slug}`;
@@ -813,7 +819,7 @@ export default function InvitationPage() {
           onClick={toggleMusic}
           aria-pressed={playing}
           aria-label={playing ? "Pause the invitation music" : "Play the invitation music"}
-          className="fixed bottom-5 right-5 z-40 flex size-11 items-center justify-center border border-[#cdc6b3] bg-black/60 text-[#f2ecdd] transition-colors hover:border-[var(--red)] hover:bg-[var(--red)]"
+          className="fixed bottom-5 right-5 z-40 flex size-11 items-center justify-center border border-[#cdc6b3] bg-black/60 text-[#f2f1ed] transition-colors hover:border-[var(--red)] hover:bg-[var(--red)]"
         >
           {playing ? <Pause className="size-4" /> : <Music className="size-4" />}
         </button>

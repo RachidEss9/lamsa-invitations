@@ -338,8 +338,8 @@ export default function Dashboard() {
                     className={cn(
                       "px-1.5 py-0.5 font-meta text-[0.48rem] uppercase tracking-[0.12em]",
                       current.status === "published"
-                        ? "bg-[var(--olive)] text-[#f2ecdd]"
-                        : "bg-[var(--ink)] text-[#f2ecdd]",
+                        ? "bg-[var(--olive)] text-[#f2f1ed]"
+                        : "bg-[var(--ink)] text-[#f2f1ed]",
                     )}
                   >
                     {current.status === "published" ? "Live" : "Draft"}
@@ -538,7 +538,7 @@ export default function Dashboard() {
                           className={cn(
                             "px-1 py-0.5 font-meta text-[0.44rem] uppercase tracking-[0.1em]",
                             published
-                              ? "bg-[var(--olive)] text-[#f2ecdd]"
+                              ? "bg-[var(--olive)] text-[#f2f1ed]"
                               : "bg-ink/10 text-ink/72",
                           )}
                         >
@@ -676,7 +676,7 @@ export default function Dashboard() {
               className="group mt-6 flex w-full items-center justify-between gap-4 border border-dashed border-ink/25 px-4 py-4 text-left transition-colors hover:border-ink/60 hover:bg-[var(--paper-light)]/70 sm:px-5"
             >
               <span className="flex items-center gap-4">
-                <span className="flex size-8 items-center justify-center border border-ink/30 transition-colors group-hover:border-[var(--red)] group-hover:bg-[var(--red)] group-hover:text-[#f7f2e5]">
+                <span className="flex size-8 items-center justify-center border border-ink/30 transition-colors group-hover:border-[var(--red)] group-hover:bg-[var(--red)] group-hover:text-[#f2f1ed]">
                   <Plus className="size-3.5" />
                 </span>
                 <span>
@@ -756,7 +756,7 @@ export default function Dashboard() {
                       className={cn(
                         "shrink-0 border px-3 py-1.5 font-meta text-[0.52rem] uppercase tracking-[0.12em] transition-colors",
                         occasion === item.id
-                          ? "border-ink bg-ink text-[#f2ecdd]"
+                          ? "border-ink bg-ink text-[#f2f1ed]"
                           : "border-ink/20 text-ink/68 hover:border-ink/50 hover:text-ink",
                       )}
                     >
@@ -784,7 +784,7 @@ export default function Dashboard() {
                             className={cn(
                               "flex size-4 shrink-0 items-center justify-center border",
                               selected
-                                ? "border-[var(--red)] bg-[var(--red)] text-[#f7f2e5]"
+                                ? "border-[var(--red)] bg-[var(--red)] text-[#f2f1ed]"
                                 : "border-ink/30",
                             )}
                           >

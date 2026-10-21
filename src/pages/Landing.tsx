@@ -213,7 +213,7 @@ export default function Landing() {
               transition={{ duration: 0.5 }}
               className="flex items-center gap-3"
             >
-              <span className="flex size-6 items-center justify-center bg-[var(--red)] font-meta text-[0.55rem] text-[#f7f2e5]">
+              <span className="flex size-6 items-center justify-center bg-[var(--red)] font-meta text-[0.55rem] text-[#f2f1ed]">
                 01
               </span>
               <span className="eyebrow text-ink/68">
@@ -225,7 +225,7 @@ export default function Landing() {
               initial={reduce ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-8 font-display text-[clamp(3.6rem,9.6vw,7.4rem)] leading-[0.86] tracking-[-0.015em]"
+              className="mt-8 font-display text-[clamp(3.4rem,7.6vw,6.4rem)] leading-[0.88] tracking-[-0.015em]"
             >
               An invitation
               <br />
@@ -324,8 +324,8 @@ export default function Landing() {
                   </p>
                 </div>
 
-                <div className="hidden flex-1 flex-col justify-between border border-ink/25 bg-[var(--red)] p-3 text-[#f7f2e5] sm:flex">
-                  <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-[#f7f2e5]/70">
+                <div className="hidden flex-1 flex-col justify-between border border-ink/25 bg-[var(--red)] p-3 text-[#f2f1ed] sm:flex">
+                  <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-[#f2f1ed]/70">
                     The reveal
                   </p>
                   <p className="mt-2 font-display text-[1.35rem] leading-[1.05]">
@@ -335,7 +335,7 @@ export default function Landing() {
                     <br />
                     then the card.
                   </p>
-                  <p className="mt-3 font-meta text-[0.5rem] uppercase tracking-[0.1em] text-[#f7f2e5]/60">
+                  <p className="mt-3 font-meta text-[0.5rem] uppercase tracking-[0.1em] text-[#f2f1ed]/60">
                     3s · one gesture
                   </p>
                 </div>
@@ -352,7 +352,7 @@ export default function Landing() {
         </section>
 
         {/* Ticker */}
-        <div className="overflow-hidden border-y border-ink/20 bg-[var(--ink)] py-3 text-[#f2ecdd]">
+        <div className="overflow-hidden border-y border-ink/20 bg-[var(--ink)] py-3 text-[#f2f1ed]">
           <div className="lamsa-ticker flex w-max items-center">
             {[0, 1].map((copy) => (
               <div
@@ -695,14 +695,14 @@ export default function Landing() {
         {/* ---------------------------------------------------------------- */}
         {/* Closing                                                          */}
         {/* ---------------------------------------------------------------- */}
-        <section className="relative overflow-hidden bg-[var(--ink)] text-[#f2ecdd]">
+        <section className="relative overflow-hidden bg-[var(--ink)] text-[#f2f1ed]">
           <div
             aria-hidden
             className="paper-grain absolute inset-0 opacity-[0.05] mix-blend-screen"
           />
           <div
             aria-hidden
-            className="absolute inset-x-0 top-0 h-px bg-[#f2ecdd]/15"
+            className="absolute inset-x-0 top-0 h-px bg-[#f2f1ed]/15"
           />
           <div className="relative mx-auto grid w-full max-w-[1480px] gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end lg:px-12 lg:py-28">
             <div>
@@ -710,8 +710,8 @@ export default function Landing() {
                 <span className="font-meta text-[0.58rem] text-[var(--red)]">
                   05
                 </span>
-                <span className="h-px w-6 bg-[#f2ecdd]/30" />
-                <span className="eyebrow text-[#f2ecdd]/50">
+                <span className="h-px w-6 bg-[#f2f1ed]/30" />
+                <span className="eyebrow text-[#f2f1ed]/50">
                   The first one is free
                 </span>
               </div>
@@ -720,7 +720,7 @@ export default function Landing() {
                 <br />
                 worth keeping.
               </h2>
-              <p className="mt-7 max-w-[26rem] text-[0.9rem] leading-[1.8] text-[#f2ecdd]/60">
+              <p className="mt-7 max-w-[26rem] text-[0.9rem] leading-[1.8] text-[#f2f1ed]/60">
                 Compose it tonight. The proof is live, the PIN is yours, and the
                 link is ready when you are.
               </p>
@@ -729,14 +729,14 @@ export default function Landing() {
               <Button
                 asChild
                 size="lg"
-                className="h-12 border-[#f2ecdd] bg-[#f2ecdd] px-7 text-[var(--ink)] hover:border-white hover:bg-white hover:text-[var(--ink)]"
+                className="h-12 border-[#f2f1ed] bg-[#f2f1ed] px-7 text-[var(--ink)] hover:border-white hover:bg-white hover:text-[var(--ink)]"
               >
                 <Link to={STUDIO_HREF}>
                   Enter the studio
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <div className="flex flex-col gap-2 font-meta text-[0.54rem] uppercase leading-relaxed tracking-[0.12em] text-[#f2ecdd]/40 lg:text-right">
+              <div className="flex flex-col gap-2 font-meta text-[0.54rem] uppercase leading-relaxed tracking-[0.12em] text-[#f2f1ed]/40 lg:text-right">
                 <span>Email verified once</span>
                 <span>No card to begin</span>
                 <span>Your work is private to your PIN</span>
@@ -746,33 +746,33 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="relative z-10 bg-[var(--ink)] text-[#f2ecdd]">
-        <div className="mx-auto w-full max-w-[1480px] border-t border-[#f2ecdd]/12 px-5 py-10 sm:px-8 lg:px-12">
+      <footer className="relative z-10 bg-[var(--ink)] text-[#f2f1ed]">
+        <div className="mx-auto w-full max-w-[1480px] border-t border-[#f2f1ed]/12 px-5 py-10 sm:px-8 lg:px-12">
           <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
             <div>
-              <Wordmark className="text-[1.35rem] text-[#f2ecdd]" />
-              <p className="mt-3 max-w-[18rem] text-[0.74rem] leading-relaxed text-[#f2ecdd]/45">
+              <Wordmark className="text-[1.35rem] text-[#f2f1ed]" />
+              <p className="mt-3 max-w-[18rem] text-[0.74rem] leading-relaxed text-[#f2f1ed]/45">
                 An invitation atelier. Composed in Tangier, opened wherever your
                 guests are.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-x-12 gap-y-3 text-[0.7rem] text-[#f2ecdd]/60 sm:grid-cols-3">
-              <a href="#collection" className="hover:text-[#f2ecdd]">
+            <div className="grid grid-cols-2 gap-x-12 gap-y-3 text-[0.7rem] text-[#f2f1ed]/60 sm:grid-cols-3">
+              <a href="#collection" className="hover:text-[#f2f1ed]">
                 Collection
               </a>
-              <a href="#method" className="hover:text-[#f2ecdd]">
+              <a href="#method" className="hover:text-[#f2f1ed]">
                 Method
               </a>
-              <a href="#guests" className="hover:text-[#f2ecdd]">
+              <a href="#guests" className="hover:text-[#f2f1ed]">
                 Guest list
               </a>
-              <Link to={STUDIO_HREF} className="hover:text-[#f2ecdd]">
+              <Link to={STUDIO_HREF} className="hover:text-[#f2f1ed]">
                 Studio
               </Link>
-              <Link to={STUDIO_HREF} className="hover:text-[#f2ecdd]">
+              <Link to={STUDIO_HREF} className="hover:text-[#f2f1ed]">
                 Start
               </Link>
-              <span className="text-[#f2ecdd]/30">© 2026 LAMSA</span>
+              <span className="text-[#f2f1ed]/30">© 2026 LAMSA</span>
             </div>
           </div>
         </div>

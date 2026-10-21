@@ -14,6 +14,11 @@ import {
   useLocation,
 } from "react-router";
 import "./index.css";
+import { ensureSorgena } from "./lib/sorgena";
+
+// Register the licensed brand face when the webfonts are present. Runs before
+// the first paint's font resolution; absent files simply keep the fallbacks.
+ensureSorgena();
 
 // Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));
@@ -26,9 +31,12 @@ const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 function RouteLoading() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-      <span className="font-ui text-[0.7rem] uppercase tracking-[0.42em] text-foreground/70">
-        LAMSA
-      </span>
+      <div className="flex items-baseline gap-2">
+        <span className="font-display text-[1.5rem] leading-none tracking-[0.16em]">
+          LAMSA
+        </span>
+        <span className="mb-[0.55em] size-[4px] bg-[var(--red)]" />
+      </div>
       <span className="relative mt-5 block h-px w-20 overflow-hidden bg-border">
         <span className="absolute inset-y-0 left-0 w-1/3 animate-pulse bg-foreground/40" />
       </span>

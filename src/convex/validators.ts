@@ -36,6 +36,21 @@ export const motifValidator = v.union(
   v.literal("star"),
   v.literal("crescent"),
   v.literal("rattle"),
+  // Atelier vector library: botanical, celestial, and geometric marks.
+  v.literal("branch"),
+  v.literal("wreath"),
+  v.literal("vine"),
+  v.literal("shell"),
+  v.literal("palm"),
+  v.literal("peony"),
+  v.literal("butterfly"),
+  v.literal("wave"),
+  v.literal("gem"),
+  v.literal("compass"),
+  v.literal("sunburst"),
+  v.literal("trellis"),
+  v.literal("moon"),
+  v.literal("frame"),
   v.literal("none"),
 );
 
@@ -47,6 +62,16 @@ export const fontPairValidator = v.union(
   // New in LAMSA v5: hand-lettered script and Arabic (RTL) typography.
   v.literal("script"),
   v.literal("arabic"),
+  // Atelier type library: didone, book, display, engraved, calligraphy,
+  // handwritten Latin, and two further Arabic families.
+  v.literal("didone"),
+  v.literal("book"),
+  v.literal("display"),
+  v.literal("engraved"),
+  v.literal("calligraphy"),
+  v.literal("handwritten"),
+  v.literal("ruqaa"),
+  v.literal("kufi"),
 );
 
 export const paletteValidator = v.object({
@@ -100,6 +125,8 @@ export const invitationContent = {
   fontPair: fontPairValidator,
   layout: layoutValidator,
   motif: motifValidator,
+  // A second, quieter vector placed in the corner of the card.
+  cornerMotif: v.optional(motifValidator),
   animations: v.boolean(),
 
   // Right-to-left presentation (Arabic presets from the LAMSA v5 kit).
