@@ -37,7 +37,7 @@ const buttonVariants = cva(
   }
 )
 
-function Button({
+function ButtonPrototype({
   className,
   variant = "default",
   size = "default",
@@ -46,8 +46,8 @@ function Button({
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot : "button"
+  }) {  const Comp = asChild ? Slot : "button"
+  const ButtonInner = Comp
 
   return (
     <Comp
@@ -61,3 +61,5 @@ function Button({
 }
 
 export { Button, buttonVariants }
+
+
