@@ -21,11 +21,9 @@ import {
   type ElementAnimation,
   type RevealEffect,
 } from "@/lib/design";
-import {
-  FONT_PAIRS,
-  MOTIFS,
-  type FontPairId,
-} from "@/lib/invitation";
+import { fontById } from "@/lib/fonts";
+import { MOTIFS } from "@/lib/invitation";
+import { FontPicker } from "@/components/studio/FontPicker";
 import { cn } from "@/lib/utils";
 import {
   AlignCenterHorizontal,
@@ -70,6 +68,7 @@ interface InspectorProps {
   onUploadImage: (file: File) => Promise<void>;
   onTestReveal: (interactionId: string) => void;
   onPreviewAnimation: () => void;
+  onEditText?: (id: string) => void;
 }
 
 function Section({
@@ -217,9 +216,11 @@ export function Inspector({
   onUploadImage,
   onTestReveal,
   onPreviewAnimation,
+  onEditText,
 }: InspectorProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const element = selected.length === 1 ? selected[0] : null;
+  const activeFont = fontById(element?.font);
   const patch = (value: Partial<DesignElement>) => {
     if (element) onPatch(element.id, value);
   };
@@ -403,22 +404,56 @@ export function Inspector({
             rows={3}
             className="rounded-none text-[11px] leading-relaxed"
           />
-          <Row label="Typeface">
-            <Select
-              value={element.font ?? "romance"}
-              onValueChange={(font) => patch({ font: font as FontPairId })}
+          {onEditText && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 w-full rounded-none text-[9px] uppercase tracking-[0.1em]"
+              onClick={() => onEditText(element.id)}
             >
-              <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {FONT_PAIRS.map((pair) => (
-                  <SelectItem key={pair.id} value={pair.id}>{pair.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              Edit wording on canvas
+            </Button>
+          )}
+          <Row label="Typeface">
+            <FontPicker
+              value={element.font ?? "cormorant-garamond"}
+              sampleText={element.text}
+              onSelect={(font) => {
+                const next = fontById(font);
+                patch({
+                  font,
+                  fontWeight: next.weights.includes(element.fontWeight ?? 400)
+                    ? element.fontWeight
+                    : next.weights.reduce((best, weight) =>
+                        Math.abs(weight - (element.fontWeight ?? 400)) <
+                        Math.abs(best - (element.fontWeight ?? 400))
+                          ? weight
+                          : best,
+                      ),
+                  italic: next.italic ? element.italic : false,
+                });
+              }}
+            />
           </Row>
+          <p className="text-[9px] leading-relaxed text-ink/40">
+            {activeFont.note ?? activeFont.name}
+            {activeFont.script === "latin" ? " · Arabic falls back to Naskh" : " · Arabic + Latin"}
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <Row label="Size"><NumberField value={element.fontSize ?? 26} onChange={(fontSize) => patch({ fontSize })} min={6} /></Row>
-            <Row label="Weight"><NumberField value={element.fontWeight ?? 400} onChange={(fontWeight) => patch({ fontWeight })} step={100} min={100} max={900} /></Row>
+            <Row label="Weight">
+              <Select
+                value={String(activeFont.weights.includes(element.fontWeight ?? 400) ? element.fontWeight ?? 400 : activeFont.weights[0])}
+                onValueChange={(weight) => patch({ fontWeight: Number(weight) })}
+              >
+                <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {activeFont.weights.map((weight) => (
+                    <SelectItem key={weight} value={String(weight)}>{weight}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Row>
             <Row label="Tracking"><NumberField value={element.letterSpacing ?? 0} onChange={(letterSpacing) => patch({ letterSpacing })} step={0.01} /></Row>
             <Row label="Leading"><NumberField value={element.lineHeight ?? 1.4} onChange={(lineHeight) => patch({ lineHeight })} step={0.05} /></Row>
           </div>
@@ -439,8 +474,31 @@ export function Inspector({
               </button>
             ))}
           </div>
+          <Row label="Direction">
+            <div className="flex gap-1">
+              {(["auto", "ltr", "rtl"] as const).map((direction) => (
+                <button
+                  key={direction}
+                  type="button"
+                  onClick={() => patch({ direction })}
+                  className={cn(
+                    "h-7 border px-2 text-[9px] uppercase tracking-[0.1em]",
+                    (element.direction ?? "auto") === direction
+                      ? "border-ink bg-ink text-[#f2f1ed]"
+                      : "border-ink/15 text-ink/60 hover:border-ink",
+                  )}
+                >
+                  {direction}
+                </button>
+              ))}
+            </div>
+          </Row>
           <div className="grid grid-cols-2 gap-2">
-            <ToggleRow label="Italic" checked={Boolean(element.italic)} onChange={(italic) => patch({ italic })} />
+            <ToggleRow
+              label={activeFont.italic ? "Italic" : "Italic (unavailable)"}
+              checked={Boolean(element.italic) && Boolean(activeFont.italic)}
+              onChange={(italic) => activeFont.italic && patch({ italic })}
+            />
             <ToggleRow label="Caps" checked={Boolean(element.uppercase)} onChange={(uppercase) => patch({ uppercase })} />
           </div>
           <Row label="Colour"><ColorField value={element.color ?? "#161616"} onChange={(color) => patch({ color })} /></Row>
@@ -490,7 +548,31 @@ export function Inspector({
       )}
 
       {element.kind === "shape" && (
-        <Section title="Shape">
+        <Section title="Shape & mask">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full rounded-none text-[10px] uppercase tracking-[0.12em]"
+            onClick={() => fileRef.current?.click()}
+          >
+            <ImagePlus className="size-3.5" />
+            {element.imageStorageId ? "Replace clipping image" : "Use image as mask"}
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void onUploadImage(file);
+            }}
+          />
+          <p className="text-[9px] leading-relaxed text-ink/40">
+            A photograph placed into an arch, heart, leaf, ellipse, star, or frame is
+            clipped to that form in the editor and on the published invitation.
+          </p>
           <Row label="Form">
             <Select value={element.shape ?? "rect"} onValueChange={(shape) => patch({ shape: shape as DesignElement["shape"] })}>
               <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>

@@ -1,10 +1,9 @@
 import type { CSSProperties } from "react";
+import { fontNameFor } from "@/lib/fonts";
 import {
-  fontPairById,
   formatEventDate,
   formatEventTime,
   isPairedOccasion,
-  type FontPairId,
   type InvitationContent,
   type MotifId,
 } from "@/lib/invitation";
@@ -44,12 +43,24 @@ export type AnimationPresetId =
   | "rise"
   | "wipeUp"
   | "wipeRight"
-  | "draw";
+  | "draw"
+  | "flipIn"
+  | "zoomFade"
+  | "swingIn"
+  | "dropIn"
+  | "maskDown"
+  | "maskLeft"
+  | "unveil"
+  | "float"
+  | "shimmer"
+  | "pulse"
+  | "driftIn"
+  | "riseFast";
 
 export const ANIMATION_PRESETS: {
   id: AnimationPresetId;
   label: string;
-  group: "Text" | "Image" | "Shape" | "Reveal";
+  group: "Text" | "Image" | "Shape" | "Reveal" | "Background" | "Interactive";
   note: string;
 }[] = [
   { id: "fade", label: "Fade", group: "Text", note: "A quiet opacity lift" },
@@ -63,6 +74,19 @@ export const ANIMATION_PRESETS: {
   { id: "wipeUp", label: "Wipe up", group: "Reveal", note: "Unmasks upward" },
   { id: "wipeRight", label: "Wipe right", group: "Reveal", note: "Unmasks to the right" },
   { id: "draw", label: "Draw", group: "Shape", note: "Traces in from the left" },
+  // A second, more expressive shelf built on the same timeline engine.
+  { id: "flipIn", label: "Flip in", group: "Text", note: "Turns in from the left edge" },
+  { id: "zoomFade", label: "Zoom fade", group: "Image", note: "Settles from a close crop" },
+  { id: "swingIn", label: "Swing in", group: "Text", note: "A gentle pendulum entrance" },
+  { id: "dropIn", label: "Drop in", group: "Text", note: "Falls softly into place" },
+  { id: "maskDown", label: "Mask down", group: "Reveal", note: "Uncovers from the top" },
+  { id: "maskLeft", label: "Mask left", group: "Reveal", note: "Uncovers from the right" },
+  { id: "unveil", label: "Unveil", group: "Reveal", note: "Opens like a lens" },
+  { id: "float", label: "Float", group: "Background", note: "Drifts up through a soft haze" },
+  { id: "shimmer", label: "Shimmer", group: "Image", note: "Brightens from a dark print" },
+  { id: "pulse", label: "Pulse", group: "Interactive", note: "Breathes in at the centre" },
+  { id: "driftIn", label: "Drift in", group: "Background", note: "A slow diagonal drift" },
+  { id: "riseFast", label: "Quick rise", group: "Text", note: "A crisp editorial lift" },
   { id: "none", label: "None", group: "Text", note: "Visible from the start" },
 ];
 
@@ -142,7 +166,8 @@ export interface DesignElement {
   groupId?: string;
 
   text?: string;
-  font?: FontPairId;
+  /** Any id from FONT_LIBRARY, or an old font-pair id for saved designs. */
+  font?: string;
   fontSize?: number;
   fontWeight?: number;
   italic?: boolean;
@@ -150,6 +175,8 @@ export interface DesignElement {
   letterSpacing?: number;
   lineHeight?: number;
   align?: "left" | "center" | "right";
+  /** Independent of alignment: auto follows the invitation language. */
+  direction?: "auto" | "ltr" | "rtl";
   color?: string;
 
   shape?: ShapeKind;
@@ -190,10 +217,17 @@ export function visiblePages(design: DesignDocument): DesignPage[] {
 export type OpeningExperienceId =
   | "none"
   | "envelope"
+  | "wax-seal"
   | "arch"
   | "curtain"
   | "door"
   | "cards"
+  | "folding"
+  | "paper"
+  | "typography"
+  | "floral"
+  | "cinematic"
+  | "image"
   | "fade"
   | "personal";
 
@@ -203,10 +237,17 @@ export const OPENING_EXPERIENCES: {
   note: string;
 }[] = [
   { id: "envelope", label: "Envelope", note: "A wax seal cracks a crimson envelope open" },
+  { id: "wax-seal", label: "Wax seal", note: "A single seal breaks over dark paper" },
   { id: "arch", label: "Glowing arch", note: "A lit arch opens onto the invitation" },
   { id: "curtain", label: "Curtain", note: "Two heavy panels part slowly" },
   { id: "door", label: "Double doors", note: "Panelled doors swing inward" },
   { id: "cards", label: "Layered cards", note: "Stacked paper lifts away one by one" },
+  { id: "folding", label: "Folding card", note: "A gate-fold card opens in three panels" },
+  { id: "paper", label: "Paper unfold", note: "A creased sheet flattens across the screen" },
+  { id: "typography", label: "Typography reveal", note: "The names are set, then the card appears" },
+  { id: "floral", label: "Floral reveal", note: "An ornamental wreath opens around the card" },
+  { id: "cinematic", label: "Cinematic layers", note: "Letterbox bars and a slow zoom part" },
+  { id: "image", label: "Image opening", note: "A cover photograph opens into the invitation" },
   { id: "fade", label: "Cinematic fade", note: "A slow reveal from darkness" },
   { id: "personal", label: "Personal welcome", note: "A named greeting before the card" },
   { id: "none", label: "No opening", note: "Opens directly on the first page" },
@@ -241,7 +282,15 @@ export interface ClosingSettings {
   duration: number;
 }
 
-export type PageTransitionId = "none" | "fade" | "slide" | "curtain" | "flip";
+export type PageTransitionId =
+  | "none"
+  | "fade"
+  | "slide"
+  | "curtain"
+  | "flip"
+  | "zoom"
+  | "blur"
+  | "rise";
 
 export const PAGE_TRANSITIONS: {
   id: PageTransitionId;
@@ -252,6 +301,9 @@ export const PAGE_TRANSITIONS: {
   { id: "slide", label: "Slide", note: "The next page slides across" },
   { id: "curtain", label: "Curtain", note: "A panel sweeps the change" },
   { id: "flip", label: "Flip", note: "A quiet card turn" },
+  { id: "zoom", label: "Zoom", note: "The next page settles in from a close crop" },
+  { id: "blur", label: "Blur", note: "A soft focus pull between pages" },
+  { id: "rise", label: "Rise", note: "The next page lifts into place" },
   { id: "none", label: "Cut", note: "No transition" },
 ];
 
@@ -271,7 +323,9 @@ export interface DesignDocument {
 
 export interface StylePreset {
   palette: { background: string; ink: string; accent: string };
-  fontPair: FontPairId;
+  fontPair: string;
+  /** Optional page treatment applied together with the palette. */
+  background?: string;
 }
 
 let idCounter = 0;
@@ -374,6 +428,73 @@ function motionFor(
       return {
         opacity: 1,
         transform: `scaleX(${Math.max(0.001, p)})`,
+      };
+    case "flipIn":
+      return {
+        opacity: p,
+        transform: `perspective(1400px) rotateY(${(1 - p) * -88 * d}deg)`,
+      };
+    case "zoomFade":
+      return {
+        opacity: p,
+        transform: `scale(${1.12 - p * 0.12})`,
+      };
+    case "swingIn":
+      return {
+        opacity: p,
+        transform: `rotate(${(1 - p) * -7 * d}deg)`,
+        filter: `blur(${(1 - p) * 2}px)`,
+      };
+    case "dropIn":
+      return {
+        opacity: p,
+        transform: `translateY(${(1 - p) * -80 * d}px)`,
+        filter: `blur(${(1 - p) * 5}px)`,
+      };
+    case "maskDown":
+      return {
+        opacity: 1,
+        transform: "",
+        clipPath: `inset(0 0 ${(1 - p) * 100}% 0)`,
+      };
+    case "maskLeft":
+      return {
+        opacity: 1,
+        transform: "",
+        clipPath: `inset(0 0 0 ${(1 - p) * 100}%)`,
+      };
+    case "unveil":
+      return {
+        opacity: 1,
+        transform: "",
+        clipPath: `circle(${p * 76}% at 50% 50%)`,
+      };
+    case "float":
+      return {
+        opacity: p,
+        transform: `translateY(${(1 - p) * 30 * d}px)`,
+        filter: `blur(${(1 - p) * 4}px)`,
+      };
+    case "shimmer":
+      return {
+        opacity: p,
+        transform: `scale(${1.02 - p * 0.02})`,
+        filter: `brightness(${0.65 + p * 0.35}) blur(${(1 - p) * 3}px)`,
+      };
+    case "pulse":
+      return {
+        opacity: p,
+        transform: `scale(${0.94 + p * 0.06})`,
+      };
+    case "driftIn":
+      return {
+        opacity: p,
+        transform: `translate(${(1 - p) * -34 * d}px, ${(1 - p) * 22 * d}px)`,
+      };
+    case "riseFast":
+      return {
+        opacity: p,
+        transform: `translateY(${(1 - p) * 58 * d}px)`,
       };
     case "none":
     default:
@@ -577,6 +698,39 @@ export function cleanRevealLinks(elements: DesignElement[]): DesignElement[] {
 /* Default design from the written invitation                                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Built-in templates set their canvas text from the expanded type library,
+ * while the invitation content keeps its compatibility font-pair id.
+ */
+export const TEMPLATE_DESIGN_FONTS: Record<string, string> = {
+  "the-arch": "great-vibes",
+  "the-seal": "parisienne",
+  "the-ribbon": "allura",
+  "the-arch-ar": "amiri",
+  "the-vow": "cormorant-garamond",
+  adeline: "cinzel",
+  "amber-hands": "lora",
+  jubilee: "playfair-display",
+  nocturne: "italiana",
+  laurel: "marcellus",
+  fete: "outfit",
+  atelier: "jost",
+  "crescent-night": "markazi-text",
+  "gold-eid": "cormorant-garamond",
+  "little-one": "cormorant-garamond",
+  "first-hello": "lora",
+  "riad-nour": "aref-ruqaa",
+  "nikah-ivory": "scheherazade-new",
+  "mehndi-gold": "fraunces",
+  "noir-gala": "bodoni-moda",
+  "botanical-letter": "eb-garamond",
+  convocation: "libre-baskerville",
+  "petal-pink": "parisienne",
+  "studio-birthday": "space-grotesk",
+  "eid-jade": "reem-kufi",
+  "anniversary-wine": "cormorant-garamond",
+};
+
 function textElement(
   name: string,
   text: string,
@@ -587,7 +741,7 @@ function textElement(
   return makeElement("text", {
     name,
     text,
-    font: content.fontPair,
+    font: TEMPLATE_DESIGN_FONTS[content.templateId] ?? content.fontPair,
     fontSize: 26,
     fontWeight: 400,
     letterSpacing: 0.18,
@@ -752,6 +906,31 @@ export function createDefaultDesign(content: InvitationContent): DesignDocument 
     );
   }
 
+  // The written layout also shapes the default canvas: editorial invitations
+  // are set flush left like a magazine, while classic and reveal layouts keep
+  // the centred card. Everything remains an ordinary editable layer.
+  const arranged =
+    content.layout === "editorial"
+      ? elements.map((element) => {
+          if (element.kind === "text") {
+            return { ...element, x: 110, w: 780, align: "left" as const };
+          }
+          if (element.kind === "shape" && element.name.toLowerCase().includes("rule")) {
+            return { ...element, x: 110, w: 170 };
+          }
+          if (element.kind === "motif" && element.name === "Ornament") {
+            return { ...element, x: 110, y: 355 };
+          }
+          return element;
+        })
+      : content.layout === "classic"
+        ? elements.map((element) =>
+            element.kind === "shape" && element.shape === "line"
+              ? { ...element, x: 350, w: 300 }
+              : element,
+          )
+        : elements;
+
   const border = makeElement("shape", {
     name: "Card frame",
     shape: "frame",
@@ -775,7 +954,7 @@ export function createDefaultDesign(content: InvitationContent): DesignDocument 
         id: makeId("page"),
         name: "Invitation",
         background: content.palette.background,
-        elements: [border, ...elements],
+        elements: [border, ...arranged],
       },
     ],
     opening: {
@@ -917,15 +1096,15 @@ export function applyStylePreset(
     pages: design.pages.map((page) => ({
       ...page,
       background:
-        page.background.toLowerCase() === previous.background.toLowerCase()
+        style.background ??
+        (page.background.toLowerCase() === previous.background.toLowerCase()
           ? style.palette.background
-          : page.background,
+          : page.background),
       elements: page.elements.map((element) => ({
         ...element,
-        font:
-          element.kind === "text" && element.color?.toLowerCase() === previous.ink.toLowerCase()
-            ? style.fontPair
-            : element.font,
+        // Typography is the point of a style preset; every text layer follows
+        // it, while images, shapes, positions and copy are untouched.
+        font: element.kind === "text" ? style.fontPair : element.font,
         color: mapColor(element.color),
         fill: mapColor(element.fill),
         stroke: mapColor(element.stroke),
@@ -995,6 +1174,16 @@ export function pageTransitionStyle(
       };
     case "curtain":
       return { opacity: p, clipPath: `inset(0 ${(1 - p) * 100}% 0 0)` };
+    case "zoom":
+      return { opacity: p, transform: `scale(${1.08 - p * 0.08})` };
+    case "blur":
+      return {
+        opacity: p,
+        transform: `scale(${1.01 - p * 0.01})`,
+        filter: `blur(${(1 - p) * 14}px)`,
+      };
+    case "rise":
+      return { opacity: p, transform: `translateY(${(1 - p) * 9}%)` };
     case "fade":
       return { opacity: p };
     case "none":
@@ -1011,6 +1200,20 @@ export function openingHint(experience: OpeningExperienceId): string {
   switch (experience) {
     case "envelope":
       return "Break the seal";
+    case "wax-seal":
+      return "Press the seal";
+    case "folding":
+      return "Open the fold";
+    case "paper":
+      return "Unfold the paper";
+    case "typography":
+      return "Reveal the names";
+    case "floral":
+      return "Part the wreath";
+    case "cinematic":
+      return "Begin";
+    case "image":
+      return "Open the invitation";
     case "arch":
       return "Step through the arch";
     case "curtain":
@@ -1028,8 +1231,8 @@ export function openingHint(experience: OpeningExperienceId): string {
   }
 }
 
-export function defaultFontLabel(font: FontPairId | undefined): string {
-  return font ? fontPairById(font).label : "Romance";
+export function defaultFontLabel(font: string | undefined): string {
+  return fontNameFor(font ?? "cormorant-garamond");
 }
 
 export function elementTypeLabel(element: DesignElement): string {

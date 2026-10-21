@@ -266,6 +266,7 @@ export function GuestExperience({
                 background={palette.background}
                 ink={palette.ink}
                 guestName={guestName}
+                names={names}
                 autoOpen={design.opening.autoOpen}
                 reducedMotion={reducedMotion}
                 coverUrl={

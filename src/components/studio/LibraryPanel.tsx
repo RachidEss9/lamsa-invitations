@@ -2,7 +2,17 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
 import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
+import { Motif } from "@/components/invitation/Motif";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
+import {
+  BUILTIN_ASSETS,
+  BUILTIN_ASSET_CATEGORIES,
+  type BuiltinAsset,
+} from "@/lib/assets";
+import { PAGE_LAYOUTS } from "@/lib/layouts";
+import { REVEAL_PRESETS, type RevealPreset } from "@/lib/reveals";
+import { BUILTIN_STYLES, type BuiltinStyle } from "@/lib/styles";
+import { FONT_LIBRARY, fontById, fontFamilyFor } from "@/lib/fonts";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,7 +41,6 @@ import {
   type StylePreset,
 } from "@/lib/design";
 import {
-  FONT_PAIRS,
   TEMPLATES,
   draftFromTemplate,
   type InvitationContent,
@@ -91,6 +100,9 @@ interface LibraryPanelProps {
   onApplyAnimation: (animation: ElementAnimation) => void;
   onApplyStyle: (style: StylePreset) => void;
   onPlaceAsset: (storageId: string, name: string, url?: string | null) => void;
+  onAddPageLayout: (layoutId: string) => void;
+  onApplyBuiltinAsset: (asset: BuiltinAsset) => void;
+  onAddRevealPreset: (preset: RevealPreset) => void;
 }
 
 const TABS: { id: LibraryKind; label: string; icon: typeof Type }[] = [
@@ -101,14 +113,99 @@ const TABS: { id: LibraryKind; label: string; icon: typeof Type }[] = [
   { id: "style", label: "Styles", icon: Type },
 ];
 
-const STYLE_PRESETS: { name: string; fontPair: StylePreset["fontPair"] }[] = [
-  { name: "Crimson didone", fontPair: "didone" },
-  { name: "Crimson script", fontPair: "script" },
-  { name: "Sand & book", fontPair: "book" },
-  { name: "Obsidian display", fontPair: "display" },
-  { name: "Pearl heritage", fontPair: "heritage" },
-  { name: "Engraved", fontPair: "engraved" },
-];
+function ShapePreview({
+  shape,
+  fill,
+  stroke,
+}: {
+  shape: string;
+  fill: string;
+  stroke?: string;
+}) {
+  const paths: Record<string, string> = {
+    heart:
+      "M50 89 C22 69 4 52 4 34 C4 18 16 8 30 8 C40 8 47 14 50 22 C53 14 60 8 70 8 C84 8 96 18 96 34 C96 52 78 69 50 89Z",
+    arch: "M6 97 L6 47 C6 23 26 4 50 4 C74 4 94 23 94 47 L94 97 Z",
+    leaf: "M50 3 C84 20 95 55 50 97 C5 55 16 20 50 3 Z",
+    star:
+      "M50 3 L61.8 36.5 L97 38.2 L69.3 59.8 L78.5 94 L50 74.2 L21.5 94 L30.7 59.8 L3 38.2 L38.2 36.5 Z",
+  };
+  if (shape === "line") {
+    return <span className="block h-[2px] w-3/4" style={{ background: fill }} />;
+  }
+  if (shape === "rect" || shape === "frame") {
+    return (
+      <span
+        className="block h-3/4 w-2/3"
+        style={{ border: `1.5px solid ${stroke ?? fill}`, background: shape === "frame" ? "transparent" : fill }}
+      />
+    );
+  }
+  if (shape === "ellipse") {
+    return (
+      <span
+        className="block size-3/4 rounded-full"
+        style={{ border: stroke ? `1.5px solid ${stroke}` : undefined, background: fill }}
+      />
+    );
+  }
+  return (
+    <svg viewBox="0 0 100 100" className="h-3/4 w-3/4" aria-hidden>
+      <path d={paths[shape]} fill={fill} />
+    </svg>
+  );
+}
+
+function AssetThumb({ asset, content }: { asset: BuiltinAsset; content: InvitationContent }) {
+  const accent = content.palette.accent;
+  const ink = content.palette.ink;
+  const paper = content.palette.background;
+  if (asset.preview.type === "background") {
+    return <span className="block h-full w-full" style={{ background: asset.background }} />;
+  }
+  if (asset.preview.type === "motif") {
+    return (
+      <span className="grid h-full w-full place-items-center" style={{ color: accent }}>
+        <Motif id={asset.preview.motif} className="h-3/4 w-3/4" strokeWidth={0.9} />
+      </span>
+    );
+  }
+  if (asset.preview.type === "shape") {
+    return (
+      <span className="grid h-full w-full place-items-center">
+        <ShapePreview
+          shape={asset.preview.shape}
+          fill={accent}
+          stroke={asset.preview.shape === "frame" ? accent : undefined}
+        />
+      </span>
+    );
+  }
+  const first = asset.elements?.find((element) => element.kind === "shape");
+  const secondary = asset.elements?.find((element) => element.kind === "motif");
+  return (
+    <span className="relative grid h-full w-full place-items-center">
+      {first && (
+        <ShapePreview
+          shape={first.shape ?? "ellipse"}
+          fill={
+            first.fill ??
+            (first.fillToken === "ink" ? ink : first.fillToken === "paper" ? paper : accent)
+          }
+          stroke={
+            first.stroke ??
+            (first.strokeToken === "accent" ? accent : first.strokeToken === "ink" ? ink : undefined)
+          }
+        />
+      )}
+      {secondary && (
+        <span className="absolute inset-0 grid place-items-center" style={{ color: paper }}>
+          <Motif id={secondary.motif ?? "star"} className="h-1/3 w-1/3" strokeWidth={1.2} />
+        </span>
+      )}
+    </span>
+  );
+}
 
 function LibrarySection({
   title,
@@ -209,6 +306,9 @@ export function LibraryPanel({
   onApplyAnimation,
   onApplyStyle,
   onPlaceAsset,
+  onAddPageLayout,
+  onApplyBuiltinAsset,
+  onAddRevealPreset,
 }: LibraryPanelProps) {
   const items = useQuery(api.library.listMine, {}) as SavedItem[] | undefined;
   const createItem = useMutation(api.library.create);
@@ -220,6 +320,7 @@ export function LibraryPanel({
   const [tab, setTab] = useState<LibraryKind>("template");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+  const [sort, setSort] = useState<"curated" | "az">("curated");
   const [showArchived, setShowArchived] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<SavedItem | null>(null);
@@ -230,7 +331,7 @@ export function LibraryPanel({
   const [templateName, setTemplateName] = useState("");
   const [styleName, setStyleName] = useState("");
   const [styleFont, setStyleFont] = useState<StylePreset["fontPair"]>(
-    (content.fontPair as StylePreset["fontPair"]) ?? "didone",
+    fontById(content.fontPair).id,
   );
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -240,7 +341,7 @@ export function LibraryPanel({
   );
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return saved.filter((item) => {
+    const list = saved.filter((item) => {
       if (!showArchived && item.archived) return false;
       if (showArchived && !item.archived) return false;
       if (category !== "all" && (item.category ?? "") !== category) return false;
@@ -249,7 +350,8 @@ export function LibraryPanel({
         .toLowerCase()
         .includes(query);
     });
-  }, [category, saved, search, showArchived]);
+    return sort === "az" ? [...list].sort((a, b) => a.name.localeCompare(b.name)) : list;
+  }, [category, saved, search, showArchived, sort]);
 
   const categories = useMemo(
     () =>
@@ -259,14 +361,46 @@ export function LibraryPanel({
 
   const builtInTemplates = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return TEMPLATES.filter((template) => {
-      if (category !== "all" && template.occasion !== category) return false;
+    const list = TEMPLATES.filter((template) => {
+      if (
+        category !== "all" &&
+        template.occasion !== category &&
+        template.style !== category
+      ) {
+        return false;
+      }
       if (!query) return true;
-      return `${template.name} ${template.description} ${template.occasion}`
+      return `${template.name} ${template.description} ${template.occasion} ${template.style ?? ""}`
         .toLowerCase()
         .includes(query);
     });
-  }, [category, search]);
+    return sort === "az" ? [...list].sort((a, b) => a.name.localeCompare(b.name)) : list;
+  }, [category, search, sort]);
+
+  const builtInLayouts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const list = PAGE_LAYOUTS.filter((layout) =>
+      !query
+        ? true
+        : `${layout.name} ${layout.category} ${layout.note}`.toLowerCase().includes(query),
+    );
+    return sort === "az" ? [...list].sort((a, b) => a.name.localeCompare(b.name)) : list;
+  }, [search, sort]);
+
+  const builtInAssets = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const list = BUILTIN_ASSETS.filter((asset) => {
+      if (category !== "all" && asset.category !== category) return false;
+      if (!query) return true;
+      return `${asset.name} ${asset.category} ${asset.note}`.toLowerCase().includes(query);
+    });
+    return sort === "az" ? [...list].sort((a, b) => a.name.localeCompare(b.name)) : list;
+  }, [category, search, sort]);
+
+  const layoutPreviews = useMemo(
+    () => builtInLayouts.map((layout) => ({ layout, page: layout.build(content) })),
+    [builtInLayouts, content],
+  );
 
   const saveRecord = async (
     kind: LibraryKind,
@@ -390,16 +524,34 @@ export function LibraryPanel({
                   <SelectContent>
                     <SelectItem value="all">All categories</SelectItem>
                     {tab === "template" &&
-                      [...new Set(TEMPLATES.map((template) => template.occasion))].map(
-                        (occasion) => (
-                          <SelectItem key={occasion} value={occasion}>
-                            {occasion[0].toUpperCase() + occasion.slice(1)}
-                          </SelectItem>
+                      [
+                        ...new Set(
+                          TEMPLATES.flatMap((template) => [
+                            template.occasion,
+                            ...(template.style ? [template.style] : []),
+                          ]),
                         ),
-                      )}
+                      ].map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value[0].toUpperCase() + value.slice(1)}
+                        </SelectItem>
+                      ))}
+                    {tab === "asset" &&
+                      BUILTIN_ASSET_CATEGORIES.map((value) => (
+                        <SelectItem key={value} value={value}>{value}</SelectItem>
+                      ))}
                     {categories.map((value) => (
                       <SelectItem key={value} value={value}>{value}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                <Select value={sort} onValueChange={(value) => setSort(value as "curated" | "az")}>
+                  <SelectTrigger className="h-8 w-[112px] rounded-none text-[11px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="curated">Curated</SelectItem>
+                    <SelectItem value="az">Name A–Z</SelectItem>
                   </SelectContent>
                 </Select>
                 <button
@@ -415,7 +567,15 @@ export function LibraryPanel({
                   Archived
                 </button>
                 <span className="ml-auto font-meta text-[9px] uppercase tracking-[0.1em] text-ink/35">
-                  {tab === "template" ? builtInTemplates.length : filtered.length}
+                  {tab === "template"
+                    ? `${builtInTemplates.length} templates · ${builtInLayouts.length} layouts`
+                    : tab === "asset"
+                      ? `${builtInAssets.length} built-in · ${filtered.length} saved`
+                      : tab === "animation"
+                        ? `${ANIMATION_PRESETS.length - 1} presets · ${REVEAL_PRESETS.length} reveals`
+                        : tab === "opening"
+                          ? `${OPENING_EXPERIENCES.length} openings`
+                          : `${BUILTIN_STYLES.length} styles · ${filtered.length} saved`}
                 </span>
               </div>
 
@@ -523,6 +683,48 @@ export function LibraryPanel({
                           );
                         })}
                       </div>
+                    )}
+                  </LibrarySection>
+
+                  <LibrarySection title="Page & section layouts">
+                    <p className="mb-3 text-[10px] leading-relaxed text-ink/45">
+                      Each layout adds a new editable page with real type, rules, ornaments,
+                      and placeholders. Nothing on the page is a static image.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {layoutPreviews.map(({ layout, page }) => (
+                        <div
+                          key={layout.id}
+                          className="group border border-ink/15 p-2 transition-colors hover:border-ink"
+                        >
+                          <DesignStage>
+                            {() => (
+                              <DesignPageView
+                                page={page}
+                                time={100000}
+                                imageUrls={{}}
+                                ignoreExit
+                              />
+                            )}
+                          </DesignStage>
+                          <p className="mt-2 font-display text-[14px] leading-tight">
+                            {layout.name}
+                          </p>
+                          <p className="mt-0.5 line-clamp-2 text-[9px] leading-relaxed text-ink/40">
+                            {layout.note}
+                          </p>
+                          <Button
+                            type="button"
+                            className="mt-2 h-7 w-full rounded-none text-[9px] uppercase tracking-[0.1em]"
+                            onClick={() => onAddPageLayout(layout.id)}
+                          >
+                            <Plus className="size-3" /> Add page
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    {layoutPreviews.length === 0 && (
+                      <p className="text-[11px] text-ink/45">No layouts match this search.</p>
                     )}
                   </LibrarySection>
 
@@ -718,7 +920,12 @@ export function LibraryPanel({
                           }}
                           className="border border-ink/15 p-2 text-left transition-colors hover:border-ink disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          <p className="text-[11px] font-medium">{preset.label}</p>
+                          <p className="text-[11px] font-medium">
+                            {preset.label}
+                            <span className="ml-1.5 text-[8px] uppercase tracking-[0.1em] text-ink/30">
+                              {preset.group}
+                            </span>
+                          </p>
                           <p className="text-[9px] leading-snug text-ink/40">{preset.note}</p>
                         </button>
                       ))}
@@ -741,6 +948,60 @@ export function LibraryPanel({
                         <Plus className="size-3.5" /> Save current motion
                       </Button>
                     )}
+                  </LibrarySection>
+
+                  <LibrarySection title="Interactive reveals">
+                    <p className="mb-3 text-[10px] leading-relaxed text-ink/45">
+                      Each preset creates a real cover and a linked target on this page.
+                      Tap the cover in Guest preview or on the published invitation to
+                      test the reveal. When a text or image layer is selected, it becomes
+                      the target where appropriate.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {REVEAL_PRESETS.filter((preset) => {
+                        const query = search.trim().toLowerCase();
+                        return !query
+                          ? true
+                          : `${preset.name} ${preset.note} ${preset.category}`
+                              .toLowerCase()
+                              .includes(query);
+                      }).map((preset) => (
+                        <div key={preset.id} className="border border-ink/15 p-3">
+                          <div
+                            className="mb-2 grid h-16 place-items-center overflow-hidden"
+                            style={{ background: content.palette.background }}
+                          >
+                            {preset.cover.kind === "motif" ? (
+                              <span style={{ color: content.palette.accent }}>
+                                <Motif
+                                  id={preset.cover.motif}
+                                  className="size-12"
+                                  strokeWidth={1}
+                                />
+                              </span>
+                            ) : (
+                              <ShapePreview
+                                shape={preset.cover.shape}
+                                fill={content.palette.accent}
+                                stroke={content.palette.ink}
+                              />
+                            )}
+                          </div>
+                          <p className="font-display text-[14px] leading-tight">{preset.name}</p>
+                          <p className="mt-0.5 text-[9px] leading-relaxed text-ink/40">{preset.note}</p>
+                          <p className="mt-1 text-[8px] uppercase tracking-[0.12em] text-ink/30">
+                            {preset.category} · {preset.effect} · {preset.duration}ms
+                          </p>
+                          <Button
+                            type="button"
+                            className="mt-2 h-7 w-full rounded-none text-[9px] uppercase tracking-[0.1em]"
+                            onClick={() => onAddRevealPreset(preset)}
+                          >
+                            <Plus className="size-3" /> Add reveal
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </LibrarySection>
 
                   <LibrarySection title="Saved presets">
@@ -786,6 +1047,39 @@ export function LibraryPanel({
               )}
 
               {tab === "asset" && (
+                <>
+                <LibrarySection title="Built-in design assets">
+                  <p className="mb-3 text-[10px] leading-relaxed text-ink/45">
+                    Vector ornaments, backgrounds, frames, dividers, seals and masks drawn
+                    by the atelier. They are inserted as editable layers or applied to the
+                    current page, never as flat screenshots.
+                  </p>
+                  {builtInAssets.length === 0 ? (
+                    <p className="text-[11px] text-ink/45">No built-in assets match this search.</p>
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                      {builtInAssets.map((asset) => (
+                        <div key={asset.id} className="border border-ink/15 p-2">
+                          <div className="aspect-[4/3] overflow-hidden border border-ink/10">
+                            <AssetThumb asset={asset} content={content} />
+                          </div>
+                          <p className="mt-1.5 truncate text-[11px]">{asset.name}</p>
+                          <p className="text-[8px] uppercase tracking-[0.1em] text-ink/35">
+                            {asset.category}
+                          </p>
+                          <Button
+                            type="button"
+                            className="mt-2 h-7 w-full rounded-none text-[9px] uppercase tracking-[0.1em]"
+                            onClick={() => onApplyBuiltinAsset(asset)}
+                          >
+                            {asset.background ? "Apply page" : "Place on page"}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </LibrarySection>
+
                 <LibrarySection
                   title="Design assets"
                   action={
@@ -861,6 +1155,7 @@ export function LibraryPanel({
                     </div>
                   )}
                 </LibrarySection>
+                </>
               )}
 
               {tab === "style" && (
@@ -878,11 +1173,11 @@ export function LibraryPanel({
                       </div>
                       <div>
                         <p className="mb-1 text-[9px] uppercase tracking-[0.12em] text-ink/40">Typeface</p>
-                        <Select value={styleFont} onValueChange={(value) => setStyleFont(value as StylePreset["fontPair"])}>
-                          <SelectTrigger className="h-8 w-[150px] rounded-none text-[11px]"><SelectValue /></SelectTrigger>
+                        <Select value={styleFont} onValueChange={setStyleFont}>
+                          <SelectTrigger className="h-8 w-[170px] rounded-none text-[11px]"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {FONT_PAIRS.map((pair) => (
-                              <SelectItem key={pair.id} value={pair.id}>{pair.label}</SelectItem>
+                            {FONT_LIBRARY.map((font) => (
+                              <SelectItem key={font.id} value={font.id}>{font.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -899,6 +1194,7 @@ export function LibraryPanel({
                               accent: content.palette.accent,
                             },
                             fontPair: styleFont,
+                            background: design.pages[0]?.background,
                           } satisfies StylePreset)
                         }
                       >
@@ -908,31 +1204,47 @@ export function LibraryPanel({
                   </LibrarySection>
 
                   <LibrarySection title="Built-in styles">
+                    <p className="mb-3 text-[10px] leading-relaxed text-ink/45">
+                      A style changes the page treatment, palette, and all text typefaces.
+                      Copy, photographs, positions, shapes, and interactions stay exactly as
+                      they are. Undo is available.
+                    </p>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {STYLE_PRESETS.map((preset) => (
+                      {BUILTIN_STYLES.filter((style) => {
+                        const query = search.trim().toLowerCase();
+                        return !query
+                          ? true
+                          : `${style.name} ${style.note}`.toLowerCase().includes(query);
+                      })
+                        .sort((a, b) => (sort === "az" ? a.name.localeCompare(b.name) : 0))
+                        .map((preset: BuiltinStyle) => (
                         <button
                           key={preset.name}
                           type="button"
-                          onClick={() =>
-                            onApplyStyle({
-                              palette: {
-                                background: design.pages[0]?.background ?? content.palette.background,
-                                ink: content.palette.ink,
-                                accent: content.palette.accent,
-                              },
-                              fontPair: preset.fontPair,
-                            })
-                          }
+                          onClick={() => onApplyStyle(preset)}
                           className="border border-ink/15 p-3 text-left hover:border-ink"
                         >
-                          <p className="font-display text-[15px]">{preset.name}</p>
-                          <p className="text-[9px] uppercase tracking-[0.1em] text-ink/40">
-                            {FONT_PAIRS.find((pair) => pair.id === preset.fontPair)?.label}
-                          </p>
+                          <div className="flex items-start justify-between gap-2">
+                            <span>
+                              <span className="block font-display text-[15px]">{preset.name}</span>
+                              <span className="mt-0.5 block text-[8px] uppercase tracking-[0.1em] text-ink/35">
+                                {preset.note}
+                              </span>
+                            </span>
+                            <span
+                              className="text-[19px] leading-none text-ink/65"
+                              style={{ fontFamily: fontFamilyFor(preset.fontPair) }}
+                            >
+                              Aa
+                            </span>
+                          </div>
                           <div className="mt-2 flex gap-1">
-                            {[content.palette.background, content.palette.ink, content.palette.accent].map((color) => (
-                              <span key={color} className="size-4 border border-ink/10" style={{ background: color }} />
+                            {[preset.palette.background, preset.palette.ink, preset.palette.accent].map((color, index) => (
+                              <span key={`${color}-${index}`} className="size-4 border border-ink/10" style={{ background: color }} />
                             ))}
+                            <span className="ml-auto text-[9px] text-ink/35">
+                              {fontById(preset.fontPair).name}
+                            </span>
                           </div>
                         </button>
                       ))}
@@ -949,6 +1261,9 @@ export function LibraryPanel({
                           return (
                             <div key={item._id} className="border border-ink/15 p-3">
                               <p className="font-display text-[15px]">{item.name}</p>
+                              <p className="text-[8px] uppercase tracking-[0.1em] text-ink/35">
+                                {fontById(style?.fontPair).name}
+                              </p>
                               <div className="mt-2 flex gap-1">
                                 {[style?.palette?.background, style?.palette?.ink, style?.palette?.accent].map((color, index) => (
                                   <span key={index} className="size-4 border border-ink/10" style={{ background: color ?? "#eee" }} />
@@ -992,6 +1307,7 @@ export function LibraryPanel({
                 background={content.palette.background}
                 ink={content.palette.ink}
                 guestName="Amelia"
+                names={[content.names.primary, content.names.secondary].filter(Boolean).join(" & ") || "LAMSA"}
                 onDone={() => undefined}
                 reducedMotion={false}
               />

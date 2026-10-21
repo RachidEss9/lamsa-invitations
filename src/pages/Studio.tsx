@@ -7,7 +7,8 @@ import { OpeningStage } from "@/components/invitation/OpeningStage";
 import { GuestExperience } from "@/components/studio/GuestExperience";
 import { Inspector } from "@/components/studio/Inspector";
 import { LibraryPanel } from "@/components/studio/LibraryPanel";
-import { StudioCanvas } from "@/components/studio/StudioCanvas";
+import { StudioCanvas, type CanvasContextAction } from "@/components/studio/StudioCanvas";
+import { ShortcutReference } from "@/components/studio/ShortcutReference";
 import { Timeline } from "@/components/studio/Timeline";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +37,7 @@ import {
   applyStylePreset,
   cleanRevealLinks,
   clipsForPage,
+  defaultAnimation,
   duplicateElements,
   makeElement,
   makeId,
@@ -54,6 +56,9 @@ import {
   contentFromInvitation,
   type InvitationContent,
 } from "@/lib/invitation";
+import { pageLayoutById } from "@/lib/layouts";
+import type { BuiltinAsset } from "@/lib/assets";
+import type { RevealPreset } from "@/lib/reveals";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -70,6 +75,7 @@ import {
   Layers,
   Layout,
   Library,
+  Keyboard,
   Loader2,
   Monitor,
   PanelLeft,
@@ -249,6 +255,12 @@ export default function Studio() {
   const reducedMotion = usePrefersReducedMotion();
   const [historyTick, setHistoryTick] = useState(0);
   const [historyFlags, setHistoryFlags] = useState({ undo: false, redo: false });
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [resetViewToken, setResetViewToken] = useState(0);
+  const [editTextRequest, setEditTextRequest] = useState<{
+    id: string;
+    token: number;
+  } | null>(null);
 
   const pastRef = useRef<DesignDocument[]>([]);
   const futureRef = useRef<DesignDocument[]>([]);
@@ -716,6 +728,303 @@ export default function Studio() {
     );
   };
 
+  const cutSelection = () => {
+    if (selectedIds.length === 0) return;
+    copySelection();
+    deleteSelection();
+  };
+
+  const selectAll = () => {
+    if (!page) return;
+    const ids = page.elements
+      .filter((element) => !element.locked && !element.hidden)
+      .map((element) => element.id);
+    setSelectedIds(ids);
+    setAnimating(false);
+    setPlaying(false);
+    toast.success(
+      ids.length > 0 ? `${ids.length} layers selected.` : "No unlocked layers on this page.",
+    );
+  };
+
+  const toggleSelectionLock = () => {
+    if (selectedIds.length === 0) return;
+    const lock = !selected.every((element) => element.locked);
+    setPageElements((elements) =>
+      elements.map((element) =>
+        selectedIds.includes(element.id) ? { ...element, locked: lock } : element,
+      ),
+    );
+    toast.success(lock ? "Selection locked." : "Selection unlocked.");
+  };
+
+  const toggleSelectionHidden = () => {
+    if (selectedIds.length === 0) return;
+    const hidden = !selected.every((element) => element.hidden);
+    setPageElements((elements) =>
+      elements.map((element) =>
+        selectedIds.includes(element.id) ? { ...element, hidden } : element,
+      ),
+    );
+    toast.success(hidden ? "Selection hidden." : "Selection shown.");
+  };
+
+  const moveSelectionToEdge = (edge: "front" | "back") => {
+    if (selectedIds.length === 0) return;
+    setPageElements((elements) => {
+      const group = elements.filter((element) => selectedIds.includes(element.id));
+      const rest = elements.filter((element) => !selectedIds.includes(element.id));
+      return edge === "front" ? [...rest, ...group] : [...group, ...rest];
+    });
+  };
+
+  const fitCanvas = () => {
+    setZoom(1);
+    setResetViewToken((token) => token + 1);
+  };
+
+  const duplicateForDrag = () => {
+    if (selectedIds.length === 0) return;
+    // Keep the selection on the originals so the drag continues seamlessly;
+    // the duplicate stays where the layer started.
+    setPageElements((elements) => duplicateElements(elements, selectedIds));
+    toast.success("Layer duplicated. Drag to place it.");
+  };
+
+  const addPageLayout = (layoutId: string) => {
+    if (!content) return;
+    const layout = pageLayoutById(layoutId);
+    const nextPage = layout.build(content);
+    const nextIndex = designRef.current?.pages.length ?? 0;
+    apply((current) => ({ ...current, pages: [...current.pages, nextPage] }));
+    setPageIndex(nextIndex);
+    setSelectedIds([]);
+    setTime(0);
+    timeRef.current = 0;
+    setLibrariesOpen(false);
+    toast.success(`${layout.name} page added. Every layer is editable.`);
+  };
+
+  const applyBuiltinAsset = (asset: BuiltinAsset) => {
+    if (!content) return;
+    if (asset.background) {
+      patchPage({ background: asset.background });
+      setLibrariesOpen(false);
+      toast.success(`${asset.name} applied to this page.`);
+      return;
+    }
+    if (!asset.elements?.length) return;
+    const resolve = (token?: "accent" | "ink" | "paper") =>
+      token === "ink"
+        ? content.palette.ink
+        : token === "paper"
+          ? content.palette.background
+          : content.palette.accent;
+    const created = asset.elements.map((spec, index) =>
+      makeElement(spec.kind, {
+        name: spec.name,
+        shape: spec.shape,
+        motif: spec.motif,
+        x: spec.x,
+        y: spec.y,
+        w: spec.w,
+        h: spec.h,
+        rotation: spec.rotation ?? 0,
+        fill:
+          spec.fill ??
+          (spec.kind === "shape" ? resolve(spec.fillToken ?? "accent") : undefined),
+        color:
+          spec.kind === "motif" ? resolve(spec.fillToken ?? "ink") : undefined,
+        stroke:
+          spec.stroke ??
+          (spec.strokeToken ? resolve(spec.strokeToken) : undefined),
+        strokeWidth: spec.strokeWidth,
+        radius: spec.radius,
+        opacity: spec.opacity ?? 1,
+        animation: defaultAnimation("fade", 120 + index * 90),
+      }),
+    );
+    setPageElements((elements) => [...elements, ...created]);
+    setSelectedIds(created.map((element) => element.id));
+    setAnimating(false);
+    setPlaying(false);
+    setLibrariesOpen(false);
+    toast.success(
+      `${asset.name} placed. Move, recolour, or restyle it like any other layer.`,
+    );
+  };
+
+  const addRevealPreset = (preset: RevealPreset) => {
+    if (!page || !content) return;
+    const candidates = selected.filter((element) => !element.reveal);
+    const preferred = candidates.find((element) =>
+      preset.target === "photo" ? element.kind === "image" : element.kind === "text",
+    );
+    const reusable = candidates.find((element) => element.id === preferred?.id);
+    const alreadyCovered = reusable
+      ? page.elements.some((element) => element.reveal?.targetId === reusable.id)
+      : false;
+    const targetElement: DesignElement =
+      reusable && !alreadyCovered
+        ? reusable
+        : makeElement(preset.target === "photo" ? "image" : "text", {
+            name:
+              preset.target === "photo"
+                ? "Revealed photograph"
+                : preset.target === "details"
+                  ? "Revealed details"
+                  : "Revealed message",
+            x: 250,
+            y: 520,
+            w: 500,
+            h: preset.target === "photo" ? 420 : 220,
+            text:
+              preset.target === "photo"
+                ? undefined
+                : preset.target === "details"
+                  ? [content.venueName, content.venueAddress].filter(Boolean).join("\n")
+                  : (content.message || "A note for {{guest}}"),
+            font: content.fontPair,
+            fontSize: preset.target === "details" ? 23 : 28,
+            lineHeight: 1.6,
+            letterSpacing: 0.04,
+            align: "center",
+            color: content.palette.ink,
+            fit: "cover",
+            animation: defaultAnimation("fade", 150),
+          });
+
+    const coverWidth =
+      preset.cover.kind === "motif"
+        ? 280
+        : preset.cover.shape === "ellipse"
+          ? Math.max(280, Math.min(460, targetElement.w + 20))
+          : Math.max(240, Math.min(840, targetElement.w + 40));
+    const coverHeight =
+      preset.cover.kind === "motif"
+        ? 280
+        : preset.cover.shape === "heart"
+          ? Math.max(220, Math.min(600, targetElement.h + 60))
+          : Math.max(260, Math.min(720, targetElement.h + 80));
+    const cover = makeElement(preset.cover.kind, {
+      name: `${preset.name} cover`,
+      shape: preset.cover.kind === "shape" ? preset.cover.shape : undefined,
+      motif: preset.cover.kind === "motif" ? preset.cover.motif : undefined,
+      x: targetElement.x + (targetElement.w - coverWidth) / 2,
+      y: targetElement.y + (targetElement.h - coverHeight) / 2,
+      w: coverWidth,
+      h: coverHeight,
+      fill:
+        preset.cover.kind === "shape"
+          ? preset.cover.fillToken === "ink"
+            ? content.palette.ink
+            : preset.cover.fillToken === "paper"
+              ? content.palette.background
+              : content.palette.accent
+          : undefined,
+      color:
+        preset.cover.kind === "motif"
+          ? preset.cover.colorToken === "ink"
+            ? content.palette.ink
+            : content.palette.accent
+          : undefined,
+      stroke:
+        preset.cover.kind === "shape" && preset.cover.strokeToken
+          ? preset.cover.strokeToken === "ink"
+            ? content.palette.ink
+            : preset.cover.strokeToken === "paper"
+              ? content.palette.background
+              : content.palette.accent
+          : undefined,
+      strokeWidth:
+        preset.cover.kind === "shape" ? preset.cover.strokeWidth : undefined,
+      radius: preset.cover.kind === "shape" ? preset.cover.radius : undefined,
+      animation: defaultAnimation("scaleIn", 700),
+      reveal: {
+        interactionId: makeId("interaction"),
+        targetId: targetElement.id,
+        effect: preset.effect,
+        direction: preset.direction,
+        duration: preset.duration,
+        trigger: "tap",
+        hint: preset.hint,
+      },
+    });
+    setPageElements((elements) => [
+      ...elements,
+      ...(reusable && !alreadyCovered ? [] : [targetElement]),
+      cover,
+    ]);
+    setSelectedIds([cover.id]);
+    setAnimating(true);
+    setPlaying(true);
+    setLibrariesOpen(false);
+    toast.success(`${preset.name} added. Tap the cover in Guest preview to test it.`);
+  };
+
+  const handleCanvasContextAction = (action: CanvasContextAction) => {
+    switch (action) {
+      case "copy":
+        copySelection();
+        break;
+      case "cut":
+        cutSelection();
+        break;
+      case "paste":
+        pasteClipboard();
+        break;
+      case "duplicate":
+        duplicateSelection();
+        break;
+      case "delete":
+        deleteSelection();
+        break;
+      case "group":
+        groupSelection();
+        break;
+      case "ungroup":
+        ungroupSelection();
+        break;
+      case "lock":
+        setPageElements((elements) =>
+          elements.map((element) =>
+            selectedIds.includes(element.id) ? { ...element, locked: true } : element,
+          ),
+        );
+        break;
+      case "unlock":
+        setPageElements((elements) =>
+          elements.map((element) =>
+            selectedIds.includes(element.id) ? { ...element, locked: false } : element,
+          ),
+        );
+        break;
+      case "hide":
+        setPageElements((elements) =>
+          elements.map((element) =>
+            selectedIds.includes(element.id) ? { ...element, hidden: true } : element,
+          ),
+        );
+        break;
+      case "show":
+        setPageElements((elements) =>
+          elements.map((element) =>
+            selectedIds.includes(element.id) ? { ...element, hidden: false } : element,
+          ),
+        );
+        break;
+      case "front":
+        moveSelectionToEdge("front");
+        break;
+      case "back":
+        moveSelectionToEdge("back");
+        break;
+      case "selectAll":
+        selectAll();
+        break;
+    }
+  };
+
   const pasteClipboard = () => {
     const source = clipboardRef.current;
     if (source.length === 0) return;
@@ -1081,7 +1390,8 @@ export default function Studio() {
     }
   };
 
-  // Keyboard shortcuts: undo/redo, duplicate, delete, arrows, save, play.
+  // Keyboard shortcuts follow the platform modifier (⌘ on macOS, Ctrl
+  // elsewhere) and never fire from a field, a textarea, or inline text editing.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -1094,35 +1404,102 @@ export default function Studio() {
       ) {
         return;
       }
+      if (librariesOpen || guestOpen || timelinePreviewOpen || shortcutsOpen || shareOpen) {
+        return;
+      }
       const mod = event.metaKey || event.ctrlKey;
-      if (mod && event.key.toLowerCase() === "z") {
+      const key = event.key.toLowerCase();
+
+      if (mod && key === "z") {
         event.preventDefault();
         if (event.shiftKey) redo();
         else undo();
         return;
       }
-      if (mod && event.key.toLowerCase() === "y") {
+      if (mod && key === "y") {
         event.preventDefault();
         redo();
         return;
       }
-      if (mod && event.key.toLowerCase() === "s") {
+      if (mod && key === "s") {
         event.preventDefault();
         if (designRef.current) void persistDesign(designRef.current);
         return;
       }
-      if (mod && event.key.toLowerCase() === "d") {
+      if (mod && key === "enter") {
+        event.preventDefault();
+        setGuestOpen((value) => !value);
+        return;
+      }
+      if (mod && key === "d") {
         event.preventDefault();
         duplicateSelection();
         return;
       }
-      if (mod && event.key.toLowerCase() === "c") {
+      if (mod && key === "c") {
+        event.preventDefault();
         copySelection();
         return;
       }
-      if (mod && event.key.toLowerCase() === "v") {
+      if (mod && key === "x") {
+        event.preventDefault();
+        cutSelection();
+        return;
+      }
+      if (mod && key === "v") {
         event.preventDefault();
         pasteClipboard();
+        return;
+      }
+      if (mod && key === "a") {
+        event.preventDefault();
+        selectAll();
+        return;
+      }
+      if (mod && key === "g") {
+        event.preventDefault();
+        if (event.shiftKey) ungroupSelection();
+        else groupSelection();
+        return;
+      }
+      if (mod && event.shiftKey && key === "l") {
+        event.preventDefault();
+        toggleSelectionLock();
+        return;
+      }
+      if (mod && event.shiftKey && key === "h") {
+        event.preventDefault();
+        toggleSelectionHidden();
+        return;
+      }
+      if (mod && event.key === "]") {
+        event.preventDefault();
+        moveSelectionToEdge("front");
+        return;
+      }
+      if (mod && event.key === "[") {
+        event.preventDefault();
+        moveSelectionToEdge("back");
+        return;
+      }
+      if (mod && (event.key === "=" || event.key === "+")) {
+        event.preventDefault();
+        setZoom((value) => Math.min(2.4, value * 1.2));
+        return;
+      }
+      if (mod && (event.key === "-" || event.key === "_")) {
+        event.preventDefault();
+        setZoom((value) => Math.max(0.4, value / 1.2));
+        return;
+      }
+      if (mod && event.key === "0") {
+        event.preventDefault();
+        fitCanvas();
+        return;
+      }
+      if (!mod && !event.altKey && key === "p") {
+        event.preventDefault();
+        setPlaying((value) => !value);
         return;
       }
       if (event.key === "Delete" || event.key === "Backspace") {
@@ -1134,11 +1511,7 @@ export default function Studio() {
       }
       if (event.key === "Escape") {
         setSelectedIds([]);
-        return;
-      }
-      if (event.key === " ") {
-        event.preventDefault();
-        setPlaying((value) => !value);
+        setShortcutsOpen(false);
         return;
       }
       if (event.key.startsWith("Arrow") && selectedIds.length) {
@@ -1158,7 +1531,7 @@ export default function Studio() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, undo, redo, persistDesign, pageIndex, design]);
+  }, [selectedIds, undo, redo, persistDesign, pageIndex, design, librariesOpen, guestOpen, timelinePreviewOpen, shortcutsOpen, shareOpen]);
 
   if (invitation === undefined && idIsValid) {
     return (
@@ -1216,6 +1589,7 @@ export default function Studio() {
             background={content.palette.background}
             ink={content.palette.ink}
             guestName="Amelia"
+            names={namesLabel}
             coverUrl={
               design.opening.coverStorageId
                 ? imageUrls[design.opening.coverStorageId]
@@ -1720,6 +2094,12 @@ export default function Studio() {
             <Library className="size-3.5" />
             <span className="hidden sm:inline">Libraries</span>
           </Button>
+          <IconButton
+            label="Keyboard shortcuts"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            <Keyboard className="size-3.5" />
+          </IconButton>
           <Button
             type="button"
             variant="outline"
@@ -1785,6 +2165,7 @@ export default function Studio() {
               style={{ maxWidth: DEVICE_WIDTH[device] }}
             >
               <StudioCanvas
+                key={page.id}
                 page={page}
                 time={animating ? time : 100000}
                 zoom={zoom}
@@ -1796,6 +2177,8 @@ export default function Studio() {
                 rtl={Boolean(content.rtl)}
                 aspectLocked={aspectLocked}
                 ignoreExit={!animating}
+                resetViewToken={resetViewToken}
+                editRequest={editTextRequest}
                 onZoom={setZoom}
                 onSelect={(ids) => {
                   setSelectedIds(ids);
@@ -1813,6 +2196,12 @@ export default function Studio() {
                 onResize={(elementId, box) => patchElement(elementId, box)}
                 onRotate={(elementId, rotation) => patchElement(elementId, { rotation })}
                 onReveal={testReveal}
+                onAltDuplicate={duplicateForDrag}
+                onTextCommit={(elementId, text) => {
+                  patchElement(elementId, { text });
+                  toast.success("Text updated.");
+                }}
+                onContextAction={handleCanvasContextAction}
               />
             </div>
 
@@ -1838,9 +2227,9 @@ export default function Studio() {
               </button>
               <button
                 type="button"
-                onClick={() => setZoom(1)}
+                onClick={fitCanvas}
                 className="pointer-events-auto border border-ink/15 bg-[var(--paper-light)]/90 px-1.5 py-1 font-meta text-[8px] text-ink/50 backdrop-blur hover:text-ink"
-                title="Reset zoom"
+                title="Fit canvas (⌘/Ctrl + 0)"
               >
                 {Math.round(zoom * 100)}%
               </button>
@@ -1965,6 +2354,9 @@ export default function Studio() {
             onUploadImage={handleInspectorUpload}
             onTestReveal={testReveal}
             onPreviewAnimation={previewAnimation}
+            onEditText={(elementId) =>
+              setEditTextRequest({ id: elementId, token: Date.now() })
+            }
           />
         </aside>
       </div>
@@ -2036,6 +2428,10 @@ export default function Studio() {
                   onUploadImage={handleInspectorUpload}
                   onTestReveal={testReveal}
                   onPreviewAnimation={previewAnimation}
+                  onEditText={(elementId) => {
+                    setEditTextRequest({ id: elementId, token: Date.now() });
+                    setMobileSheet(null);
+                  }}
                 />
               ) : mobileSheet === "timeline" ? (
                 <div className="h-[240px]">
@@ -2093,6 +2489,9 @@ export default function Studio() {
         onApplyAnimation={applyAnimation}
         onApplyStyle={applyStyle}
         onPlaceAsset={placeAsset}
+        onAddPageLayout={addPageLayout}
+        onApplyBuiltinAsset={applyBuiltinAsset}
+        onAddRevealPreset={addRevealPreset}
       />
 
       {guestOpen && (
@@ -2188,6 +2587,8 @@ export default function Studio() {
           </div>
         </DialogContent>
       </Dialog>
+      <ShortcutReference open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+
       <span className="sr-only" aria-live="polite">
         {historyTick} edits
       </span>

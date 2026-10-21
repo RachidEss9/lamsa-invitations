@@ -885,6 +885,10 @@ export default function InvitationPage() {
                 background={data.palette.background}
                 ink={data.palette.ink}
                 guestName={data.guestName}
+                names={
+                  [data.names.primary, data.names.secondary].filter(Boolean).join(" & ") ||
+                  "LAMSA"
+                }
                 autoOpen={designOpeningSettings.autoOpen}
                 reducedMotion={reducedMotion}
                 coverUrl={

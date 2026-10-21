@@ -8,7 +8,7 @@ import {
   type DesignPage,
   type RevealConfig,
 } from "@/lib/design";
-import { fontPairById } from "@/lib/invitation";
+import { ensureDesignFonts, fontFamilyFor } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import { Motif } from "./Motif";
 import {
@@ -190,7 +190,7 @@ function ElementVisual({
       <div
         className="h-full w-full whitespace-pre-wrap break-words"
         style={{
-          fontFamily: fontPairById(element.font ?? "romance").family,
+          fontFamily: fontFamilyFor(element.font ?? "cormorant-garamond"),
           fontSize: element.fontSize ?? 26,
           fontWeight: element.fontWeight ?? 400,
           fontStyle: element.italic ? "italic" : "normal",
@@ -199,8 +199,25 @@ function ElementVisual({
           textAlign: element.align ?? "center",
           textTransform: element.uppercase ? "uppercase" : "none",
           color: element.color ?? "#161616",
-          direction: rtl ? "rtl" : "ltr",
+          direction:
+            element.direction === "rtl"
+              ? "rtl"
+              : element.direction === "ltr"
+                ? "ltr"
+                : rtl
+                  ? "rtl"
+                  : "ltr",
+          unicodeBidi: element.direction === "auto" ? "plaintext" : "normal",
         }}
+        dir={
+          element.direction === "rtl"
+            ? "rtl"
+            : element.direction === "ltr"
+              ? "ltr"
+              : rtl
+                ? "rtl"
+                : "ltr"
+        }
       >
         {personalize(element.text, guestName)}
       </div>
@@ -389,6 +406,8 @@ export interface DesignPageViewProps {
   revealPreview?: Set<string>;
   /** Studio design view: show exits as still present. */
   ignoreExit?: boolean;
+  /** Studio inline editing: the text editor replaces this layer visually. */
+  hideElementId?: string | null;
   /**
    * Time at which the card entered the viewport, in page milliseconds. Scroll
    * triggered elements wait for this moment (null) and then animate locally.
@@ -412,6 +431,7 @@ export function DesignPageView({
   revealed,
   revealPreview,
   ignoreExit,
+  hideElementId,
   scrollActivationTime = 0,
   className,
   style,
@@ -419,6 +439,21 @@ export function DesignPageView({
   const [localRevealed, setLocalRevealed] = useState<Set<string>>(new Set());
   const opened = revealed ?? localRevealed;
   const covered = coveredElementIds(page);
+
+  // Fetch only the faces this page actually sets, and only when needed. The
+  // public invitation and the studio share this path, so what you see in the
+  // editor is what guests download.
+  useEffect(() => {
+    ensureDesignFonts(
+      page.elements
+        .filter((element) => element.kind === "text")
+        .map((element) => ({
+          id: element.font,
+          weight: element.fontWeight ?? 400,
+          italic: element.italic,
+        })),
+    );
+  }, [page.elements]);
 
   const handleReveal = (targetId: string, interactionId: string) => {
     if (!interactive) return;
@@ -447,6 +482,7 @@ export function DesignPageView({
       />
       {page.elements.map((element) => {
         if (element.hidden && !editor) return null;
+        if (hideElementId === element.id) return null;
         const isCovered = covered.has(element.id);
         const cover = page.elements.find(
           (candidate) => candidate.reveal?.targetId === element.id,

@@ -22,6 +22,8 @@ interface OpeningStageProps {
   background: string;
   ink: string;
   guestName?: string | null;
+  /** Couple or host names for the typographic and image openers. */
+  names?: string;
   autoOpen?: boolean;
   reducedMotion?: boolean;
   coverUrl?: string;
@@ -41,6 +43,7 @@ export function OpeningStage({
   background,
   ink,
   guestName,
+  names = "LAMSA",
   autoOpen = false,
   reducedMotion = false,
   coverUrl,
@@ -99,7 +102,7 @@ export function OpeningStage({
 
   let scene: ReactNode = null;
 
-  if (experience === "envelope") {
+  if (experience === "envelope" || experience === "wax-seal") {
     scene = (
       <div
         className="relative"
@@ -298,6 +301,205 @@ export function OpeningStage({
         ))}
       </div>
     );
+  } else if (experience === "folding") {
+    scene = (
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{ perspective: "1500px", background: "#120307" }}
+      >
+        <div
+          className="absolute inset-y-0 left-0 w-1/2 origin-left border-r shadow-[0_0_60px_rgba(0,0,0,0.35)]"
+          style={{
+            background: `linear-gradient(120deg, #3f0009, ${accent})`,
+            borderColor: `${background}44`,
+            transform: `rotateY(${-p * 96}deg)`,
+            transformStyle: "preserve-3d",
+          }}
+        />
+        <div
+          className="absolute inset-y-0 right-0 w-1/2 origin-right border-l shadow-[0_0_60px_rgba(0,0,0,0.35)]"
+          style={{
+            background: `linear-gradient(240deg, #3f0009, ${accent})`,
+            borderColor: `${background}44`,
+            transform: `rotateY(${p * 96}deg)`,
+            transformStyle: "preserve-3d",
+          }}
+        />
+        <div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"
+          style={{ opacity: clamp(1 - p * 1.6) }}
+        >
+          <p className="text-[0.55rem] uppercase tracking-[0.34em]" style={{ color: accent }}>
+            The gatefold
+          </p>
+          <p className="mt-3 font-display text-[clamp(2rem,8vw,3.2rem)] leading-none" style={{ color: background }}>
+            {names}
+          </p>
+        </div>
+      </div>
+    );
+  } else if (experience === "paper") {
+    scene = (
+      <div className="absolute inset-0 overflow-hidden" style={{ perspective: "1200px" }}>
+        {[0, 1, 2].map((index) => (
+          <div
+            key={index}
+            className="absolute inset-x-0 origin-top border-b shadow-[0_18px_40px_rgba(0,0,0,0.22)]"
+            style={{
+              top: `${index * 33.34}%`,
+              height: "33.4%",
+              background:
+                index % 2 === 0
+                  ? `linear-gradient(180deg, ${background}, #e7e1d3)`
+                  : `linear-gradient(180deg, #e7e1d3, ${background})`,
+              borderColor: `${accent}33`,
+              transformOrigin: "top center",
+              transform: `rotateX(${(1 - p) * (index === 1 ? -118 : 72)}deg)`,
+              opacity: clamp(1 - p * 0.25),
+            }}
+          >
+            <div
+              className="absolute inset-x-0 top-0 h-px"
+              style={{ background: `${accent}55` }}
+            />
+          </div>
+        ))}
+        <p
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center font-display text-[clamp(1.8rem,7vw,3rem)] leading-tight"
+          style={{ color: accent, opacity: p }}
+        >
+          {names}
+        </p>
+      </div>
+    );
+  } else if (experience === "typography") {
+    scene = (
+      <div className="max-w-[640px] px-6 text-center">
+        <p
+          className="text-[0.55rem] uppercase tracking-[0.4em]"
+          style={{ color: accent, opacity: 0.55 + p * 0.45 }}
+        >
+          You are invited
+        </p>
+        <h2
+          className="mt-5 overflow-hidden font-display text-[clamp(2.6rem,11vw,5.4rem)] leading-[0.95]"
+          style={{
+            color: ink,
+            letterSpacing: `${0.18 - p * 0.14}em`,
+            clipPath: `inset(0 ${(1 - p) * 100}% 0 0)`,
+            transform: `translateY(${(1 - p) * 24}px)`,
+          }}
+        >
+          {names}
+        </h2>
+        <p
+          className="mt-6 text-[0.62rem] uppercase tracking-[0.3em]"
+          style={{ color: accent, opacity: p }}
+        >
+          {welcome}
+        </p>
+      </div>
+    );
+  } else if (experience === "floral") {
+    scene = (
+      <div className="relative grid place-items-center">
+        {Array.from({ length: 14 }).map((_, index) => (
+          <span
+            key={index}
+            aria-hidden
+            className="absolute rounded-full border"
+            style={{
+              width: `${8 + index * 4}px`,
+              height: `${22 + index * 4}px`,
+              borderColor: `${accent}${index % 2 ? "88" : "55"}`,
+              borderRadius: "999px 999px 4px 4px",
+              transform: `rotate(${index * (360 / 14)}deg) translateY(-${80 + p * 110}px)`,
+              opacity: clamp(1 - p * 0.7),
+            }}
+          />
+        ))}
+        <div
+          className="relative z-10 text-center"
+          style={{ opacity: clamp(p * 1.4) }}
+        >
+          <p className="text-[0.55rem] uppercase tracking-[0.34em]" style={{ color: accent }}>
+            With joy
+          </p>
+          <p className="mt-4 font-display text-[clamp(2rem,9vw,3.6rem)] leading-none" style={{ color: ink }}>
+            {names}
+          </p>
+        </div>
+      </div>
+    );
+  } else if (experience === "cinematic") {
+    scene = (
+      <div className="absolute inset-0 overflow-hidden">
+        {coverUrl && (
+          <img
+            src={coverUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ transform: `scale(${1.08 + p * 0.06})`, opacity: 0.55 }}
+          />
+        )}
+        <div
+          className="absolute inset-x-0 top-0 z-10 bg-[#0b0b0b]"
+          style={{ height: `${(1 - p) * 22}%` }}
+        />
+        <div
+          className="absolute inset-x-0 bottom-0 z-10 bg-[#0b0b0b]"
+          style={{ height: `${(1 - p) * 22}%` }}
+        />
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="text-center" style={{ opacity: clamp(p * 1.3) }}>
+            <p className="text-[0.55rem] uppercase tracking-[0.4em] text-[#f2f1ed]/55">
+              A private celebration
+            </p>
+            <p className="mt-4 font-display text-[clamp(2.4rem,10vw,4.6rem)] leading-none text-[#f2f1ed]">
+              {names}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  } else if (experience === "image") {
+    scene = (
+      <div className="absolute inset-0 overflow-hidden">
+        {coverUrl ? (
+          <img
+            src={coverUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{
+              transform: `scale(${1.02 + p * 0.16})`,
+              filter: `brightness(${0.55 + p * 0.25})`,
+            }}
+          />
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `radial-gradient(80% 60% at 50% 40%, ${accent}aa, #140309 75%)`,
+              transform: `scale(${1.02 + p * 0.16})`,
+            }}
+          />
+        )}
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-end pb-[16vh] text-center"
+          style={{
+            background: `linear-gradient(to top, ${background}cc, transparent 65%)`,
+            opacity: clamp(p * 1.2),
+          }}
+        >
+          <p className="font-display text-[clamp(2rem,8vw,3.4rem)] leading-none" style={{ color: ink }}>
+            {names}
+          </p>
+          <p className="mt-2 text-[0.6rem] uppercase tracking-[0.3em]" style={{ color: accent }}>
+            {welcome}
+          </p>
+        </div>
+      </div>
+    );
   } else if (experience === "fade") {
     scene = (
       <div
@@ -347,7 +549,11 @@ export function OpeningStage({
       )}
       style={{
         background:
-          experience === "arch" || experience === "fade"
+          experience === "arch" ||
+          experience === "fade" ||
+          experience === "wax-seal" ||
+          experience === "cinematic" ||
+          experience === "image"
             ? `radial-gradient(120% 90% at 50% 100%, ${accent}44, #121212 72%)`
             : background,
         color: ink,
