@@ -7,6 +7,8 @@ import {
   isRevealLayout,
   SCRIPT_FONT_PAIRS,
   type InvitationContent,
+  type InvitationTemplateBackground,
+  isInvitationTemplateBackground,
 } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
 import { Motif } from "./Motif";
@@ -30,7 +32,11 @@ export function InvitationCanvas({
   className,
   style,
 }: InvitationCanvasProps) {
-  const { palette } = content;
+  const { palette, background } = content;
+  const backdrop =
+    background && isInvitationTemplateBackground(background)
+      ? background
+      : undefined;
   // LAMSA v5: right-to-left invitations read in Amiri regardless of the
   // chosen pair, exactly like the brand-kit Arabic preset.
   const arabicPair =
@@ -162,6 +168,9 @@ export function InvitationCanvas({
         ...style,
       }}
     >
+      {backdrop && (
+        <InvitationCanvasBackdrop seed={backdrop.storageSeed} fx={backdrop.fx} />
+      )}
       <div aria-hidden className="paper-texture absolute inset-0" />
       <div
         aria-hidden
@@ -418,3 +427,274 @@ export function InvitationCanvas({
     </div>
   );
 }
+
+function InvitationCanvasBackdrop({
+  seed,
+  fx,
+}: {
+  seed: string;
+  fx?: InvitationFxSpec;
+}) {
+  const hash =
+    typeof crypto !== "undefined" && "subtle" in crypto
+      ? "" +
+        crypto
+          .createHash
+          ? crypto.createHash("sha256").update(seed).digest("hex").slice(0, 8)
+          : "x" +
+            parseInt(
+              Array.from(
+                new Uint8Array(
+                  crypto.subtle
+                    ? crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed))
+                    : new ArrayBuffer(0),
+                ),
+                (b) => b,
+              ).join(""),
+              16,
+            ).toString(16).slice(0, 8)
+      : Math.random().toString(36).slice(2, 8);
+
+  const imageUrl = `/templates/airvendor/${seed.split("/").pop() || seed}.jpg`;
+
+  return (
+    <div className="absolute inset-0 h-full w-full overflow-hidden" aria-hidden>
+      <img
+        src={imageUrl}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="h-full w-full object-cover"
+        style={{ objectPosition: "center" }}
+      />
+      {fx && (
+        <div className="absolute inset-0" aria-hidden style={{ pointerEvents: "none" }}>
+          {fx.dust && (
+            <DustField color={fx.dust[0]} count={fx.dust[1]} seed={hash} />
+          )}
+          {fx.petals && (
+            <PetalField color={fx.petals[0]} count={fx.petals[1]} seed={hash} />
+          )}
+          {fx.sweep && <Sweeper />}
+          {fx.flick && <Flicker />}
+          {fx.glow && (
+            <GlowField points={fx.glow} seed={hash} />
+          )}
+          {fx.spark && (
+            <SparkField points={fx.spark} seed={hash} />
+          )}
+        </div>
+      ]}
+    </div>
+  );
+}
+
+function reducedMotion() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+
+function seededRandom(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul(31 * h + seed.charCodeAt(i), 0x6cd4e4b) >>> 0) || 1;
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
+    h = Math.imul(h ^ (h >>> 15), 0x84647515);
+    return (h >>> 0) / 4294967296;
+  };
+}
+
+function DustField({ color, count, seed }: { color: string; count: number; seed: string }) {
+  const sprites = useMemo(() => {
+    const rnd = seededRandom(seed + ":dust");
+    return Array.from({ length: count }, () => ({
+      id: Math.random().toString(36).slice(2, 8),
+      left: rnd() * 100,
+      top: 40 + rnd() * 60,
+      size: 2 + rnd() * 3,
+      duration: 5 + rnd() * 7,
+      delay: -(rnd() * 9),
+    }));
+  }, [count, seed]);
+
+  if (reducedMotion()) return null;
+
+  return (
+    <div
+      className="absolute inset-0"
+      aria-hidden
+      style={{ pointerEvents: "none" }}
+    >
+      {sprites.map((sprite) => (
+        <div
+          key={sprite.id}
+          className="absolute rounded-full animate-dust"
+          style={{
+            left: `${sprite.left}%`,
+            top: `${sprite.top}%`,
+            width: `${sprite.size}px`,
+            height: `${sprite.size}px`,
+            background: color,
+            boxShadow: `0 0 ${sprite.size * 2}px ${color}`,
+            animationDuration: `${sprite.duration}s`,
+            animationDelay: `${sprite.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PetalField({ color, count, seed }: { color: string; count: number; seed: string }) {
+  const sprites = useMemo(() => {
+    const rnd = seededRandom(seed + ":petal");
+    return Array.from({ length: count }, () => ({
+      id: Math.random().toString(36).slice(2, 8),
+      left: rnd() * 95,
+      size: 7 + rnd() * 6,
+      duration: 8 + rnd() * 6,
+      delay: -(rnd() * 12),
+    }));
+  }, [count, seed]);
+
+  if (reducedMotion()) return null;
+
+  return (
+    <div
+      className="absolute inset-0"
+      aria-hidden
+      style={{ pointerEvents: "none" }}
+    >
+      {sprites.map((sprite) => (
+        <div
+          key={sprite.id}
+          className="absolute rounded-[60%_0_60%_40%] animate-petal"
+          style={{
+            left: `${sprite.left}%`,
+            top: "-6%",
+            width: `${sprite.size}px`,
+            height: `${sprite.size * 1.3}px`,
+            background: color,
+            boxShadow: "inset -2px -2px 3px rgba(0,0,0,0.3)",
+            animationDuration: `${sprite.duration}s`,
+            animationDelay: `${sprite.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Sweeper() {
+  if (reducedMotion()) return null;
+  return (
+    <div
+      className="absolute left-0 top-0 h-full w-[35%] animate-sweep"
+      aria-hidden
+      style={{
+        top: "-10%",
+        bottom: "-10%",
+        background: "linear-gradient(90deg,transparent,rgba(255,244,214,0.28),transparent)",
+        transform: "skewX(-18deg)",
+        mixBlendMode: "screen",
+      }}
+    />
+  );
+}
+
+function Flicker() {
+  if (reducedMotion()) return null;
+  return (
+    <div
+      className="absolute inset-0 animate-flicker"
+      aria-hidden
+      style={{
+        background: "#ffb04a",
+        mixBlendMode: "soft-light",
+      }}
+    />
+  );
+}
+
+function GlowField({ points, seed }: { points: [number, number, number][]; seed: string }) {
+  const items = useMemo(() => {
+    const rnd = seededRandom(seed + ":glow");
+    return points.map((point, index) => ({
+      id: Math.random().toString(36).slice(2, 8),
+      left: point[0] * 100,
+      top: point[1] * 100,
+      size: point[2] * 100,
+      delay: -(index * 0.7 + rnd() * 0.4),
+    }));
+  }, [points, seed]);
+
+  if (reducedMotion()) return null;
+
+  return (
+    <div
+      className="absolute inset-0"
+      aria-hidden
+      style={{ pointerEvents: "none" }}
+    >
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="absolute rounded-full animate-glow"
+          style={{
+            left: `${item.left}%`,
+            top: `calc(${item.top}% - ${item.size * 0.5}%)`,
+            width: `${item.size}%`,
+            aspectRatio: "1 / 1",
+            background:
+              "radial-gradient(circle,rgba(255,200,110,0.85),rgba(255,170,60,0) 68%)",
+            mixBlendMode: "screen",
+            animationDelay: `${item.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SparkField({ points, seed }: { points: [number, number][]; seed: string }) {
+  const items = useMemo(() => {
+    const rnd = seededRandom(seed + ":spark");
+    return points.map((point, index) => ({
+      id: Math.random().toString(36).slice(2, 8),
+      left: point[0] * 100,
+      top: point[1] * 100,
+      delay: -(index * 0.5 + rnd() * 0.4),
+    }));
+  }, [points, seed]);
+
+  if (reducedMotion()) return null;
+
+  return (
+    <div
+      className="absolute inset-0"
+      aria-hidden
+      style={{ pointerEvents: "none" }}
+    >
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="absolute size-3.5 animate-spark"
+          style={{
+            left: `${item.left}%`,
+            top: `${item.top}%`,
+            background:
+              "radial-gradient(circle,#fff 0,rgba(255,255,255,0.9) 12%,transparent 14%),linear-gradient(#fff,#fff) center/1px 100% no-repeat,linear-gradient(#fff,#fff) center/100% 1px no-repeat",
+            animationDelay: `${item.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+

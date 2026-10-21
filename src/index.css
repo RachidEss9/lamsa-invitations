@@ -394,6 +394,156 @@
   }
 }
 
+/* LAMSA v6 backdrop fx layer *
+   Coordinates are fractions of the frame, and every effect respects
+   prefers-reduced-motion. */
+.invitation-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.invitation-backdrop .dust {
+  position: absolute;
+  border-radius: 50%;
+  animation: dust-up linear infinite;
+}
+
+.invitation-backdrop .petal {
+  position: absolute;
+  border-radius: 60% 0 60% 40%;
+  animation: petal-fall linear infinite;
+}
+
+.invitation-backdrop .sweep {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  width: 35%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 244, 214, 0.28),
+    transparent
+  );
+  transform: skewX(-18deg);
+  mix-blend-mode: screen;
+  animation: sweep 7s ease-in-out infinite;
+}
+
+.invitation-backdrop .flicker {
+  inset: 0;
+  background: #ffb04a;
+  mix-blend-mode: soft-light;
+  animation: flicker 1.6s ease-in-out infinite alternate;
+}
+
+.invitation-backdrop .glow {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 200, 110, 0.85),
+    rgba(255, 170, 60, 0) 68%
+  );
+  mix-blend-mode: screen;
+  animation: glow 2.6s ease-in-out infinite alternate;
+}
+
+.invitation-backdrop .spark {
+  width: 14px;
+  height: 14px;
+  background: radial-gradient(
+      circle,
+      #fff 0,
+      rgba(255, 255, 255, 0.9) 12%,
+      transparent 14%
+    ),
+    linear-gradient(#fff, #fff) center / 1px 100% no-repeat,
+    linear-gradient(#fff, #fff) center / 100% 1px no-repeat;
+  animation: spark 3s ease-in-out infinite;
+}
+
+@keyframes dust-up {
+  from {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  to {
+    transform: translateY(-140px) translateX(10px);
+    opacity: 0;
+  }
+}
+
+@keyframes petal-fall {
+  0% {
+    top: -6%;
+    opacity: 0;
+    transform: rotate(0deg) translateX(0);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: rotate(180deg) translateX(18px);
+  }
+  100% {
+    top: 104%;
+    opacity: 0.2;
+    transform: rotate(360deg) translateX(-10px);
+  }
+}
+
+@keyframes sweep {
+  from {
+    left: -45%;
+  }
+  to {
+    left: 115%;
+  }
+}
+
+@keyframes flicker {
+  from {
+    opacity: 0.05;
+  }
+  to {
+    opacity: 0.3;
+  }
+}
+
+@keyframes glow {
+  from {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 0.9;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes spark {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .invitation-backdrop *{
+    animation: none !important;
+  }
+}
+
 @media print {
   body {
     background: #ffffff;
