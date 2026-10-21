@@ -124,9 +124,7 @@ export const SCRIPT_FONT_PAIRS: readonly FontPairId[] = [
   "ruqaa",
   "kufi",
 ];
-
 export type FontPairId = (typeof FONT_PAIRS)[number]["id"];
-
 export const LAYOUTS = [
   { id: "centered", label: "Centered", note: "A calm, symmetrical card" },
   { id: "editorial", label: "Editorial", note: "Left set, like a magazine" },
@@ -139,7 +137,6 @@ export const LAYOUTS = [
 ] as const;
 
 export type LayoutId = (typeof LAYOUTS)[number]["id"];
-
 export const MOTIFS = [
   { id: "arch", label: "Arch" },
   { id: "sprig", label: "Sprig" },
@@ -174,7 +171,6 @@ export type MotifId = Infer<typeof motifValidator>;
 export const REVEAL_LAYOUTS = ["arch", "envelope", "ribbon"] as const;
 
 export type RevealLayoutId = (typeof REVEAL_LAYOUTS)[number];
-
 export function isRevealLayout(layout: LayoutId): layout is RevealLayoutId {
   return (REVEAL_LAYOUTS as readonly string[]).includes(layout);
 }
@@ -304,7 +300,6 @@ export const PALETTE_PRESETS: { name: string; palette: InvitationPalette }[] = [
     palette: { background: "#f2efe8", ink: "#32302b", accent: "#8a8275" },
   },
 ];
-
 export interface InvitationTemplate {
   id: string;
   name: string;
@@ -862,7 +857,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     },
   },
 ];
-
 /**
  * Backdrop templates imported from the studio pack downloaded from the Google
  * Drive link shared in the studio. The image files are stored in the studio’s
@@ -896,7 +890,6 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueAddress: "مراكش، المغرب",
     },
     background: { kind: "image", storageSeed: "templates/airvendor/1" },
-    backdropLabel: "Pinterest reference image — replace before publishing",
     fx: { dust: ["#ffe08a", 18], sweep: 1, flick: 1 },
   },
   {
@@ -920,11 +913,9 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueAddress: "المدينة القديمة، مراكش",
     },
     background: { kind: "image", storageSeed: "templates/airvendor/2" },
-    fx: { dust: ["#ffe0a0", 16], glow: [[0.5, 0.97, 0.9]], sweep: 1 },
     backdropLabel: "Pinterest reference image — replace before publishing",
+    fx: { dust: ["#ffe0a0", 16], glow: [[0.5, 0.97, 0.9]], sweep: 1 },
   },
-  {
-    id: "marble-gold",
   {
     id: "marble-gold",
     name: "قوس فوانيس وورود",
@@ -945,7 +936,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueName: "قاعة الفوانيس",
       venueAddress: "الرباط، المغرب",
     },
-    background: { kind: "image", storageSeed: "templates/airvendor/3" },
+    background: { kind: "image",    storageSeed: "templates/airvendor/3",
     fx: {
       glow: [
         [0.835, 0.23, 0.14],
@@ -1178,6 +1169,18 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
   },
 ];
 
+/**
+ * Backdrop templates imported from the studio pack downloaded from the Google
+ * Drive link shared in the studio. The image files are stored in the studio's
+ * public asset bucket under /templates/airvendor/{id}.jpg, and the background
+ * track of each file is labelled as a Pinterest reference image that should be
+ * replaced before commercial release.
+ *
+ * IMPORTANT: These samples are supplied as a private-studio starting point only.
+ * Replace the reference images with licensed assets before publishing a live
+ * invitation. The fx overlay recipe is reusable regardless of the image.
+ */
+export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
   {
     id: "gypsum-candles",
     name: "نيش جبس منقوش",
@@ -1199,8 +1202,8 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueAddress: "المدينة القديمة، مراكش",
     },
     background: { kind: "image", storageSeed: "templates/airvendor/2" },
-    fx: { dust: ["#ffe0a0", 16], glow: [[0.5, 0.97, 0.9]], sweep: 1 },
-  },
+    fx: { dust: ["#ffe0a0", 16], glow: [[0.5, 0.97, 0.9]], sweep: 1 },  },
+
   {
     id: "marble-gold",
     name: "قوس فوانيس وورود",
@@ -1221,7 +1224,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueName: "قاعة الفوانيس",
       venueAddress: "الرباط، المغرب",
     },
-    background: { kind: "image", storageSeed: "templates/airvendor/3" },
+    background: { kind: "image",    storageSeed: "templates/airvendor/3",
     fx: {
       glow: [
         [0.835, 0.23, 0.14],
@@ -1487,8 +1490,6 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueAddress: "مراكش، المغرب",
     },
     background: { kind: "image", storageSeed: "templates/airvendor/1" },
-    backdropLabel: "Pinterest reference image — replace before publishing",
-    backdropLabel: "Pinterest reference image — replace before publishing",
     fx: { dust: ["#ffe08a", 18], sweep: 1, flick: 1 },
   },
   {
@@ -1512,11 +1513,9 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueAddress: "المدينة القديمة، مراكش",
     },
     background: { kind: "image", storageSeed: "templates/airvendor/2" },
-    fx: { dust: ["#ffe0a0", 16], glow: [[0.5, 0.97, 0.9]], sweep: 1 },
     backdropLabel: "Pinterest reference image — replace before publishing",
+    fx: { dust: ["#ffe0a0", 16], glow: [[0.5, 0.97, 0.9]], sweep: 1 },
   },
-  {
-    id: "marble-gold",
   {
     id: "marble-gold",
     name: "قوس فوانيس وورود",
@@ -1537,7 +1536,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueName: "قاعة الفوانيس",
       venueAddress: "الرباط، المغرب",
     },
-    background: { kind: "image", storageSeed: "templates/airvendor/3" },
+    background: { kind: "image",    storageSeed: "templates/airvendor/3",
     fx: {
       glow: [
         [0.835, 0.23, 0.14],
@@ -1892,21 +1891,24 @@ export function contentFromInvitation(doc: InvitationContent): InvitationContent
 
 export function formatEventDate(date: string): string {
   if (!date) return "Date to be announced";
-  const parsed = parse(date, "yyyy-MM-dd", new Date());
+
+const parsed = parse(date, "yyyy-MM-dd", new Date());
   if (!isValid(parsed)) return "Date to be announced";
   return format(parsed, "EEEE, d MMMM yyyy");
 }
 
 export function formatEventDateShort(date: string): string {
   if (!date) return "Date to be announced";
-  const parsed = parse(date, "yyyy-MM-dd", new Date());
+
+const parsed = parse(date, "yyyy-MM-dd", new Date());
   if (!isValid(parsed)) return "Date to be announced";
   return format(parsed, "d MMM yyyy");
 }
 
 export function formatEventTime(time: string): string {
   if (!time) return "";
-  const parsed = parse(time, "HH:mm", new Date());
+
+const parsed = parse(time, "HH:mm", new Date());
   if (!isValid(parsed)) return "";
   return format(parsed, "h:mm a");
 }
@@ -1936,18 +1938,24 @@ export function calendarHref(content: Pick<InvitationContent, "date" | "time" | 
   const parsedDate = content.date
     ? parse(content.date, "yyyy-MM-dd", new Date())
     : addDays(new Date(), 30);
-  const [hours, minutes] = (content.time || "18:00").split(":").map(Number);
-  const start = new Date(parsedDate);
+
+const [hours, minutes] = (content.time || "18:00").split(":").map(Number);
+
+const start = new Date(parsedDate);
   start.setHours(
     Number.isFinite(hours) ? hours : 18,
     Number.isFinite(minutes) ? minutes : 0,
     0,
     0,
   );
-  const end = addHours(start, 3);
-  const stamp = (value: Date) => format(value, "yyyyMMdd'T'HHmmss");
-  const uid = `lamsa-${Date.now()}@lamsa.studio`;
-  const lines = [
+
+const end = addHours(start, 3);
+
+const stamp = (value: Date) => format(value, "yyyyMMdd'T'HHmmss");
+
+const uid = `lamsa-${Date.now()}@lamsa.studio`;
+
+const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//LAMSA//Invitations//EN",
