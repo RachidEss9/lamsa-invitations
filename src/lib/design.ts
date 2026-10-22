@@ -117,16 +117,28 @@ export type ShapeKind =
   | "arch"
   | "leaf"
   | "star"
-  | "frame";
+  | "frame"
+  | "capsule"
+  | "triangle"
+  | "diamond"
+  | "hexagon"
+  | "shield"
+  | "scallop";
 
 export const SHAPES: { id: ShapeKind; label: string }[] = [
   { id: "rect", label: "Rectangle" },
+  { id: "capsule", label: "Capsule" },
   { id: "ellipse", label: "Ellipse" },
   { id: "line", label: "Rule" },
+  { id: "triangle", label: "Triangle" },
+  { id: "diamond", label: "Diamond" },
+  { id: "hexagon", label: "Hexagon" },
   { id: "heart", label: "Heart" },
   { id: "arch", label: "Arch" },
   { id: "leaf", label: "Leaf" },
   { id: "star", label: "Star" },
+  { id: "shield", label: "Shield" },
+  { id: "scallop", label: "Scallop" },
   { id: "frame", label: "Frame" },
 ];
 
@@ -178,6 +190,15 @@ export interface DesignElement {
   /** Independent of alignment: auto follows the invitation language. */
   direction?: "auto" | "ltr" | "rtl";
   color?: string;
+  /** Case treatment applied by CSS; the stored text is never rewritten. */
+  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+  verticalAlign?: "top" | "middle" | "bottom";
+  textBackground?: string;
+  textBorder?: string;
+  textBorderWidth?: number;
+  textRadius?: number;
+  textShadow?: boolean;
+  textPadding?: number;
 
   shape?: ShapeKind;
   fill?: string;

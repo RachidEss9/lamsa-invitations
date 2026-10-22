@@ -113,7 +113,7 @@ const TABS: { id: LibraryKind; label: string; icon: typeof Type }[] = [
   { id: "style", label: "Styles", icon: Type },
 ];
 
-function ShapePreview({
+export function ShapePreview({
   shape,
   fill,
   stroke,
@@ -129,9 +129,24 @@ function ShapePreview({
     leaf: "M50 3 C84 20 95 55 50 97 C5 55 16 20 50 3 Z",
     star:
       "M50 3 L61.8 36.5 L97 38.2 L69.3 59.8 L78.5 94 L50 74.2 L21.5 94 L30.7 59.8 L3 38.2 L38.2 36.5 Z",
+    triangle: "M50 4 L98 96 L2 96 Z",
+    diamond: "M50 2 L98 50 L50 98 L2 50 Z",
+    hexagon: "M25 3 L75 3 L98 50 L75 97 L25 97 L2 50 Z",
+    shield:
+      "M50 3 C68 12 84 14 96 14 L96 48 C96 76 76 92 50 98 C24 92 4 76 4 48 L4 14 C16 14 32 12 50 3 Z",
+    scallop:
+      "M50 4 C59 4 67 8 72 14 C80 12 89 16 93 24 C97 32 94 40 90 46 C95 53 95 64 89 70 C91 79 84 88 76 90 C71 96 62 98 55 94 C50 98 42 98 37 94 C30 98 20 96 15 90 C7 88 0 79 2 70 C-4 64 -4 53 1 46 C-3 40 -6 32 -2 24 C2 16 11 12 19 14 C24 8 32 4 41 4 Z",
   };
   if (shape === "line") {
     return <span className="block h-[2px] w-3/4" style={{ background: fill }} />;
+  }
+  if (shape === "capsule") {
+    return (
+      <span
+        className="block h-1/3 w-3/4 rounded-full"
+        style={{ background: fill, border: stroke ? `1.5px solid ${stroke}` : undefined }}
+      />
+    );
   }
   if (shape === "rect" || shape === "frame") {
     return (

@@ -5,8 +5,10 @@ import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import { GuestExperience } from "@/components/studio/GuestExperience";
+import { ColourPanel } from "@/components/studio/ColourPanel";
 import { Inspector } from "@/components/studio/Inspector";
-import { LibraryPanel } from "@/components/studio/LibraryPanel";
+import { LibraryPanel, ShapePreview } from "@/components/studio/LibraryPanel";
+import { PrintExportDialog } from "@/components/studio/PrintExportDialog";
 import { StudioCanvas, type CanvasContextAction } from "@/components/studio/StudioCanvas";
 import { ShortcutReference } from "@/components/studio/ShortcutReference";
 import { Timeline } from "@/components/studio/Timeline";
@@ -42,6 +44,7 @@ import {
   makeElement,
   makeId,
   normalizeDesign,
+  SHAPES,
   timelineDuration,
   type ClosingSettings,
   type DesignDocument,
@@ -57,6 +60,7 @@ import {
   type InvitationContent,
 } from "@/lib/invitation";
 import { pageLayoutById } from "@/lib/layouts";
+import { recolourDesign, type ColourPalette } from "@/lib/palettes";
 import type { BuiltinAsset } from "@/lib/assets";
 import type { RevealPreset } from "@/lib/reveals";
 import { cn } from "@/lib/utils";
@@ -70,6 +74,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FileText,
   Heart,
   Image as ImageIcon,
   Layers,
@@ -77,7 +82,9 @@ import {
   Library,
   Keyboard,
   Loader2,
+  Lock,
   Monitor,
+  Palette,
   PanelLeft,
   PanelRight,
   Play,
@@ -91,6 +98,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  Unlock,
 } from "lucide-react";
 import {
   useCallback,
@@ -106,8 +114,8 @@ import { toast } from "sonner";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 type Device = "desktop" | "tablet" | "phone";
-type LeftPanel = "add" | "layers" | "opening" | "pages";
-type MobileSheet = null | "add" | "layers" | "properties" | "pages" | "timeline";
+type LeftPanel = "add" | "layers" | "colour" | "opening" | "pages";
+type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline";
 
 const DEVICE_WIDTH: Record<Device, string> = {
   desktop: "100%",
@@ -245,6 +253,7 @@ export default function Studio() {
     name: string;
   } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(0);
   const [showOpeningPreview, setShowOpeningPreview] = useState(false);
@@ -1241,6 +1250,11 @@ export default function Studio() {
     toast.success("Style applied to this design.");
   };
 
+  const applyPalette = (palette: ColourPalette) => {
+    apply((current) => recolourDesign(current, palette));
+    toast.success(`${palette.name} applied.`);
+  };
+
   const placeAsset = (storageId: string, name: string, url?: string | null) => {
     if (url) {
       setLocalImageUrls((previous) => ({ ...previous, [storageId]: url }));
@@ -1643,6 +1657,29 @@ export default function Studio() {
           </div>
           <div className="border-t border-ink/12 p-3">
             <p className="mb-2 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/40">
+              Shapes
+            </p>
+            <div className="grid grid-cols-5 gap-1">
+              {SHAPES.map((shape) => (
+                <button
+                  key={shape.id}
+                  type="button"
+                  onClick={() => addShape(shape.id)}
+                  title={shape.label}
+                  aria-label={`Add ${shape.label}`}
+                  className="grid aspect-square place-items-center border border-ink/12 text-ink/60 hover:border-ink hover:text-[var(--red)]"
+                >
+                  <ShapePreview
+                    shape={shape.id}
+                    fill={content?.palette.accent ?? "#710014"}
+                    stroke={shape.id === "frame" ? content?.palette.accent : undefined}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-ink/12 p-3">
+            <p className="mb-2 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/40">
               Ornament library
             </p>
             <div className="grid grid-cols-5 gap-1">
@@ -1695,44 +1732,109 @@ export default function Studio() {
       );
     }
 
+    if (leftPanel === "colour") {
+      return (
+        <ColourPanel
+          page={page}
+          selected={selected}
+          onPatch={patchElement}
+          onPagePatch={patchPage}
+          onApplyPalette={applyPalette}
+        />
+      );
+    }
+
     if (leftPanel === "layers") {
       return (
         <>
-          <PanelHeading title="Layers" note={`${page.elements.length} layers · back to front`} />
+          <PanelHeading title="Layers" note={`${page.elements.length} layers · front to back · drag to reorder`} />
           <div className="p-2">
             {[...page.elements].reverse().map((element) => {
               const active = selectedIds.includes(element.id);
               return (
-                <button
+                <div
                   key={element.id}
-                  type="button"
-                  onClick={(event) =>
-                    setSelectedIds((previous) => {
-                      if (event.shiftKey) {
-                        const next = new Set(previous);
-                        if (next.has(element.id)) next.delete(element.id);
-                        else next.add(element.id);
-                        return [...next];
-                      }
-                      return [element.id];
-                    })
-                  }
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", element.id);
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const draggedId = event.dataTransfer.getData("text/plain");
+                    if (!draggedId || draggedId === element.id) return;
+                    setPageElements((elements) => {
+                      const visual = [...elements].reverse();
+                      const from = visual.findIndex((item) => item.id === draggedId);
+                      const to = visual.findIndex((item) => item.id === element.id);
+                      if (from < 0 || to < 0) return elements;
+                      const [moved] = visual.splice(from, 1);
+                      visual.splice(to, 0, moved);
+                      return visual.reverse();
+                    });
+                  }}
                   className={cn(
-                    "flex w-full items-center gap-2 border-b border-ink/8 px-2 py-2 text-left text-[11px]",
+                    "flex w-full items-center gap-1.5 border-b border-ink/8 py-1 pl-1 pr-1.5 text-[11px]",
                     active ? "bg-[var(--red)]/8 text-ink" : "text-ink/60 hover:bg-ink/4",
                   )}
                 >
-                  {element.kind === "text" ? (
-                    <Type className="size-3 shrink-0" />
-                  ) : element.kind === "image" ? (
-                    <ImageIcon className="size-3 shrink-0" />
-                  ) : (
-                    <Shapes className="size-3 shrink-0" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{element.name}</span>
-                  {element.groupId && <span className="size-1.5 rounded-full bg-[var(--gold)]" />}
-                  {element.locked && <EyeOff className="size-2.5 opacity-60" />}
-                </button>
+                  <button
+                    type="button"
+                    onClick={(event) =>
+                      setSelectedIds((previous) => {
+                        if (event.shiftKey) {
+                          const next = new Set(previous);
+                          if (next.has(element.id)) next.delete(element.id);
+                          else next.add(element.id);
+                          return [...next];
+                        }
+                        return [element.id];
+                      })
+                    }
+                    className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
+                  >
+                    {element.kind === "text" ? (
+                      <Type className="size-3 shrink-0" />
+                    ) : element.kind === "image" ? (
+                      <ImageIcon className="size-3 shrink-0" />
+                    ) : (
+                      <Shapes className="size-3 shrink-0" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{element.name}</span>
+                    {element.groupId && <span className="size-1.5 rounded-full bg-[var(--gold)]" />}
+                  </button>
+                  <button
+                    type="button"
+                    title={element.hidden ? "Show layer" : "Hide layer"}
+                    aria-label={element.hidden ? "Show layer" : "Hide layer"}
+                    onClick={() =>
+                      setPageElements((elements) =>
+                        elements.map((item) =>
+                          item.id === element.id ? { ...item, hidden: !item.hidden } : item,
+                        ),
+                      )
+                    }
+                    className={cn("shrink-0 p-0.5", element.hidden ? "text-[var(--red)]" : "text-ink/35 hover:text-ink")}
+                  >
+                    {element.hidden ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                  </button>
+                  <button
+                    type="button"
+                    title={element.locked ? "Unlock layer" : "Lock layer"}
+                    aria-label={element.locked ? "Unlock layer" : "Lock layer"}
+                    onClick={() =>
+                      setPageElements((elements) =>
+                        elements.map((item) =>
+                          item.id === element.id ? { ...item, locked: !item.locked } : item,
+                        ),
+                      )
+                    }
+                    className={cn("shrink-0 p-0.5", element.locked ? "text-[var(--red)]" : "text-ink/35 hover:text-ink")}
+                  >
+                    {element.locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+                  </button>
+                </div>
               );
             })}
             <div className="mt-2 grid grid-cols-2 gap-1">
@@ -2120,6 +2222,16 @@ export default function Studio() {
           </Button>
           <Button
             type="button"
+            variant="outline"
+            onClick={() => setPrintOpen(true)}
+            className="h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em]"
+            title="Export a print-ready PDF"
+          >
+            <FileText className="size-3.5" />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
+          <Button
+            type="button"
             onClick={handlePublish}
             disabled={publishing}
             className="h-8 rounded-none px-3 text-[9px] uppercase tracking-[0.14em]"
@@ -2138,7 +2250,7 @@ export default function Studio() {
           )}
         >
           <div className="flex border-b border-ink/12">
-            {(["add", "layers", "opening", "pages"] as LeftPanel[]).map((panel) => (
+            {(["add", "layers", "colour", "opening", "pages"] as LeftPanel[]).map((panel) => (
               <button
                 key={panel}
                 type="button"
@@ -2151,7 +2263,7 @@ export default function Studio() {
                   leftPanel === panel ? "bg-ink text-[#f2f1ed]" : "text-ink/45 hover:text-ink",
                 )}
               >
-                {panel === "opening" ? "Open" : panel}
+                {panel === "opening" ? "Open" : panel === "colour" ? "Colour" : panel}
               </button>
             ))}
           </div>
@@ -2367,6 +2479,7 @@ export default function Studio() {
           { id: "add" as const, label: "Add", icon: Plus },
           { id: "libraries" as const, label: "Library", icon: Library },
           { id: "layers" as const, label: "Layers", icon: Layers },
+          { id: "colour" as const, label: "Colour", icon: Palette },
           { id: "properties" as const, label: "Properties", icon: PanelRight },
           { id: "pages" as const, label: "Pages", icon: Layout },
           { id: "timeline" as const, label: "Timeline", icon: Play },
@@ -2380,7 +2493,7 @@ export default function Studio() {
                 return;
               }
               setMobileSheet((current) => (current === sheet ? null : sheet));
-              if (sheet === "add" || sheet === "layers" || sheet === "pages") {
+              if (sheet === "add" || sheet === "layers" || sheet === "colour" || sheet === "pages") {
                 setLeftPanel(sheet);
               }
             }}
@@ -2521,6 +2634,16 @@ export default function Studio() {
           onClose={() => setTimelinePreviewOpen(false)}
         />
       )}
+
+      <PrintExportDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        design={design}
+        pageIndex={pageIndex}
+        imageUrls={imageUrls}
+        title={content.title}
+        rtl={Boolean(content.rtl)}
+      />
 
       {openingStagePreview}
       {closingPreview}

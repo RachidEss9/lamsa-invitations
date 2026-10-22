@@ -917,8 +917,13 @@ export function StudioCanvas({
                     letterSpacing: `${editingElement.letterSpacing ?? 0}em`,
                     lineHeight: editingElement.lineHeight ?? 1.4,
                     textAlign: editingElement.align ?? "center",
-                    textTransform: editingElement.uppercase ? "uppercase" : "none",
+                    textTransform:
+                      editingElement.textTransform ??
+                      (editingElement.uppercase ? "uppercase" : "none"),
                     color: editingElement.color ?? "#161616",
+                    padding: editingElement.textPadding ?? 0,
+                    background: editingElement.textBackground,
+                    borderRadius: editingElement.textRadius ?? 0,
                     direction:
                       editingElement.direction === "rtl"
                         ? "rtl"

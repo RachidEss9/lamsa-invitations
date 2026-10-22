@@ -39,6 +39,12 @@ const SHAPE_PATHS: Record<string, string> = {
   leaf: "M50 3 C84 20 95 55 50 97 C5 55 16 20 50 3 Z",
   star:
     "M50 3 L61.8 36.5 L97 38.2 L69.3 59.8 L78.5 94 L50 74.2 L21.5 94 L30.7 59.8 L3 38.2 L38.2 36.5 Z",
+  triangle: "M50 4 L98 96 L2 96 Z",
+  diamond: "M50 2 L98 50 L50 98 L2 50 Z",
+  hexagon: "M25 3 L75 3 L98 50 L75 97 L25 97 L2 50 Z",
+  shield: "M50 3 C68 12 84 14 96 14 L96 48 C96 76 76 92 50 98 C24 92 4 76 4 48 L4 14 C16 14 32 12 50 3 Z",
+  scallop:
+    "M50 3 C60 3 68 8 73 14 C81 11 91 15 95 24 C99 32 96 41 92 47 C97 54 97 65 91 72 C93 81 86 90 77 92 C72 98 62 100 55 96 C50 100 42 100 37 96 C30 100 20 98 15 92 C6 90 -1 81 1 72 C-5 65 -5 54 0 47 C-4 41 -7 32 -3 24 C1 15 11 11 19 14 C24 8 32 3 42 3 Z",
 };
 
 function ShapeArt({
@@ -54,7 +60,7 @@ function ShapeArt({
   const fill = element.fill ?? element.color ?? "#161616";
   const stroke = element.stroke;
   const strokeWidth = element.strokeWidth ?? 0;
-  const radius = element.radius ?? 0;
+  const radius = shape === "capsule" ? 50 : (element.radius ?? 0);
 
   // The rule is a horizontal stroke, not a filled box.
   if (shape === "line") {
@@ -95,7 +101,7 @@ function ShapeArt({
           </clipPath>
         )}
       </defs>
-      {shape === "rect" || shape === "frame" ? (
+      {shape === "rect" || shape === "frame" || shape === "capsule" ? (
         imageUrl ? (
           <image
             href={imageUrl}
@@ -186,40 +192,54 @@ function ElementVisual({
   clipId: string;
 }) {
   if (element.kind === "text") {
+    const direction =
+      element.direction === "rtl"
+        ? "rtl"
+        : element.direction === "ltr"
+          ? "ltr"
+          : rtl
+            ? "rtl"
+            : "ltr";
+    const transform =
+      element.textTransform ?? (element.uppercase ? "uppercase" : "none");
+    const borderWidth = element.textBorderWidth ?? 0;
     return (
       <div
-        className="h-full w-full whitespace-pre-wrap break-words"
+        className="flex h-full w-full overflow-hidden"
         style={{
-          fontFamily: fontFamilyFor(element.font ?? "cormorant-garamond"),
-          fontSize: element.fontSize ?? 26,
-          fontWeight: element.fontWeight ?? 400,
-          fontStyle: element.italic ? "italic" : "normal",
-          letterSpacing: `${element.letterSpacing ?? 0}em`,
-          lineHeight: element.lineHeight ?? 1.4,
-          textAlign: element.align ?? "center",
-          textTransform: element.uppercase ? "uppercase" : "none",
-          color: element.color ?? "#161616",
-          direction:
-            element.direction === "rtl"
-              ? "rtl"
-              : element.direction === "ltr"
-                ? "ltr"
-                : rtl
-                  ? "rtl"
-                  : "ltr",
-          unicodeBidi: element.direction === "auto" ? "plaintext" : "normal",
+          alignItems:
+            element.verticalAlign === "top"
+              ? "flex-start"
+              : element.verticalAlign === "bottom"
+                ? "flex-end"
+                : "center",
+          justifyContent: "center",
+          padding: element.textPadding ?? (borderWidth || element.textBackground ? 10 : 0),
+          background: element.textBackground,
+          border: borderWidth > 0 ? `${borderWidth}px solid ${element.textBorder ?? "transparent"}` : undefined,
+          borderRadius: element.textRadius ?? 0,
+          boxShadow: element.textShadow ? "0 18px 44px rgba(22,22,22,0.24)" : undefined,
         }}
-        dir={
-          element.direction === "rtl"
-            ? "rtl"
-            : element.direction === "ltr"
-              ? "ltr"
-              : rtl
-                ? "rtl"
-                : "ltr"
-        }
       >
-        {personalize(element.text, guestName)}
+        <div
+          className="w-full whitespace-pre-wrap break-words"
+          style={{
+            fontFamily: fontFamilyFor(element.font ?? "cormorant-garamond"),
+            fontSize: element.fontSize ?? 26,
+            fontWeight: element.fontWeight ?? 400,
+            fontStyle: element.italic ? "italic" : "normal",
+            letterSpacing: `${element.letterSpacing ?? 0}em`,
+            lineHeight: element.lineHeight ?? 1.4,
+            textAlign: element.align ?? "center",
+            textTransform: transform,
+            color: element.color ?? "#161616",
+            direction,
+            unicodeBidi: element.direction === "auto" ? "plaintext" : "normal",
+          }}
+          dir={direction}
+        >
+          {personalize(element.text, guestName)}
+        </div>
       </div>
     );
   }

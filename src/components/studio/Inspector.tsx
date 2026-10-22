@@ -502,6 +502,114 @@ export function Inspector({
             <ToggleRow label="Caps" checked={Boolean(element.uppercase)} onChange={(uppercase) => patch({ uppercase })} />
           </div>
           <Row label="Colour"><ColorField value={element.color ?? "#161616"} onChange={(color) => patch({ color })} /></Row>
+          <Row label="Case">
+            <Select
+              value={element.textTransform ?? (element.uppercase ? "uppercase" : "none")}
+              onValueChange={(value) =>
+                patch({
+                  textTransform: value as DesignElement["textTransform"],
+                  uppercase: value === "uppercase",
+                })
+              }
+            >
+              <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">As written</SelectItem>
+                <SelectItem value="uppercase">Uppercase</SelectItem>
+                <SelectItem value="lowercase">Lowercase</SelectItem>
+                <SelectItem value="capitalize">Capitalise</SelectItem>
+              </SelectContent>
+            </Select>
+          </Row>
+          <Row label="Vertical">
+            <div className="flex gap-1">
+              {(["top", "middle", "bottom"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => patch({ verticalAlign: value })}
+                  className={cn(
+                    "h-7 flex-1 border text-[9px] uppercase tracking-[0.08em]",
+                    (element.verticalAlign ?? "middle") === value
+                      ? "border-ink bg-ink text-[#f2f1ed]"
+                      : "border-ink/15 text-ink/60 hover:border-ink",
+                  )}
+                >
+                  {value === "middle" ? "Mid" : value}
+                </button>
+              ))}
+            </div>
+          </Row>
+          <div className="border-t border-ink/10 pt-2">
+            <ToggleRow
+              label="Text background"
+              checked={Boolean(element.textBackground)}
+              onChange={(enabled) =>
+                patch({
+                  textBackground: enabled ? "#f2f1ed" : undefined,
+                  textPadding: enabled ? (element.textPadding ?? 14) : 0,
+                })
+              }
+            />
+            {element.textBackground && (
+              <div className="mt-2 space-y-2">
+                <Row label="Fill">
+                  <ColorField
+                    value={element.textBackground}
+                    onChange={(textBackground) => patch({ textBackground })}
+                    allowTransparent
+                  />
+                </Row>
+                <Row label="Padding">
+                  <NumberField
+                    value={element.textPadding ?? 14}
+                    onChange={(textPadding) => patch({ textPadding })}
+                    min={0}
+                  />
+                </Row>
+                <Row label="Radius">
+                  <NumberField
+                    value={element.textRadius ?? 0}
+                    onChange={(textRadius) => patch({ textRadius })}
+                    min={0}
+                  />
+                </Row>
+              </div>
+            )}
+            <ToggleRow
+              label="Text border"
+              checked={(element.textBorderWidth ?? 0) > 0}
+              onChange={(enabled) =>
+                patch({
+                  textBorderWidth: enabled ? 1 : 0,
+                  textBorder: enabled ? (element.textBorder ?? element.color ?? "#161616") : undefined,
+                })
+              }
+            />
+            {(element.textBorderWidth ?? 0) > 0 && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Row label="Ink">
+                  <ColorField
+                    value={element.textBorder ?? "#161616"}
+                    onChange={(textBorder) => patch({ textBorder })}
+                  />
+                </Row>
+                <Row label="Width">
+                  <NumberField
+                    value={element.textBorderWidth ?? 1}
+                    onChange={(textBorderWidth) => patch({ textBorderWidth })}
+                    min={0}
+                    max={20}
+                  />
+                </Row>
+              </div>
+            )}
+            <ToggleRow
+              label="Soft text shadow"
+              checked={Boolean(element.textShadow)}
+              onChange={(textShadow) => patch({ textShadow })}
+            />
+          </div>
         </Section>
       )}
 
