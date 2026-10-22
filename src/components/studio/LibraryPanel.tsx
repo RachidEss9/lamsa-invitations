@@ -146,6 +146,7 @@ interface LibraryPanelProps {
   onApplyTemplate: (next: DesignDocument, name: string) => void;
   onApplyOpening: (opening: OpeningSettings) => void;
   onApplyAnimation: (animation: ElementAnimation) => void;
+  onApplyFont: (fontId: string) => void;
   onApplyStyle: (style: BuiltinStyle) => void;
   onPlaceAsset: (storageId: string, name: string, url?: string | null) => void;
   onAddPageLayout: (layoutId: string) => void;
@@ -471,10 +472,9 @@ export function LibraryPanel({
   content,
   design,
   selectedIds,
-  selectedAnimations,
   onApplyTemplate,
   onApplyOpening,
-  onApplyAnimation,
+  onApplyFont,
   onApplyStyle,
   onPlaceAsset,
   onAddPageLayout,
@@ -502,32 +502,15 @@ export function LibraryPanel({
     [onApplyStyle, onClose],
   );
 
-  const handleApplyFont = useCallback(() => {
+  const handleApplyFont = useCallback(
+    (fontId: string) => {
       if (selectedIds.length === 0) {
-        onClose();
         return;
       }
-      const existing = selectedAnimations[0];
-      onApplyAnimation(
-        existing ?? {
-          enabled: true,
-          preset: "fadeUp",
-          trigger: "load",
-          delay: 0,
-          duration: 1200,
-          easing: "easeOut",
-        },
-      );
+      onApplyFont(fontId);
       onClose();
     },
-    [selectedIds, selectedAnimations, onApplyAnimation, onClose],
-  );
-
-  const handlePlaceAsset = useCallback(
-    (asset: BuiltinAsset) => {
-      onPlaceAsset("", asset.name);
-    },
-    [onPlaceAsset],
+    [onApplyFont, onClose, selectedIds],
   );
 
   const filteredTemplates = useMemo(() => {
@@ -585,7 +568,10 @@ export function LibraryPanel({
     );
   }, [query]);
 
-  const selectedFontId = selectedIds.length === 1 ? design.pages[0]?.elements.find((e) => e.id === selectedIds[0])?.font : undefined;
+  const selectedFontId =
+    selectedIds.length === 1
+      ? design.pages.find((pg) => pg.elements.some((e) => e.id === selectedIds[0]))?.elements.find((e) => e.id === selectedIds[0])?.font
+      : undefined;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -716,7 +702,7 @@ export function LibraryPanel({
                       key={font.id}
                       font={font}
                       selected={font.id === selectedFontId}
-                      onApply={() => handleApplyFont()}
+                      onApply={() => handleApplyFont(font.id)}
                     />
                   ))}
                 </div>
@@ -762,7 +748,7 @@ export function LibraryPanel({
                       <AssetCard
                         key={asset.id}
                         asset={asset}
-                        onApply={() => { onApplyBuiltinAsset(asset); handlePlaceAsset(asset); } }
+                        onApply={() => onApplyBuiltinAsset(asset)}
                       />
                     ))}
                   </div>

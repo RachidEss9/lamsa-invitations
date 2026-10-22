@@ -60,6 +60,7 @@ import {
   type InvitationContent,
 } from "@/lib/invitation";
 import { pageLayoutById } from "@/lib/layouts";
+import { ensureFont, fontById } from "@/lib/fonts";
 import { recolourDesign, type ColourPalette } from "@/lib/palettes";
 import type { BuiltinAsset } from "@/lib/assets";
 import type { RevealPreset } from "@/lib/reveals";
@@ -1278,6 +1279,23 @@ export default function Studio() {
           : element,
       ),
     );
+  };
+
+  const applyFont = async (fontId: string) => {
+    if (selectedIds.length === 0) return;
+    const element = page?.elements.find((candidate) => candidate.id === selectedIds[0]);
+    if (!element || element.kind !== "text") {
+      toast.error("Select a text layer to change its font.");
+      return;
+    }
+    patchElement(element.id, { font: fontId });
+    const font = fontById(fontId);
+    const loaded = await ensureFont(fontId, element.fontWeight ?? 400, Boolean(element.italic));
+    if (loaded) {
+      toast.success(`${font.name} applied to "${element.name}".`);
+    } else {
+      toast.success(`${font.name} applied — showing fallback face in this browser.`);
+    }
   };
 
   const applyStyle = (style: StylePreset) => {
@@ -2686,6 +2704,7 @@ export default function Studio() {
         onApplyTemplate={applyTemplate}
         onApplyOpening={applyOpening}
         onApplyAnimation={applyAnimation}
+        onApplyFont={applyFont}
         onApplyStyle={applyStyle}
         onPlaceAsset={placeAsset}
         onAddPageLayout={addPageLayout}
