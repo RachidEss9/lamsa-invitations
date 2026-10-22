@@ -101,9 +101,6 @@ function FormLabel({ className, ...props }: React.ComponentProps<typeof LabelPri
   )
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
-const _formLabelAnchor3 = React.useId
-
 function FormControl({ className, ...props }: React.ComponentProps<typeof Slot>) {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
