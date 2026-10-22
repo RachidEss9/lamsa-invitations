@@ -2220,9 +2220,12 @@ export default function Studio() {
           </button>
         </div>
 
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="flex items-center gap-1">
           <IconButton label="Undo" onClick={undo} disabled={!historyFlags.undo}><Undo2 className="size-3.5" /></IconButton>
           <IconButton label="Redo" onClick={redo} disabled={!historyFlags.redo}><Redo2 className="size-3.5" /></IconButton>
+        </div>
+
+        <div className="hidden items-center gap-1 md:flex">
           <span className="mx-1 h-5 w-px bg-ink/12" />
           <IconButton label="Desktop canvas" active={device === "desktop"} onClick={() => setDevice("desktop")}><Monitor className="size-3.5" /></IconButton>
           <IconButton label="Tablet canvas" active={device === "tablet"} onClick={() => setDevice("tablet")}><Tablet className="size-3.5" /></IconButton>
@@ -2237,7 +2240,7 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setLibrariesOpen(true)}
-            className="h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em]"
+            className="hidden h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em] sm:inline-flex"
           >
             <Library className="size-3.5" />
             <span className="hidden sm:inline">Libraries</span>
@@ -2263,6 +2266,8 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setGuestOpen(true)}
+            aria-label="Guest preview"
+            title="Guest preview"
             className="h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em]"
           >
             <Eye className="size-3.5" />
@@ -2273,6 +2278,7 @@ export default function Studio() {
             variant="outline"
             onClick={() => setPrintOpen(true)}
             className="h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em]"
+            aria-label="Export a print-ready PDF"
             title="Export a print-ready PDF"
           >
             <FileText className="size-3.5" />

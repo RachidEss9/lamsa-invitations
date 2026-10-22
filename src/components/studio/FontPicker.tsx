@@ -268,7 +268,7 @@ export function FontPicker({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="grid max-h-[88vh] max-w-3xl grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-ink/20 p-0">
+        <DialogContent className="grid max-h-[88vh] sm:max-w-[min(768px,calc(100%_-_2rem))] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-ink/20 p-0">
           <DialogHeader className="border-b border-ink/12 px-5 py-4">
             <DialogTitle className="font-display text-2xl">Type library</DialogTitle>
             <DialogDescription className="text-[11px] leading-relaxed text-ink/50">

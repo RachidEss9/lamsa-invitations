@@ -573,7 +573,7 @@ export function LibraryPanel({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[88vh] max-w-[920px] gap-0 overflow-y-auto p-0">
+      <DialogContent className="max-h-[88vh] sm:max-w-[min(920px,calc(100%_-_2rem))] gap-0 overflow-y-auto p-0">
         <DialogHeader className="border-b border-ink/12 px-5 py-4">
           <DialogTitle className="flex items-center gap-2 font-display text-xl">
             <Palette className="size-4 text-[var(--red)]" />
