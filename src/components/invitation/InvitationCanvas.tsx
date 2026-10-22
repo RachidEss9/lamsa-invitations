@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import {
   formatEventDate,
   formatEventTime,
@@ -437,24 +437,14 @@ function InvitationCanvasBackdrop({
   seed: string;
   fx?: InvitationFxSpec;
 }) {
-  let hash = Math.random().toString(36).slice(2, 8);
-  if (typeof crypto !== "undefined" && "subtle" in crypto) {
-    hash =
-      crypto.createHash
-        ? crypto.createHash("sha256").update(seed).digest("hex").slice(0, 8)
-        : "x" +
-            parseInt(
-              Array.from(
-                new Uint8Array(
-                  crypto.subtle
-                    ? crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed))
-                    : new ArrayBuffer(0),
-                ),
-                (b) => b,
-              ).join(""),
-              16,
-            ).toString(16).slice(0, 8);
+  // Deterministic FNV-1a hash so each backdrop's overlay sprites stay stable
+  // across re-renders without pulling in a hashing library.
+  let hashNumber = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    hashNumber ^= seed.charCodeAt(i);
+    hashNumber = Math.imul(hashNumber, 16777619);
   }
+  const hash = (hashNumber >>> 0).toString(16).slice(0, 8);
 
   const imageUrl = `/templates/airvendor/${seed.split("/").pop() || seed}.jpg`;
 
