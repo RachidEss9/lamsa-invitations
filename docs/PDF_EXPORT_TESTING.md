@@ -6,7 +6,7 @@ No headless browser (Chromium/Firefox) is available in this environment:
 
 - Disk: 3.9 GB total, ~87% used, ~540 MB free.
 - Playwright `chrome-headless-shell` download fails: the Playwright CDN returns `NoSuchBucket` (404) for `chromium-headless-shell-linux-x64-1248`.
-- `@vitejs/plugin-react` 6.1.2 requires `vite ^8.0.0` (peer dependency); the project uses `vite ^7.2.6`. The resolved 6.1.2 imports `vite/internal`, which only exists in Vite 8.x — so the production build (`bun run build`) fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- ~~`@vitejs/plugin-react` 6.1.2 requires `vite ^8.0.0`; the production build failed with `ERR_PACKAGE_PATH_NOT_EXPORTED`.~~ **Fixed:** the plugin was downgraded to `5.2.0` (peer `vite ^4–^8`), and `bun run build` now succeeds.
 - No `chromium`, `firefox`, `google-chrome` binaries are installed; `chromium`/`firefox` are snap-only in the package repositories and cannot be installed here.
 - `xvfb-run` exists but needs a browser binary, which is absent.
 

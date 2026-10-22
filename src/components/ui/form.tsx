@@ -101,7 +101,7 @@ function FormLabel({ className, ...props }: React.ComponentProps<typeof LabelPri
   )
 }
 
-function FormControl({ className, ...props }: React.ComponentProps<typeof Slot>) {
+function FormControl({ ...props }: React.ComponentProps<typeof Slot>) {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
   return (

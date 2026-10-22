@@ -2,10 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   fontById,
   fontFamilyFor,
-  fontNameFor,
   isLegacyFontId,
   supportsArabic,
-  FONT_LIBRARY,
   LEGACY_FONT_IDS,
 } from "./fonts";
 import type { DesignElement } from "./design";

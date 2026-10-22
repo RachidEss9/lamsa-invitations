@@ -148,7 +148,6 @@ interface LibraryPanelProps {
   onApplyAnimation: (animation: ElementAnimation) => void;
   onApplyFont: (fontId: string) => void;
   onApplyStyle: (style: BuiltinStyle) => void;
-  onPlaceAsset: (storageId: string, name: string, url?: string | null) => void;
   onAddPageLayout: (layoutId: string) => void;
   onApplyBuiltinAsset: (asset: BuiltinAsset) => void;
   onAddRevealPreset: (preset: RevealPreset) => void;
@@ -476,7 +475,6 @@ export function LibraryPanel({
   onApplyOpening,
   onApplyFont,
   onApplyStyle,
-  onPlaceAsset,
   onAddPageLayout,
   onApplyBuiltinAsset,
   onAddRevealPreset,

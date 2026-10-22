@@ -1327,32 +1327,6 @@ export default function Studio() {
     toast.success(`${palette.name} applied.`);
   };
 
-  const placeAsset = (storageId: string, name: string, url?: string | null) => {
-    if (url) {
-      setLocalImageUrls((previous) => ({ ...previous, [storageId]: url }));
-    }
-    addElement(
-      makeElement("image", {
-        name,
-        imageStorageId: storageId,
-        x: 190,
-        y: 460,
-        w: 620,
-        h: 430,
-        fit: "cover",
-        animation: {
-          enabled: true,
-          preset: "scaleIn",
-          trigger: "load",
-          delay: 400,
-          duration: 1100,
-          easing: "easeOut",
-        },
-      }),
-    );
-    setLibrariesOpen(false);
-  };
-
   const clipChange = (elementId: string, value: { start?: number; duration?: number }) => {
     setPageElements((elements) =>
       elements.map((element) =>
@@ -2706,7 +2680,6 @@ export default function Studio() {
         onApplyAnimation={applyAnimation}
         onApplyFont={applyFont}
         onApplyStyle={applyStyle}
-        onPlaceAsset={placeAsset}
         onAddPageLayout={addPageLayout}
         onApplyBuiltinAsset={applyBuiltinAsset}
         onAddRevealPreset={addRevealPreset}

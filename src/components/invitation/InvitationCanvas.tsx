@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   formatEventDate,
   formatEventTime,
@@ -7,7 +7,6 @@ import {
   isRevealLayout,
   SCRIPT_FONT_PAIRS,
   type InvitationContent,
-  type InvitationTemplateBackground,
   isInvitationTemplateBackground,
   type InvitationFxSpec,
 } from "@/lib/invitation";
@@ -480,13 +479,24 @@ function InvitationCanvasBackdrop({
   );
 }
 
-function reducedMotion() {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  } catch {
-    return false;
-  }
+/**
+ * Reads the OS reduced-motion preference as reactive state so ambient fields
+ * can hide themselves and respond when the setting changes mid-session.
+ */
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false,
+  );
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return reduced;
 }
 
 function seededRandom(seed: string) {
@@ -502,10 +512,11 @@ function seededRandom(seed: string) {
 }
 
 function DustField({ color, count, seed }: { color: string; count: number; seed: string }) {
+  const reduced = useReducedMotion();
   const sprites = useMemo(() => {
     const rnd = seededRandom(seed + ":dust");
-    return Array.from({ length: count }, () => ({
-      id: Math.random().toString(36).slice(2, 8),
+    return Array.from({ length: count }, (_, index) => ({
+      id: `${seed}:dust:${index}`,
       left: rnd() * 100,
       top: 40 + rnd() * 60,
       size: 2 + rnd() * 3,
@@ -514,7 +525,7 @@ function DustField({ color, count, seed }: { color: string; count: number; seed:
     }));
   }, [count, seed]);
 
-  if (reducedMotion()) return null;
+  if (reduced) return null;
 
   return (
     <div
@@ -543,10 +554,11 @@ function DustField({ color, count, seed }: { color: string; count: number; seed:
 }
 
 function PetalField({ color, count, seed }: { color: string; count: number; seed: string }) {
+  const reduced = useReducedMotion();
   const sprites = useMemo(() => {
     const rnd = seededRandom(seed + ":petal");
-    return Array.from({ length: count }, () => ({
-      id: Math.random().toString(36).slice(2, 8),
+    return Array.from({ length: count }, (_, index) => ({
+      id: `${seed}:petal:${index}`,
       left: rnd() * 95,
       size: 7 + rnd() * 6,
       duration: 8 + rnd() * 6,
@@ -554,7 +566,7 @@ function PetalField({ color, count, seed }: { color: string; count: number; seed
     }));
   }, [count, seed]);
 
-  if (reducedMotion()) return null;
+  if (reduced) return null;
 
   return (
     <div
@@ -583,7 +595,8 @@ function PetalField({ color, count, seed }: { color: string; count: number; seed
 }
 
 function Sweeper() {
-  if (reducedMotion()) return null;
+  const reduced = useReducedMotion();
+  if (reduced) return null;
   return (
     <div
       className="absolute left-0 top-0 h-full w-[35%] animate-sweep"
@@ -600,7 +613,8 @@ function Sweeper() {
 }
 
 function Flicker() {
-  if (reducedMotion()) return null;
+  const reduced = useReducedMotion();
+  if (reduced) return null;
   return (
     <div
       className="absolute inset-0 animate-flicker"
@@ -614,10 +628,11 @@ function Flicker() {
 }
 
 function GlowField({ points, seed }: { points: [number, number, number][]; seed: string }) {
+  const reduced = useReducedMotion();
   const items = useMemo(() => {
     const rnd = seededRandom(seed + ":glow");
     return points.map((point, index) => ({
-      id: Math.random().toString(36).slice(2, 8),
+      id: `${seed}:glow:${index}`,
       left: point[0] * 100,
       top: point[1] * 100,
       size: point[2] * 100,
@@ -625,7 +640,7 @@ function GlowField({ points, seed }: { points: [number, number, number][]; seed:
     }));
   }, [points, seed]);
 
-  if (reducedMotion()) return null;
+  if (reduced) return null;
 
   return (
     <div
@@ -654,17 +669,18 @@ function GlowField({ points, seed }: { points: [number, number, number][]; seed:
 }
 
 function SparkField({ points, seed }: { points: [number, number][]; seed: string }) {
+  const reduced = useReducedMotion();
   const items = useMemo(() => {
     const rnd = seededRandom(seed + ":spark");
     return points.map((point, index) => ({
-      id: Math.random().toString(36).slice(2, 8),
+      id: `${seed}:spark:${index}`,
       left: point[0] * 100,
       top: point[1] * 100,
       delay: -(index * 0.5 + rnd() * 0.4),
     }));
   }, [points, seed]);
 
-  if (reducedMotion()) return null;
+  if (reduced) return null;
 
   return (
     <div
