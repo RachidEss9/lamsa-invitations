@@ -1,0 +1,18 @@
+import { chromium } from '/home/daytona/codebase/node_modules/playwright-core/index.mjs';
+import { install } from './serve.mjs';
+const browser = await chromium.launch({ headless: true, executablePath: '/home/daytona/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome', args: ['--no-sandbox','--disable-dev-shm-usage'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = [];
+page.on('requestfailed', (r) => errors.push('REQFAIL: ' + r.url() + ' ' + r.failure()?.errorText));
+page.on('response', (r) => { if (r.status() >= 400) errors.push('HTTP ' + r.status() + ' ' + r.url()); });
+page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message.slice(0,400)));
+page.on('console', (m) => { if (m.type() === 'error') errors.push('CONSOLE: ' + m.text().slice(0,300)); });
+const handler = await install();
+await page.route('http://harness.local/**', handler);
+await page.goto('http://harness.local/index.html', { waitUntil: 'load', timeout: 60000 });
+await page.waitForTimeout(3500);
+console.log('layers', await page.locator('[aria-label$="layer"]').count());
+console.log((await page.locator('body').innerText()).slice(0, 600));
+console.log('ERRORS', errors.slice(0,10));
+await page.screenshot({ path: '/tmp/lamsa-harness/studio-desktop.png' });
+await browser.close();

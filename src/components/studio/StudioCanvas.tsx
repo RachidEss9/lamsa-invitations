@@ -246,6 +246,7 @@ export function StudioCanvas({
   onContextAction,
 }: StudioCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const designRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const [fit, setFit] = useState(0);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -364,8 +365,11 @@ export function StudioCanvas({
     if (event.button !== 0) return;
     event.stopPropagation();
     const originals = new Map([[element.id, element]]);
-    const centerX = element.x + element.w / 2;
-    const centerY = element.y + element.h / 2;
+    // Rotation is measured in screen space, so the element centre has to be
+    // converted from design coordinates through the canvas scale and pan.
+    const rect = designRef.current?.getBoundingClientRect();
+    const centerX = (rect?.left ?? 0) + (element.x + element.w / 2) * scale;
+    const centerY = (rect?.top ?? 0) + (element.y + element.h / 2) * scale;
     setDrag({
       mode,
       handle,
@@ -455,39 +459,92 @@ export function StudioCanvas({
         );
         const delta = ((angle - current.startAngle) * 180) / Math.PI;
         let rotation = current.anchor.rotation + delta;
-        if (!event.altKey) rotation = Math.round(rotation / 5) * 5;
-        rotation = ((Math.round(rotation) % 360) + 360) % 360;
+        // Shift snaps to a clean fifteen degrees; free rotation stays precise.
+        rotation = event.shiftKey ? Math.round(rotation / 15) * 15 : Math.round(rotation);
+        rotation = ((rotation % 360) + 360) % 360;
         onRotate(current.anchor.id, rotation);
         return;
       }
 
       const handle = current.handle ?? "se";
       const original = current.originals.get(current.anchor.id) ?? current.anchor;
+      // Work in the element's own axes so a rotated layer resizes along its
+      // edges instead of the screen axes.
+      const theta = (original.rotation * Math.PI) / 180;
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+      const localDx = dx * cos + dy * sin;
+      const localDy = -dx * sin + dy * cos;
       let { x, y, w, h } = original;
       const minW = 24;
       const minH = 20;
 
-      if (handle.includes("e")) w = Math.max(minW, original.w + dx);
-      if (handle.includes("s")) h = Math.max(minH, original.h + dy);
+      if (handle.includes("e")) w = Math.max(minW, original.w + localDx);
+      if (handle.includes("s")) h = Math.max(minH, original.h + localDy);
       if (handle.includes("w")) {
-        w = Math.max(minW, original.w - dx);
+        w = Math.max(minW, original.w - localDx);
         x = original.x + (original.w - w);
       }
       if (handle.includes("n")) {
-        h = Math.max(minH, original.h - dy);
+        h = Math.max(minH, original.h - localDy);
         y = original.y + (original.h - h);
       }
 
       const proportional = aspectLocked || event.shiftKey;
-      if (proportional && (handle.length === 2 || handle === "n" || handle === "s")) {
+      if (proportional && handle.length === 2) {
         const ratio = original.w / Math.max(1, original.h);
-        if (handle === "n" || handle === "s") {
-          w = h * ratio;
-          x = original.x + (original.w - w) / 2;
-        } else {
+        const flipX = handle.includes("w");
+        const flipY = handle.includes("n");
+        if (Math.abs(w - original.w) >= Math.abs(h - original.h)) {
           h = w / ratio;
-          y = original.y + (original.h - h) / 2;
+          y = flipY ? original.y + original.h - h : original.y;
+        } else {
+          w = h * ratio;
+          x = flipX ? original.x + original.w - w : original.x;
         }
+      }
+
+      // Keep the opposite corner or edge pinned in screen space even when the
+      // layer is rotated: the box grows around the handle the host grabbed.
+      if (Math.abs(original.rotation) > 0.01) {
+        const centerX0 = original.x + original.w / 2;
+        const centerY0 = original.y + original.h / 2;
+        const anchorX = handle.includes("e")
+          ? original.x
+          : handle.includes("w")
+            ? original.x + original.w
+            : centerX0;
+        const anchorY = handle.includes("s")
+          ? original.y
+          : handle.includes("n")
+            ? original.y + original.h
+            : centerY0;
+        const worldX =
+          centerX0 + cos * (anchorX - centerX0) - sin * (anchorY - centerY0);
+        const worldY =
+          centerY0 + sin * (anchorX - centerX0) + cos * (anchorY - centerY0);
+        const nextCenterX = x + w / 2;
+        const nextCenterY = y + h / 2;
+        const nextAnchorX = handle.includes("e")
+          ? x
+          : handle.includes("w")
+            ? x + w
+            : nextCenterX;
+        const nextAnchorY = handle.includes("s")
+          ? y
+          : handle.includes("n")
+            ? y + h
+            : nextCenterY;
+        const nextWorldX =
+          nextCenterX +
+          cos * (nextAnchorX - nextCenterX) -
+          sin * (nextAnchorY - nextCenterY);
+        const nextWorldY =
+          nextCenterY +
+          sin * (nextAnchorX - nextCenterX) +
+          cos * (nextAnchorY - nextCenterY);
+        x += worldX - nextWorldX;
+        y += worldY - nextWorldY;
       }
 
       onResize(current.anchor.id, {
@@ -738,6 +795,7 @@ export function StudioCanvas({
         }}
       >
         <div
+          ref={designRef}
           className="absolute left-0 top-0 origin-top-left"
           style={{
             width: DESIGN_WIDTH,
@@ -851,11 +909,15 @@ export function StudioCanvas({
                     return (
                       <span
                         key={handle}
-                        className="pointer-events-auto absolute size-2.5 -translate-x-1/2 -translate-y-1/2 border border-[#710014] bg-[#f2f1ed]"
+                        className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 border border-[#710014] bg-[#f2f1ed]"
                         style={{
                           left: position.left,
                           top: position.top,
+                          width: 11 / scale,
+                          height: 11 / scale,
+                          borderWidth: 1.5 / scale,
                           cursor: position.cursor,
+                          touchAction: "none",
                         }}
                         onPointerDown={(event) =>
                           beginHandle(event as ReactPointerEvent, single, "resize", handle)
@@ -865,7 +927,14 @@ export function StudioCanvas({
                   },
                 )}
                 <span
-                  className="pointer-events-auto absolute left-1/2 top-0 size-3 -translate-x-1/2 -translate-y-8 cursor-grab rounded-full border border-[#710014] bg-[#f2f1ed]"
+                  className="pointer-events-auto absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border border-[#710014] bg-[#f2f1ed]"
+                  style={{
+                    width: 15 / scale,
+                    height: 15 / scale,
+                    marginTop: -26 / scale,
+                    borderWidth: 1.5 / scale,
+                    touchAction: "none",
+                  }}
                   onPointerDown={(event) =>
                     beginHandle(event as ReactPointerEvent, single, "rotate")
                   }

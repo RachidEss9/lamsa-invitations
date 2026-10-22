@@ -124,7 +124,11 @@ function NumberField({
       max={max}
       onChange={(event) => {
         const parsed = Number(event.target.value);
-        if (Number.isFinite(parsed)) onChange(parsed);
+        if (!Number.isFinite(parsed)) return;
+        let next = parsed;
+        if (typeof min === "number") next = Math.max(min, next);
+        if (typeof max === "number") next = Math.min(max, next);
+        onChange(next);
       }}
       className={cn(numberInput, "w-full")}
     />
@@ -353,8 +357,34 @@ export function Inspector({
         <div className="grid grid-cols-2 gap-2">
           <Row label="X"><NumberField value={element.x} onChange={(x) => patch({ x })} /></Row>
           <Row label="Y"><NumberField value={element.y} onChange={(y) => patch({ y })} /></Row>
-          <Row label="W"><NumberField value={element.w} onChange={(w) => patch({ w })} min={8} /></Row>
-          <Row label="H"><NumberField value={element.h} onChange={(h) => patch({ h })} min={8} /></Row>
+          <Row label="W">
+            <NumberField
+              value={element.w}
+              min={8}
+              onChange={(w) => {
+                if (!aspectLocked) {
+                  patch({ w });
+                  return;
+                }
+                const ratio = element.h / Math.max(1, element.w);
+                patch({ w, h: Math.max(8, Math.round(w * ratio)) });
+              }}
+            />
+          </Row>
+          <Row label="H">
+            <NumberField
+              value={element.h}
+              min={8}
+              onChange={(h) => {
+                if (!aspectLocked) {
+                  patch({ h });
+                  return;
+                }
+                const ratio = element.w / Math.max(1, element.h);
+                patch({ h, w: Math.max(8, Math.round(h * ratio)) });
+              }}
+            />
+          </Row>
           <Row label="Angle"><NumberField value={element.rotation} onChange={(rotation) => patch({ rotation })} /></Row>
           <Row label="Opacity">
             <NumberField
@@ -373,6 +403,27 @@ export function Inspector({
             onCheckedChange={onAspectLocked}
             className="ml-auto scale-90"
           />
+        </div>
+        <div className="grid grid-cols-6 gap-1">
+          {[
+            { kind: "left", icon: AlignStartVertical, label: "Align left" },
+            { kind: "hcenter", icon: AlignCenterVertical, label: "Centre horizontally" },
+            { kind: "right", icon: AlignEndVertical, label: "Align right" },
+            { kind: "top", icon: AlignStartHorizontal, label: "Align top" },
+            { kind: "vcenter", icon: AlignCenterHorizontal, label: "Centre vertically" },
+            { kind: "bottom", icon: AlignEndHorizontal, label: "Align bottom" },
+          ].map(({ kind, icon: Icon, label }) => (
+            <button
+              key={kind}
+              type="button"
+              title={label}
+              aria-label={label}
+              onClick={() => onAlign(kind as Parameters<typeof onAlign>[0])}
+              className="grid h-8 place-items-center border border-ink/15 text-ink/65 hover:border-ink hover:text-ink"
+            >
+              <Icon className="size-3.5" />
+            </button>
+          ))}
         </div>
         <div className="grid grid-cols-3 gap-1">
           <button type="button" onClick={() => onLayer("back")} className="flex h-8 items-center justify-center border border-ink/15 text-ink/65 hover:border-ink" title="Send to back">

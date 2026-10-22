@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.app.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "convex/react": [".tmp-harness/mockConvex.tsx"],
+      "@/convex/_generated/api": [".tmp-harness/mockApi.ts"],
+      "@/*": ["./src/*"]
+    },
+    "noEmit": true
+  },
+  "include": ["./**/*.ts", "./**/*.tsx", "../src/**/*.ts", "../src/**/*.tsx"]
+}

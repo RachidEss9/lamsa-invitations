@@ -83,6 +83,7 @@ import {
   Keyboard,
   Loader2,
   Lock,
+  Minus,
   Monitor,
   Palette,
   PanelLeft,
@@ -273,6 +274,7 @@ export default function Studio() {
 
   const pastRef = useRef<DesignDocument[]>([]);
   const futureRef = useRef<DesignDocument[]>([]);
+  const gestureStart = useRef<DesignDocument | null>(null);
   const hydratedRef = useRef<string | null>(null);
   const saveTimer = useRef<number | null>(null);
   const saveVersion = useRef(0);
@@ -385,9 +387,61 @@ export default function Studio() {
       scheduleSave(next);
       setHistoryFlags({ undo: true, redo: false });
       setHistoryTick((tick) => tick + 1);
+      gestureStart.current = null;
     },
     [scheduleSave],
   );
+
+  // A drag produces a change per pointer move. Those changes must collapse
+  // into one undo step, so a gesture records the design once and commits it on
+  // pointer up instead of pushing a hundred near-identical snapshots.
+  const applyGesture = useCallback(
+    (updater: (current: DesignDocument) => DesignDocument) => {
+      const current = designRef.current;
+      if (!current) return;
+      if (!gestureStart.current) gestureStart.current = current;
+      const next = updater(current);
+      if (next === current) return;
+      designRef.current = next;
+      setDesignState(next);
+      scheduleSave(next);
+    },
+    [scheduleSave],
+  );
+
+  const gestureElements = useCallback(
+    (updater: (elements: DesignElement[]) => DesignElement[]) => {
+      applyGesture((current) => ({
+        ...current,
+        pages: current.pages.map((candidate, index) =>
+          index === pageIndex
+            ? { ...candidate, elements: updater(candidate.elements) }
+            : candidate,
+        ),
+      }));
+    },
+    [applyGesture, pageIndex],
+  );
+
+  const finishGesture = useCallback(() => {
+    const start = gestureStart.current;
+    gestureStart.current = null;
+    if (!start || !designRef.current || start === designRef.current) return;
+    pastRef.current = [...pastRef.current.slice(-59), start];
+    futureRef.current = [];
+    setHistoryFlags({ undo: true, redo: false });
+    setHistoryTick((tick) => tick + 1);
+  }, []);
+
+  useEffect(() => {
+    const end = () => finishGesture();
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+  }, [finishGesture]);
 
   const undo = useCallback(() => {
     const current = designRef.current;
@@ -2139,8 +2193,8 @@ export default function Studio() {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[var(--paper-deep)]">
-      <header className="z-40 flex h-[56px] shrink-0 items-center gap-2 border-b border-ink/15 bg-[var(--paper-light)] px-3">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">
+      <header className="z-40 flex h-[56px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-ink/15 bg-[var(--paper-light)] px-2 sm:gap-2 sm:px-3">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
@@ -2196,12 +2250,14 @@ export default function Studio() {
             <Library className="size-3.5" />
             <span className="hidden sm:inline">Libraries</span>
           </Button>
-          <IconButton
-            label="Keyboard shortcuts"
-            onClick={() => setShortcutsOpen(true)}
-          >
-            <Keyboard className="size-3.5" />
-          </IconButton>
+          <span className="hidden sm:block">
+            <IconButton
+              label="Keyboard shortcuts"
+              onClick={() => setShortcutsOpen(true)}
+            >
+              <Keyboard className="size-3.5" />
+            </IconButton>
+          </span>
           <Button
             type="button"
             variant="outline"
@@ -2218,7 +2274,7 @@ export default function Studio() {
             className="h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em]"
           >
             <Eye className="size-3.5" />
-            <span className="hidden sm:inline">Guest</span> preview
+            <span className="hidden sm:inline">Guest preview</span>
           </Button>
           <Button
             type="button"
@@ -2298,15 +2354,27 @@ export default function Studio() {
                   setPlaying(false);
                 }}
                 onMove={(updates) =>
-                  setPageElements((elements) =>
+                  gestureElements((elements) =>
                     elements.map((element) => {
                       const update = updates.find((item) => item.id === element.id);
                       return update ? { ...element, x: update.x, y: update.y } : element;
                     }),
                   )
                 }
-                onResize={(elementId, box) => patchElement(elementId, box)}
-                onRotate={(elementId, rotation) => patchElement(elementId, { rotation })}
+                onResize={(elementId, box) =>
+                  gestureElements((elements) =>
+                    elements.map((element) =>
+                      element.id === elementId ? { ...element, ...box } : element,
+                    ),
+                  )
+                }
+                onRotate={(elementId, rotation) =>
+                  gestureElements((elements) =>
+                    elements.map((element) =>
+                      element.id === elementId ? { ...element, rotation } : element,
+                    ),
+                  )
+                }
                 onReveal={testReveal}
                 onAltDuplicate={duplicateForDrag}
                 onTextCommit={(elementId, text) => {
@@ -2328,7 +2396,25 @@ export default function Studio() {
               )}
             </div>
 
-            <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex flex-col gap-1">
+            <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex flex-col items-end gap-1">
+              <div className="pointer-events-auto flex border border-ink/15 bg-[var(--paper-light)]/90 backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => setZoom((value) => Math.max(0.4, value / 1.2))}
+                  aria-label="Zoom out"
+                  className="grid size-6 place-items-center text-ink/55 hover:text-ink"
+                >
+                  <Minus className="size-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom((value) => Math.min(2.4, value * 1.2))}
+                  aria-label="Zoom in"
+                  className="grid size-6 place-items-center text-ink/55 hover:text-ink"
+                >
+                  <Plus className="size-3" />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowHidden((value) => !value)}
@@ -2480,9 +2566,9 @@ export default function Studio() {
           { id: "libraries" as const, label: "Library", icon: Library },
           { id: "layers" as const, label: "Layers", icon: Layers },
           { id: "colour" as const, label: "Colour", icon: Palette },
-          { id: "properties" as const, label: "Properties", icon: PanelRight },
+          { id: "properties" as const, label: "Props", icon: PanelRight },
           { id: "pages" as const, label: "Pages", icon: Layout },
-          { id: "timeline" as const, label: "Timeline", icon: Play },
+          { id: "timeline" as const, label: "Motion", icon: Play },
         ].map(({ id: sheet, label, icon: Icon }) => (
           <button
             key={sheet}

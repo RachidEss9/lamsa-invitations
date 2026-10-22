@@ -287,7 +287,20 @@ export function PrintExportDialog({
                 <FieldRow label="Units">
                   <Select
                     value={settings.unit}
-                    onValueChange={(unit) => patch({ unit: unit as PrintUnit })}
+                    onValueChange={(unit) =>
+                      patch({
+                        unit: unit as PrintUnit,
+                        // Convert the custom size instead of reinterpreting it.
+                        customWidth: fromMm(
+                          toMm(settings.customWidth, settings.unit),
+                          unit as PrintUnit,
+                        ),
+                        customHeight: fromMm(
+                          toMm(settings.customHeight, settings.unit),
+                          unit as PrintUnit,
+                        ),
+                      })
+                    }
                   >
                     <SelectTrigger className="h-7 rounded-none text-[11px]">
                       <SelectValue />

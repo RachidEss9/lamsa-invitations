@@ -209,28 +209,10 @@ export function pagesForPrint(
 
 const mmToPt = (mm: number) => (mm / 25.4) * 72;
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const value = hex.trim();
-  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(value);
-  if (short) {
-    return {
-      r: parseInt(short[1] + short[1], 16) / 255,
-      g: parseInt(short[2] + short[2], 16) / 255,
-      b: parseInt(short[3] + short[3], 16) / 255,
-    };
-  }
-  const long = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(value);
-  if (!long) return null;
-  return {
-    r: parseInt(long[1], 16) / 255,
-    g: parseInt(long[2], 16) / 255,
-    b: parseInt(long[3], 16) / 255,
-  };
-}
-
 export interface PrintCapture {
   /** PNG data URL of the artwork, cropped to its placed rectangle. */
   image: string;
+  /** The page background, kept for diagnostics; the PDF sheet stays white. */
   background: string;
   label: string;
 }
@@ -261,13 +243,14 @@ export async function buildPrintPdf(
 
   for (const capture of captures) {
     const pdfPage = pdf.addPage([pageW, pageH]);
-    const paper = hexToRgb(capture.background) ?? { r: 1, g: 1, b: 1 };
+    // The sheet itself is white; the artwork (with its own page background)
+    // sits inside the margins, exactly as the preview shows.
     pdfPage.drawRectangle({
       x: 0,
       y: 0,
       width: pageW,
       height: pageH,
-      color: rgb(paper.r, paper.g, paper.b),
+      color: rgb(1, 1, 1),
     });
 
     if (capture.image) {
