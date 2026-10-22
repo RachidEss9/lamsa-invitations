@@ -314,6 +314,11 @@ export interface InvitationTemplate {
   /** Templates designed for right-to-left reading start in RTL. */
   rtl?: boolean;
   cornerMotif?: MotifId;
+  /**
+   * Editor-only label for Pinterest-sourced reference backdrops that must be
+   * replaced with licensed art before publishing.
+   */
+  backdropLabel?: string;
   sample: {
     primary: string;
     secondary: string;
@@ -322,6 +327,21 @@ export interface InvitationTemplate {
     venueName: string;
     venueAddress: string;
   };
+}
+
+export interface InvitationTemplateBackground {
+  kind: "image";
+  storageSeed: string;
+}
+
+export function isInvitationTemplateBackground(value: unknown): value is InvitationTemplateBackground {
+  return (
+    typeof value === "object" &&
+    value != null &&
+    "kind" in value &&
+    (value as InvitationTemplateBackground).kind === "image" &&
+    typeof (value as InvitationTemplateBackground).storageSeed === "string"
+  );
 }
 
 export const TEMPLATES: InvitationTemplate[] = [
@@ -334,8 +354,6 @@ export const TEMPLATES: InvitationTemplate[] = [
    * layer is still built by the normal template starter flow.
    */
   {
-    // LAMSA v5 animated reveal templates.
-    id: "the-arch",
     // LAMSA v5 animated reveal templates.
     id: "the-arch",
     name: "The Arch",
@@ -935,8 +953,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       message: "حفل زفاف تحت سماء مراكش.",
       venueName: "قاعة الفوانيس",
       venueAddress: "الرباط، المغرب",
-    },
-    background: { kind: "image",    storageSeed: "templates/airvendor/3",
+    },    background: { kind: "image", storageSeed: "templates/airvendor/3" },
     fx: {
       glow: [
         [0.835, 0.23, 0.14],
@@ -961,6 +978,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
     layout: "centered",
     motif: "star",
     rtl: true,
+    backdropLabel: "Pinterest reference image — replace before publishing",
     sample: {
       primary: "نادية",
       secondary: "كرم",
@@ -1180,51 +1198,8 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
  * Replace the reference images with licensed assets before publishing a live
  * invitation. The fx overlay recipe is reusable regardless of the image.
  */
-export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
-  {
-    id: "gypsum-candles",
-    name: "نيش جبس منقوش",
-    occasion: "wedding",
-    style: "Traditional",
-    description:
-      "A carved plaster panel with a warm lantern glow and gold dust. Imported as a private-studio reference sample; replace the reference image before publishing.",
-    palette: { background: "#cdc5b7", ink: "#2a1d1d", accent: "#8c6a2e" },
-    fontPair: "arabic",
-    layout: "centered",
-    motif: "arch",
-    rtl: true,
-    sample: {
-      primary: "سلمى",
-      secondary: "عمر",
-      eyebrow: "نيش جبس منقوش",
-      message: "حفل زفاف تحت نور الشموع.",
-      venueName: "دار الجبس",
-      venueAddress: "المدينة القديمة، مراكش",
     },
-    background: { kind: "image", storageSeed: "templates/airvendor/2" },
-    fx: { dust: ["#ffe0a0", 16], glow: [[0.5, 0.97, 0.9]], sweep: 1 },  },
-
-  {
-    id: "marble-gold",
-    name: "قوس فوانيس وورود",
-    occasion: "wedding",
-    style: "Romantic",
-    description:
-      "A lantern arch over dark florals, with floating petals and warm dust. Imported as a private-studio reference sample; replace the reference image before publishing.",
-    palette: { background: "#4a2a26", ink: "#f2f1ed", accent: "#c96a3a" },
-    fontPair: "arabic",
-    layout: "centered",
-    motif: "arch",
-    rtl: true,
-    sample: {
-      primary: "نور",
-      secondary: "ثلاثون",
-      eyebrow: "قوس فوانيس وورود",
-      message: "حفل زفاف تحت سماء مراكش.",
-      venueName: "قاعة الفوانيس",
-      venueAddress: "الرباط، المغرب",
-    },
-    background: { kind: "image",    storageSeed: "templates/airvendor/3",
+    background: { kind: "image", storageSeed: "templates/airvendor/3" },
     fx: {
       glow: [
         [0.835, 0.23, 0.14],
@@ -1249,6 +1224,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
     layout: "centered",
     motif: "star",
     rtl: true,
+    backdropLabel: "Pinterest reference image — replace before publishing",
     sample: {
       primary: "نادية",
       secondary: "كرم",
@@ -1459,7 +1435,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
 
 /**
  * Backdrop templates imported from the studio pack downloaded from the Google
- * Drive link shared in the studio. The image files are stored in the studio’s
+ * Drive link shared in the studio. The image files are stored in the studio's
  * public asset bucket under /templates/airvendor/{id}.jpg, and the background
  * track of each file is labelled as a Pinterest reference image that should be
  * replaced before commercial release.
@@ -1535,8 +1511,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       message: "حفل زفاف تحت سماء مراكش.",
       venueName: "قاعة الفوانيس",
       venueAddress: "الرباط، المغرب",
-    },
-    background: { kind: "image",    storageSeed: "templates/airvendor/3",
+    },    background: { kind: "image", storageSeed: "templates/airvendor/3" },
     fx: {
       glow: [
         [0.835, 0.23, 0.14],
@@ -1561,6 +1536,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
     layout: "centered",
     motif: "star",
     rtl: true,
+    backdropLabel: "Pinterest reference image — replace before publishing",
     sample: {
       primary: "نادية",
       secondary: "كرم",
@@ -1719,6 +1695,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueAddress: "فاس، المغرب",
     },
     background: { kind: "image", storageSeed: "templates/airvendor/10" },
+    backdropLabel: "Pinterest reference image — replace before publishing",
     fx: { sweep: 1, dust: ["#ffd0d0", 10] },
   },
   {
@@ -1733,6 +1710,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
     layout: "centered",
     motif: "trellis",
     rtl: true,
+    backdropLabel: "Pinterest reference image — replace before publishing",
     sample: {
       primary: "نور",
       secondary: "ثلاثون",
@@ -1742,6 +1720,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueAddress: "مراكش، المغرب",
     },
     background: { kind: "image", storageSeed: "templates/airvendor/11" },
+    backdropLabel: "Pinterest reference image — replace before publishing",
     fx: { sweep: 1, dust: ["#fff2b0", 14] },
   },
   {
@@ -1756,6 +1735,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
     layout: "centered",
     motif: "wreath",
     rtl: true,
+    backdropLabel: "Pinterest reference image — replace before publishing",
     sample: {
       primary: "سلمى",
       secondary: "عمر",
@@ -1765,6 +1745,7 @@ export const BACKDROP_TEMPLATES: InvitationTemplate[] = [
       venueAddress: "المدينة القديمة، مراكش",
     },
     background: { kind: "image", storageSeed: "templates/airvendor/12" },
+    backdropLabel: "Pinterest reference image — replace before publishing",
     fx: { sweep: 1, dust: ["#fff2b0", 14] },
   },
 ];
@@ -1924,10 +1905,6 @@ export function displayTitle(content: Pick<InvitationContent, "names" | "occasio
   return content.names.primary || "Your invitation";
 }
 
-/**
- * Pre-filled WhatsApp share link. `wa.me` works on every platform and opens
- * the share sheet without needing any service or recipient number.
- */
 export function whatsappShareHref(text: string, url?: string): string {
   const body = url ? `${text}\n${url}` : text;
   return `https://wa.me/?text=${encodeURIComponent(body.slice(0, 1600))}`;
@@ -1939,9 +1916,9 @@ export function calendarHref(content: Pick<InvitationContent, "date" | "time" | 
     ? parse(content.date, "yyyy-MM-dd", new Date())
     : addDays(new Date(), 30);
 
-const [hours, minutes] = (content.time || "18:00").split(":").map(Number);
+  const [hours, minutes] = (content.time || "18:00").split(":").map(Number);
 
-const start = new Date(parsedDate);
+  const start = new Date(parsedDate);
   start.setHours(
     Number.isFinite(hours) ? hours : 18,
     Number.isFinite(minutes) ? minutes : 0,
@@ -1949,11 +1926,11 @@ const start = new Date(parsedDate);
     0,
   );
 
-const end = addHours(start, 3);
+  const end = addHours(start, 3);
 
-const stamp = (value: Date) => format(value, "yyyyMMdd'T'HHmmss");
+  const stamp = (value: Date) => format(value, "yyyyMMdd'T'HHmmss");
 
-const uid = `lamsa-${Date.now()}@lamsa.studio`;
+  const uid = `lamsa-${Date.now()}@lamsa.studio`;
 
 const lines = [
     "BEGIN:VCALENDAR",

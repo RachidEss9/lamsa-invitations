@@ -9,9 +9,11 @@ import {
   type InvitationContent,
   type InvitationTemplateBackground,
   isInvitationTemplateBackground,
+  type InvitationFxSpec,
 } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
 import { Motif } from "./Motif";
+
 
 interface InvitationCanvasProps {
   content: InvitationContent;
@@ -32,10 +34,10 @@ export function InvitationCanvas({
   className,
   style,
 }: InvitationCanvasProps) {
-  const { palette, background } = content;
+  const { palette } = content;
   const backdrop =
-    background && isInvitationTemplateBackground(background)
-      ? background
+    content.background && isInvitationTemplateBackground(content.background)
+      ? content.background
       : undefined;
   // LAMSA v5: right-to-left invitations read in Amiri regardless of the
   // chosen pair, exactly like the brand-kit Arabic preset.
@@ -435,13 +437,12 @@ function InvitationCanvasBackdrop({
   seed: string;
   fx?: InvitationFxSpec;
 }) {
-  const hash =
-    typeof crypto !== "undefined" && "subtle" in crypto
-      ? "" +
-        crypto
-          .createHash
-          ? crypto.createHash("sha256").update(seed).digest("hex").slice(0, 8)
-          : "x" +
+  let hash = Math.random().toString(36).slice(2, 8);
+  if (typeof crypto !== "undefined" && "subtle" in crypto) {
+    hash =
+      crypto.createHash
+        ? crypto.createHash("sha256").update(seed).digest("hex").slice(0, 8)
+        : "x" +
             parseInt(
               Array.from(
                 new Uint8Array(
@@ -452,8 +453,8 @@ function InvitationCanvasBackdrop({
                 (b) => b,
               ).join(""),
               16,
-            ).toString(16).slice(0, 8)
-      : Math.random().toString(36).slice(2, 8);
+            ).toString(16).slice(0, 8);
+  }
 
   const imageUrl = `/templates/airvendor/${seed.split("/").pop() || seed}.jpg`;
 
@@ -484,7 +485,7 @@ function InvitationCanvasBackdrop({
             <SparkField points={fx.spark} seed={hash} />
           )}
         </div>
-      ]}
+      )}
     </div>
   );
 }
