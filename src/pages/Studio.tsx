@@ -5,6 +5,7 @@ import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import { GuestExperience } from "@/components/studio/GuestExperience";
+import { SequentialGuestPreview } from "@/components/studio/SequentialGuestPreview";
 import { ColourPanel } from "@/components/studio/ColourPanel";
 import { Inspector } from "@/components/studio/Inspector";
 import { LibraryPanel, ShapePreview } from "@/components/studio/LibraryPanel";
@@ -2692,7 +2693,7 @@ export default function Studio() {
       />
 
       {guestOpen && (
-        <GuestExperience
+        <SequentialGuestPreview
           design={design}
           imageUrls={imageUrls}
           guestName={null}

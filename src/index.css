@@ -54,11 +54,12 @@
 
   /* LAMSA typography. The atelier is set in a high-contrast display serif
      against a grotesque, with a mono for folios, counts, and file numbers. */
-  /* Sorgena is the brand face. It is a licensed family, loaded locally or from
-     /fonts/sorgena (see src/lib/sorgena.ts). Until those files exist the stack
-     falls back to the closest open faces. */
+  /* The brand display face is licensed and loaded by src/lib/sorgena.ts when the
+     licensed webfonts are present; until then it falls back to the open display
+     stacks above. Invitation design fonts are configured separately (invitation). */
   --font-display: "Sorgena", "Bodoni Moda", "Instrument Serif", "Cormorant Garamond", "Times New Roman", serif;
-  --font-ui: "Sorgena Text", "Sorgena", "Archivo", system-ui, Helvetica, Arial, sans-serif;
+  --font-ui: "Montserrat Variable", "Montserrat", system-ui, Helvetica, Arial, sans-serif;
+  --font-ui-fallback: "Archivo", system-ui, Helvetica, Arial, sans-serif;
   --font-script: "Pinyon Script", "Snell Roundhand", cursive;
   --font-arabic: "Amiri", serif;
   --font-meta: "Space Mono", ui-monospace, monospace;

@@ -26,7 +26,7 @@ export const brand = {
   },
   fonts: {
     display: '"Sorgena", "Bodoni Moda", "Instrument Serif", serif',
-    ui: '"Sorgena Text", "Sorgena", "Archivo", system-ui, sans-serif',
+    ui: '"Montserrat Variable", "Montserrat", system-ui, sans-serif',
     meta: '"Space Mono", ui-monospace, monospace',
     script: '"Pinyon Script", "Snell Roundhand", cursive',
     arabic: '"Amiri", "Times New Roman", serif',

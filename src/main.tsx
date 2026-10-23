@@ -16,9 +16,15 @@ import {
 import "./index.css";
 import { ensureSorgena } from "./lib/sorgena";
 
-// Register the licensed brand face when the webfonts are present. Runs before
-// the first paint's font resolution; absent files simply keep the fallbacks.
+// Register the licensed brand display face when the webfonts are present. Runs
+// before the first paint's font resolution; absent files keep the fallbacks.
 ensureSorgena();
+
+// Load the application interface font (Montserrat) as self-hosted WOFF2 via Fontsource.
+// This is the app glyph stack used by navigation, buttons, panels, labels, dialogs,
+// and dashboard UI. Invitation design typography is configured independently in the
+// invitation content / design document and is untouched by this import.
+import "@fontsource-variable/montserrat";
 
 // Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));

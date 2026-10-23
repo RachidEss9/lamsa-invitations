@@ -3,6 +3,7 @@ import { BrandLink, Wordmark } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import { PublicDesignExperience } from "@/components/invitation/PublicDesignExperience";
+import { SequentialInvitation } from "@/components/invitation/SequentialInvitation";
 import { RevealOpening } from "@/components/invitation/RevealOpening";
 import { Button } from "@/components/ui/button";
 import {
@@ -473,7 +474,7 @@ export default function InvitationPage() {
           className="w-full max-w-[540px]"
         >
           {designDoc ? (
-            <PublicDesignExperience
+            <SequentialInvitation
               design={designDoc}
               imageUrls={designImageUrls}
               guestName={data.guestName}
@@ -495,7 +496,14 @@ export default function InvitationPage() {
 
           {eventTarget && <Countdown target={eventTarget} />}
 
-          <div className="mt-5 flex flex-col items-center gap-4">
+          <p className="mt-5 max-w-[26rem] text-center text-[0.66rem] leading-relaxed text-muted-foreground">
+            {data.guestName
+              ? `This invitation was prepared for ${data.guestName}. `
+              : ""}
+            The link is yours to keep.
+          </p>
+
+          <div className="mt-6 flex flex-col items-center gap-4">
             <div className="grid w-full grid-cols-4 gap-2">
               <Button
                 type="button"
@@ -547,16 +555,8 @@ export default function InvitationPage() {
               >
                 <CalendarDays className="size-3.5" />
                 Add to calendar
-              </a>
-            </Button>
-
-            <p className="max-w-[26rem] text-center text-[0.66rem] leading-relaxed text-muted-foreground">
-              {data.guestName
-                ? `This invitation was prepared for ${data.guestName}. `
-                : ""}
-              The link is yours to keep.
-            </p>
-          </div>
+              </a>          </Button>
+        </div>
 
           {/* Event details */}
           {(data.schedule.length > 0 ||
