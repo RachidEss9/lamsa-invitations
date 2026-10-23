@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
@@ -27,6 +27,7 @@ afterEach(() => {
   root = null;
   host?.remove();
   host = null;
+  vi.useRealTimers();
 });
 
 function page(id: string, text: string): DesignPage {
@@ -88,6 +89,12 @@ function buttonByText(container: HTMLElement, label: string) {
   );
 }
 
+function buttonByLabel(container: HTMLElement, label: string) {
+  return Array.from(container.querySelectorAll("button")).find(
+    (button) => button.getAttribute("aria-label") === label,
+  );
+}
+
 describe("guest journey interaction", () => {
   it("reveals one section at a time and closes on the last one", () => {
     const container = mount(
@@ -107,12 +114,84 @@ describe("guest journey interaction", () => {
     act(() => continueButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
     expect(container.textContent).toContain("The Garden Hall");
-    const closeButton = buttonByText(container, "Close the invitation");
+    const closeButton = buttonByLabel(container, "Close the invitation");
     expect(closeButton).toBeTruthy();
+    // The option to finish is stated in words, not an unlabelled glyph.
+    expect(closeButton?.textContent).toContain("Close");
 
     act(() => closeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(container.textContent).toContain("With love, always");
     expect(buttonByText(container, "Continue")).toBeUndefined();
+  });
+
+  it("plays the opening, settles the first section, then offers the way on", () => {
+    vi.useFakeTimers();
+    const queue: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      queue.push(callback);
+      return queue.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+
+    const withOpening = design();
+    withOpening.opening = {
+      experience: "envelope",
+      duration: 1200,
+      autoOpen: false,
+      welcome: "",
+    };
+
+    const container = mount(
+      createElement(InvitationJourney, {
+        design: withOpening,
+        imageUrls: {},
+        guestName: "Amara",
+        reducedMotion: false,
+      }),
+    );
+
+    const open = buttonByLabel(container, "Break the seal");
+    expect(open).toBeTruthy();
+    act(() => open?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    // The invitation is inside the envelope before the guest opens it.
+    expect(container.querySelector("[data-opening-card]")).toBeTruthy();
+
+    act(() => {
+      for (const callback of queue.splice(0)) callback(0);
+    });
+    act(() => {
+      for (const callback of queue.splice(0)) callback(2400);
+    });
+
+    // The opening has handed over to the same section, now a live page.
+    expect(container.querySelector("[data-opening-card]")).toBeNull();
+    expect(container.textContent).toContain("Amelia and Soren");
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(buttonByLabel(container, "Continue to section 2 of 2")).toBeTruthy();
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("offers an invitation-integrated flourish rather than a button plaque", () => {
+    const container = mount(
+      createElement(InvitationJourney, {
+        design: design(),
+        imageUrls: {},
+        reducedMotion: true,
+      }),
+    );
+    const cue = container.querySelector("[data-journey-cue]");
+    expect(cue).toBeTruthy();
+    // It is a real, named control with a drawn ornament, not a page picker.
+    expect(cue?.tagName).toBe("BUTTON");
+    expect(cue?.getAttribute("aria-label")).toBe("Continue to section 2 of 2");
+    expect(cue?.querySelector("svg")).toBeTruthy();
+    expect(container.querySelector("[aria-label^='Page ']")).toBeNull();
   });
 
   it("offers no transport controls to the guest", () => {

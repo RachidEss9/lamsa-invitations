@@ -1,5 +1,6 @@
 import { InvitationJourney } from "@/components/invitation/InvitationJourney";
 import type { DesignDocument } from "@/lib/design";
+import type { JourneyPhase } from "@/lib/journey";
 import { useMemo, useState } from "react";
 
 interface SequentialGuestPreviewProps {
@@ -32,8 +33,16 @@ export function SequentialGuestPreview({
   const [restartSignal, setRestartSignal] = useState(0);
   const [step, setStep] = useState(1);
   const [total, setTotal] = useState(design.pages.length);
+  const [phase, setPhase] = useState<JourneyPhase>(
+    design.opening.experience === "none" || reducedMotion ? "page" : "opening",
+  );
 
-  const stageWidth = useMemo(() => "min(92vw, 500px)", []);
+  // Keep the whole card, including the progress flourish at its foot, inside
+  // the viewing room on short screens.
+  const stageWidth = useMemo(
+    () => "min(92vw, 500px, calc((100vh - 210px) * 0.75))",
+    [],
+  );
 
   return (
     <div className="fixed inset-0 z-[90] flex flex-col bg-[#101010]">
@@ -43,7 +52,11 @@ export function SequentialGuestPreview({
             Guest journey preview
           </p>
           <p className="mt-0.5 truncate font-meta text-[8px] uppercase tracking-[0.16em] text-white/35">
-            Section {step} of {total} · exactly what guests see
+            {phase === "opening"
+              ? "Opening · exactly what guests see"
+              : phase === "closing"
+                ? "Closing · exactly what guests see"
+                : `Section ${step} of ${total} · exactly what guests see`}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -51,8 +64,9 @@ export function SequentialGuestPreview({
             type="button"
             onClick={() => setRestartSignal((value) => value + 1)}
             className="h-9 border border-white/20 px-3 font-ui text-[9px] uppercase tracking-[0.16em] text-white/75 transition-colors hover:border-white hover:text-white"
+            aria-label="Replay the opening and the whole guest journey"
           >
-            Replay
+            Replay opening
           </button>
           <button
             type="button"
@@ -76,7 +90,7 @@ export function SequentialGuestPreview({
       </div>
 
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 py-4">
-        <div style={{ width: stageWidth, maxHeight: "calc(100vh - 180px)" }}>
+        <div style={{ width: stageWidth }}>
           <InvitationJourney
             design={design}
             imageUrls={imageUrls}
@@ -91,15 +105,18 @@ export function SequentialGuestPreview({
               setStep(next + 1);
               setTotal(count);
             }}
+            onPhaseChange={setPhase}
           />
         </div>
       </div>
 
       <div className="border-t border-white/12 px-4 py-3 text-[#f2f1ed]">
         <p className="text-[10px] leading-relaxed text-white/40">
-          The invitation opens, then reveals each saved page in order. Continue
-          appears once a section has finished animating. Nothing here is a
-          separate demo: it is the same journey the public link renders.
+          The opening reveals the real first section; tap the engraved flourish
+          at the foot of a settled section to move on, and watch each saved page
+          transition into the next. Replay opening runs the whole story again.
+          Nothing here is a separate demo: it is the same journey the public link
+          renders.
         </p>
       </div>
     </div>

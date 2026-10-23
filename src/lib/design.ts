@@ -1180,37 +1180,124 @@ export function coveredElementIds(page: DesignPage): Set<string> {
 /* Page transitions                                                           */
 /* -------------------------------------------------------------------------- */
 
+function transitionSmooth(t: number): number {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+}
+
+function transitionWindow(p: number, start: number, end: number): number {
+  return transitionSmooth((p - start) / Math.max(0.0001, end - start));
+}
+
+/**
+ * The outgoing and incoming halves of one page change.
+ *
+ * Both pages are alive for the length of the transition: the outgoing page
+ * holds the frame while the incoming page is already readable. That overlap is
+ * what stops a hard switch producing a blank frame or a flash. The outgoing
+ * layer is only removed once the incoming page owns the frame.
+ */
+export interface PageTransitionFrames {
+  incoming: CSSProperties;
+  outgoing: CSSProperties;
+}
+
+export function pageTransitionFrames(
+  transition: PageTransition,
+  progress: number,
+  options: { rtl?: boolean } = {},
+): PageTransitionFrames {
+  const p = Math.min(1, Math.max(0, progress));
+  const dir = options.rtl ? -1 : 1;
+  const enter = transitionWindow(p, 0, 0.76);
+  const leave = transitionWindow(p, 0.32, 1);
+  const gone = p >= 1;
+  const outgoingBase: CSSProperties = {
+    opacity: 1 - leave,
+    pointerEvents: "none",
+    visibility: gone ? "hidden" : "visible",
+  };
+
+  switch (transition.preset) {
+    case "slide":
+      return {
+        incoming: {
+          opacity: transitionWindow(p, 0, 0.5),
+          transform: `translateX(${(1 - enter) * 26 * dir}%)`,
+        },
+        outgoing: {
+          ...outgoingBase,
+          transform: `translateX(${-leave * 8 * dir}%)`,
+        },
+      };
+    case "flip":
+      return {
+        incoming: {
+          opacity: 0.35 + enter * 0.65,
+          transform: `perspective(1600px) rotateY(${(1 - enter) * -16 * dir}deg)`,
+          transformOrigin: options.rtl ? "right center" : "left center",
+        },
+        outgoing: {
+          ...outgoingBase,
+          transform: `scale(${1 - leave * 0.015})`,
+        },
+      };
+    case "curtain":
+      return {
+        incoming: {
+          clipPath: options.rtl
+            ? `inset(0 0 0 ${(1 - enter) * 100}%)`
+            : `inset(0 ${(1 - enter) * 100}% 0 0)`,
+        },
+        // The outgoing page is a stable backing, never a blank one.
+        outgoing: { ...outgoingBase, opacity: 1 - transitionWindow(p, 0.94, 1) },
+      };
+    case "zoom":
+      return {
+        incoming: {
+          opacity: transitionWindow(p, 0, 0.55),
+          transform: `scale(${1.06 - enter * 0.06})`,
+        },
+        outgoing: { ...outgoingBase, transform: `scale(${1 - leave * 0.02})` },
+      };
+    case "blur":
+      return {
+        incoming: {
+          opacity: transitionWindow(p, 0, 0.45),
+          filter: `blur(${(1 - enter) * 12}px)`,
+        },
+        outgoing: {
+          ...outgoingBase,
+          filter: leave > 0.001 ? `blur(${leave * 8}px)` : undefined,
+        },
+      };
+    case "rise":
+      return {
+        incoming: {
+          opacity: transitionWindow(p, 0, 0.55),
+          transform: `translateY(${(1 - enter) * 8}%)`,
+        },
+        outgoing: {
+          ...outgoingBase,
+          transform: `translateY(${-leave * 4}%)`,
+        },
+      };
+    case "none":
+      return { incoming: {}, outgoing: { opacity: 0, visibility: "hidden" } };
+    case "fade":
+    default:
+      return {
+        incoming: { opacity: transitionWindow(p, 0, 0.7) },
+        outgoing: outgoingBase,
+      };
+  }
+}
+
 export function pageTransitionStyle(
   transition: PageTransition,
   progress: number,
 ): CSSProperties {
-  const p = Math.min(1, Math.max(0, progress));
-  switch (transition.preset) {
-    case "slide":
-      return { opacity: 1, transform: `translateX(${(1 - p) * 24}%)` };
-    case "flip":
-      return {
-        opacity: p,
-        transform: `perspective(1600px) rotateY(${(1 - p) * -18}deg)`,
-      };
-    case "curtain":
-      return { opacity: p, clipPath: `inset(0 ${(1 - p) * 100}% 0 0)` };
-    case "zoom":
-      return { opacity: p, transform: `scale(${1.08 - p * 0.08})` };
-    case "blur":
-      return {
-        opacity: p,
-        transform: `scale(${1.01 - p * 0.01})`,
-        filter: `blur(${(1 - p) * 14}px)`,
-      };
-    case "rise":
-      return { opacity: p, transform: `translateY(${(1 - p) * 9}%)` };
-    case "fade":
-      return { opacity: p };
-    case "none":
-    default:
-      return {};
-  }
+  return pageTransitionFrames(transition, progress).incoming;
 }
 
 /* -------------------------------------------------------------------------- */

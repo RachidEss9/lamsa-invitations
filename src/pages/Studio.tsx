@@ -1688,6 +1688,8 @@ export default function Studio() {
           <OpeningStage
             key={openingPreview}
             opening={{ ...design.opening, autoOpen: false }}
+            page={design.pages.find((candidate) => !candidate.hidden) ?? design.pages[0] ?? null}
+            imageUrls={imageUrls}
             accent={content.palette.accent}
             background={content.palette.background}
             ink={content.palette.ink}
@@ -1702,7 +1704,7 @@ export default function Studio() {
           />              <button
                 type="button"
                 onClick={() => setOpeningPreview((value) => value + 1)}
-                className="absolute right-3 top-3 z-50 border border-ink/20 bg-[var(--paper-light)] px-2 py-1 text-[9px] uppercase tracking-[0.12em]"
+                className="absolute left-3 top-3 z-50 border border-ink/20 bg-[var(--paper-light)] px-2 py-1 text-[9px] uppercase tracking-[0.12em]"
                 aria-label="Replay opening animation"
               >
                 Replay

@@ -1,25 +1,26 @@
 import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, useStageScale } from "@/components/invitation/DesignPageView";
+import { JourneyCue } from "@/components/invitation/JourneyCue";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import {
   DESIGN_HEIGHT,
   DESIGN_WIDTH,
-  pageTransitionStyle,
+  pageTransitionFrames,
   type DesignDocument,
+  type DesignPage,
 } from "@/lib/design";
+import { fontFamilyFor } from "@/lib/fonts";
 import {
   advancePhase,
   continueState,
   initialTiming,
   journeyPages,
-  journeyProgress,
   journeyStartsAtOpening,
   pageDuration,
   pageEntranceEnd,
   type JourneyPhase,
 } from "@/lib/journey";
 import { cn } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface InvitationJourneyProps {
@@ -39,19 +40,25 @@ interface InvitationJourneyProps {
   onPhaseChange?: (phase: JourneyPhase) => void;
 }
 
-const CONTINUE_BEAT_MS = 350;
+const CONTINUE_BEAT_MS = 320;
+
+interface OutgoingPage {
+  page: DesignPage;
+  time: number;
+  key: string;
+}
 
 /**
  * The single guest-facing invitation journey.
  *
- * One continuous experience: opening cover → each saved page in order, playing
- * its own entrance choreography → the existing closing stage. There is no page
- * picker and no player chrome. The guest moves on with one Continue control
- * that appears only once the current section has settled, by swipe, or with the
- * right arrow key.
+ * One continuous experience: the opening — in which the real first section is
+ * the card being revealed — then each saved page in order, playing its own
+ * entrance choreography, then the configured closing. There is no page picker
+ * and no player chrome. The guest moves on with a small engraved flourish that
+ * appears once the section has settled, by swipe, or with the arrow keys.
  *
- * The public invitation and the studio's guest preview both render this
- * component, so what an owner previews is exactly what a guest receives.
+ * The public invitation, the studio's guest preview and the opening dialog all
+ * render the same implementation.
  */
 export function InvitationJourney({
   design,
@@ -81,6 +88,7 @@ export function InvitationJourney({
   );
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [transition, setTransition] = useState(1);
+  const [outgoing, setOutgoing] = useState<OutgoingPage | null>(null);
   const [scrollActivationTime, setScrollActivationTime] = useState<number | null>(
     reducedMotion ? 0 : null,
   );
@@ -94,6 +102,7 @@ export function InvitationJourney({
   const entrance = pageEntranceEnd(page);
   const closingEnabled = design.closing.enabled && step === total - 1;
   const settled = reducedMotion || (phase === "page" && time >= entrance);
+  const frames = pageTransitionFrames(design.transition, transition, { rtl });
 
   useEffect(() => {
     onStepChange?.(step, total);
@@ -117,6 +126,7 @@ export function InvitationJourney({
 
   const restart = useCallback(() => {
     setRevealed(new Set());
+    setOutgoing(null);
     setPhase(journeyStartsAtOpening(design, reducedMotion) ? "opening" : "page");
     setTransition(1);
     timeRef.current = 0;
@@ -136,18 +146,21 @@ export function InvitationJourney({
     restartRef.current();
   }, [restartSignal]);
 
-  // Settle the section, then wait one short beat before offering Continue so
-  // the control does not appear on top of the last entrance animation.
+  // Settle the section, then wait one short beat before offering the way on so
+  // the flourish does not appear on top of the last entrance animation.
   useEffect(() => {
     if (phase !== "page" || !settled) return;
     if (ready) return;
-    const timer = window.setTimeout(() => setReady(true), reducedMotion ? 0 : CONTINUE_BEAT_MS);
+    const timer = window.setTimeout(
+      () => setReady(true),
+      reducedMotion ? 0 : CONTINUE_BEAT_MS,
+    );
     return () => window.clearTimeout(timer);
   }, [phase, reducedMotion, ready, settled, step]);
 
-  // If animation frames never fire (a throttled tab, a browser that dropped
-  // rAF, a stalled animation), the guest must still be able to move on. This
-  // safety net settles the section and reveals its finished state.
+  // If animation frames never fire (a throttled tab, a stalled compositor), the
+  // guest must still be able to move on. This settles the section and reveals
+  // its finished state.
   useEffect(() => {
     if (phase !== "page" || reducedMotion) return;
     const fallback = window.setTimeout(() => {
@@ -213,6 +226,8 @@ export function InvitationJourney({
       );
       setTransition(progress);
       if (progress < 1) frame = requestAnimationFrame(tick);
+      // Once the incoming page owns the frame, the outgoing copy can go.
+      else setOutgoing(null);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
@@ -229,11 +244,35 @@ export function InvitationJourney({
     if (phase !== "page" || !continueInfo.visible) return;
     const next = advancePhase(step, total, closingEnabled);
     if (next.phase === "closing") {
+      setOutgoing(null);
+      setTransition(reducedMotion ? 1 : 0);
       setPhase("closing");
       return;
     }
-    if (next.step !== step) resetPage(next.step);
-  }, [closingEnabled, continueInfo.visible, phase, resetPage, step, total]);
+    if (next.step !== step) {
+      // Keep the section the guest just read on screen while the next one
+      // arrives, so a page change is a continuation rather than a cut. A
+      // reduced-motion guest asks for no transition at all.
+      if (!reducedMotion) {
+        setOutgoing({
+          page: page!,
+          time: Math.max(timeRef.current, entrance),
+          key: `${page?.id ?? "page"}-${step}`,
+        });
+      }
+      resetPage(next.step);
+    }
+  }, [
+    closingEnabled,
+    continueInfo.visible,
+    entrance,
+    page,
+    phase,
+    reducedMotion,
+    resetPage,
+    step,
+    total,
+  ]);
 
   const handleReveal = useCallback((_targetId: string, interactionId: string) => {
     setRevealed((previous) => {
@@ -245,13 +284,19 @@ export function InvitationJourney({
   }, []);
 
   const handleOpeningDone = () => {
+    const first = pages[0] ?? null;
+    // The opening has already shown this section settling into place, so the
+    // first page hands over fully revealed at exactly the same position.
+    const settledAt = Math.max(900, pageEntranceEnd(first));
     setPhase("page");
     setStep(0);
-    timeRef.current = 0;
-    setTime(reducedMotion ? pageDuration(pages[0] ?? null) : 0);
+    timeRef.current = settledAt;
+    setTime(settledAt);
+    setTransition(1);
+    setOutgoing(null);
     setRevealed(new Set());
-    setScrollActivationTime(reducedMotion ? 0 : null);
-    setReady(reducedMotion);
+    setScrollActivationTime(0);
+    setReady(false);
   };
 
   const handleTouchStart = (event: React.TouchEvent) => {
@@ -275,13 +320,26 @@ export function InvitationJourney({
     if (event.target instanceof HTMLElement && event.target.closest("input, textarea")) {
       return;
     }
-    if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown") {
+    if (
+      event.key === "ArrowRight" ||
+      event.key === "ArrowDown" ||
+      event.key === "PageDown"
+    ) {
       event.preventDefault();
       handleContinue();
     }
   };
 
   if (!page) return null;
+
+  const titleElement = page.elements.find(
+    (element) => element.kind === "text" && element.font,
+  );
+  const cueFont = fontFamilyFor(titleElement?.font ?? "cormorant-garamond");
+  const cueLabel = continueInfo.finishes ? "Close" : "Continue";
+  const cueAriaLabel = continueInfo.finishes
+    ? "Close the invitation"
+    : `Continue to section ${Math.min(step + 2, total)} of ${total}`;
 
   return (
     <div
@@ -307,86 +365,103 @@ export function InvitationJourney({
             visibility: scale ? "visible" : "hidden",
           }}
         >
-          <div
-            className="absolute inset-0"
-            style={pageTransitionStyle(design.transition, transition)}
-          >
-            {phase === "opening" && (
-              <OpeningStage
-                opening={design.opening}
-                accent={accent}
-                background={page?.background ?? "#f2f1ed"}
-                ink={ink}
-                guestName={guestName}
-                names={names}
-                autoOpen={design.opening.autoOpen}
-                reducedMotion={reducedMotion}
-                coverUrl={
-                  design.opening.coverStorageId
-                    ? imageUrls[design.opening.coverStorageId]
-                    : undefined
-                }
-                onDone={handleOpeningDone}
-              />
-            )}
-
-            <DesignPageView
-              key={`journey-${page.id}-${step}`}
+          {phase === "opening" ? (
+            <OpeningStage
+              opening={design.opening}
               page={page}
-              time={reducedMotion ? duration : time}
               imageUrls={imageUrls}
+              accent={accent}
+              background={page.background}
+              ink={ink}
               guestName={guestName}
+              names={names}
               rtl={rtl}
-              interactive
+              autoOpen={design.opening.autoOpen}
               reducedMotion={reducedMotion}
-              revealed={revealed}
-              scrollActivationTime={reducedMotion ? 0 : scrollActivationTime}
-              onReveal={handleReveal}
+              coverUrl={
+                design.opening.coverStorageId
+                  ? imageUrls[design.opening.coverStorageId]
+                  : undefined
+              }
+              onDone={handleOpeningDone}
             />
-          </div>
+          ) : (
+            <>
+              {outgoing && (
+                <div
+                  key={`out-${outgoing.key}`}
+                  aria-hidden
+                  className="absolute inset-0"
+                  style={frames.outgoing}
+                >
+                  <DesignPageView
+                    page={outgoing.page}
+                    time={outgoing.time}
+                    imageUrls={imageUrls}
+                    guestName={guestName}
+                    rtl={rtl}
+                    reducedMotion={reducedMotion}
+                    revealed={revealed}
+                    scrollActivationTime={0}
+                  />
+                </div>
+              )}
+
+              <div
+                key={`in-${page.id}-${step}`}
+                className="absolute inset-0"
+                aria-hidden={phase === "closing"}
+                style={phase === "page" ? frames.incoming : undefined}
+              >
+                <DesignPageView
+                  page={page}
+                  // Reduced motion shows the section fully entered, never its
+                  // exit state, so nothing is hidden from the guest.
+                  time={reducedMotion ? entrance : time}
+                  imageUrls={imageUrls}
+                  guestName={guestName}
+                  rtl={rtl}
+                  interactive
+                  reducedMotion={reducedMotion}
+                  revealed={revealed}
+                  scrollActivationTime={reducedMotion ? 0 : scrollActivationTime}
+                  onReveal={handleReveal}
+                />
+              </div>
+
+              {phase === "closing" && (
+                <div
+                  className="absolute inset-0 z-50"
+                  style={frames.incoming}
+                >
+                  <ClosingStage
+                    closing={design.closing}
+                    accent={accent}
+                    background={page.background}
+                    ink={ink}
+                    guestName={guestName}
+                    names={names}
+                    reducedMotion={reducedMotion}
+                    onReplay={restart}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
 
-        {phase === "closing" && (
-          <ClosingStage
-            closing={design.closing}
+        {phase === "page" && continueInfo.visible && (
+          <JourneyCue
+            label={cueLabel}
+            ariaLabel={cueAriaLabel}
             accent={accent}
             background={page.background}
             ink={ink}
-            guestName={guestName}
-            names={names}
+            fontFamily={cueFont}
+            rtl={rtl}
             reducedMotion={reducedMotion}
-            onReplay={restart}
+            onAdvance={handleContinue}
           />
-        )}
-
-        {phase === "page" && continueInfo.visible && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 bg-gradient-to-t from-black/30 to-transparent px-4 pb-4 pt-12">
-            <button
-              type="button"
-              onClick={handleContinue}
-              aria-label={
-                continueInfo.finishes
-                  ? "Close the invitation"
-                  : `Continue to section ${Math.min(step + 2, total)} of ${total}`
-              }
-              className="pointer-events-auto inline-flex min-h-11 items-center gap-2 border border-ink/15 bg-[var(--paper-light)]/95 px-5 py-2.5 font-ui text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--ink)] shadow-[0_10px_30px_rgba(0,0,0,0.22)] backdrop-blur transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--red)]"
-            >
-              {continueInfo.label}
-              <ChevronRight className="size-3.5" aria-hidden="true" />
-            </button>
-          </div>
-        )}
-
-        {phase === "page" && (
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-30 h-[2px] bg-ink/10"
-            aria-hidden="true"
-          >
-            <div
-              className="h-full bg-[var(--red)] transition-[width] duration-500 ease-out"
-              style={{ width: `${journeyProgress(step, total) * 100}%` }}
-            />
-          </div>
         )}
       </div>
 

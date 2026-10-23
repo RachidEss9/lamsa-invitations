@@ -565,6 +565,22 @@
   }
 }
 
+/* The engraved progress flourish breathes very slightly, so it reads as an
+   invitation to continue rather than a button demanding attention. */
+@keyframes lamsa-cue-drift {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-journey-cue] svg {
+    animation: none !important;
+  }
+}
+
 @keyframes spark {
   0%, 100% {
     opacity: 0;

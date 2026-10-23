@@ -262,11 +262,14 @@ export function GuestExperience({
             {phase === "opening" && (
               <OpeningStage
                 opening={design.opening}
+                page={page}
+                imageUrls={imageUrls}
                 accent={palette.accent}
                 background={palette.background}
                 ink={palette.ink}
                 guestName={guestName}
                 names={names}
+                rtl={rtl}
                 autoOpen={design.opening.autoOpen}
                 reducedMotion={reducedMotion}
                 coverUrl={

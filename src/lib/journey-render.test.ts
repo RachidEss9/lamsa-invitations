@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { InvitationJourney } from "@/components/invitation/InvitationJourney";
-import type { DesignDocument } from "./design";
+import { OPENING_EXPERIENCES, type DesignDocument } from "./design";
 
 function design(): DesignDocument {
   return {
@@ -80,8 +80,45 @@ describe("invitation journey rendering", () => {
         reducedMotion: false,
       }),
     );
-    // The opening stage renders its own tap affordance before any page.
-    expect(html.length).toBeGreaterThan(1000);
+    // The opening stage renders its own tap affordance before any page, and
+    // the invitation card inside it is the saved first section itself.
+    expect(html).toContain("Break the seal");
+    expect(html).toContain("Amelia &amp; Søren");
+    expect(html).toContain("data-opening-card");
     expect(html).not.toContain("Close the invitation");
+    expect(html).not.toContain("data-journey-cue");
+  });
+
+  it("gives every opening preset the real first section to reveal", () => {
+    for (const experience of OPENING_EXPERIENCES) {
+      if (experience.id === "none") continue;
+      const doc = design();
+      doc.opening.experience = experience.id;
+      const html = renderToStaticMarkup(
+        createElement(InvitationJourney, {
+          design: doc,
+          imageUrls: {},
+          guestName: "Amara",
+          reducedMotion: false,
+        }),
+      );
+      expect(html, experience.id).toContain("data-opening-card");
+      expect(html, experience.id).toContain("Amelia &amp; Søren");
+      expect(html, experience.id).toContain('role="dialog"');
+    }
+  });
+
+  it("never renders playback transport or a page selector", () => {
+    const html = renderToStaticMarkup(
+      createElement(InvitationJourney, {
+        design: design(),
+        imageUrls: {},
+        reducedMotion: true,
+      }),
+    );
+    expect(html).not.toContain("Pause");
+    expect(html).not.toContain("Play");
+    expect(html).not.toContain("Replay this page");
+    expect(html).not.toMatch(/aria-label="Page \d/);
   });
 });
