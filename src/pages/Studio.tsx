@@ -658,7 +658,7 @@ export default function Studio() {
               ? "A few considered words."
               : "A SMALL NOTE",
         fontSize,
-        font: content?.fontPair ?? "romance",
+        font: (content && content.fontPair) || "cormorant-garamond",
         color: content?.palette.ink ?? "#161616",
         align: "center",
         letterSpacing: variant === "caption" ? 0.28 : 0,
@@ -735,7 +735,7 @@ export default function Studio() {
       w: 660,
       h: 220,
       fontSize: 40,
-      font: content?.fontPair ?? "romance",
+      font: (content && content.fontPair) || "cormorant-garamond",
       color: content?.palette.ink ?? "#161616",
       align: "center",
       lineHeight: 1.4,
@@ -3016,10 +3016,9 @@ export default function Studio() {
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" className="rounded-none" onClick={() => setPendingTemplate(null)}>
               Keep current design
-            </Button>
-            <Button type="button" className="rounded-none" onClick={confirmTemplate}>
-              Apply template
-            </Button>
+            </Button>                <Button type="button" className="rounded-none" onClick={confirmTemplate}>
+                  Use design in canvas studio
+                </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

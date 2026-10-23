@@ -3,7 +3,6 @@ import {
   type DesignElement,
   type DesignPage,
 } from "@/lib/design";
-import { fontFamilyFor } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import {
   useCallback,
@@ -243,7 +242,6 @@ export function StudioCanvas({
   onRotate,
   onReveal,
   onAltDuplicate,
-  onTextCommit,
   onContextAction,
   onEditingChange,
 }: StudioCanvasProps) {
@@ -259,15 +257,7 @@ export function StudioCanvas({
   const panOrigin = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
-  const isCoarseTouch = useMemo(
-    () =>
-      typeof window !== "undefined"
-        ? window.matchMedia("(pointer: coarse)").matches
-        : false,
-    [],
-  );
-  const handleSize = isCoarseTouch ? 18 : 11;
-  const rotateSize = isCoarseTouch ? 20 : 15;
+
   const pinch = useRef<{
     distance: number;
     zoom: number;
@@ -278,10 +268,7 @@ export function StudioCanvas({
   const scale = Math.max(0.05, fit * zoom);
   const size = pageSizeOf(page);
   const selected = page.elements.filter((element) => selectedIds.includes(element.id));
-  const single = selected.length === 1 ? selected[0] : null;
-  const editingElement = editing
-    ? page.elements.find((element) => element.id === editing.id) ?? null
-    : null;
+
 
   // Inline editing is local to the canvas; the studio needs to know so it can
   // disable Delete while a caret is inside a text layer.
@@ -377,33 +364,7 @@ export function StudioCanvas({
     (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
   };
 
-  const beginHandle = (
-    event: ReactPointerEvent,
-    element: DesignElement,
-    mode: "resize" | "rotate",
-    handle?: Handle,
-  ) => {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-    const originals = new Map([[element.id, element]]);
-    // Rotation is measured in screen space, so the element centre has to be
-    // converted from design coordinates through the canvas scale and pan.
-    const rect = designRef.current?.getBoundingClientRect();
-    const centerX = (rect?.left ?? 0) + (element.x + element.w / 2) * scale;
-    const centerY = (rect?.top ?? 0) + (element.y + element.h / 2) * scale;
-    setDrag({
-      mode,
-      handle,
-      startX: event.clientX,
-      startY: event.clientY,
-      originals,
-      anchor: element,
-      centerX,
-      centerY,
-      startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
-    });
-    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
-  };
+
 
   /* ------------------------------------------------------------- drag / pan */
 
@@ -648,19 +609,6 @@ export function StudioCanvas({
 
   /* -------------------------------------------------------- inline editing */
 
-  const finishEditing = useCallback(
-    (cancel = false) => {
-      const node = editorRef.current;
-      const current = editing;
-      if (!current) return;
-      if (!cancel && node && onTextCommit) {
-        const text = node.innerText.replace(/\u00a0/g, " ");
-        if (text !== current.original) onTextCommit(current.id, text);
-      }
-      setEditing(null);
-    },
-    [editing, onTextCommit],
-  );
 
   useLayoutEffect(() => {
     if (!editing) return;
@@ -767,7 +715,7 @@ export function StudioCanvas({
     onZoom(next);
   };
 
-  const guidesForRender = useMemo(() => guides, [guides]);
+  const _guidesForRender = useMemo(() => guides, [guides]);
 
   return (
     <div
@@ -904,18 +852,7 @@ export function StudioCanvas({
             })}
           </div>
         </div>
-      </div>
-
-      <BoxGuideHandles x={guidesForRender.x} y={guidesForRender.y} zIndex={55} />
-
-      <p className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap font-meta text-[9px] text-ink/40">
-          {t({ width: Math.round(sizeDraftValue.width), height: Math.round(sizeDraftValue.height), unit: "px" })}
-          · {guideLabel}
-          · Space + drag to pan · ⌘/Ctrl + wheel to zoom
-          {drag ? " · moving" : ""}
-        </p>
-
-      {menu && (
+      </div>          {menu && (
         <ContextMenu
           menu={menu}
           locked={Boolean(menu.elementId) && selected.every((element) => element.locked)}
@@ -923,9 +860,7 @@ export function StudioCanvas({
           hasSelection={selectedIds.length > 0}
           onAction={(action) => onContextAction?.(action)}
           onClose={() => setMenu(null)}
-        >
-          <BoxGuideHandles x={guidesForRender.x} y={guidesForRender.y} zIndex={55} />
-        </ContextMenu>
+        />
       )}
     </div>
   );
@@ -941,4 +876,4 @@ export function StudioCanvas({
  * pointer handling so nothing else on the page fights for the pointer.
  */
 
-const BOX_COMMENT = "";
+

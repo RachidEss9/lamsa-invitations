@@ -212,13 +212,21 @@ export function CreateInvitationDialog({
   const [pages, setPages] = useState("1");
   const [opening, setOpening] = useState<OpeningExperienceId>("none");
   const [designName, setDesignName] = useState("");
-  const [savedPresets, setSavedPresets] = useState<SavedPreset[]>([]);
+
   const [presetLabel, setPresetLabel] = useState("");
 
+  const [savedPresets, setSavedPresetsState] = useState(() => readSavedPresets());
+
+  // Keep presets in sync when the dialog opens, without a synchronous effect.
   useEffect(() => {
     if (!open) return;
-    setSavedPresets(readSavedPresets());
+    const outsiderPresets = readSavedPresets();
+    if (outsiderPresets.length !== savedPresets.length) {
+      setSavedPresetsState(outsiderPresets);
+    }
   }, [open]);
+
+
 
   const templates = useMemo(
     () => TEMPLATES.filter((template) => template.occasion === occasion),
@@ -309,14 +317,14 @@ export function CreateInvitationDialog({
       },
       ...savedPresets.filter((preset) => preset.label !== label),
     ].slice(0, 12);
-    setSavedPresets(next);
+    setSavedPresetsState(next);
     writeSavedPresets(next);
     setPresetLabel("");
   };
 
   const removeSavedPreset = (id: string) => {
     const next = savedPresets.filter((preset) => preset.id !== id);
-    setSavedPresets(next);
+    setSavedPresetsState(next);
     writeSavedPresets(next);
   };
 
@@ -359,12 +367,12 @@ export function CreateInvitationDialog({
             <DialogTitle className="mt-3 max-w-[42rem] font-ui text-[clamp(1.9rem,4.4vw,2.7rem)] font-semibold leading-[0.98] tracking-[-0.035em]">
               {track === "scratch"
                 ? "Set the page, then begin."
-                : "Begin with a design, or with a blank page."}
+                : "Begin with a design, with a blank canvas, or with a blank page."}
             </DialogTitle>
             <DialogDescription className="mt-2 max-w-[40rem] text-[0.86rem] leading-relaxed text-ink/62">
               {track === "scratch"
                 ? "Choose the size, paper and opening. The canvas opens genuinely empty, at your own dimensions — nothing is filled in for you."
-                : "Every starting point opens the real canvas studio. Words, palette, type and animation are yours to change — nothing here is a fixed template."}
+                : "Every starting point opens the real canvas studio: a pre-made design you can edit, a blank canvas you size yourself, or a quick blank page. Words, palette, type and animation are yours to change — nothing here is a fixed template."}
             </DialogDescription>
           </header>
 
@@ -460,7 +468,7 @@ export function CreateInvitationDialog({
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 font-ui text-[1.02rem] font-semibold leading-tight">
                       <Plus className="size-3.5 text-[var(--red)]" />
-                      Quick start
+                      Quick blank canvas
                     </span>
                     <span className="mt-1 block text-[0.72rem] leading-relaxed text-ink/56">
                       The classic 3:4 canvas with placeholders, ready for your
