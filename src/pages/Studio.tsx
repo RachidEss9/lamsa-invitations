@@ -475,12 +475,38 @@ export default function Studio() {
     setHistoryTick((tick) => tick + 1);
   }, [scheduleSave]);
 
+  // Page state (kept near the top so selection tooling can reference it).
   const page: DesignPage | null = design?.pages[Math.min(pageIndex, design.pages.length - 1)] ?? null;
+
+  /** Deletable layer kinds. `cleanRevealLinks` already clears dangling covers,
+   * so removing a shape/motif/image/text is safe; the remaining canvas stay
+   * internally consistent after every delete. */
+  const DesignElementDeletableKinds = new Set<DesignElement["kind"]>([
+    "text",
+    "image",
+    "shape",
+    "motif",
+  ] as const);
   const duration = page ? timelineDuration(page) : 4000;
   const clips = page ? clipsForPage(page) : [];
   const selected = page
     ? page.elements.filter((element) => selectedIds.includes(element.id))
     : [];
+
+  const deleteableKindSet = new Set<DesignElement["kind"]>([
+    "text",
+    "image",
+    "shape",
+    "motif",
+  ] as const);
+
+  const hasDeletableSelection =
+    selected.length > 0 &&
+    selected.every((element) => deleteableKindSet.has(element.kind));
+
+  const hasAnyDeletableSelection = selected.some((element) =>
+    deleteableKindSet.has(element.kind),
+  );
   const selectedAnimations = selected.map((element) => element.animation);
   const published = invitation?.status === "published";
   const publicLink = invitation ? `${window.location.origin}/i/${invitation.slug}` : "";
@@ -779,9 +805,26 @@ export default function Studio() {
     }
   };
 
+  const deletableIdSet = useMemo(
+    () =>
+      new Set(
+        page?.elements
+          .filter(
+            (element) =>
+              !element.locked &&
+              DesignElementDeletableKinds.has(element.kind),
+          )
+          .map((element) => element.id),
+      ),
+    [page],
+  );
+
   const deleteSelection = () => {
     if (selectedIds.length === 0) return;
-    setPageElements((elements) => cleanRevealLinks(elements.filter((element) => !selectedIds.includes(element.id))));
+    if (!hasAnyDeletableSelection) return;
+    setPageElements((elements) =>
+      cleanRevealLinks(elements.filter((element) => !selectedIds.includes(element.id))),
+    );
     setSelectedIds([]);
   };
 
@@ -2389,8 +2432,15 @@ export default function Studio() {
                 {page.name} · {page.elements.length} layers
               </span>
               {selected.length > 0 && (
-                <span className="pointer-events-auto border border-[var(--red)]/30 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-[var(--red)] backdrop-blur">
-                  {selected.length === 1 ? selected[0].name : `${selected.length} selected`}
+                <span
+                  className="pointer-events-auto border border-[var(--red)]/30 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-[var(--red)] backdrop-blur"
+                  aria-live="polite"
+                >
+                  {selected.length === 1
+                    ? selected[0].name
+                    : `${selected.length} selected`}
+                  {selected.length === 1 && deleteableKindSet.has(selected[0].kind) ?
+                    " · selectable to delete" : ""}
                 </span>
               )}
             </div>
@@ -2533,8 +2583,7 @@ export default function Studio() {
             "hidden shrink-0 overflow-y-auto border-l border-ink/15 bg-[var(--paper-light)] transition-[width] duration-200 lg:block",
             rightOpen ? "w-[304px]" : "w-0 overflow-hidden border-l-0",
           )}
-        >
-          <Inspector
+        >          <Inspector
             page={page}
             selected={selected}
             aspectLocked={aspectLocked}
@@ -2555,6 +2604,72 @@ export default function Studio() {
               setEditTextRequest({ id: elementId, token: Date.now() })
             }
           />
+
+        {/* Mobile affordances: keep Delete reachable without a keyboard and make
+         * selection state readable from reach-friendly touch targets. */}
+        <div className="fixed inset-x-0 top-[70px] z-30 pointer-events-none block lg:hidden">
+          <div className="mx-auto max-w-[90vw] pointer-events-auto border border-ink/20 bg-[var(--paper-light)]/90 px-3 py-1.5 backdrop-blur text-[9px] font-meta uppercase tracking-[0.14em] shadow-sm">
+            {(() => {
+              if (selected.length === 0) {
+                return "Select a layer to edit";
+              }
+              if (hasAnyDeletableSelection) {
+                return selected.length === 1
+                  ? `Delete · ${selected[0].name}`
+                  : `Delete · ${selected.length} selected`;
+              }
+              return selected.length === 1
+                ? `${selected[0].name} · non-deletable`
+                : `${selected.length} selected · non-deletable`;
+            })()}
+          </div>
+        </div>
+
+        {/* Mobile affordances: keep Delete reachable without a keyboard and make
+         * selection state readable from reach-friendly touch targets. */}
+        <div className="fixed inset-x-0 top-[70px] z-30 pointer-events-none block lg:hidden">
+          <div className="mx-auto max-w-[90vw] pointer-events-auto border border-ink/20 bg-[var(--paper-light)]/90 px-3 py-1.5 backdrop-blur text-[9px] font-meta uppercase tracking-[0.14em] shadow-sm">
+            {(() => {
+              if (selected.length === 0) {
+                return "Select a layer to edit";
+              }
+              if (hasAnyDeletableSelection) {
+                return selected.length === 1
+                  ? `Delete · ${selected[0].name}`
+                  : `Delete · ${selected.length} selected`;
+              }
+              return selected.length === 1
+                ? `${selected[0].name} · non-deletable`
+                : `${selected.length} selected · non-deletable`;
+            })()}
+          </div>
+        </div>
+        </aside>
+
+        {/* Mobile affordances: keep Delete reachable without a keyboard and make
+         * selection state readable from reach-friendly touch targets. */}
+        <div className="fixed inset-x-0 top-[70px] z-30 pointer-events-none block lg:hidden">
+          <div className="mx-auto max-w-[90vw] pointer-events-auto border border-ink/20 bg-[var(--paper-light)]/90 px-3 py-1.5 backdrop-blur text-[9px] font-meta uppercase tracking-[0.14em] shadow-sm">
+            {(() => {
+              if (selected.length === 0) {
+                return "Select a layer to edit";
+              }
+              if (hasAnyDeletableSelection) {
+                return selected.length === 1
+                  ? `Delete · ${selected[0].name}`
+                  : `Delete · ${selected.length} selected`;
+              }
+              return selected.length === 1
+                ? `${selected[0].name} · non-deletable`
+                : `${selected.length} selected · non-deletable`;
+            })()}
+          </div>
+        </div>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 hidden lg:block" aria-hidden="true">
+          <span className="pointer-events-none border border-ink/20 bg-[var(--paper-light)]/80 px-2.5 py-1 backdrop-blur text-[9px] font-meta uppercase tracking-[0.14em] text-[var(--red)] shadow-sm">
+            ⌫ Delete · ⌘Z Undo · selected {selected.length ? selected[0]?.name : "layer"}
+          </span>
+        </div>
         </aside>
       </div>
 
@@ -2593,7 +2708,7 @@ export default function Studio() {
         ))}
       </nav>
 
-      {mobileSheet && (
+      {mobileSheet === "properties" || mobileSheet === "timeline" ? (
         <div className="fixed inset-0 z-[70] flex flex-col justify-end bg-black/25 lg:hidden" onClick={() => setMobileSheet(null)}>
           <div
             className="flex max-h-[70vh] flex-col overflow-hidden border-t border-ink/20 bg-[var(--paper-light)]"
@@ -2601,14 +2716,39 @@ export default function Studio() {
           >
             <div className="flex items-center justify-between border-b border-ink/12 px-3 py-2">
               <span className="font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
-                {mobileSheet}
+                {mobileSheet === "properties" ? "Layer properties" : "Timeline preview"}
               </span>
               <button type="button" onClick={() => setMobileSheet(null)} className="text-[10px] uppercase tracking-[0.1em] text-ink/50">
                 Close
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="flex flex-col min-h-0 flex-1 overflow-y-auto">
+              <div className="flex border-b border-ink/10 bg-[var(--paper-light)] px-3 py-2">
+                <button
+                  type="button"
+                  className={cn(
+                    "flex-1 border border-ink/20 py-2 font-meta text-[8px] uppercase tracking-[0.12em] text-center transition-colors",
+                    mobileSheet === "properties" ? "text-[#710014] border-[#710014]/30" : "text-ink/50 hover:text-ink",
+                  )}
+                  onClick={() => setMobileSheet("properties")}
+                  aria-pressed={mobileSheet === "properties"}
+                >
+                  Properties
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 border border-ink/20 py-2 font-meta text-[8px] uppercase tracking-[0.12em] text-center transition-colors"
+                  onClick={() => {
+                    setMobileSheet(null);
+                    setTimelinePreviewOpen(true);
+                  }}
+                  aria-pressed={mobileSheet === "timeline"}
+                >
+                  Timeline preview
+                </button>
+              </div>
               {mobileSheet === "properties" ? (
+                <Inspector
                 <Inspector
                   page={page}
                   selected={selected}
@@ -2631,7 +2771,90 @@ export default function Studio() {
                     setMobileSheet(null);
                   }}
                 />
+                <div className="sticky bottom-0 border-t border-ink/12 bg-[var(--paper-light)] px-3 py-3">
+                  <div className="flex flex-col gap-1">
+                    <p className="font-meta text-[8px] uppercase tracking-[0.14em] text-[var(--red)]">
+                      Tap Delete to remove the selected layer
+                    </p>
+                    <div className="flex gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em] flex-1"
+                        disabled={!hasDeletableSelection}
+                        onClick={deleteSelection}
+                      >
+                        <Trash2 className="size-3.5" /> Delete
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em] flex-1"
+                        onClick={() => {
+                          setMobileSheet(null);
+                          setTimelinePreviewOpen(true);
+                        }}
+                      >
+                        <Play className="size-3.5" /> Preview
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em]"
+                        onClick={() => setMobileSheet(null)}
+                      >
+                        Close
+                      </Button>
+                    </div>
+                    <p className="text-[9px] text-ink/45">
+                      Undo with ⌘Z / Ctrl+Z · Redo with ⌘⇧Z / Ctrl+Shift+Z
+                    </p>
+                  </div>
+                </div>
+                <div className="sticky bottom-0 border-t border-ink/12 bg-[var(--paper-light)] px-3 py-3">
+                  <div className="flex flex-col gap-1">
+                    <p className="font-meta text-[8px] uppercase tracking-[0.14em] text-[var(--red)]">
+                      Tap Delete to remove the selected layer
+                    </p>
+                    <div className="flex gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em] flex-1"
+                        disabled={!hasDeletableSelection}
+                        onClick={deleteSelection}
+                      >
+                        <Trash2 className="size-3.5" /> Delete
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em] flex-1"
+                        onClick={() => {
+                          setMobileSheet(null);
+                          setTimelinePreviewOpen(true);
+                        }}
+                      >
+                        <Play className="size-3.5" /> Preview
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em]"
+                        onClick={() => setMobileSheet(null)}
+                      >
+                        Close
+                      </Button>
+                    </div>
+                    <p className="text-[9px] text-ink/45">
+                      Undo with ⌘Z / Ctrl+Z · Redo with ⌘⇧Z / Ctrl+Shift+Z
+                    </p>
+                  </div>
+                </div>
               ) : mobileSheet === "timeline" ? (
+                <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
+                  <div className="flex-1">
+                    <Timeline
                 <div className="h-[240px]">
                   <Timeline
                     page={page}
@@ -2666,6 +2889,30 @@ export default function Studio() {
                     }}
                     onZoom={setPixelsPerSecond}
                   />
+                  </div>
+                  <div className="sticky bottom-0 border-t border-ink/12 bg-[var(--paper-light)] px-3 py-3">
+                    <div className="flex gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em] flex-1"
+                        onClick={() => {
+                          setMobileSheet(null);
+                          setMobileSheet("properties");
+                        }}
+                      >
+                        <PanelRight className="size-3.5" /> Properties
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em]"
+                        onClick={() => setMobileSheet(null)}
+                      >
+                        Close
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div>{renderLeftPanel()}</div>
