@@ -373,6 +373,7 @@ function RevealCover({
   onReveal,
   duration,
   reducedMotion,
+  interactive = true,
   children,
 }: {
   element: DesignElement;
@@ -380,6 +381,7 @@ function RevealCover({
   onReveal: () => void;
   duration: number;
   reducedMotion: boolean;
+  interactive?: boolean;
   children: ReactNode;
 }) {
   const progress = useRevealProgress(revealed, duration, reducedMotion);
@@ -391,7 +393,7 @@ function RevealCover({
       style={done ? { visibility: "hidden" } : coverExitStyle(element.reveal!, progress)}
     >
       {children}
-      {!revealed && (
+      {!revealed && interactive && (
         <button
           type="button"
           onClick={onReveal}
@@ -586,6 +588,7 @@ export function DesignPageView({
                 }
                 duration={element.reveal.duration}
                 reducedMotion={reducedMotion}
+                interactive={interactive}
               >
                 <ElementVisual
                   element={{ ...element, x: 0, y: 0 }}

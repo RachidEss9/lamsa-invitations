@@ -107,6 +107,10 @@ export const listMine = query({
           rsvpNo: guests.filter((g) => g.rsvpAttending === false).length,
           rsvpPending:
             guests.filter((g) => g.rsvpAttending === undefined).length,
+          // The dashboard renders each saved design rather than a generic
+          // thumbnail, so the storage ids in the document need their URLs.
+          // Reads only: the invitation records themselves are untouched.
+          designImageUrls: await resolveDesignUrls(ctx, invitation.design),
         };
       }),
     );

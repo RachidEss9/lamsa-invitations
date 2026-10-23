@@ -1,8 +1,11 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { useStudio } from "@/components/auth/studio-context";
 import { BrandLink } from "@/components/brand/Wordmark";
-import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
+import { CreateInvitationDialog } from "@/components/dashboard/CreateInvitationDialog";
+import { InvitationCard } from "@/components/dashboard/InvitationCard";
+import {
+  InvitationPreview,
+  TemplatePreview,
+} from "@/components/dashboard/InvitationPreview";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,192 +18,241 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import {
-  displayTitle,
-  draftFromTemplate,
-  formatEventDateShort,
-  occasionLabel,
-  OCCASIONS,
-  TEMPLATES,
-  templateById,
-  type InvitationContent,
-  type Occasion,
-} from "@/lib/invitation";
+  GALLERY_FILTERS,
+  GALLERY_PAGE_SIZE,
+  blankInvitationContent,
+  RECENT_COUNT,
+  filterGallery,
+  formatEdited,
+  galleryCounts,
+  invitationTitle,
+  recentCreations,
+  type GalleryFilter,
+  type GalleryItem,
+} from "@/lib/dashboard";
+import { createDefaultDesign } from "@/lib/design";
+import { draftFromTemplate } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
-import { AnimatePresence, motion } from "framer-motion";
+import { format } from "date-fns";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   ArrowUpRight,
-  Check,
-  Copy,
-  Eye,
-  FilePenLine,
   Loader2,
   Lock,
-  MoreHorizontal,
   Plus,
-  Send,
+  Search,
+  Settings2,
   Trash2,
-  Undo2,
+  X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import {
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-type Filter = "all" | "draft" | "published";
+const ease = [0.22, 0.61, 0.36, 1] as const;
 
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All files" },
-  { id: "draft", label: "In progress" },
-  { id: "published", label: "Published" },
-];
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.075, delayChildren: 0.04 } },
+};
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
-}
+const rise = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease } },
+};
 
-function publicUrl(slug: string): string {
-  return `${window.location.origin}/i/${slug}`;
-}
-
-function titleOf(invitation: {
-  title?: string;
-  names: { primary: string; secondary: string };
-  occasion: string;
+/** Small caps label used across the studio surfaces. */
+function Eyebrow({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
 }) {
   return (
-    invitation.title ||
-    displayTitle({
-      names: invitation.names,
-      occasion: invitation.occasion as Occasion,
-    })
+    <p
+      className={cn(
+        "font-meta text-[0.5rem] font-medium tracking-[0.3em] text-ink/45 uppercase",
+        className,
+      )}
+    >
+      {children}
+    </p>
   );
 }
 
+function invitationOrigin() {
+  if (typeof window === "undefined") return "";
+  return window.location.origin;
+}
+
 export default function Dashboard() {
-  const { email, lock } = useStudio();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const invitations = useQuery(api.invitations.listMine);
+  const { email, lock } = useStudio();
+  const reduced = useReducedMotion();
+
+  const invitations = useQuery(api.invitations.listMine) as
+    | GalleryItem[]
+    | undefined;
   const createInvitation = useMutation(api.invitations.create);
   const duplicateInvitation = useMutation(api.invitations.duplicate);
   const removeInvitation = useMutation(api.invitations.remove);
   const publishInvitation = useMutation(api.invitations.publish);
   const unpublishInvitation = useMutation(api.invitations.unpublish);
 
-  // Deep link from the collection: /dashboard?template=the-vow
-  const [initialTemplate] = useState(() => {
-    const requested = searchParams.get("template");
-    return TEMPLATES.find((item) => item.id === requested) ?? null;
-  });
-
-  const [filter, setFilter] = useState<Filter>("all");
-  const [createOpen, setCreateOpen] = useState(Boolean(initialTemplate));
-  const [occasion, setOccasion] = useState<Occasion>(
-    initialTemplate?.occasion ?? "wedding",
-  );
-  const [selectedTemplate, setSelectedTemplate] = useState<string>(
-    initialTemplate?.id ?? "the-vow",
-  );
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+  const [filter, setFilter] = useState<GalleryFilter>("all");
+  const [limit, setLimit] = useState(GALLERY_PAGE_SIZE);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [busyId, setBusyId] = useState<Id<"invitations"> | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: Id<"invitations">;
-    title: string;
-  } | null>(null);
+  // A template link from the landing page arrives as /dashboard?template=…
+  // and opens the create flow with that design already chosen.
+  const [createOpen, setCreateOpen] = useState(() =>
+    searchParams.has("template"),
+  );
+  const [createSession, setCreateSession] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<GalleryItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const galleryRef = useRef<HTMLElement | null>(null);
+
+  const ready = invitations !== undefined;
+  const records = useMemo(() => invitations ?? [], [invitations]);
+  const [now] = useState(() => Date.now());
+  const counts = useMemo(() => galleryCounts(records, now), [records, now]);
+  const recent = useMemo(() => recentCreations(records), [records]);
+  const filtered = useMemo(
+    () => filterGallery(records, filter, deferredQuery, now),
+    [records, filter, deferredQuery, now],
+  );
+  const visible = filtered.slice(0, limit);
+  const total = records.length;
+  const showRecent = recent.length > 0 && total > RECENT_COUNT;
+  const latest = recent[0] ?? null;
+  const second = recent[1] ?? null;
+  const initialTemplate = searchParams.get("template");
+  const blankContent = useMemo(() => blankInvitationContent(), []);
+  const filteredByHand =
+    filter !== "all" || deferredQuery.trim().length > 0;
+
+  const scrollToGallery = () => {
+    galleryRef.current?.scrollIntoView({
+      behavior: reduced ? "auto" : "smooth",
+      block: "start",
+    });
+  };
+
+  const openCreate = (templateId?: string) => {
+    if (templateId) {
+      setSearchParams({ template: templateId }, { replace: true });
+    }
+    setCreateSession((session) => session + 1);
+    setCreateOpen(true);
+  };
 
   const closeCreate = () => {
     setCreateOpen(false);
-    if (searchParams.has("template")) {
+    if (searchParams.get("template")) {
       setSearchParams({}, { replace: true });
     }
   };
 
-  const visibleTemplates = useMemo(
-    () => TEMPLATES.filter((template) => template.occasion === occasion),
-    [occasion],
-  );
-
-  const filtered = useMemo(() => {
-    if (!invitations) return [];
-    if (filter === "all") return invitations;
-    return invitations.filter((invitation) => invitation.status === filter);
-  }, [invitations, filter]);
-
-  const counts = useMemo(() => {
-    const total = invitations?.length ?? 0;
-    const published =
-      invitations?.filter((invitation) => invitation.status === "published")
-        .length ?? 0;
-    const views =
-      invitations?.reduce((sum, invitation) => sum + invitation.views, 0) ?? 0;
-    const replies =
-      invitations?.reduce(
-        (sum, invitation) => sum + invitation.rsvpYes + invitation.rsvpNo,
-        0,
-      ) ?? 0;
-    return { total, published, drafts: total - published, views, replies };
-  }, [invitations]);
-
-  const current = invitations?.[0];
-
-  const handleCreate = async () => {
-    if (!selectedTemplate) return;
+  const handleCreate = async (selection: string) => {
     setCreating(true);
     try {
-      const draft = draftFromTemplate(selectedTemplate);
-      const id = await createInvitation(draft);
-      toast.success("New file opened in the studio.");
+      const content =
+        selection === "blank"
+          ? blankContent
+          : draftFromTemplate(selection);
+      const design = createDefaultDesign(content);
+      const id = await createInvitation({
+        ...content,
+        design,
+      });
       closeCreate();
+      toast.success(
+        selection === "blank"
+          ? "Blank invitation created."
+          : "Invitation created from the collection.",
+      );
       navigate(`/studio/${id}`);
-    } catch (error) {
-      toast.error(errorMessage(error));
+    } catch {
+      toast.error("The invitation could not be created. Please try again.");
     } finally {
       setCreating(false);
     }
   };
 
-  const handleDuplicate = async (id: Id<"invitations">) => {
-    setBusyId(id);
+  const handlePreview = (item: GalleryItem) => {
+    if (item.status === "published") {
+      window.open(
+        `${invitationOrigin()}/i/${item.slug}`,
+        "_blank",
+        "noopener",
+      );
+      return;
+    }
+    navigate(`/invitations/${item._id}?preview=1`);
+  };
+
+  const handleCopyLink = async (item: GalleryItem) => {
+    const url = `${invitationOrigin()}/i/${item.slug}`;
     try {
-      await duplicateInvitation({ id });
-      toast.success("A copy is filed under in progress.");
-    } catch (error) {
-      toast.error(errorMessage(error));
+      await navigator.clipboard.writeText(url);
+      toast.success("Guest link copied.");
+    } catch {
+      toast.error(`Copy this link: ${url}`);
+    }
+  };
+
+  const handleDuplicate = async (item: GalleryItem) => {
+    setBusyId(item._id);
+    try {
+      await duplicateInvitation({ id: item._id as Id<"invitations"> });
+      toast.success("A draft copy has been filed in your atelier.");
+    } catch {
+      toast.error("This invitation could not be duplicated.");
     } finally {
       setBusyId(null);
     }
   };
 
-  const handlePublishToggle = async (
-    id: Id<"invitations">,
+  const handleTogglePublish = async (
+    item: GalleryItem,
     published: boolean,
   ) => {
-    setBusyId(id);
+    setBusyId(item._id);
     try {
-      if (published) {
-        await unpublishInvitation({ id });
-        toast.success("Back in progress. The link is closed.");
-      } else {
-        await publishInvitation({ id });
-        toast.success("Published. Your link is live.");
-      }
-    } catch (error) {
-      toast.error(errorMessage(error));
+      const target = { id: item._id as Id<"invitations"> };
+      await (published
+        ? publishInvitation(target)
+        : unpublishInvitation(target));
+      toast.success(
+        published
+          ? "The invitation is live for its guests."
+          : "The invitation has been unpublished.",
+      );
+    } catch {
+      toast.error("The publication state could not be changed.");
     } finally {
       setBusyId(null);
     }
@@ -208,769 +260,620 @@ export default function Dashboard() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    setBusyId(deleteTarget.id);
+    setDeleting(true);
     try {
-      await removeInvitation({ id: deleteTarget.id });
-      toast.success("Invitation deleted.");
+      await removeInvitation({ id: deleteTarget._id as Id<"invitations"> });
+      toast.success("The invitation has been removed.");
       setDeleteTarget(null);
-    } catch (error) {
-      toast.error(errorMessage(error));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleCopy = async (slug: string) => {
-    try {
-      await navigator.clipboard.writeText(publicUrl(slug));
-      toast.success("Public link copied.");
     } catch {
-      toast.error("Could not copy the link. Copy it from the address bar.");
+      toast.error("The invitation could not be removed.");
+    } finally {
+      setDeleting(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen bg-background">
-      <div
-        aria-hidden
-        className="paper-grain pointer-events-none fixed inset-0 opacity-[0.03]"
-      />
-
-      <header className="sticky top-0 z-30 border-b border-ink/15 bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex h-[68px] w-full max-w-[1480px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
-          <div className="flex items-center gap-5">
-            <BrandLink />
-            <span className="hidden h-8 w-px bg-ink/15 sm:block" />
-            <p className="hidden font-meta text-[0.55rem] uppercase tracking-[0.14em] text-ink/60 sm:block">
-              Studio / Index
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
+    <div className="min-h-dvh bg-[var(--paper)] font-ui text-ink">
+      <header className="sticky top-0 z-40 border-b border-ink/10 bg-[var(--paper)]/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-[72px] w-full max-w-[1480px] items-center gap-4 px-4 sm:px-7 lg:px-10">
+          <BrandLink className="shrink-0" />
+          <nav
+            aria-label="Studio"
+            className="ml-2 hidden items-center gap-6 md:flex"
+          >
+            <Link
+              to="/dashboard"
+              aria-current="page"
+              className="font-meta text-[0.52rem] tracking-[0.22em] text-ink uppercase"
+            >
+              Invitations
+            </Link>
             <button
               type="button"
-              onClick={lock}
-              title={email ? `Lock studio · ${email}` : "Lock studio"}
-              className="flex h-9 items-center gap-2 border border-transparent px-2.5 text-[0.62rem] uppercase tracking-[0.12em] text-ink/68 transition-colors hover:border-ink/20 hover:text-ink"
+              onClick={() => openCreate("the-vow")}
+              className="font-meta text-[0.52rem] tracking-[0.22em] text-ink/45 uppercase transition-colors hover:text-ink"
             >
-              <Lock className="size-3.5" />
-              <span className="hidden sm:inline">Lock</span>
+              The collection
             </button>
+          </nav>
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Studio settings"
+                  className="grid size-10 place-items-center border border-ink/15 text-ink/55 transition-colors hover:border-ink/40 hover:text-ink focus-visible:border-ink focus-visible:outline-none"
+                >
+                  <Settings2 className="size-4" aria-hidden />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="space-y-1 py-2">
+                  <span className="block font-meta text-[0.46rem] tracking-[0.24em] text-ink/40 uppercase">
+                    Studio session
+                  </span>
+                  <span className="block truncate text-[11px] font-normal tracking-normal text-ink/70 normal-case">
+                    {email ?? "Private studio"}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={lock}>
+                  <Lock className="size-3.5" aria-hidden />
+                  Lock the studio
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/">
+                    <ArrowUpRight className="size-3.5" aria-hidden />
+                    About LAMSA
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="h-9 px-4"
+              className="h-10 gap-2 px-3 text-[0.58rem] tracking-[0.14em] uppercase sm:px-5"
+              onClick={() => openCreate()}
             >
-              <Plus className="size-3.5" />
-              <span className="hidden sm:inline">New invitation</span>
-              <span className="sm:hidden">New</span>
+              <Plus className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Create invitation</span>
+              <span className="sm:hidden">Create</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="relative mx-auto w-full max-w-[1480px] px-5 pb-24 pt-10 sm:px-8 sm:pt-14 lg:px-12">
-        {/* Masthead + ledger */}
-        <div className="flex flex-col justify-between gap-8 border-b border-ink/20 pb-8 lg:flex-row lg:items-end">
-          <div>
-            <div className="flex items-baseline gap-3">
-              <span className="font-meta text-[0.58rem] text-[var(--red)]">
-                01
-              </span>
-              <span className="h-px w-6 bg-ink/30" />
-              <span className="eyebrow text-ink/60">The desk</span>
-            </div>
-            <h1 className="mt-4 font-ui text-[clamp(2.9rem,6.4vw,4.8rem)] font-semibold leading-[0.9] tracking-[-0.035em]">
-              Your invitations.
-            </h1>
-            <p className="mt-3 max-w-[32rem] text-[0.88rem] leading-[1.75] text-ink/68">
-              Every file, its proof, and its guest list. Work saves as you type —
-              open any row to continue where you left off.
-            </p>
-          </div>
+      <main className="mx-auto w-full max-w-[1480px] px-4 pb-20 sm:px-7 lg:px-10">
+        <section className="relative pt-10 sm:pt-14 lg:pt-16">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-24 right-[-12%] hidden size-[520px] rounded-full opacity-70 blur-3xl lg:block"
+            style={{
+              background:
+                "radial-gradient(circle at 60% 45%, rgba(179,143,111,0.20), transparent 68%)",
+            }}
+          />
+          <div className="relative grid items-center gap-12 lg:grid-cols-[1.02fr_0.98fr] lg:gap-14">
+            <motion.div
+              variants={stagger}
+              initial={reduced ? false : "hidden"}
+              animate="show"
+            >
+              <motion.div variants={rise}>
+                <Eyebrow className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="size-1 bg-[var(--red)]" aria-hidden />
+                    The atelier
+                  </span>
+                  <span className="text-ink/20" aria-hidden>
+                    /
+                  </span>
+                  <span>{format(new Date(now), "EEEE, d MMMM")}</span>
+                </Eyebrow>
+              </motion.div>
+              <motion.h1
+                variants={rise}
+                className="mt-5 text-[clamp(2.55rem,6.2vw,4.9rem)] leading-[0.94] font-semibold tracking-[-0.045em] text-balance"
+              >
+                Your next{" "}
+                <span className="relative inline-block">
+                  <span className="relative z-10">beautiful</span>
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-0 bottom-[0.1em] h-[0.07em] bg-[var(--gold)]/55"
+                  />
+                </span>{" "}
+                invitation
+                <span className="block text-ink/55">starts here.</span>
+              </motion.h1>
+              <motion.p
+                variants={rise}
+                className="mt-5 max-w-[34rem] text-[0.95rem] leading-[1.75] text-ink/60"
+              >
+                {email ? `Welcome back, ${email.split("@")[0]}. ` : ""}
+                Every design in this studio is a piece of paper you can still
+                change — set the wording, choose the opening, and send one
+                private link to the people you love.
+              </motion.p>
+              <motion.div
+                variants={rise}
+                className="mt-7 flex flex-col gap-2.5 sm:flex-row sm:items-center"
+              >
+                <Button
+                  className="h-12 gap-2 px-6 text-[0.62rem] tracking-[0.16em] uppercase"
+                  onClick={() => openCreate()}
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Create invitation
+                </Button>
+                {latest ? (
+                  <Link
+                    to={`/studio/${latest._id}`}
+                    className="group inline-flex h-12 items-center justify-between gap-3 border border-ink/15 px-5 transition-colors hover:border-ink/40"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        aria-hidden
+                        className="size-1 shrink-0 bg-[var(--olive)]"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-meta text-[0.44rem] tracking-[0.24em] text-ink/40 uppercase">
+                          Continue editing
+                        </span>
+                        <span className="block max-w-[13rem] truncate text-[0.76rem] font-medium">
+                          {invitationTitle(latest)}
+                        </span>
+                      </span>
+                    </span>
+                    <ArrowUpRight
+                      className="size-4 shrink-0 text-ink/45 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                      aria-hidden
+                    />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openCreate("the-vow")}
+                    className="group inline-flex h-12 items-center gap-2 border border-ink/15 px-5 font-meta text-[0.54rem] tracking-[0.18em] text-ink/60 uppercase transition-colors hover:border-ink/40 hover:text-ink"
+                  >
+                    Browse the collection
+                    <ArrowRight
+                      className="size-3.5 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden
+                    />
+                  </button>
+                )}
+              </motion.div>
+              {ready && total > 0 && (
+                <motion.p
+                  variants={rise}
+                  className="mt-6 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-meta text-[0.46rem] tracking-[0.2em] text-ink/40 uppercase"
+                >
+                  <span>
+                    {counts.total}{" "}
+                    {counts.total === 1 ? "invitation" : "invitations"}
+                  </span>
+                  <span aria-hidden>·</span>
+                  <span>{counts.published} live</span>
+                  <span aria-hidden>·</span>
+                  <span>{counts.drafts} in progress</span>
+                  {counts.recent > 0 && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>{counts.recent} edited this fortnight</span>
+                    </>
+                  )}
+                </motion.p>
+              )}
+            </motion.div>
 
-          {invitations && invitations.length > 0 && (
-            <dl className="grid grid-cols-4 gap-6 border-t border-ink/15 pt-4 sm:gap-10 lg:border-0 lg:pt-0">
-              {[
-                ["Files", counts.total],
-                ["Published", counts.published],
-                ["Views", counts.views],
-                ["Replies", counts.replies],
-              ].map(([label, value]) => (
-                <div key={label as string}>
-                  <dd className="font-ui text-[2rem] font-semibold leading-none tabular-nums tracking-[-0.03em]">
-                    {value as number}
-                  </dd>
-                  <dt className="mt-1.5 font-meta text-[0.5rem] uppercase tracking-[0.12em] text-ink/60">
-                    {label as string}
-                  </dt>
+            <motion.div
+              initial={reduced ? false : { opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease, delay: 0.12 }}
+              className="relative mx-auto w-full max-w-[340px] sm:max-w-[400px] lg:max-w-[420px]"
+            >
+              <div
+                aria-hidden
+                className="absolute -inset-8 rounded-full opacity-60 blur-3xl"
+                style={{
+                  background:
+                    "radial-gradient(circle at 55% 40%, rgba(179,143,111,0.18), transparent 70%)",
+                }}
+              />
+              {latest ? (
+                <div>
+                  <div className="relative aspect-[5/6]">
+                    {second && (
+                      <Link
+                        to={`/studio/${second._id}`}
+                        aria-label={`Open ${invitationTitle(second)}`}
+                        className="absolute right-0 bottom-0 w-[52%] rotate-[2.4deg] border border-ink/10 bg-[var(--paper-deep)] p-1.5 shadow-[0_18px_45px_rgba(21,21,21,0.13)] transition-transform duration-700 ease-out hover:rotate-0"
+                      >
+                        <InvitationPreview invitation={second} />
+                      </Link>
+                    )}
+                    <Link
+                      to={`/studio/${latest._id}`}
+                      aria-label={`Open ${invitationTitle(latest)}`}
+                      className="absolute top-0 left-0 w-[62%] -rotate-[2.4deg] border border-ink/10 bg-[var(--paper-deep)] p-1.5 shadow-[0_28px_60px_rgba(21,21,21,0.18)] transition-transform duration-700 ease-out hover:rotate-0"
+                    >
+                      <InvitationPreview invitation={latest} />
+                    </Link>
+                  </div>
+                  <div className="mt-4 flex items-start justify-between gap-4 border-t border-ink/15 pt-3">
+                    <div className="min-w-0">
+                      <Eyebrow className="text-[0.44rem] tracking-[0.24em]">
+                        Latest edit
+                      </Eyebrow>
+                      <p className="mt-1.5 truncate text-[0.88rem] leading-tight font-semibold">
+                        {invitationTitle(latest)}
+                      </p>
+                      <p className="mt-1 font-meta text-[0.44rem] tracking-[0.18em] text-ink/40 uppercase">
+                        {formatEdited(latest.updatedAt)}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-1.5 border px-2 py-1 font-meta text-[8px] tracking-[0.16em] uppercase",
+                        latest.status === "published"
+                          ? "border-[var(--olive)]/30 text-[var(--olive)]"
+                          : "border-ink/15 text-ink/50",
+                      )}
+                    >
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "size-1",
+                          latest.status === "published"
+                            ? "bg-[var(--olive)]"
+                            : "bg-ink/30",
+                        )}
+                      />
+                      {latest.status === "published" ? "Live" : "Draft"}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="mx-auto w-[72%] -rotate-[2deg] border border-ink/12 bg-[var(--paper-deep)] p-2 shadow-[0_26px_60px_rgba(21,21,21,0.16)]">
+                    <TemplatePreview templateId="the-vow" />
+                  </div>
+                  <p className="mt-5 text-center font-meta text-[0.44rem] tracking-[0.24em] text-ink/40 uppercase">
+                    Specimen · The Vow, from the collection
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        </section>
+
+        {!ready && (
+          <section className="mt-16 sm:mt-20" aria-busy="true">
+            <div className="border-b border-ink/15 pb-4">
+              <Eyebrow>The gallery</Eyebrow>
+              <h2 className="mt-2 text-[clamp(1.7rem,3.4vw,2.6rem)] font-semibold tracking-[-0.03em]">
+                Gathering your invitations.
+              </h2>
+            </div>
+            <p className="sr-only">Loading your invitations</p>
+            <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="animate-pulse">
+                  <div className="aspect-[3/4] border border-ink/5 bg-ink/[0.055]" />
+                  <div className="mt-3 h-3 w-2/3 bg-ink/[0.07]" />
+                  <div className="mt-2 h-2 w-1/2 bg-ink/[0.05]" />
                 </div>
               ))}
-            </dl>
-          )}
-        </div>
-
-        {/* Continue */}
-        {current && (
-          <div className="mt-8">
-            <div className="flex items-center justify-between">
-              <p className="eyebrow text-ink/56">Pick up where you left off</p>
-              <p className="font-meta text-[0.5rem] uppercase tracking-[0.12em] text-ink/52">
-                Latest edit
-              </p>
             </div>
-            <div className="lift mt-3 grid items-center gap-5 border border-ink/12 bg-[var(--paper-light)] p-5 shadow-[0_12px_40px_rgba(21,21,21,0.05)] sm:grid-cols-[96px_minmax(0,1fr)_auto] sm:p-6">
-              <button
-                type="button"
-                onClick={() => navigate(`/studio/${current._id}`)}
-                className="hidden w-[96px] shrink-0 sm:block"
-                aria-label={`Open ${titleOf(current)}`}
-              >
-                <div className="editorial-shadow">
-                  <InvitationCanvas
-                    content={current as unknown as InvitationContent}
-                  />
-                </div>
-              </button>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={cn(
-                      "px-1.5 py-0.5 font-meta text-[0.48rem] uppercase tracking-[0.12em]",
-                      current.status === "published"
-                        ? "bg-[var(--olive)] text-[#f2f1ed]"
-                        : "bg-[var(--ink)] text-[#f2f1ed]",
-                    )}
-                  >
-                    {current.status === "published" ? "Live" : "Draft"}
-                  </span>
-                  <span className="font-meta text-[0.52rem] uppercase tracking-[0.1em] text-ink/60">
-                    {occasionLabel(current.occasion as Occasion)}
-                    <span className="mx-1.5 text-ink/25">/</span>
-                    {formatEventDateShort(current.date)}
-                  </span>
-                </div>
-                <p className="mt-2 truncate font-ui text-[1.75rem] font-semibold leading-tight tracking-[-0.02em]">
-                  {titleOf(current)}
-                </p>
-                <p className="mt-1 font-meta text-[0.52rem] uppercase tracking-[0.1em] text-ink/56">
-                  {current.guestCount}{" "}
-                  {current.guestCount === 1 ? "guest" : "guests"}
-                  <span className="mx-1.5 text-ink/25">/</span>
-                  {current.views} {current.views === 1 ? "view" : "views"}
-                  <span className="mx-1.5 text-ink/25">/</span>
-                  {current.rsvpYes + current.rsvpNo} replied
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate(`/studio/${current._id}`)}
-                  className="h-9"
-                >
-                  <FilePenLine className="size-3.5" />
-                  Continue in canvas
-                </Button>
-                {current.status === "published" ? (
-                  <Button
-                    type="button"
-                    onClick={() =>
-                      window.open(publicUrl(current.slug), "_blank", "noopener")
-                    }
-                    className="h-9"
-                  >
-                    <Eye className="size-3.5" />
-                    View live
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={() => handlePublishToggle(current._id, false)}
-                    className="h-9"
-                  >
-                    <Send className="size-3.5" />
-                    Publish
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
+          </section>
         )}
 
-        {/* Filter line */}
-        <div className="mt-10 flex flex-wrap items-end justify-between gap-4 border-b border-ink/20">
-          <div className="flex items-center gap-5 sm:gap-7">
-            {FILTERS.map((item) => {
-              const count =
-                item.id === "all"
-                  ? counts.total
-                  : item.id === "draft"
-                    ? counts.drafts
-                    : counts.published;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setFilter(item.id)}
-                  className={cn(
-                    "group relative -mb-px flex items-baseline gap-2 pb-3 text-[0.7rem] transition-colors",
-                    filter === item.id
-                      ? "text-ink"
-                      : "text-ink/60 hover:text-ink/75",
-                  )}
+        {ready && total === 0 && (
+          <section className="mt-14 border-t border-ink/15 py-12 sm:mt-16 sm:py-16">
+            <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
+              <div>
+                <Eyebrow>Your atelier is ready</Eyebrow>
+                <h2 className="mt-4 max-w-[28rem] text-[clamp(2.1rem,4.8vw,3.6rem)] leading-[0.96] font-semibold tracking-[-0.035em] text-balance">
+                  The first page is yours to write.
+                </h2>
+                <p className="mt-4 max-w-[32rem] text-[0.92rem] leading-[1.75] text-ink/60">
+                  Start from a blank canvas or choose a design from the
+                  collection. Nothing is published until you decide it is.
+                </p>
+                <Button
+                  className="mt-7 h-12 gap-2 px-6 text-[0.62rem] tracking-[0.16em] uppercase"
+                  onClick={() => openCreate()}
                 >
-                  <span>{item.label}</span>
-                  <span className="font-meta text-[0.54rem] tabular-nums text-ink/52">
-                    {invitations ? String(count).padStart(2, "0") : "—"}
-                  </span>
-                  {filter === item.id && (
-                    <span className="absolute inset-x-0 -bottom-px h-[2px] bg-[var(--red)]" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          <p className="pb-3 font-meta text-[0.5rem] uppercase tracking-[0.12em] text-ink/52">
-            Sorted by last edit
-          </p>
-        </div>
-
-        {invitations === undefined ? (
-          <div className="mt-4">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div
-                key={index}
-                className="grid animate-pulse grid-cols-[2rem_54px_1fr] items-center gap-4 border-b border-ink/10 py-4"
-              >
-                <div className="h-2 w-4 bg-ink/10" />
-                <div className="h-[72px] w-[54px] bg-ink/10" />
-                <div className="space-y-2">
-                  <div className="h-4 w-1/3 bg-ink/10" />
-                  <div className="h-2 w-1/5 bg-ink/[0.07]" />
-                </div>
+                  <Plus className="size-4" aria-hidden />
+                  Create your first invitation
+                </Button>
               </div>
-            ))}
-          </div>
-        ) : invitations.length === 0 ? (
-          <EmptyState onCreate={() => setCreateOpen(true)} />
-        ) : filtered.length === 0 ? (
-          <div className="mt-16 flex flex-col items-start">
-            <p className="font-meta text-[0.55rem] uppercase tracking-[0.12em] text-ink/56">
-              Nothing filed here
-            </p>
-            <p className="mt-3 max-w-[24rem] font-ui text-[2rem] font-semibold leading-tight tracking-[-0.02em]">
-              {filter === "draft"
-                ? "No invitations in progress."
-                : "Nothing published yet."}
-            </p>
-            <p className="mt-2 max-w-[26rem] text-[0.86rem] leading-relaxed text-ink/68">
-              {filter === "draft"
-                ? "Everything you start is a draft until you publish it."
-                : "Publish an invitation and its link becomes live for guests."}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setFilter("all")}
-              className="mt-5"
-            >
-              View all files
-            </Button>
-          </div>
-        ) : (
-          <div>
-            <div className="hidden grid-cols-[2rem_64px_minmax(0,1fr)_7rem_6rem_7rem_2rem] items-center gap-4 border-b border-ink/15 pb-2 pt-3 font-meta text-[0.48rem] uppercase tracking-[0.14em] text-ink/52 sm:grid">
-              <span>No.</span>
-              <span>Proof</span>
-              <span>Invitation</span>
-              <span>Guests</span>
-              <span>Views</span>
-              <span>Status</span>
-              <span />
-            </div>
-            <AnimatePresence initial={false}>
-              {filtered.map((invitation, index) => {
-                const title = titleOf(invitation);
-                const published = invitation.status === "published";
-                return (
-                  <motion.div
-                    key={invitation._id}
-                    layout
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25, delay: index * 0.02 }}
-                    className="group grid grid-cols-[1.75rem_54px_minmax(0,1fr)_auto] items-center gap-3 border-b border-ink/12 py-3 transition-colors hover:bg-[var(--paper-light)]/80 sm:grid-cols-[2rem_64px_minmax(0,1fr)_7rem_6rem_7rem_2rem] sm:gap-4 sm:py-4"
+              <ul className="grid gap-4 border-t border-ink/15 pt-6 lg:border-t-0 lg:pt-0">
+                {[
+                  "A design you can change completely",
+                  "One private link, or one for each guest",
+                  "Replies and guest names kept in your studio",
+                ].map((line) => (
+                  <li
+                    key={line}
+                    className="flex items-start gap-3 border-b border-ink/10 pb-3 text-[0.82rem] leading-relaxed text-ink/65 last:border-b-0 last:pb-0"
                   >
-                    <span className="font-meta text-[0.56rem] tabular-nums text-ink/48">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
+                    <span
+                      aria-hidden
+                      className="mt-[0.45rem] size-1 shrink-0 bg-[var(--gold)]"
+                    />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
 
+        {ready && total > 0 && showRecent && (
+          <motion.section
+            initial={reduced ? false : "hidden"}
+            animate="show"
+            variants={stagger}
+            className="mt-16 sm:mt-20"
+          >
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink/15 pb-4">
+              <motion.div variants={rise}>
+                <Eyebrow>Recently edited</Eyebrow>
+                <h2 className="mt-2 text-[clamp(1.7rem,3.4vw,2.6rem)] font-semibold tracking-[-0.03em]">
+                  Pick up where you left off.
+                </h2>
+              </motion.div>
+              <motion.button
+                variants={rise}
+                type="button"
+                onClick={scrollToGallery}
+                className="group inline-flex items-center gap-2 font-meta text-[0.5rem] tracking-[0.2em] text-ink/55 uppercase transition-colors hover:text-ink"
+              >
+                View all
+                <ArrowRight
+                  className="size-3.5 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </motion.button>
+            </div>
+            <motion.div
+              variants={stagger}
+              className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6"
+            >
+              {recent.map((item) => (
+                <motion.div key={item._id} variants={rise}>
+                  <InvitationCard
+                    invitation={item}
+                    busy={busyId === item._id}
+                    onPreview={handlePreview}
+                    onCopyLink={handleCopyLink}
+                    onDuplicate={handleDuplicate}
+                    onTogglePublish={handleTogglePublish}
+                    onDelete={setDeleteTarget}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.section>
+        )}
+
+        {ready && total > 0 && (
+          <section
+            id="gallery"
+            ref={galleryRef}
+            className="mt-16 scroll-mt-24 sm:mt-20"
+          >
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink/15 pb-4">
+              <div>
+                <Eyebrow>The gallery</Eyebrow>
+                <h2 className="mt-2 text-[clamp(1.7rem,3.4vw,2.6rem)] font-semibold tracking-[-0.03em]">
+                  {filteredByHand
+                    ? "Your invitations."
+                    : "Every invitation, in one place."}
+                </h2>
+              </div>
+              <p
+                aria-live="polite"
+                className="font-meta text-[0.48rem] tracking-[0.2em] text-ink/40 uppercase"
+              >
+                {filtered.length} of {counts.total} shown
+              </p>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative w-full lg:max-w-[22rem]">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink/35"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setLimit(GALLERY_PAGE_SIZE);
+                  }}
+                  placeholder="Search names, guests, venues"
+                  aria-label="Search invitations"
+                  className="h-11 w-full border border-ink/15 bg-transparent pr-10 pl-10 text-[0.82rem] text-ink transition-colors placeholder:text-ink/35 focus:border-ink focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery("");
+                      setLimit(GALLERY_PAGE_SIZE);
+                    }}
+                    aria-label="Clear search"
+                    className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 place-items-center text-ink/45 transition-colors hover:text-ink"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
+                )}
+              </div>
+              <div
+                className="flex flex-wrap items-center gap-2"
+                role="group"
+                aria-label="Filter invitations"
+              >
+                {GALLERY_FILTERS.map((option) => {
+                  const count =
+                    option.id === "all"
+                      ? counts.total
+                      : option.id === "draft"
+                        ? counts.drafts
+                        : option.id === "published"
+                          ? counts.published
+                          : counts.recent;
+                  const active = filter === option.id;
+                  return (
                     <button
+                      key={option.id}
                       type="button"
-                      onClick={() => navigate(`/studio/${invitation._id}`)}
-                      className="w-[54px] shrink-0 text-left transition-transform duration-300 group-hover:-translate-y-0.5 sm:w-[64px]"
-                      aria-label={`Open ${title}`}
+                      aria-pressed={active}
+                      onClick={() => {
+                        setFilter(option.id);
+                        setLimit(GALLERY_PAGE_SIZE);
+                      }}
+                      className={cn(
+                        "inline-flex h-9 items-center gap-2 border px-3.5 font-meta text-[0.48rem] tracking-[0.18em] uppercase transition-colors",
+                        active
+                          ? "border-ink bg-ink text-[var(--paper)]"
+                          : "border-ink/15 text-ink/55 hover:border-ink/40 hover:text-ink",
+                      )}
                     >
-                      <div className="editorial-shadow">
-                        <InvitationCanvas
-                          content={invitation as unknown as InvitationContent}
-                        />
-                      </div>
-                    </button>
-
-                    <div className="min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/studio/${invitation._id}`)}
-                        className="block max-w-full truncate text-left font-ui text-[1.35rem] font-semibold leading-tight tracking-[-0.015em] transition-colors group-hover:text-[var(--red)] sm:text-[1.5rem]"
-                      >
-                        {title}
-                      </button>
-                      <p className="mt-1 truncate font-meta text-[0.5rem] uppercase tracking-[0.1em] text-ink/56">
-                        {occasionLabel(invitation.occasion as Occasion)}
-                        <span className="mx-1.5 text-ink/25">/</span>
-                        {formatEventDateShort(invitation.date)}
-                      </p>
-                      <p className="mt-1 flex items-center gap-2 sm:hidden">
-                        <span
-                          className={cn(
-                            "px-1 py-0.5 font-meta text-[0.44rem] uppercase tracking-[0.1em]",
-                            published
-                              ? "bg-[var(--olive)] text-[#f2f1ed]"
-                              : "bg-ink/10 text-ink/72",
-                          )}
-                        >
-                          {published ? "Live" : "Draft"}
-                        </span>
-                        <span className="font-meta text-[0.46rem] uppercase tracking-[0.1em] text-ink/52">
-                          {invitation.guestCount} guests · {invitation.views} views
-                        </span>
-                      </p>
-                    </div>
-
-                    <span className="hidden font-meta text-[0.6rem] text-ink/68 sm:block">
-                      {invitation.guestCount}
-                      <span className="ml-1.5 text-[0.48rem] uppercase tracking-[0.1em] text-ink/48">
-                        named
-                      </span>
-                    </span>
-
-                    <span className="hidden font-meta text-[0.6rem] text-ink/68 sm:block">
-                      {invitation.views}
-                    </span>
-
-                    <span className="hidden sm:block">
+                      {option.label}
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1.5 font-meta text-[0.48rem] uppercase tracking-[0.12em]",
-                          published ? "text-[var(--olive)]" : "text-ink/60",
+                          "text-[0.44rem]",
+                          active ? "text-[var(--paper)]/55" : "text-ink/35",
                         )}
                       >
-                        <span
-                          className={cn(
-                            "size-1.5",
-                            published
-                              ? "rounded-full bg-[var(--olive)]"
-                              : "bg-ink/25",
-                          )}
-                        />
-                        {published ? "Published" : "In progress"}
+                        {count}
                       </span>
-                    </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-                    <div className="flex items-center justify-end">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            className="flex size-8 items-center justify-center text-ink/56 transition-colors hover:text-ink"
-                            aria-label={`Actions for ${title}`}
-                          >
-                            {busyId === invitation._id ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <MoreHorizontal className="size-4" />
-                            )}
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-52">
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              navigate(`/studio/${invitation._id}`)
-                            }
-                          >
-                            <FilePenLine className="size-3.5" />
-                            Open canvas studio
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              navigate(`/invitations/${invitation._id}`)
-                            }
-                          >
-                            <FilePenLine className="size-3.5" />
-                            Details, guests & media
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              if (published) {
-                                window.open(
-                                  publicUrl(invitation.slug),
-                                  "_blank",
-                                  "noopener",
-                                );
-                              } else {
-                                navigate(
-                                  `/invitations/${invitation._id}?preview=1`,
-                                );
-                              }
-                            }}
-                          >
-                            <Eye className="size-3.5" />
-                            {published ? "View live" : "Preview proof"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={!published}
-                            onSelect={() => handleCopy(invitation.slug)}
-                          >
-                            <Copy className="size-3.5" />
-                            Copy guest link
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => handleDuplicate(invitation._id)}
-                          >
-                            <Copy className="size-3.5" />
-                            Duplicate file
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              handlePublishToggle(invitation._id, published)
-                            }
-                          >
-                            {published ? (
-                              <>
-                                <Undo2 className="size-3.5" />
-                                Return to drafts
-                              </>
-                            ) : (
-                              <>
-                                <Send className="size-3.5" />
-                                Publish
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() =>
-                              setDeleteTarget({ id: invitation._id, title })
-                            }
-                          >
-                            <Trash2 className="size-3.5" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="group mt-6 flex w-full items-center justify-between gap-4 border border-dashed border-ink/25 px-4 py-4 text-left transition-colors hover:border-ink/60 hover:bg-[var(--paper-light)]/70 sm:px-5"
-            >
-              <span className="flex items-center gap-4">
-                <span className="flex size-8 items-center justify-center border border-ink/30 transition-colors group-hover:border-[var(--red)] group-hover:bg-[var(--red)] group-hover:text-[#f2f1ed]">
-                  <Plus className="size-3.5" />
-                </span>
-                <span>
-                  <span className="block font-ui text-[1.25rem] font-semibold leading-tight tracking-[-0.015em]">
-                    Begin another invitation
-                  </span>
-                  <span className="mt-0.5 block font-meta text-[0.48rem] uppercase tracking-[0.12em] text-ink/56">
-                    From the collection
-                  </span>
-                </span>
-              </span>
-              <ArrowUpRight className="size-4 text-ink/56 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            </button>
-          </div>
+            {filtered.length === 0 ? (
+              <div className="mt-10 border border-dashed border-ink/20 px-6 py-14 text-center">
+                <p className="text-[0.95rem] font-medium">
+                  Nothing matches that yet.
+                </p>
+                <p className="mx-auto mt-2 max-w-[26rem] text-[0.82rem] leading-relaxed text-ink/55">
+                  Try another name, or clear the filters to see the whole
+                  gallery again.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setFilter("all");
+                    setLimit(GALLERY_PAGE_SIZE);
+                  }}
+                  className="mt-5 inline-flex h-10 items-center gap-2 border border-ink/20 px-4 font-meta text-[0.5rem] tracking-[0.18em] uppercase transition-colors hover:border-ink"
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4">
+                  {visible.map((item) => (
+                    <InvitationCard
+                      key={item._id}
+                      invitation={item}
+                      busy={busyId === item._id}
+                      onPreview={handlePreview}
+                      onCopyLink={handleCopyLink}
+                      onDuplicate={handleDuplicate}
+                      onTogglePublish={handleTogglePublish}
+                      onDelete={setDeleteTarget}
+                    />
+                  ))}
+                </div>
+                {filtered.length > limit && (
+                  <div className="mt-10 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setLimit((value) => value + GALLERY_PAGE_SIZE)}
+                      className="inline-flex h-11 items-center gap-2 border border-ink/20 px-5 font-meta text-[0.5rem] tracking-[0.2em] uppercase transition-colors hover:border-ink"
+                    >
+                      Show more
+                      <ArrowRight className="size-3.5" aria-hidden />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
         )}
       </main>
 
-      {/* New file dialog */}
-      <Dialog
+      <footer className="border-t border-ink/12">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-2 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7 lg:px-10">
+          <p className="font-meta text-[0.46rem] tracking-[0.22em] text-ink/40 uppercase">
+            LAMSA · An atelier for invitations
+          </p>
+          <p className="flex items-center gap-2 font-meta text-[0.46rem] tracking-[0.22em] text-ink/40 uppercase">
+            <Lock className="size-3" aria-hidden />
+            A private studio
+          </p>
+        </div>
+      </footer>
+
+      <CreateInvitationDialog
+        key={createSession}
         open={createOpen}
         onOpenChange={(open) => (open ? setCreateOpen(true) : closeCreate())}
-      >
-        <DialogContent className="max-h-[92vh] gap-0 overflow-hidden border-ink/25 bg-background p-0 sm:max-w-5xl">
-          <div className="grid max-h-[92vh] grid-rows-[auto_1fr] lg:grid-cols-[0.95fr_1.05fr] lg:grid-rows-1">
-            <div className="flex min-h-0 flex-col">
-              <DialogHeader className="space-y-0 border-b border-ink/15 px-6 pb-5 pt-6 text-left sm:px-8">
-                <div className="flex items-baseline gap-3">
-                  <span className="font-meta text-[0.55rem] text-[var(--red)]">
-                    New
-                  </span>
-                  <span className="h-px w-5 bg-ink/30" />
-                  <span className="eyebrow text-ink/60">Choose a starting point</span>
-                </div>
-                <DialogTitle className="mt-3 font-ui text-[2rem] font-semibold leading-[0.95] tracking-[-0.03em]">
-                  Start from the collection.
-                </DialogTitle>
-                <DialogDescription className="max-w-md text-[0.8rem] leading-relaxed text-ink/68">
-                  Every design is editable — words, palette, typeface, motif, and
-                  the opening gesture. You can change anything later.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 sm:px-8">
-                {/* On narrow screens the proof pane is hidden, so the selected
-                    design gets a compact preview here instead. */}
-                <div className="mb-4 flex items-center gap-3 border border-ink/20 bg-[var(--paper-deep)]/50 p-2.5 lg:hidden">
-                  <div className="w-[42px] shrink-0">
-                    <InvitationCanvas
-                      content={draftFromTemplate(selectedTemplate)}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-meta text-[0.46rem] uppercase tracking-[0.12em] text-ink/56">
-                      Selected
-                    </p>
-                    <p className="truncate font-ui text-[1.05rem] font-semibold leading-tight">
-                      {templateById(selectedTemplate).name}
-                    </p>
-                    <p className="truncate text-[0.66rem] text-ink/62">
-                      {templateById(selectedTemplate).description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="-mx-1 flex gap-1.5 overflow-x-auto pb-2">
-                  {OCCASIONS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setOccasion(item.id);
-                        const first = TEMPLATES.find(
-                          (template) => template.occasion === item.id,
-                        );
-                        if (first) setSelectedTemplate(first.id);
-                      }}
-                      className={cn(
-                        "shrink-0 border px-3 py-1.5 font-meta text-[0.52rem] uppercase tracking-[0.12em] transition-colors",
-                        occasion === item.id
-                          ? "border-ink bg-ink text-[#f2f1ed]"
-                          : "border-ink/20 text-ink/68 hover:border-ink/50 hover:text-ink",
-                      )}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-
-                <ul className="mt-3 border-t border-ink/12">
-                  {visibleTemplates.map((template) => {
-                    const selected = selectedTemplate === template.id;
-                    return (
-                      <li key={template.id}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedTemplate(template.id)}
-                          className={cn(
-                            "flex w-full items-center gap-3 border-b border-ink/12 px-2 py-3 text-left transition-colors",
-                            selected
-                              ? "bg-[var(--paper-light)]"
-                              : "hover:bg-[var(--paper-light)]/60",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "flex size-4 shrink-0 items-center justify-center border",
-                              selected
-                                ? "border-[var(--red)] bg-[var(--red)] text-[#f2f1ed]"
-                                : "border-ink/30",
-                            )}
-                          >
-                            {selected && <Check className="size-2.5" />}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-baseline justify-between gap-2">
-                              <span className="truncate font-ui text-[1.15rem] font-semibold leading-tight">
-                                {template.name}
-                              </span>
-                              <span className="shrink-0 font-meta text-[0.46rem] uppercase tracking-[0.1em] text-ink/52">
-                                {occasionLabel(template.occasion)}
-                              </span>
-                            </span>
-                            <span className="mt-0.5 block truncate text-[0.72rem] text-ink/62">
-                              {template.description}
-                            </span>
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {visibleTemplates.length === 0 && (
-                  <p className="mt-6 text-[0.82rem] text-ink/62">
-                    No designs filed under this occasion yet — start from any other
-                    and change the occasion inside the studio.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="hidden flex-col border-l border-ink/15 bg-[var(--paper-deep)]/60 lg:flex">
-              <div className="flex items-baseline justify-between border-b border-ink/15 px-6 py-3 font-meta text-[0.5rem] uppercase tracking-[0.12em] text-ink/60">
-                <span>Proof</span>
-                <span>{templateById(selectedTemplate).name}</span>
-              </div>
-              <div className="flex min-h-0 flex-1 items-center justify-center p-8">
-                <div className="editorial-shadow w-full max-w-[330px]">
-                  <InvitationCanvas
-                    content={draftFromTemplate(selectedTemplate)}
-                  />
-                </div>
-              </div>
-              <div className="border-t border-ink/15 px-6 py-4">
-                <div className="flex items-baseline justify-between">
-                  <div>
-                    <p className="eyebrow text-ink/56">Selected</p>
-                    <p className="mt-1 font-ui text-[1.4rem] font-semibold leading-none tracking-[-0.02em]">
-                      {templateById(selectedTemplate).name}
-                    </p>
-                  </div>
-                  <p className="max-w-[12rem] text-right font-meta text-[0.48rem] uppercase leading-relaxed tracking-[0.1em] text-ink/56">
-                    {occasionLabel(templateById(selectedTemplate).occasion)}
-                    <br />
-                    {templateById(selectedTemplate).fontPair}
-                  </p>
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={closeCreate}
-                    className="h-10"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleCreate}
-                    disabled={creating}
-                    className="h-10 flex-1"
-                  >
-                    {creating ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <ArrowRight className="size-4" />
-                    )}
-                    Create file
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile action bar */}
-          <div className="flex items-center gap-2 border-t border-ink/15 bg-background px-5 py-3 lg:hidden">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={closeCreate}
-              className="h-10"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCreate}
-              disabled={creating}
-              className="h-10 flex-1"
-            >
-              {creating ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <ArrowRight className="size-4" />
-              )}
-              Create invitation
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        initialTemplateId={initialTemplate}
+        creating={creating}
+        onCreate={handleCreate}
+      />
 
       <AlertDialog
-        open={Boolean(deleteTarget)}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
       >
-        <AlertDialogContent className="border-ink/25">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-ui text-[1.8rem] font-semibold leading-tight tracking-[-0.02em]">
+            <AlertDialogTitle className="flex items-center gap-2 text-[1.15rem] font-semibold tracking-[-0.02em]">
+              <Trash2 className="size-4 text-[var(--red)]" aria-hidden />
               Delete this invitation?
             </AlertDialogTitle>
             <AlertDialogDescription className="leading-relaxed">
-              &ldquo;{deleteTarget?.title}&rdquo; and its guest list will be
-              permanently removed. If it is published, its link will stop working.
+              “{deleteTarget ? invitationTitle(deleteTarget) : ""}” and its
+              saved design will be removed from your studio
+              {deleteTarget?.status === "published"
+                ? ", and its public guest link will stop working"
+                : ""}
+              . This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>Keep it</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+              className="gap-2 bg-[var(--red)] text-[#f9f5ec] hover:bg-[var(--red)]/90"
             >
-              {busyId ? (
-                <Loader2 className="size-4 animate-spin" />
+              {deleting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (
-                <Trash2 className="size-4" />
+                <Trash2 className="size-4" aria-hidden />
               )}
-              Delete invitation
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
-}
-
-function EmptyState({ onCreate }: { onCreate: () => void }) {
-  return (
-    <div className="mt-10 grid items-stretch gap-0 border border-ink/20 lg:grid-cols-[1.15fr_0.85fr]">
-      <div className="flex flex-col justify-center p-7 sm:p-10">
-        <p className="eyebrow text-ink/60">The first page is blank</p>
-        <h2 className="mt-4 max-w-[26rem] font-ui text-[clamp(2.2rem,4.5vw,3.4rem)] font-semibold leading-[0.95] tracking-[-0.03em]">
-          Choose a design and start writing.
-        </h2>
-        <p className="mt-4 max-w-[27rem] text-[0.88rem] leading-[1.8] text-ink/68">
-          Pick a starting point, add the names and the date, then share one link —
-          or a personal link for every guest. The proof updates as you type.
-        </p>
-        <div className="mt-7">
-          <Button type="button" onClick={onCreate} className="h-11">
-            <Plus className="size-4" />
-            Create the first invitation
-          </Button>
-        </div>
-      </div>
-      <div className="flex items-center justify-center border-t border-ink/15 bg-[var(--paper-deep)]/60 p-7 lg:border-l lg:border-t-0">
-        <div className="w-full max-w-[220px]">
-          <div className="flex items-baseline justify-between border-b border-ink/20 pb-1 font-meta text-[0.46rem] uppercase tracking-[0.12em] text-ink/56">
-            <span>Specimen</span>
-            <span>3 : 4</span>
-          </div>
-          <div className="proof mt-3 p-3">
-            <div className="editorial-shadow">
-              <InvitationCanvas content={draftFromTemplate("the-vow")} />
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
