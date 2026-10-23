@@ -3,9 +3,8 @@ import { DesignPageView, useStageScale } from "@/components/invitation/DesignPag
 import { JourneyCue } from "@/components/invitation/JourneyCue";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import {
-  DESIGN_HEIGHT,
-  DESIGN_WIDTH,
   pageTransitionFrames,
+  pageSizeOf,
   type DesignDocument,
   type DesignPage,
 } from "@/lib/design";
@@ -77,7 +76,8 @@ export function InvitationJourney({
 }: InvitationJourneyProps) {
   const pages = useMemo(() => journeyPages(design), [design]);
   const total = pages.length;
-  const { ref: stageRef, scale } = useStageScale();
+  const pageSize = pageSizeOf(pages[0] ?? null);
+  const { ref: stageRef, scale } = useStageScale(pageSize.width);
 
   const [phase, setPhase] = useState<JourneyPhase>(() =>
     journeyStartsAtOpening(design, reducedMotion) ? "opening" : "page",
@@ -354,13 +354,13 @@ export function InvitationJourney({
       <div
         ref={stageRef}
         className="relative w-full overflow-hidden bg-[var(--paper-light)] shadow-[0_24px_70px_rgba(22,22,22,0.16)]"
-        style={{ aspectRatio: `${DESIGN_WIDTH} / ${DESIGN_HEIGHT}` }}
+        style={{ aspectRatio: `${pageSize.width} / ${pageSize.height}` }}
       >
         <div
           className="absolute left-0 top-0 origin-top-left"
           style={{
-            width: DESIGN_WIDTH,
-            height: DESIGN_HEIGHT,
+            width: pageSize.width,
+            height: pageSize.height,
             transform: `scale(${scale || 0.0001})`,
             visibility: scale ? "visible" : "hidden",
           }}

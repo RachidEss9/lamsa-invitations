@@ -1,6 +1,5 @@
 import {
-  DESIGN_HEIGHT,
-  DESIGN_WIDTH,
+  pageSizeOf,
   type DesignElement,
   type DesignPage,
 } from "@/lib/design";
@@ -268,6 +267,7 @@ export function StudioCanvas({
   } | null>(null);
 
   const scale = Math.max(0.05, fit * zoom);
+  const size = pageSizeOf(page);
   const selected = page.elements.filter((element) => selectedIds.includes(element.id));
   const single = selected.length === 1 ? selected[0] : null;
   const editingElement = editing
@@ -289,13 +289,13 @@ export function StudioCanvas({
     const measure = () => {
       const width = node.clientWidth;
       const height = node.clientHeight;
-      setFit(Math.min((width - 56) / DESIGN_WIDTH, (height - 56) / DESIGN_HEIGHT));
+      setFit(Math.min((width - 56) / size.width, (height - 56) / size.height));
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [size.width, size.height]);
 
   useEffect(() => {
     if (!editRequest) return;
@@ -417,8 +417,8 @@ export function StudioCanvas({
           const candidateY = anchor.y + dy;
           const xTargets = [
             0,
-            DESIGN_WIDTH / 2 - anchor.w / 2,
-            DESIGN_WIDTH - anchor.w,
+            size.width / 2 - anchor.w / 2,
+            size.width - anchor.w,
             ...page.elements
               .filter((element) => element.id !== anchor.id && !element.hidden)
               .flatMap((element) => [
@@ -429,8 +429,8 @@ export function StudioCanvas({
           ];
           const yTargets = [
             0,
-            DESIGN_HEIGHT / 2 - anchor.h / 2,
-            DESIGN_HEIGHT - anchor.h,
+            size.height / 2 - anchor.h / 2,
+            size.height - anchor.h,
             ...page.elements
               .filter((element) => element.id !== anchor.id && !element.hidden)
               .flatMap((element) => [
@@ -457,8 +457,8 @@ export function StudioCanvas({
 
         const moves = [...current.originals.values()].map((element) => ({
           id: element.id,
-          x: Math.round(clamp(element.x + snapDx, -element.w + 40, DESIGN_WIDTH - 40)),
-          y: Math.round(clamp(element.y + snapDy, -element.h + 40, DESIGN_HEIGHT - 40)),
+          x: Math.round(clamp(element.x + snapDx, -element.w + 40, size.width - 40)),
+          y: Math.round(clamp(element.y + snapDy, -element.h + 40, size.height - 40)),
         }));
         onMove(moves);
         return;
@@ -801,8 +801,8 @@ export function StudioCanvas({
       <div
         className="relative shrink-0 shadow-[0_30px_80px_rgba(22,22,22,0.18)]"
         style={{
-          width: DESIGN_WIDTH * scale,
-          height: DESIGN_HEIGHT * scale,
+          width: size.width * scale,
+          height: size.height * scale,
           transform: `translate(${pan.x}px, ${pan.y}px)`,
         }}
       >
@@ -810,8 +810,8 @@ export function StudioCanvas({
           ref={designRef}
           className="absolute left-0 top-0 origin-top-left"
           style={{
-            width: DESIGN_WIDTH,
-            height: DESIGN_HEIGHT,
+            width: size.width,
+            height: size.height,
             transform: `scale(${scale})`,
           }}
         >

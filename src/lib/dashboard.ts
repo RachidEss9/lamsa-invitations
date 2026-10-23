@@ -11,7 +11,20 @@ import {
   type MotifId,
   type Occasion,
 } from "./invitation";
-import { normalizeDesign, visiblePages, type DesignDocument, type DesignPage } from "./design";
+import {
+  createBlankDesign,
+  fromDesignPx,
+  normalizeDesign,
+  pageSizeOf,
+  toDesignPx,
+  visiblePages,
+  type DesignDocument,
+  type DesignOutput,
+  type DesignPage,
+  type DesignUnit,
+  type OpeningExperienceId,
+  type PageTextureId,
+} from "./design";
 import { pageEntranceEnd } from "./journey";
 
 /**
@@ -250,4 +263,99 @@ export function blankInvitationContent(now = new Date()): InvitationContent {
     date: format(date, "yyyy-MM-dd"),
     time: "16:00",
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Starting from scratch                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** A background as the host actually entered it: a colour or a gradient. */
+export interface ScratchBackground {
+  color: string;
+  gradient?: { from: string; to: string; angle: number } | null;
+}
+
+export function backgroundCss(background: ScratchBackground): string {
+  const gradient = background.gradient;
+  if (!gradient) return background.color;
+  return `linear-gradient(${Math.round(gradient.angle)}deg, ${gradient.from}, ${gradient.to})`;
+}
+
+export function isGradientCss(value: string): boolean {
+  return /gradient\(/i.test(value);
+}
+
+export interface ScratchDesignInput {
+  name: string;
+  unit: DesignUnit;
+  /** Width and height in `unit`, exactly as the host typed them. */
+  width: number;
+  height: number;
+  output: DesignOutput;
+  background: ScratchBackground;
+  /** Safe margin and bleed in `unit`. */
+  margin: number;
+  bleed: number;
+  pages: number;
+  texture: PageTextureId;
+  opening: OpeningExperienceId;
+  accent?: string;
+}
+
+/**
+ * Turns the setup dialog into a real invitation: an empty canvas at the chosen
+ * geometry, with the physical brief kept for print, and the written invitation
+ * left blank for the host to fill in inside the studio.
+ */
+export function scratchInvitation(input: ScratchDesignInput): {
+  content: InvitationContent;
+  design: DesignDocument;
+} {
+  const widthPx = Math.max(40, Math.round(toDesignPx(input.width, input.unit)));
+  const heightPx = Math.max(40, Math.round(toDesignPx(input.height, input.unit)));
+  const background = backgroundCss(input.background);
+  const base = blankInvitationContent();
+  const content: InvitationContent = {
+    ...base,
+    title: input.name.trim() || "Untitled invitation",
+    // The written invitation stays empty on purpose: a scratch design is built
+    // on the canvas, not in the details form.
+    names: { primary: "", secondary: "" },
+    message: "",
+    venueName: "",
+    venueAddress: "",
+    palette: {
+      ...base.palette,
+      background: input.background.color,
+      accent: input.accent?.trim() || base.palette.accent,
+    },
+  };
+  const design = createBlankDesign({
+    width: widthPx,
+    height: heightPx,
+    background,
+    pages: input.pages,
+    texture: input.texture,
+    margin: Math.max(0, Math.round(toDesignPx(input.margin, input.unit))),
+    bleed: Math.max(0, Math.round(toDesignPx(input.bleed, input.unit))),
+    output: input.output,
+    unit: input.unit,
+    physicalWidth: input.width,
+    physicalHeight: input.height,
+    opening: { experience: input.opening },
+  });
+  return { content, design };
+}
+
+/** The human label for a canvas size: "148 × 210 mm". */
+export function formatPageSize(
+  page: Pick<DesignPage, "width" | "height">,
+  unit: DesignUnit,
+): string {
+  const size = pageSizeOf(page);
+  const width = fromDesignPx(size.width, unit);
+  const height = fromDesignPx(size.height, unit);
+  const round = (value: number) =>
+    Math.abs(value % 1) < 0.05 ? value.toFixed(0) : value.toFixed(1);
+  return `${round(width)} × ${round(height)} ${unit}`;
 }

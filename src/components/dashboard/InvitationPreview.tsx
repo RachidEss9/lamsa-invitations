@@ -24,7 +24,11 @@ function StaticDesign({
 }) {
   if (!page) return null;
   return (
-    <DesignStage className={cn("w-full bg-[var(--paper-light)]", className)}>
+    <DesignStage
+      width={page.width}
+      height={page.height}
+      className={cn("w-full bg-[var(--paper-light)]", className)}
+    >
       {() => (
         <DesignPageView
           page={page}

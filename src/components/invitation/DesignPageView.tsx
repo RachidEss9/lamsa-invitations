@@ -1,8 +1,8 @@
 import {
   coveredElementIds,
-  DESIGN_HEIGHT,
-  DESIGN_WIDTH,
   elementStyleAt,
+  pageBackgroundStyle,
+  pageSizeOf,
   personalize,
   type DesignElement,
   type DesignPage,
@@ -485,19 +485,30 @@ export function DesignPageView({
     onReveal?.(targetId, interactionId);
   };
 
+  const size = pageSizeOf(page);
+
   return (
     <div
       className={cn("relative overflow-hidden", className)}
       dir={rtl ? "rtl" : "ltr"}
       style={{
-        width: DESIGN_WIDTH,
-        height: DESIGN_HEIGHT,
-        backgroundColor: page.background,
+        width: size.width,
+        height: size.height,
         containerType: "inline-size",
+        ...pageBackgroundStyle(page.background),
         ...style,
       }}
     >
       <div aria-hidden className="paper-texture pointer-events-none absolute inset-0" />
+      {page.texture && page.texture !== "none" && (
+        <div
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-multiply",
+            `texture-${page.texture}`,
+          )}
+        />
+      )}
       <div
         aria-hidden
         className="paper-grain pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-multiply"
@@ -610,42 +621,52 @@ export function DesignPageView({
 /* Scaled stage                                                               */
 /* -------------------------------------------------------------------------- */
 
-export function useStageScale() {
+export function useStageScale(width: number) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0);
 
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
-    const measure = () => setScale(node.clientWidth / DESIGN_WIDTH);
+    const measure = () => setScale(node.clientWidth / width);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [width]);
 
   return { ref, scale };
 }
 
 export function DesignStage({
   className,
+  width,
+  height,
   children,
 }: {
   className?: string;
+  /** Canvas size in design units; defaults to the classic studio card. */
+  width?: number;
+  height?: number;
   children: (scale: number) => ReactNode;
 }) {
-  const { ref, scale } = useStageScale();
+  const stageWidth = width && width > 0 ? width : undefined;
+  const stageHeight = height && height > 0 ? height : undefined;
+  const size = pageSizeOf(
+    stageWidth && stageHeight ? { width: stageWidth, height: stageHeight } : null,
+  );
+  const { ref, scale } = useStageScale(size.width);
   return (
     <div
       ref={ref}
       className={cn("relative w-full overflow-hidden", className)}
-      style={{ aspectRatio: `${DESIGN_WIDTH} / ${DESIGN_HEIGHT}` }}
+      style={{ aspectRatio: `${size.width} / ${size.height}` }}
     >
       <div
         className="absolute left-0 top-0 origin-top-left"
         style={{
-          width: DESIGN_WIDTH,
-          height: DESIGN_HEIGHT,
+          width: size.width,
+          height: size.height,
           transform: `scale(${scale || 0.0001})`,
           visibility: scale ? "visible" : "hidden",
         }}

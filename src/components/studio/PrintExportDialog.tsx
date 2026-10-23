@@ -528,7 +528,10 @@ export function PrintExportDialog({
                       height: `${(art.h / page.heightMm) * 100}%`,
                     }}
                   >
-                    <DesignStage>
+                    <DesignStage
+                      width={exportPage(previewEntry.page).width}
+                      height={exportPage(previewEntry.page).height}
+                    >
                       {() => (
                         <DesignPageView
                           page={exportPage(previewEntry.page)}

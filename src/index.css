@@ -261,6 +261,23 @@
       radial-gradient(circle at 16% 10%, rgba(255, 255, 255, 0.5), transparent 46%),
       radial-gradient(circle at 84% 90%, rgba(23, 22, 15, 0.06), transparent 58%);
   }
+  /* Paper surfaces chosen when a design is created: they sit on the page
+     under the artwork, exactly like a sheet's own grain. */
+  .texture-cotton {
+    background-image:
+      radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.55), transparent 52%),
+      radial-gradient(circle at 74% 82%, rgba(23, 22, 15, 0.06), transparent 56%),
+      radial-gradient(circle at 52% 52%, rgba(23, 22, 15, 0.03), transparent 64%);
+  }
+  .texture-linen {
+    background-image:
+      repeating-linear-gradient(0deg, rgba(23, 22, 15, 0.08) 0 1px, transparent 1px 4px),
+      repeating-linear-gradient(90deg, rgba(23, 22, 15, 0.08) 0 1px, transparent 1px 4px);
+  }
+  .texture-fibre {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='220' height='220' filter='url(%23f)' opacity='0.6'/></svg>");
+    background-size: 220px 220px;
+  }
   /* A hard offset shadow reads as printed matter, not a floating UI card. */
   .press {
     box-shadow: 5px 5px 0 0 var(--ink);

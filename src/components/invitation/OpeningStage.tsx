@@ -2,7 +2,9 @@ import { DesignPageView } from "@/components/invitation/DesignPageView";
 import {
   DESIGN_HEIGHT,
   DESIGN_WIDTH,
+  flatBackgroundOf,
   openingHint,
+  pageSizeOf,
   personalize,
   type DesignPage,
   type OpeningSettings,
@@ -77,12 +79,23 @@ function rgba(hex: string, alpha: number): string {
 
 function InvitationCard({
   frame,
+  box,
+  contentScale,
   children,
 }: {
   frame: OpeningFrame;
+  /** The card's own box in artboard units, so it lands exactly on the page. */
+  box: { width: number; height: number };
+  /** Converts page pixels into artboard units. */
+  contentScale: number;
   children: ReactNode;
 }) {
   const style: CSSProperties = {
+    position: "absolute",
+    left: (DESIGN_WIDTH - box.width) / 2,
+    top: (DESIGN_HEIGHT - box.height) / 2,
+    width: box.width,
+    height: box.height,
     transform: `translate3d(0, ${frame.cardOffsetY}px, 0) scale(${frame.cardScale}) rotate(${frame.cardRotate}deg)`,
     borderRadius: frame.cardRadius,
     boxShadow: `0 ${Math.round(30 - frame.card * 24)}px ${Math.round(
@@ -93,8 +106,21 @@ function InvitationCard({
   };
 
   return (
-    <div className="absolute inset-0 overflow-hidden" style={style} data-opening-card>
-      {children}
+    <div
+      className="absolute overflow-hidden"
+      style={style}
+      data-opening-card
+    >
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          transform: `scale(${contentScale})`,
+          transformOrigin: "top left",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -1039,6 +1065,18 @@ export function OpeningStage({
 }: OpeningStageProps) {
   const preset = openingPresetOf(opening.experience) ?? "fade";
   const duration = openingRunDuration(opening.duration);
+  // The opening is composed on the classic artboard and centred inside the
+  // page's own frame, so a landscape or story invitation still opens with the
+  // same proportions and hands over to the journey without a jump.
+  const size = pageSizeOf(page);
+  const artScale = Math.max(
+    size.width / DESIGN_WIDTH,
+    size.height / DESIGN_HEIGHT,
+  );
+  const cardBox = {
+    width: size.width / artScale,
+    height: size.height / artScale,
+  };
   const [phase, setPhase] = useState<"idle" | "playing">("idle");
   const [progress, setProgress] = useState(0);
   const [scale, setScale] = useState(0);
@@ -1053,13 +1091,13 @@ export function OpeningStage({
   useEffect(() => {
     const node = stageRef.current;
     if (!node) return;
-    const measure = () => setScale(node.clientWidth / DESIGN_WIDTH);
+    const measure = () => setScale(node.clientWidth / size.width);
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [size.width]);
 
   const finish = () => {
     if (finishedRef.current) return;
@@ -1123,6 +1161,9 @@ export function OpeningStage({
   const welcome = personalize(opening.welcome, guestName);
   const palette: Palette = { accent, background, ink };
   const pageBackground = page?.background ?? background;
+  // Tints and translucent plates need one flat colour; a saved wash cannot be
+  // tinted, so those surfaces fall back to the studio ivory.
+  const pageTint = flatBackgroundOf(pageBackground);
   const titleElement = page?.elements.find(
     (element) => element.kind === "text" && element.font,
   );
@@ -1156,7 +1197,15 @@ export function OpeningStage({
       ),
     [guestName, imageUrls, page, reducedMotion, rtl, settledTime],
   );
-  const card = <InvitationCard frame={frame}>{cardContent}</InvitationCard>;
+  const card = (
+    <InvitationCard
+      frame={frame}
+      box={cardBox}
+      contentScale={1 / artScale}
+    >
+      {cardContent}
+    </InvitationCard>
+  );
 
   let scene: ReactNode;
   switch (preset) {
@@ -1261,7 +1310,7 @@ export function OpeningStage({
                 ink,
                 0.94,
               )} 72%)`
-            : background,
+            : pageBackground,
         color: ink,
       }}
       role="dialog"
@@ -1271,8 +1320,8 @@ export function OpeningStage({
       <div
         className="absolute left-0 top-0 origin-top-left"
         style={{
-          width: DESIGN_WIDTH,
-          height: DESIGN_HEIGHT,
+          width: size.width,
+          height: size.height,
           transform: `scale(${scale || 0.0001})`,
           visibility: scale ? "visible" : "hidden",
         }}
@@ -1281,7 +1330,18 @@ export function OpeningStage({
           aria-hidden
           className="paper-grain pointer-events-none absolute inset-0 opacity-[0.06] mix-blend-multiply"
         />
-        {scene}
+        <div
+          className="absolute left-0 top-0 origin-top-left"
+          style={{
+            width: DESIGN_WIDTH,
+            height: DESIGN_HEIGHT,
+            transform: `translate(${(size.width - DESIGN_WIDTH * artScale) / 2}px, ${
+              (size.height - DESIGN_HEIGHT * artScale) / 2
+            }px) scale(${artScale})`,
+          }}
+        >
+          {scene}
+        </div>
       </div>
 
       {phase === "idle" && !reducedMotion ? (
@@ -1317,7 +1377,7 @@ export function OpeningStage({
           style={{
             borderColor: rgba(ink, 0.28),
             color: ink,
-            background: rgba(pageBackground, 0.78),
+            background: rgba(pageTint, 0.78),
             opacity: 0.8,
           }}
         >

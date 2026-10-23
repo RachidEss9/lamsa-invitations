@@ -2,9 +2,8 @@ import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import {
-  DESIGN_HEIGHT,
-  DESIGN_WIDTH,
   pageTransitionStyle,
+  pageSizeOf,
   timelineDuration,
   visiblePages,
   type DesignDocument,
@@ -65,22 +64,23 @@ export function GuestExperience({
   );
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0);
+  const page = pages[Math.min(pageIndex, pages.length - 1)];
+  const pageSize = pageSizeOf(page ?? null);
 
   useLayoutEffect(() => {
     const node = stageRef.current;
     if (!node) return;
-    const measure = () => setScale(node.clientWidth / DESIGN_WIDTH);
+    const measure = () => setScale(node.clientWidth / pageSize.width);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [pageSize.width]);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [transition, setTransition] = useState(1);
   const [reducedClosingReady, setReducedClosingReady] = useState(false);
-  const page = pages[Math.min(pageIndex, pages.length - 1)];
   const duration = timelineDuration(page);
 
   useEffect(() => {
@@ -205,7 +205,7 @@ export function GuestExperience({
           className="relative overflow-hidden shadow-[0_40px_120px_rgba(0,0,0,0.6)]"
           style={{
             width: stageWidth,
-            aspectRatio: `${DESIGN_WIDTH} / ${DESIGN_HEIGHT}`,
+            aspectRatio: `${pageSize.width} / ${pageSize.height}`,
             maxHeight: "calc(100vh - 170px)",
           }}
         >
@@ -219,8 +219,8 @@ export function GuestExperience({
               <div
                 className="absolute left-0 top-0 origin-top-left"
                 style={{
-                  width: DESIGN_WIDTH,
-                  height: DESIGN_HEIGHT,
+                  width: pageSize.width,
+                  height: pageSize.height,
                   transform: `scale(${scale || 0.0001})`,
                   visibility: scale ? "visible" : "hidden",
                 }}

@@ -1,6 +1,6 @@
 import { useStudio } from "@/components/auth/studio-context";
 import { BrandLink } from "@/components/brand/Wordmark";
-import { CreateInvitationDialog } from "@/components/dashboard/CreateInvitationDialog";
+import { CreateInvitationDialog, type CreateTarget } from "@/components/dashboard/CreateInvitationDialog";
 import { InvitationCard } from "@/components/dashboard/InvitationCard";
 import {
   InvitationPreview,
@@ -30,13 +30,13 @@ import type { Id } from "@/convex/_generated/dataModel";
 import {
   GALLERY_FILTERS,
   GALLERY_PAGE_SIZE,
-  blankInvitationContent,
   RECENT_COUNT,
   filterGallery,
   formatEdited,
   galleryCounts,
   invitationTitle,
   recentCreations,
+  scratchInvitation,
   type GalleryFilter,
   type GalleryItem,
 } from "@/lib/dashboard";
@@ -150,7 +150,6 @@ export default function Dashboard() {
   const latest = recent[0] ?? null;
   const second = recent[1] ?? null;
   const initialTemplate = searchParams.get("template");
-  const blankContent = useMemo(() => blankInvitationContent(), []);
   const filteredByHand =
     filter !== "all" || deferredQuery.trim().length > 0;
 
@@ -176,22 +175,26 @@ export default function Dashboard() {
     }
   };
 
-  const handleCreate = async (selection: string) => {
+  const handleCreate = async (target: CreateTarget) => {
     setCreating(true);
     try {
-      const content =
-        selection === "blank"
-          ? blankContent
-          : draftFromTemplate(selection);
-      const design = createDefaultDesign(content);
+      const next =
+        target.kind === "scratch"
+          ? scratchInvitation(target.input)
+          : {
+              content: draftFromTemplate(target.templateId),
+              design: createDefaultDesign(
+                draftFromTemplate(target.templateId),
+              ),
+            };
       const id = await createInvitation({
-        ...content,
-        design,
+        ...next.content,
+        design: next.design,
       });
       closeCreate();
       toast.success(
-        selection === "blank"
-          ? "Blank invitation created."
+        target.kind === "scratch"
+          ? "Your blank canvas is ready."
           : "Invitation created from the collection.",
       );
       navigate(`/studio/${id}`);

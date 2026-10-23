@@ -228,11 +228,222 @@ export interface DesignPage {
   elements: DesignElement[];
   /** Hidden pages stay editable here but are skipped by the guest run. */
   hidden?: boolean;
+  /**
+   * Canvas geometry in design units (CSS pixels). Older documents do not have
+   * these fields and keep the studio's 1000 × 1333 default, so every saved
+   * invitation keeps the exact page it was designed on.
+   */
+  width?: number;
+  height?: number;
+  /** Safe margin from each edge, in design units. Used by guides and print. */
+  margin?: number;
+  /** Bleed beyond the trim edge, in design units. */
+  bleed?: number;
+  /** Paper surface printed under the artwork. */
+  texture?: PageTextureId;
 }
+
+export type PageTextureId = "none" | "cotton" | "linen" | "fibre";
+
+export const PAGE_TEXTURES: { id: PageTextureId; label: string; note: string }[] = [
+  { id: "none", label: "Smooth", note: "No grain, a clean printed surface" },
+  { id: "cotton", label: "Cotton", note: "Soft mottled fibre, like cotton stock" },
+  { id: "linen", label: "Linen", note: "A fine woven weave" },
+  { id: "fibre", label: "Raw fibre", note: "Handmade paper with visible flecks" },
+];
 
 export function visiblePages(design: DesignDocument): DesignPage[] {
   const shown = design.pages.filter((page) => !page.hidden);
   return shown.length > 0 ? shown : design.pages.slice(0, 1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page geometry                                                              */
+/* -------------------------------------------------------------------------- */
+
+export type DesignUnit = "mm" | "cm" | "px" | "in";
+
+export const DESIGN_UNITS: { id: DesignUnit; label: string; note: string }[] = [
+  { id: "mm", label: "mm", note: "Millimetres, for print" },
+  { id: "cm", label: "cm", note: "Centimetres, for print" },
+  { id: "in", label: "in", note: "Inches, for cards and stationery" },
+  { id: "px", label: "px", note: "Pixels, for screens and stories" },
+];
+
+/** The canvas is measured in CSS pixels: 96 of them to the inch, always. */
+export const PX_PER_UNIT: Record<DesignUnit, number> = {
+  mm: 96 / 25.4,
+  cm: 96 / 2.54,
+  in: 96,
+  px: 1,
+};
+
+/** Physical measurement → canvas units. */
+export function toDesignPx(value: number, unit: DesignUnit): number {
+  return value * PX_PER_UNIT[unit];
+}
+
+/** Canvas units → physical measurement, for the labels shown next to them. */
+export function fromDesignPx(value: number, unit: DesignUnit): number {
+  return value / PX_PER_UNIT[unit];
+}
+
+export interface PageSize {
+  width: number;
+  height: number;
+}
+
+/** The page's real size, falling back to the classic studio card. */
+export function pageSizeOf(page?: Pick<DesignPage, "width" | "height"> | null): PageSize {
+  const width = Number(page?.width) > 0 ? Number(page?.width) : DESIGN_WIDTH;
+  const height = Number(page?.height) > 0 ? Number(page?.height) : DESIGN_HEIGHT;
+  return { width, height };
+}
+
+export function pageAspectOf(page?: Pick<DesignPage, "width" | "height"> | null): number {
+  const { width, height } = pageSizeOf(page);
+  return width / height;
+}
+
+/** A page background may be a flat colour or a saved CSS wash. */
+export function isGradientBackground(value: string): boolean {
+  return /gradient\(/i.test(value);
+}
+
+/** Backgrounds the renderer can draw: a flat colour, or a wash as its image. */
+export function pageBackgroundStyle(
+  background: string | undefined,
+): CSSProperties {
+  const value = background || "#fbfaf7";
+  return isGradientBackground(value)
+    ? { backgroundImage: value, backgroundColor: "#ffffff" }
+    : { backgroundColor: value };
+}
+
+/**
+ * A single flat colour for a surface that has to sit behind something else
+ * (a translucent plate, a tinted shadow). A wash cannot be tinted, so it falls
+ * back to the studio ivory rather than producing an invalid colour.
+ */
+export function flatBackgroundOf(
+  background: string | undefined,
+  fallback = "#f4f3ef",
+): string {
+  const value = (background || "").trim();
+  if (!value) return fallback;
+  return isGradientBackground(value) ? fallback : value;
+}
+
+export interface SizePreset {
+  id: string;
+  label: string;
+  note: string;
+  unit: DesignUnit;
+  width: number;
+  height: number;
+}
+
+/** The formats a host actually reaches for, in the unit they are sold in. */
+export const SIZE_PRESETS: SizePreset[] = [
+  { id: "studio", label: "Studio portrait", note: "The classic LAMSA card", unit: "px", width: 1000, height: 1333.33 },
+  { id: "5x7", label: "5 × 7 in", note: "The standard mailed invitation", unit: "in", width: 5, height: 7 },
+  { id: "7x5", label: "7 × 5 in", note: "Landscape card, portrait envelope", unit: "in", width: 7, height: 5 },
+  { id: "a5", label: "A5", note: "148 × 210 mm", unit: "mm", width: 148, height: 210 },
+  { id: "a6", label: "A6", note: "105 × 148 mm, RSVP size", unit: "mm", width: 105, height: 148 },
+  { id: "square", label: "Square", note: "150 × 150 mm favour card", unit: "mm", width: 150, height: 150 },
+  { id: "story", label: "Mobile story", note: "1080 × 1920 px for screens", unit: "px", width: 1080, height: 1920 },
+  { id: "custom", label: "Custom", note: "Your own width and height", unit: "px", width: 1000, height: 1333.33 },
+];
+
+export function sizePresetById(id: string): SizePreset {
+  return SIZE_PRESETS.find((preset) => preset.id === id) ?? SIZE_PRESETS[0];
+}
+
+/**
+ * Resizes a page. The host always chooses what happens to the artwork, because
+ * silently stretching a finished invitation is how designs get ruined:
+ *
+ * - `scale`    — artwork is stretched to the new page exactly (may distort).
+ * - `fit`      — artwork keeps its proportions and is centred to fit.
+ * - `preserve` — every number is left alone; only the page edge moves.
+ */
+export type PageResizeMode = "scale" | "fit" | "preserve";
+
+export const PAGE_RESIZE_MODES: {
+  id: PageResizeMode;
+  label: string;
+  note: string;
+}[] = [
+  { id: "fit", label: "Fit to page", note: "Keeps proportions, scales and centres everything" },
+  { id: "scale", label: "Stretch to page", note: "Fills the new size exactly, may distort" },
+  { id: "preserve", label: "Keep artwork size", note: "Only the page changes; layers stay as they are" },
+];
+
+function scaleElement(
+  element: DesignElement,
+  sx: number,
+  sy: number,
+  uniform: number,
+): DesignElement {
+  const next: DesignElement = {
+    ...element,
+    x: element.x * sx,
+    y: element.y * sy,
+    w: element.w * sx,
+    h: element.h * sy,
+  };
+  if (element.fontSize != null) next.fontSize = Math.max(4, element.fontSize * uniform);
+  if (element.strokeWidth != null) next.strokeWidth = Math.max(0.1, element.strokeWidth * uniform);
+  if (element.radius != null) next.radius = element.radius * uniform;
+  if (element.textBorderWidth != null) next.textBorderWidth = element.textBorderWidth * uniform;
+  if (element.textPadding != null) next.textPadding = element.textPadding * uniform;
+  return next;
+}
+
+export function resizePage(
+  page: DesignPage,
+  size: PageSize,
+  mode: PageResizeMode,
+): DesignPage {
+  const current = pageSizeOf(page);
+  const width = Math.max(40, Math.round(size.width * 100) / 100);
+  const height = Math.max(40, Math.round(size.height * 100) / 100);
+  if (width === current.width && height === current.height) {
+    return { ...page, width, height };
+  }
+  if (mode === "preserve") {
+    return { ...page, width, height };
+  }
+  const sx = width / current.width;
+  const sy = height / current.height;
+  if (mode === "scale") {
+    return {
+      ...page,
+      width,
+      height,
+      elements: page.elements.map((element) => scaleElement(element, sx, sy, (sx + sy) / 2)),
+    };
+  }
+  const uniform = Math.min(sx, sy);
+  const offsetX = (width - current.width * uniform) / 2;
+  const offsetY = (height - current.height * uniform) / 2;
+  return {
+    ...page,
+    width,
+    height,
+    elements: page.elements.map((element) => {
+      const scaled = scaleElement(element, uniform, uniform, uniform);
+      return { ...scaled, x: scaled.x + offsetX, y: scaled.y + offsetY };
+    }),
+  };
+}
+
+/**
+ * The scale new layers should be created at, so default type on a 397 px A6
+ * card is the same proportion as it is on the classic 1000 px canvas.
+ */
+export function canvasScaleFor(page?: Pick<DesignPage, "width" | "height"> | null): number {
+  return pageSizeOf(page).width / DESIGN_WIDTH;
 }
 
 export type OpeningExperienceId =
@@ -339,7 +550,26 @@ export interface DesignDocument {
   opening: OpeningSettings;
   closing: ClosingSettings;
   transition: PageTransition;
+  /**
+   * The physical brief the design was created under: what the host asked for
+   * when they started from scratch. Print and PDF read it as their starting
+   * point; the canvas still owns the geometry.
+   */
+  format?: DesignFormat;
   startedAt?: number;
+}
+
+export type DesignOutput = "digital" | "print" | "both";
+
+export interface DesignFormat {
+  output: DesignOutput;
+  unit: DesignUnit;
+  /** Physical size exactly as entered, in `unit`. */
+  width: number;
+  height: number;
+  /** Safe margin and bleed, in `unit`. */
+  margin: number;
+  bleed: number;
 }
 
 export interface StylePreset {
@@ -779,6 +1009,79 @@ function textElement(
  * is what turns an older card into an editable canvas without losing any of
  * its content: every field becomes its own element.
  */
+export interface BlankDesignOptions {
+  width?: number;
+  height?: number;
+  background?: string;
+  pages?: number;
+  margin?: number;
+  bleed?: number;
+  texture?: PageTextureId;
+  output?: DesignOutput;
+  unit?: DesignUnit;
+  /** The physical brief, in `unit`, kept for print and PDF. */
+  physicalWidth?: number;
+  physicalHeight?: number;
+  opening?: Partial<OpeningSettings>;
+  closing?: Partial<ClosingSettings>;
+  transition?: Partial<PageTransition>;
+}
+
+/**
+ * A genuinely empty canvas: no sample words, no border, no layers at all.
+ * Everything a host does next — text, shapes, images, ornaments — is their own
+ * work on their own page size.
+ */
+export function createBlankDesign(
+  options: BlankDesignOptions = {},
+): DesignDocument {
+  const width = Math.max(40, Math.round(options.width ?? DESIGN_WIDTH));
+  const height = Math.max(40, Math.round(options.height ?? DESIGN_HEIGHT));
+  const pageCount = Math.max(1, Math.min(20, Math.round(options.pages ?? 1)));
+  const background = options.background || "#fbfaf7";
+  const unit = options.unit ?? "px";
+  const pages: DesignPage[] = Array.from({ length: pageCount }, (_, index) => ({
+    id: makeId("page"),
+    name: pageCount === 1 ? "Invitation" : `Page ${index + 1}`,
+    background,
+    elements: [],
+    width,
+    height,
+    margin: options.margin ?? 0,
+    bleed: options.bleed ?? 0,
+    texture: options.texture ?? "none",
+  }));
+  const format: DesignFormat = {
+    output: options.output ?? "digital",
+    unit,
+    width: options.physicalWidth ?? fromDesignPx(width, unit),
+    height: options.physicalHeight ?? fromDesignPx(height, unit),
+    margin: options.margin ?? 0,
+    bleed: options.bleed ?? 0,
+  };
+  return {
+    version: 1,
+    pages,
+    opening: {
+      experience: "none",
+      duration: 2600,
+      autoOpen: false,
+      welcome: "For {{guest}}",
+      ...options.opening,
+    },
+    closing: {
+      enabled: false,
+      style: "message",
+      message: "",
+      duration: 1800,
+      ...options.closing,
+    },
+    transition: { preset: "fade", duration: 700, ...options.transition },
+    format,
+    startedAt: Date.now(),
+  };
+}
+
 export function createDefaultDesign(content: InvitationContent): DesignDocument {
   const paired = isPairedOccasion(content.occasion);
   const accent = content.palette.accent;
@@ -1071,6 +1374,15 @@ export function normalizeDesign(
         name: page.name || `Page ${index + 1}`,
         background: page.background || fallback.pages[0].background,
         hidden: Boolean(page.hidden),
+        // A page keeps the exact geometry it was saved with. Missing fields
+        // mean the classic 1000 × 1333 card, never a resize.
+        width: Number(page.width) > 0 ? Number(page.width) : undefined,
+        height: Number(page.height) > 0 ? Number(page.height) : undefined,
+        margin: page.margin != null ? Math.max(0, Number(page.margin)) : undefined,
+        bleed: page.bleed != null ? Math.max(0, Number(page.bleed)) : undefined,
+        texture: PAGE_TEXTURES.some((texture) => texture.id === page.texture)
+          ? page.texture
+          : undefined,
         elements,
       };
     }),
@@ -1087,6 +1399,7 @@ export function normalizeDesign(
       ...fallback.transition,
       ...(value.transition ?? {}),
     },
+    format: value.format,
     startedAt: value.startedAt,
   };
 }

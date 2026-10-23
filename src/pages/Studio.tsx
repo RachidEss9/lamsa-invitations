@@ -40,10 +40,15 @@ import {
   applyStylePreset,
   clipsForPage,
   defaultAnimation,
+  DESIGN_HEIGHT,
+  DESIGN_WIDTH,
   duplicateElements,
   makeElement,
   makeId,
   normalizeDesign,
+  pageSizeOf,
+  resizePage,
+  PAGE_RESIZE_MODES,
   SHAPES,
   timelineDuration,
   type ClosingSettings,
@@ -52,6 +57,7 @@ import {
   type DesignPage,
   type ElementAnimation,
   type OpeningSettings,
+  type PageResizeMode,
   type StylePreset,
 } from "@/lib/design";
 import {
@@ -283,6 +289,8 @@ export default function Studio() {
   // True while a text layer is being edited on the canvas. Delete is disabled
   // then, so a careless Backspace can never destroy the layer being typed into.
   const [canvasEditing, setCanvasEditing] = useState(false);
+  const [resizeMode, setResizeMode] = useState<PageResizeMode>("fit");
+  const [sizeDraft, setSizeDraft] = useState({ width: DESIGN_WIDTH, height: DESIGN_HEIGHT });
 
   const pastRef = useRef<DesignDocument[]>([]);
   const futureRef = useRef<DesignDocument[]>([]);
@@ -590,6 +598,46 @@ export default function Studio() {
       }));
     },
     [apply, pageIndex],
+  );
+
+  // The size fields follow the page they belong to until the host types.
+  const currentSize = pageSizeOf(page);
+  const [sizeTouched, setSizeTouched] = useState(false);
+  const sizeDraftValue = sizeTouched ? sizeDraft : currentSize;
+
+  const applyCanvasSize = useCallback(
+    (target = sizeDraftValue) => {
+      apply((current) => ({
+        ...current,
+        pages: current.pages.map((candidate, index) =>
+          index === pageIndex
+            ? resizePage(candidate, target, resizeMode)
+            : candidate,
+        ),
+      }));
+      setSizeTouched(false);
+      setSizeDraft(target);
+      toast.success(
+        resizeMode === "preserve"
+          ? "Page resized. Your layers are untouched."
+          : `Page resized — artwork ${resizeMode === "fit" ? "fitted" : "stretched"}.`,
+      );
+    },
+    [apply, pageIndex, resizeMode, sizeDraftValue],
+  );
+
+  const setDeviceCanvasSize = useCallback(
+    (orientation: "portrait" | "landscape") => {
+      const source = sizeDraftValue;
+      const next =
+        orientation === "portrait"
+          ? { width: Math.min(source.width, source.height), height: Math.max(source.width, source.height) }
+          : { width: Math.max(source.width, source.height), height: Math.min(source.width, source.height) };
+      setSizeDraft(next);
+      setSizeTouched(true);
+      applyCanvasSize(next);
+    },
+    [applyCanvasSize, sizeDraftValue],
   );
 
   const addElement = (element: DesignElement) => {
@@ -2225,6 +2273,106 @@ export default function Studio() {
             />
           </label>
         </div>
+        <div className="border-t border-ink/12 p-3">
+          <p className="mb-1 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/40">
+            Canvas size
+          </p>
+          <p className="mb-2 text-[10px] leading-relaxed text-ink/45">
+            This page is {Math.round(currentSize.width)} ×{" "}
+            {Math.round(currentSize.height)} design units. Change it below — the
+            artwork is never touched until you choose how it should follow.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[10px] text-ink/55">Width</span>
+              <Input
+                type="number"
+                min={40}
+                value={Math.round(sizeDraftValue.width)}
+                onChange={(event) => {
+                  setSizeTouched(true);
+                  setSizeDraft((current) => ({
+                    ...current,
+                    width: Math.max(40, Number(event.target.value) || 40),
+                    height: current.height,
+                  }));
+                }}
+                className="h-8 rounded-none text-[11px]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] text-ink/55">Height</span>
+              <Input
+                type="number"
+                min={40}
+                value={Math.round(sizeDraftValue.height)}
+                onChange={(event) => {
+                  setSizeTouched(true);
+                  setSizeDraft((current) => ({
+                    ...current,
+                    height: Math.max(40, Number(event.target.value) || 40),
+                  }));
+                }}
+                className="h-8 rounded-none text-[11px]"
+              />
+            </label>
+          </div>
+          <div className="mt-2 flex gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 flex-1 rounded-none text-[10px]"
+              onClick={() => setDeviceCanvasSize("portrait")}
+            >
+              Portrait
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 flex-1 rounded-none text-[10px]"
+              onClick={() => setDeviceCanvasSize("landscape")}
+            >
+              Landscape
+            </Button>
+          </div>
+          <p className="mt-3 mb-1 text-[10px] text-ink/55">On resize</p>
+          <div className="grid gap-1">
+            {PAGE_RESIZE_MODES.map((mode) => (
+              <label
+                key={mode.id}
+                className={cn(
+                  "flex cursor-pointer items-start gap-2 border p-2",
+                  resizeMode === mode.id
+                    ? "border-[var(--red)] bg-[var(--red)]/5"
+                    : "border-ink/12 hover:border-ink/40",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="resize-mode"
+                  className="mt-0.5"
+                  checked={resizeMode === mode.id}
+                  onChange={() => setResizeMode(mode.id)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-medium text-ink/75">
+                    {mode.label}
+                  </span>
+                  <span className="block text-[9px] leading-snug text-ink/45">
+                    {mode.note}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <Button
+            type="button"
+            className="mt-3 h-8 w-full rounded-none text-[10px] uppercase tracking-[0.12em]"
+            onClick={() => applyCanvasSize()}
+          >
+            Resize this page
+          </Button>
+        </div>
       </>
     );
   };
@@ -2560,7 +2708,10 @@ export default function Studio() {
                   )}
                   aria-label={`Page ${index + 1}: ${candidate.name}`}
                 >
-                  <DesignStage>
+                  <DesignStage
+                    width={candidate.width}
+                    height={candidate.height}
+                  >
                     {() => (
                       <DesignPageView
                         page={candidate}

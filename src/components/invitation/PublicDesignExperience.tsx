@@ -1,9 +1,8 @@
 import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, useStageScale } from "@/components/invitation/DesignPageView";
 import {
-  DESIGN_HEIGHT,
-  DESIGN_WIDTH,
   pageTransitionStyle,
+  pageSizeOf,
   timelineDuration,
   visiblePages,
   type DesignDocument,
@@ -52,9 +51,10 @@ export function PublicDesignExperience({
   );
   const [reducedClosingReady, setReducedClosingReady] = useState(false);
   const timeRef = useRef(0);
-  const { ref, scale } = useStageScale();
-
   const page = pages[Math.min(pageIndex, pages.length - 1)];
+  const pageSize = pageSizeOf(page ?? null);
+  const { ref, scale } = useStageScale(pageSize.width);
+
   const duration = timelineDuration(page);
   const lastPage = pageIndex === pages.length - 1;
 
@@ -190,13 +190,13 @@ export function PublicDesignExperience({
       <div
         ref={ref}
         className="relative w-full overflow-hidden bg-[var(--paper-light)] shadow-[0_30px_80px_rgba(22,22,22,0.2)]"
-        style={{ aspectRatio: `${DESIGN_WIDTH} / ${DESIGN_HEIGHT}` }}
+        style={{ aspectRatio: `${pageSize.width} / ${pageSize.height}` }}
       >
         <div
           className="absolute left-0 top-0 origin-top-left"
           style={{
-            width: DESIGN_WIDTH,
-            height: DESIGN_HEIGHT,
+            width: pageSize.width,
+            height: pageSize.height,
             transform: `scale(${scale || 0.0001})`,
             visibility: scale ? "visible" : "hidden",
           }}
