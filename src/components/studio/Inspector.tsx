@@ -63,6 +63,9 @@ interface InspectorProps {
   onLayer: (action: "up" | "down" | "front" | "back") => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /** Delete is disabled when nothing deletable is selected (or while typing). */
+  deleteDisabled?: boolean;
+  deleteHint?: string;
   onGroup: () => void;
   onUngroup: () => void;
   onUploadImage: (file: File) => Promise<void>;
@@ -215,6 +218,8 @@ export function Inspector({
   onLayer,
   onDuplicate,
   onDelete,
+  deleteDisabled = false,
+  deleteHint,
   onGroup,
   onUngroup,
   onUploadImage,
@@ -247,7 +252,7 @@ export function Inspector({
           <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
             Page
           </p>
-          <h2 className="mt-1 font-display text-xl leading-tight">{page.name}</h2>
+          <h2 className="mt-1 font-ui text-xl font-semibold leading-tight tracking-[-0.015em]">{page.name}</h2>
           <p className="mt-1 text-[10px] text-ink/45">
             {page.elements.length} layer{page.elements.length === 1 ? "" : "s"}
           </p>
@@ -283,7 +288,7 @@ export function Inspector({
           <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
             Selection
           </p>
-          <h2 className="mt-1 font-display text-xl leading-tight">
+          <h2 className="mt-1 font-ui text-xl font-semibold leading-tight tracking-[-0.015em]">
             {selected.length} layers
           </h2>
         </div>
@@ -328,7 +333,14 @@ export function Inspector({
             <Button type="button" variant="outline" className="h-8 rounded-none text-[10px]" onClick={onDuplicate}>
               <Copy className="size-3.5" /> Duplicate
             </Button>
-            <Button type="button" variant="outline" className="h-8 rounded-none text-[10px]" onClick={onDelete}>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 rounded-none text-[10px]"
+              onClick={onDelete}
+              disabled={deleteDisabled}
+              title={deleteDisabled ? deleteHint : "Delete selected layers"}
+            >
               <Trash2 className="size-3.5" /> Delete
             </Button>
           </div>
@@ -348,7 +360,7 @@ export function Inspector({
         <Input
           value={element.name}
           onChange={(event) => patch({ name: event.target.value })}
-          className="mt-1 h-8 border-none bg-transparent px-0 font-display text-lg shadow-none focus-visible:ring-0"
+          className="mt-1 h-8 border-none bg-transparent px-0 font-ui text-lg font-semibold shadow-none focus-visible:ring-0"
           aria-label="Layer name"
         />
       </div>
@@ -951,11 +963,18 @@ export function Inspector({
         )}
       </Section>
 
-      <div className="mt-auto grid grid-cols-2 gap-1 border-t border-ink/12 p-3">
-        <Button type="button" variant="outline" className="h-8 rounded-none text-[10px]" onClick={onDuplicate}>
+      <div className="sticky bottom-0 mt-auto grid grid-cols-2 gap-1 border-t border-ink/12 bg-[var(--paper-light)] p-3">
+        <Button type="button" variant="outline" className="h-9 rounded-none text-[10px] uppercase tracking-[0.1em]" onClick={onDuplicate}>
           <Copy className="size-3.5" /> Duplicate
         </Button>
-        <Button type="button" variant="outline" className="h-8 rounded-none text-[10px]" onClick={onDelete}>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 rounded-none border-[var(--red)]/40 text-[10px] uppercase tracking-[0.1em] text-[var(--red)] hover:border-[var(--red)] hover:bg-[var(--red)] hover:text-[#f2f1ed]"
+          onClick={onDelete}
+          disabled={deleteDisabled}
+          title={deleteDisabled ? deleteHint : "Delete this layer (⌫)"}
+        >
           <Trash2 className="size-3.5" /> Delete
         </Button>
       </div>

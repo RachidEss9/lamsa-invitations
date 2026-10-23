@@ -58,8 +58,11 @@
      licensed webfonts are present; until then it falls back to the open display
      stacks above. Invitation design fonts are configured separately (invitation). */
   --font-display: "Sorgena", "Bodoni Moda", "Instrument Serif", "Cormorant Garamond", "Times New Roman", serif;
-  --font-ui: "Montserrat Variable", "Montserrat", system-ui, Helvetica, Arial, sans-serif;
-  --font-ui-fallback: "Archivo", system-ui, Helvetica, Arial, sans-serif;
+  /* Montserrat is the application interface face: navigation, buttons,
+     dialogs, panels, labels, menus and dashboard headings. Arabic interface
+     text falls through to a readable Arabic stack; no fallback is blank. */
+  --font-ui: "Montserrat Variable", "Montserrat", "Noto Sans Arabic", "Segoe UI", Tahoma, "Geeza Pro", system-ui, Helvetica, Arial, sans-serif;
+  --font-ui-fallback: "Segoe UI", Tahoma, "Geeza Pro", system-ui, Helvetica, Arial, sans-serif;
   --font-script: "Pinyon Script", "Snell Roundhand", cursive;
   --font-arabic: "Amiri", serif;
   --font-meta: "Space Mono", ui-monospace, monospace;
@@ -73,46 +76,48 @@
 :root {
   --radius: 0px;
   /* Soft Pearl + Obsidian Black, with Crimson Depth as the only primary ink. */
-  --background: #f2f1ed;
-  --foreground: #161616;
-  --card: #f7f6f2;
-  --card-foreground: #161616;
-  --popover: #f7f6f2;
+  --background: #f4f3ef;
+  --foreground: #151515;
+  --card: #fbfaf7;
+  --card-foreground: #151515;
+  --popover: #fbfaf7;
   --popover-foreground: #161616;
   --primary: #710014;
   --primary-foreground: #f2f1ed;
-  --secondary: #e9e7e1;
-  --secondary-foreground: #161616;
-  --muted: #e9e7e1;
+  --secondary: #eae8e2;
+  --secondary-foreground: #151515;
+  --muted: #eae8e2;
   --muted-foreground: #6a665e;
   --accent: #eae6db;
   --accent-foreground: #161616;
   --destructive: #8f1a2b;
-  --border: #dcd9cf;
-  --input: #d2cec2;
+  --border: #e0ddd4;
+  --input: #d4d0c6;
   --ring: #b38f6f;
   --chart-1: #710014;
   --chart-2: #b38f6f;
   --chart-3: #a3182f;
   --chart-4: #5f5b53;
   --chart-5: #161616;
-  --sidebar: #f2f1ed;
-  --sidebar-foreground: #161616;
+  --sidebar: #fbfaf7;
+  --sidebar-foreground: #151515;
   --sidebar-primary: #710014;
   --sidebar-primary-foreground: #f2f1ed;
-  --sidebar-accent: #e9e7e1;
-  --sidebar-accent-foreground: #161616;
-  --sidebar-border: #dcd9cf;
+  --sidebar-accent: #eae8e2;
+  --sidebar-accent-foreground: #151515;
+  --sidebar-border: #e0ddd4;
   --sidebar-ring: #b38f6f;
 
-  /* Working inks used across the app. */
-  --paper: #f2f1ed;
-  --paper-deep: #e9e6dc;
-  --paper-light: #f7f6f2;
-  --ink: #161616;
+  /* Working inks used across the app. Quiet, high-contrast surfaces with one
+     crimson accent: the LAMSA translation of a premium product page. */
+  --paper: #f4f3ef;
+  --paper-deep: #e9e7e0;
+  --paper-light: #fbfaf7;
+  --ink: #151515;
   --ink-soft: #6a665e;
-  --rule: #dcd9cf;
+  --rule: #e0ddd4;
   --red: #710014;
+  --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
   /* A deeper sand for status text: the brand sand alone is decorative. */
   --olive: #6d5539;
   --gold: #b38f6f;
@@ -171,15 +176,24 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-ui);
-    font-feature-settings: "ss01" on, "cv05" on;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+  /* Interface headings are Montserrat, tight and confident. Invitation design
+     typography is rendered inside the canvas from each layer's own font and is
+     never governed by these rules. */
   h1,
   h2,
   h3 {
-    font-family: var(--font-display);
-    font-weight: 400;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
   }
   ::selection {
     background: var(--red);
@@ -188,6 +202,12 @@
   :focus-visible {
     outline: 2px solid var(--red);
     outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lift:hover {
+      transform: none;
+      box-shadow: none;
+    }
   }
   button:not([disabled]),
   [role="button"]:not([disabled]) {
@@ -253,6 +273,23 @@
   }
   .editorial-shadow {
     box-shadow: 4px 4px 0 0 rgba(23, 22, 15, 0.16);
+  }
+  /* Soft, barely-there elevation for interface surfaces, and a measured lift on
+     hover. Motion is feedback, never decoration, and it stops entirely when the
+     guest or host prefers reduced motion. */
+  .surface {
+    background: var(--paper-light);
+    border: 1px solid color-mix(in oklab, var(--ink) 10%, transparent);
+  }
+  .lift {
+    transition:
+      transform 0.35s var(--ease-premium),
+      box-shadow 0.35s var(--ease-premium),
+      border-color 0.35s var(--ease-premium);
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 48px rgba(21, 21, 21, 0.08);
   }
   /* Registration proof: the frame used for live invitation previews. */
   .proof {

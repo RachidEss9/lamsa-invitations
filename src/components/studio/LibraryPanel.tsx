@@ -187,7 +187,7 @@ function TemplateCard({
             style={{ backgroundColor: template.palette.accent }}
           />
         </span>
-        <span className="flex-1 truncate font-display text-[13px]">
+        <span className="flex-1 truncate font-ui text-[13px] font-semibold">
           {template.name}
         </span>
       </div>
@@ -240,7 +240,7 @@ function StyleCard({
             style={{ backgroundColor: style.palette.accent }}
           />
         </span>
-        <span className="flex-1 truncate font-display text-[13px]">
+        <span className="flex-1 truncate font-ui text-[13px] font-semibold">
           {style.name}
         </span>
       </div>
@@ -575,7 +575,7 @@ export function LibraryPanel({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[88vh] sm:max-w-[min(920px,calc(100%_-_2rem))] gap-0 overflow-y-auto p-0">
         <DialogHeader className="border-b border-ink/12 px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 font-display text-xl">
+          <DialogTitle className="flex items-center gap-2 font-ui text-xl font-semibold tracking-[-0.01em]">
             <Palette className="size-4 text-[var(--red)]" />
             Libraries
           </DialogTitle>
@@ -772,7 +772,7 @@ export function LibraryPanel({
                     >
                       <div className="flex items-center gap-2">
                         <Film className="size-4 text-[var(--red)]" />
-                        <span className="flex-1 truncate font-display text-[13px]">
+                        <span className="flex-1 truncate font-ui text-[13px] font-semibold">
                           {layout.name}
                         </span>
                       </div>
@@ -834,7 +834,7 @@ export function LibraryPanel({
                       >
                         <div className="flex items-center gap-2.5">
                           <Sparkle className="size-4 text-[var(--red)]" />
-                          <span className="flex-1 truncate font-display text-[13px]">
+                          <span className="flex-1 truncate font-ui text-[13px] font-semibold">
                             {experience.label}
                           </span>
                         </div>

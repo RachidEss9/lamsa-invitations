@@ -1,8 +1,6 @@
 import { api } from "@/convex/_generated/api";
 import { BrandLink, Wordmark } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
-import { OpeningStage } from "@/components/invitation/OpeningStage";
-import { PublicDesignExperience } from "@/components/invitation/PublicDesignExperience";
 import { SequentialInvitation } from "@/components/invitation/SequentialInvitation";
 import { RevealOpening } from "@/components/invitation/RevealOpening";
 import { Button } from "@/components/ui/button";
@@ -29,10 +27,7 @@ import {
   type InvitationContent,
   type Occasion,
 } from "@/lib/invitation";
-import {
-  normalizeDesign,
-  type OpeningExperienceId,
-} from "@/lib/design";
+import { normalizeDesign } from "@/lib/design";
 import { useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
@@ -70,7 +65,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
           <span>LAMSA</span>
         </div>
       </div>
-      <header className="relative z-10 border-b border-ink/15">
+      <header className="sticky top-0 z-30 border-b border-ink/10 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex h-[68px] w-full max-w-[1200px] items-center justify-between px-5 sm:px-8">
           <BrandLink />
           <Link
@@ -83,7 +78,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {children}
-      <footer className="relative z-10 mt-auto border-t border-border/60">
+      <footer className="relative z-10 mt-16 border-t border-border/60">
         <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center justify-between gap-3 px-5 py-6 sm:flex-row sm:px-8">
           <Wordmark className="text-[0.95rem] tracking-[0.2em] text-ink/62" />
           <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-ink/56">
@@ -134,7 +129,7 @@ function Countdown({ target }: { target: Date }) {
     <div className="mt-6 grid grid-cols-3 divide-x divide-ink/15 border-y border-ink/20">
       {cells.map((cell) => (
         <div key={cell.label} className="py-3 text-center">
-          <p className="font-display text-[2rem] leading-none tabular-nums tracking-[-0.01em]">
+          <p className="font-ui text-[2rem] font-semibold leading-none tabular-nums tracking-[-0.03em]">
             {String(cell.value).padStart(2, "0")}
           </p>
           <p className="mt-1.5 font-meta text-[0.46rem] uppercase tracking-[0.14em] text-ink/56">
@@ -184,11 +179,11 @@ export default function InvitationPage() {
   }, [data, guestToken, recordView]);
 
   const savedDesign = data?.design ?? null;
-  const savedOpening = (savedDesign as { opening?: { experience?: OpeningExperienceId } } | null)
-    ?.opening?.experience;
-  const designHasOpening = Boolean(savedOpening && savedOpening !== "none");
+  // Saved designs open inside the sequential journey itself: the journey owns
+  // the cover, the opening animation and the hand-off to the first section. The
+  // legacy cover below is only for invitations saved before the design canvas.
   const coverVisible = savedDesign
-    ? designHasOpening && !reducedMotion && !opened
+    ? false
     : Boolean(data?.animations) && !reducedMotion && !opened;
 
   useEffect(() => {
@@ -375,7 +370,6 @@ export default function InvitationPage() {
       : fontPairById(data.fontPair).family;
   const paired = isPairedOccasion(data.occasion as Occasion);
   const designDoc = data.design ? normalizeDesign(data.design, content) : null;
-  const designOpeningSettings = designDoc?.opening ?? null;
   const designImageUrls = data.designImageUrls ?? {};
 
   const cleanUrl = `${window.location.origin}/i/${data.slug}`;
@@ -481,7 +475,7 @@ export default function InvitationPage() {
               names={displayTitle(content)}
               rtl={Boolean(data.rtl)}
               reducedMotion={reducedMotion}
-              active={opened || !designHasOpening || reducedMotion}
+              active
               accent={data.palette.accent}
               ink={data.palette.ink}
             />
@@ -878,27 +872,7 @@ export default function InvitationPage() {
                 : { backgroundColor: data.palette.ink, color: data.palette.background }
             }
           >
-            {designOpeningSettings && designHasOpening ? (
-              <OpeningStage
-                opening={designOpeningSettings}
-                accent={data.palette.accent}
-                background={data.palette.background}
-                ink={data.palette.ink}
-                guestName={data.guestName}
-                names={
-                  [data.names.primary, data.names.secondary].filter(Boolean).join(" & ") ||
-                  "LAMSA"
-                }
-                autoOpen={designOpeningSettings.autoOpen}
-                reducedMotion={reducedMotion}
-                coverUrl={
-                  designOpeningSettings.coverStorageId
-                    ? designImageUrls[designOpeningSettings.coverStorageId]
-                    : undefined
-                }
-                onDone={() => setOpened(true)}
-              />
-            ) : reveal ? (
+            {reveal ? (
               <RevealOpening
                 layout={reveal}
                 accent={data.palette.accent}

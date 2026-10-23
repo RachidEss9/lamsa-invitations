@@ -38,7 +38,6 @@ import {
   PAGE_TRANSITIONS,
   PAGE_TRANSITIONS as TRANSITIONS,
   applyStylePreset,
-  cleanRevealLinks,
   clipsForPage,
   defaultAnimation,
   duplicateElements,
@@ -65,6 +64,14 @@ import { ensureFont, fontById } from "@/lib/fonts";
 import { recolourDesign, type ColourPalette } from "@/lib/palettes";
 import type { BuiltinAsset } from "@/lib/assets";
 import type { RevealPreset } from "@/lib/reveals";
+import {
+  isDeletable,
+  pushHistory,
+  redoHistory,
+  removeElements,
+  selectionAfterDelete,
+  undoHistory,
+} from "@/lib/studio-edit";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -273,6 +280,9 @@ export default function Studio() {
     id: string;
     token: number;
   } | null>(null);
+  // True while a text layer is being edited on the canvas. Delete is disabled
+  // then, so a careless Backspace can never destroy the layer being typed into.
+  const [canvasEditing, setCanvasEditing] = useState(false);
 
   const pastRef = useRef<DesignDocument[]>([]);
   const futureRef = useRef<DesignDocument[]>([]);
@@ -382,7 +392,7 @@ export default function Studio() {
       if (!current) return;
       const next = updater(current);
       if (next === current) return;
-      pastRef.current = [...pastRef.current.slice(-59), current];
+      pastRef.current = pushHistory(pastRef.current, current);
       futureRef.current = [];
       designRef.current = next;
       setDesignState(next);
@@ -429,7 +439,7 @@ export default function Studio() {
     const start = gestureStart.current;
     gestureStart.current = null;
     if (!start || !designRef.current || start === designRef.current) return;
-    pastRef.current = [...pastRef.current.slice(-59), start];
+    pastRef.current = pushHistory(pastRef.current, start);
     futureRef.current = [];
     setHistoryFlags({ undo: true, redo: false });
     setHistoryTick((tick) => tick + 1);
@@ -447,14 +457,19 @@ export default function Studio() {
 
   const undo = useCallback(() => {
     const current = designRef.current;
-    const previous = pastRef.current.pop();
-    if (!current || !previous) return;
-    futureRef.current = [...futureRef.current, current];
-    designRef.current = previous;
-    setDesignState(previous);
-    scheduleSave(previous);
+    if (!current) return;
+    const step = undoHistory(
+      { past: pastRef.current, future: futureRef.current },
+      current,
+    );
+    if (!step) return;
+    pastRef.current = step.stacks.past;
+    futureRef.current = step.stacks.future;
+    designRef.current = step.snapshot;
+    setDesignState(step.snapshot);
+    scheduleSave(step.snapshot);
     setHistoryFlags({
-      undo: pastRef.current.length > 0,
+      undo: step.stacks.past.length > 0,
       redo: true,
     });
     setHistoryTick((tick) => tick + 1);
@@ -462,15 +477,20 @@ export default function Studio() {
 
   const redo = useCallback(() => {
     const current = designRef.current;
-    const next = futureRef.current.pop();
-    if (!current || !next) return;
-    pastRef.current = [...pastRef.current, current];
-    designRef.current = next;
-    setDesignState(next);
-    scheduleSave(next);
+    if (!current) return;
+    const step = redoHistory(
+      { past: pastRef.current, future: futureRef.current },
+      current,
+    );
+    if (!step) return;
+    pastRef.current = step.stacks.past;
+    futureRef.current = step.stacks.future;
+    designRef.current = step.snapshot;
+    setDesignState(step.snapshot);
+    scheduleSave(step.snapshot);
     setHistoryFlags({
       undo: true,
-      redo: futureRef.current.length > 0,
+      redo: step.stacks.future.length > 0,
     });
     setHistoryTick((tick) => tick + 1);
   }, [scheduleSave]);
@@ -481,6 +501,8 @@ export default function Studio() {
   const selected = page
     ? page.elements.filter((element) => selectedIds.includes(element.id))
     : [];
+  const deletableSelection = selected.filter(isDeletable);
+  const canDeleteSelection = !canvasEditing && deletableSelection.length > 0;
   const selectedAnimations = selected.map((element) => element.animation);
   const published = invitation?.status === "published";
   const publicLink = invitation ? `${window.location.origin}/i/${invitation.slug}` : "";
@@ -780,9 +802,29 @@ export default function Studio() {
   };
 
   const deleteSelection = () => {
-    if (selectedIds.length === 0) return;
-    setPageElements((elements) => cleanRevealLinks(elements.filter((element) => !selectedIds.includes(element.id))));
-    setSelectedIds([]);
+    if (canvasEditing) {
+      toast.error("Finish editing the text before deleting a layer.");
+      return;
+    }
+    if (selectedIds.length === 0 || !page) return;
+    const outcome = removeElements(page.elements, selectedIds);
+    if (outcome.removed.length === 0) {
+      if (outcome.blocked.length > 0) {
+        toast.error("Locked layers are protected. Unlock to delete.");
+      }
+      return;
+    }
+    setPageElements(() => outcome.elements);
+    setSelectedIds((previous) => selectionAfterDelete(previous, outcome));
+    if (outcome.blocked.length > 0) {
+      toast.success(
+        `${outcome.removed.length} layer${outcome.removed.length === 1 ? "" : "s"} deleted · ${outcome.blocked.length} locked kept.`,
+      );
+    } else {
+      toast.success(
+        `${outcome.removed.length} layer${outcome.removed.length === 1 ? "" : "s"} deleted. Undo with ⌘/Ctrl + Z.`,
+      );
+    }
   };
 
   const copySelection = () => {
@@ -1564,7 +1606,7 @@ export default function Studio() {
         return;
       }
       if (event.key === "Delete" || event.key === "Backspace") {
-        if (selectedIds.length) {
+        if (selectedIds.length && !canvasEditing) {
           event.preventDefault();
           deleteSelection();
         }
@@ -1592,7 +1634,7 @@ export default function Studio() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, undo, redo, persistDesign, pageIndex, design, librariesOpen, guestOpen, timelinePreviewOpen, shortcutsOpen, shareOpen]);
+  }, [selectedIds, undo, redo, persistDesign, pageIndex, design, librariesOpen, guestOpen, timelinePreviewOpen, shortcutsOpen, shareOpen, canvasEditing]);
 
   if (invitation === undefined && idIsValid) {
     return (
@@ -1611,7 +1653,7 @@ export default function Studio() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
         <EyeOff className="size-6 text-muted-foreground" />
-        <h1 className="mt-5 font-display text-3xl">This studio is private.</h1>
+        <h1 className="mt-5 font-ui text-3xl font-semibold tracking-[-0.02em]">This studio is private.</h1>
         <p className="mt-3 max-w-sm text-[0.85rem] leading-relaxed text-muted-foreground">
           The invitation may have been deleted, or it belongs to another studio.
         </p>
@@ -2187,7 +2229,7 @@ export default function Studio() {
 
   return (
     <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">
-      <header className="z-40 flex h-[56px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-ink/15 bg-[var(--paper-light)] px-2 sm:gap-2 sm:px-3">
+      <header className="z-40 flex h-[60px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-ink/10 bg-[var(--paper-light)]/95 px-2 backdrop-blur-xl sm:gap-2 sm:px-4">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
@@ -2199,7 +2241,7 @@ export default function Studio() {
         <Wordmark className="hidden text-[1rem] sm:inline-flex" />
         <div className="mx-1 hidden h-6 w-px bg-ink/15 sm:block" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-[15px] leading-tight">{content.title}</p>
+          <p className="truncate font-ui text-[15px] font-semibold leading-tight">{content.title}</p>
           <button
             type="button"
             onClick={() => void persistDesign(design)}
@@ -2381,8 +2423,66 @@ export default function Studio() {
                   toast.success("Text updated.");
                 }}
                 onContextAction={handleCanvasContextAction}
+                onEditingChange={setCanvasEditing}
               />
             </div>
+
+            {/* Selection toolbar: every destructive action is one visible tap
+             * away on desktop and mobile, and nothing is offered when the
+             * selection cannot be deleted. */}
+            {selected.length > 0 && (
+              <div className="relative z-30 flex shrink-0 flex-wrap items-center gap-1 border-t border-ink/15 bg-[var(--paper-light)] px-2 py-1.5">
+                <span className="mr-auto min-w-0 truncate font-meta text-[8px] uppercase tracking-[0.14em] text-ink/45">
+                  {selected.length === 1 ? selected[0].name : `${selected.length} layers`}
+                  {canvasEditing ? " · editing text" : ""}
+                </span>
+                <IconButton label="Duplicate selection" onClick={duplicateSelection}>
+                  <Copy className="size-3.5" />
+                </IconButton>
+                <IconButton
+                  label={selected.every((element) => element.locked) ? "Unlock selection" : "Lock selection"}
+                  onClick={toggleSelectionLock}
+                >
+                  {selected.every((element) => element.locked) ? (
+                    <Unlock className="size-3.5" />
+                  ) : (
+                    <Lock className="size-3.5" />
+                  )}
+                </IconButton>
+                <IconButton
+                  label={selected.every((element) => element.hidden) ? "Show selection" : "Hide selection"}
+                  onClick={toggleSelectionHidden}
+                >
+                  {selected.every((element) => element.hidden) ? (
+                    <EyeOff className="size-3.5" />
+                  ) : (
+                    <Eye className="size-3.5" />
+                  )}
+                </IconButton>
+                <IconButton label="Send to back" onClick={() => moveSelectionToEdge("back")}>
+                  <ChevronDown className="size-3.5" />
+                </IconButton>
+                <IconButton label="Bring to front" onClick={() => moveSelectionToEdge("front")}>
+                  <ChevronUp className="size-3.5" />
+                </IconButton>
+                <button
+                  type="button"
+                  onClick={deleteSelection}
+                  disabled={!canDeleteSelection}
+                  title={
+                    canvasEditing
+                      ? "Finish editing the text before deleting"
+                      : canDeleteSelection
+                        ? "Delete selected layers (⌫)"
+                        : "Locked layers are protected — unlock to delete"
+                  }
+                  className="flex h-8 items-center gap-1.5 border border-[var(--red)] bg-[var(--red)] px-2.5 text-[9px] uppercase tracking-[0.12em] text-[#f2f1ed] transition-colors hover:bg-[#8a0318] disabled:cursor-not-allowed disabled:border-ink/15 disabled:bg-transparent disabled:text-ink/30"
+                >
+                  <Trash2 className="size-3.5" />
+                  Delete
+                </button>
+              </div>
+            )}
 
             <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col gap-1">
               <span className="pointer-events-auto border border-ink/15 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-ink/55 backdrop-blur">
@@ -2395,7 +2495,12 @@ export default function Studio() {
               )}
             </div>
 
-            <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex flex-col items-end gap-1">
+            <div
+              className={cn(
+                "pointer-events-none absolute right-3 z-20 flex flex-col items-end gap-1 transition-[bottom] duration-200",
+                selected.length > 0 ? "bottom-[54px]" : "bottom-3",
+              )}
+            >
               <div className="pointer-events-auto flex border border-ink/15 bg-[var(--paper-light)]/90 backdrop-blur">
                 <button
                   type="button"
@@ -2546,6 +2651,12 @@ export default function Studio() {
             onLayer={orderSelection}
             onDuplicate={duplicateSelection}
             onDelete={deleteSelection}
+            deleteDisabled={!canDeleteSelection}
+            deleteHint={
+              canvasEditing
+                ? "Finish editing the text before deleting"
+                : "Locked layers are protected — unlock to delete"
+            }
             onGroup={groupSelection}
             onUngroup={ungroupSelection}
             onUploadImage={handleInspectorUpload}
@@ -2621,6 +2732,12 @@ export default function Studio() {
                   onLayer={orderSelection}
                   onDuplicate={duplicateSelection}
                   onDelete={deleteSelection}
+                  deleteDisabled={!canDeleteSelection}
+                  deleteHint={
+                    canvasEditing
+                      ? "Finish editing the text before deleting"
+                      : "Locked layers are protected — unlock to delete"
+                  }
                   onGroup={groupSelection}
                   onUngroup={ungroupSelection}
                   onUploadImage={handleInspectorUpload}
@@ -2736,7 +2853,7 @@ export default function Studio() {
       <Dialog open={Boolean(pendingTemplate)} onOpenChange={(open) => !open && setPendingTemplate(null)}>
         <DialogContent className="max-w-[440px]">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl">Apply “{pendingTemplate?.name}”?</DialogTitle>
+            <DialogTitle className="font-ui text-xl font-semibold tracking-[-0.01em]">Apply “{pendingTemplate?.name}”?</DialogTitle>
             <DialogDescription className="text-[12px] leading-relaxed">
               This replaces the pages and layers on this invitation's canvas. Your
               written words, date, venue, guests, RSVP settings, photos, and public
@@ -2757,7 +2874,7 @@ export default function Studio() {
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="max-w-[460px]">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl">
+            <DialogTitle className="font-ui text-xl font-semibold tracking-[-0.01em]">
               {published ? "Your invitation is live" : "Share this invitation"}
             </DialogTitle>
             <DialogDescription className="text-[12px] leading-relaxed">

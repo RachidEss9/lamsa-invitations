@@ -100,10 +100,10 @@ export function StudioShell({
                       <span
                         className={
                           active
-                            ? "font-display text-[1.5rem] leading-none text-ink"
+                            ? "font-ui text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-ink"
                             : done
-                              ? "font-display text-[1.5rem] leading-none text-ink/52"
-                              : "font-display text-[1.5rem] leading-none text-ink/25"
+                              ? "font-ui text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-ink/52"
+                              : "font-ui text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-ink/25"
                         }
                       >
                         {item.label}
@@ -133,7 +133,7 @@ export function StudioShell({
                 <span>Kept private</span>
                 <span>No. 03</span>
               </div>
-              <p className="mt-5 font-display text-[clamp(1.9rem,2.6vw,2.6rem)] leading-[0.98] tracking-[-0.01em]">
+              <p className="mt-5 font-ui text-[clamp(1.9rem,2.6vw,2.6rem)] font-semibold leading-[0.98] tracking-[-0.03em]">
                 Guest names,
                 <br />
                 replies, and
@@ -161,7 +161,7 @@ export function StudioShell({
               <span className="eyebrow text-ink/60">{step}</span>
             </div>
 
-            <h1 className="mt-5 font-display text-[clamp(2.6rem,6vw,3.7rem)] leading-[0.94] tracking-[-0.015em]">
+            <h1 className="mt-5 font-ui text-[clamp(2.6rem,6vw,3.7rem)] font-semibold leading-[0.94] tracking-[-0.04em]">
               {title}
               {accent ? (
                 <span className="text-[var(--red)]"> {accent}</span>

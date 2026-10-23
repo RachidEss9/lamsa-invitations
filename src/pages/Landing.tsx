@@ -142,8 +142,8 @@ export default function Landing() {
         </div>
       </div>
 
-      <header className="relative z-40 border-b border-ink/15">
-        <div className="mx-auto flex h-20 w-full max-w-[1480px] items-center justify-between px-5 sm:px-8 lg:px-12">
+      <header className="sticky top-0 z-40 border-b border-ink/10 bg-background/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-[76px] w-full max-w-[1480px] items-center justify-between px-5 sm:px-8 lg:px-12">
           <BrandLink />
           <nav className="hidden items-center gap-8 md:flex">
             {nav.map((item) => (

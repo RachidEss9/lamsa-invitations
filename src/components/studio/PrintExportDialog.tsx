@@ -228,7 +228,7 @@ export function PrintExportDialog({
     <Dialog open={open} onOpenChange={(value) => !busy && onOpenChange(value)}>
       <DialogContent className="max-h-[92vh] sm:max-w-[min(1000px,calc(100%_-_2rem))] gap-0 overflow-y-auto p-0">
         <DialogHeader className="border-b border-ink/12 px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 font-display text-xl">
+          <DialogTitle className="flex items-center gap-2 font-ui text-xl font-semibold tracking-[-0.01em]">
             <FileText className="size-4 text-[var(--red)]" />
             Print-ready PDF
           </DialogTitle>

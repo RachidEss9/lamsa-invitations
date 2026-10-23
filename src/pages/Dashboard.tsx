@@ -280,7 +280,7 @@ export default function Dashboard() {
               <span className="h-px w-6 bg-ink/30" />
               <span className="eyebrow text-ink/60">The desk</span>
             </div>
-            <h1 className="mt-4 font-display text-[clamp(2.9rem,6.4vw,4.8rem)] leading-[0.9] tracking-[-0.02em]">
+            <h1 className="mt-4 font-ui text-[clamp(2.9rem,6.4vw,4.8rem)] font-semibold leading-[0.9] tracking-[-0.035em]">
               Your invitations.
             </h1>
             <p className="mt-3 max-w-[32rem] text-[0.88rem] leading-[1.75] text-ink/68">
@@ -298,7 +298,7 @@ export default function Dashboard() {
                 ["Replies", counts.replies],
               ].map(([label, value]) => (
                 <div key={label as string}>
-                  <dd className="font-display text-[2rem] leading-none tabular-nums">
+                  <dd className="font-ui text-[2rem] font-semibold leading-none tabular-nums tracking-[-0.03em]">
                     {value as number}
                   </dd>
                   <dt className="mt-1.5 font-meta text-[0.5rem] uppercase tracking-[0.12em] text-ink/60">
@@ -319,7 +319,7 @@ export default function Dashboard() {
                 Latest edit
               </p>
             </div>
-            <div className="mt-3 grid items-center gap-5 border border-ink/25 bg-[var(--paper-light)] p-4 press sm:grid-cols-[96px_minmax(0,1fr)_auto] sm:p-5">
+            <div className="lift mt-3 grid items-center gap-5 border border-ink/12 bg-[var(--paper-light)] p-5 shadow-[0_12px_40px_rgba(21,21,21,0.05)] sm:grid-cols-[96px_minmax(0,1fr)_auto] sm:p-6">
               <button
                 type="button"
                 onClick={() => navigate(`/studio/${current._id}`)}
@@ -350,7 +350,7 @@ export default function Dashboard() {
                     {formatEventDateShort(current.date)}
                   </span>
                 </div>
-                <p className="mt-2 truncate font-display text-[1.75rem] leading-tight">
+                <p className="mt-2 truncate font-ui text-[1.75rem] font-semibold leading-tight tracking-[-0.02em]">
                   {titleOf(current)}
                 </p>
                 <p className="mt-1 font-meta text-[0.52rem] uppercase tracking-[0.1em] text-ink/56">
@@ -459,7 +459,7 @@ export default function Dashboard() {
             <p className="font-meta text-[0.55rem] uppercase tracking-[0.12em] text-ink/56">
               Nothing filed here
             </p>
-            <p className="mt-3 max-w-[24rem] font-display text-[2rem] leading-tight">
+            <p className="mt-3 max-w-[24rem] font-ui text-[2rem] font-semibold leading-tight tracking-[-0.02em]">
               {filter === "draft"
                 ? "No invitations in progress."
                 : "Nothing published yet."}
@@ -524,7 +524,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => navigate(`/studio/${invitation._id}`)}
-                        className="block max-w-full truncate text-left font-display text-[1.35rem] leading-tight transition-colors group-hover:text-[var(--red)] sm:text-[1.5rem]"
+                        className="block max-w-full truncate text-left font-ui text-[1.35rem] font-semibold leading-tight tracking-[-0.015em] transition-colors group-hover:text-[var(--red)] sm:text-[1.5rem]"
                       >
                         {title}
                       </button>
@@ -688,7 +688,7 @@ export default function Dashboard() {
                   <Plus className="size-3.5" />
                 </span>
                 <span>
-                  <span className="block font-display text-[1.25rem] leading-tight">
+                  <span className="block font-ui text-[1.25rem] font-semibold leading-tight tracking-[-0.015em]">
                     Begin another invitation
                   </span>
                   <span className="mt-0.5 block font-meta text-[0.48rem] uppercase tracking-[0.12em] text-ink/56">
@@ -718,7 +718,7 @@ export default function Dashboard() {
                   <span className="h-px w-5 bg-ink/30" />
                   <span className="eyebrow text-ink/60">Choose a starting point</span>
                 </div>
-                <DialogTitle className="mt-3 font-display text-[2rem] font-normal leading-[0.95] tracking-[-0.01em]">
+                <DialogTitle className="mt-3 font-ui text-[2rem] font-semibold leading-[0.95] tracking-[-0.03em]">
                   Start from the collection.
                 </DialogTitle>
                 <DialogDescription className="max-w-md text-[0.8rem] leading-relaxed text-ink/68">
@@ -740,7 +740,7 @@ export default function Dashboard() {
                     <p className="font-meta text-[0.46rem] uppercase tracking-[0.12em] text-ink/56">
                       Selected
                     </p>
-                    <p className="truncate font-display text-[1.05rem] leading-tight">
+                    <p className="truncate font-ui text-[1.05rem] font-semibold leading-tight">
                       {templateById(selectedTemplate).name}
                     </p>
                     <p className="truncate text-[0.66rem] text-ink/62">
@@ -800,7 +800,7 @@ export default function Dashboard() {
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="flex items-baseline justify-between gap-2">
-                              <span className="truncate font-display text-[1.15rem] leading-tight">
+                              <span className="truncate font-ui text-[1.15rem] font-semibold leading-tight">
                                 {template.name}
                               </span>
                               <span className="shrink-0 font-meta text-[0.46rem] uppercase tracking-[0.1em] text-ink/52">
@@ -841,7 +841,7 @@ export default function Dashboard() {
                 <div className="flex items-baseline justify-between">
                   <div>
                     <p className="eyebrow text-ink/56">Selected</p>
-                    <p className="mt-1 font-display text-[1.4rem] leading-none">
+                    <p className="mt-1 font-ui text-[1.4rem] font-semibold leading-none tracking-[-0.02em]">
                       {templateById(selectedTemplate).name}
                     </p>
                   </div>
@@ -911,7 +911,7 @@ export default function Dashboard() {
       >
         <AlertDialogContent className="border-ink/25">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-[1.8rem] font-normal leading-tight">
+            <AlertDialogTitle className="font-ui text-[1.8rem] font-semibold leading-tight tracking-[-0.02em]">
               Delete this invitation?
             </AlertDialogTitle>
             <AlertDialogDescription className="leading-relaxed">
@@ -944,7 +944,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
     <div className="mt-10 grid items-stretch gap-0 border border-ink/20 lg:grid-cols-[1.15fr_0.85fr]">
       <div className="flex flex-col justify-center p-7 sm:p-10">
         <p className="eyebrow text-ink/60">The first page is blank</p>
-        <h2 className="mt-4 max-w-[26rem] font-display text-[clamp(2.2rem,4.5vw,3.4rem)] leading-[0.95] tracking-[-0.015em]">
+        <h2 className="mt-4 max-w-[26rem] font-ui text-[clamp(2.2rem,4.5vw,3.4rem)] font-semibold leading-[0.95] tracking-[-0.03em]">
           Choose a design and start writing.
         </h2>
         <p className="mt-4 max-w-[27rem] text-[0.88rem] leading-[1.8] text-ink/68">

@@ -709,7 +709,7 @@ export default function Editor() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
         <Lock className="size-6 text-muted-foreground" />
-        <h1 className="mt-5 font-display text-3xl">This invitation is private.</h1>
+        <h1 className="mt-5 font-ui text-3xl font-semibold tracking-[-0.02em]">This invitation is private.</h1>
         <p className="mt-3 max-w-sm text-[0.85rem] leading-relaxed text-muted-foreground">
           It may have been deleted, or it belongs to another studio.
         </p>
@@ -743,7 +743,7 @@ export default function Editor() {
           </button>
           <div className="hidden h-7 w-px bg-ink/15 sm:block" />
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-[1.22rem] leading-tight">
+            <p className="truncate font-ui text-[1.22rem] font-semibold leading-tight tracking-[-0.015em]">
               {draft.title || "Untitled invitation"}
             </p>
             <button
@@ -860,7 +860,7 @@ export default function Editor() {
                         >
                           {String(index + 1).padStart(2, "0")}
                         </span>
-                        <span className="font-display text-[1.2rem] leading-none">
+                        <span className="font-ui text-[1.2rem] font-semibold leading-none tracking-[-0.015em]">
                           {item.label}
                         </span>
                         {item.id === "guests" && guestCount > 0 && (
@@ -921,7 +921,7 @@ export default function Editor() {
                   <p className="font-meta text-[0.48rem] uppercase tracking-[0.12em] text-ink/56">
                     Live proof
                   </p>
-                  <p className="mt-1 truncate font-display text-[1.05rem] leading-tight">
+                  <p className="mt-1 truncate font-ui text-[1.05rem] font-semibold leading-tight">
                     {draft.title || "Untitled invitation"}
                   </p>
                 </div>
@@ -982,7 +982,7 @@ export default function Editor() {
                 <p className="eyebrow text-ink/52">
                   Section {String(TABS.findIndex((item) => item.id === tab) + 1).padStart(2, "0")} / 05
                 </p>
-                <h2 className="mt-1 font-display text-[1.85rem] leading-none">
+                <h2 className="mt-1 font-ui text-[1.85rem] font-semibold leading-none tracking-[-0.02em]">
                   {TABS.find((item) => item.id === tab)?.label}
                 </h2>
               </div>
@@ -1341,7 +1341,7 @@ export default function Editor() {
                                   />
                                 ))}
                               </span>
-                              <span className="truncate font-display text-[0.9rem]">
+                              <span className="truncate font-ui text-[0.9rem] font-semibold">
                                 {template.name}
                               </span>
                               {selected && (
@@ -1805,7 +1805,7 @@ export default function Editor() {
                             <p className="eyebrow text-[0.5rem] text-muted-foreground">
                               Public invitation
                             </p>
-                            <p className="mt-1.5 font-display text-xl">
+                            <p className="mt-1.5 font-ui text-xl font-semibold tracking-[-0.015em]">
                               {published ? "Live and shareable" : "Not published yet"}
                             </p>
                           </div>
@@ -2034,7 +2034,7 @@ export default function Editor() {
                       ) : guests.length === 0 ? (
                         <div className="mt-7 flex flex-col items-center border border-dashed border-border px-6 py-9 text-center">
                           <Users className="size-5 text-muted-foreground/60" />
-                          <p className="mt-3 font-display text-lg">
+                          <p className="mt-3 font-ui text-lg font-semibold tracking-[-0.01em]">
                             No names yet.
                           </p>
                           <p className="mt-1 max-w-[18rem] text-[0.7rem] leading-relaxed text-muted-foreground">
@@ -2050,7 +2050,7 @@ export default function Editor() {
                               className="flex items-center justify-between gap-3 border-b border-border/60 py-3"
                             >
                               <div className="min-w-0">
-                                <p className="truncate font-display text-[1.02rem] leading-tight">
+                                <p className="truncate font-ui text-[1.02rem] font-semibold leading-tight">
                                   {guest.name}
                                 </p>
                                 <p className="mt-0.5 text-[0.56rem] uppercase tracking-[0.14em] text-muted-foreground/70">
@@ -2345,7 +2345,7 @@ export default function Editor() {
         <DialogContent className="rounded-none border-border sm:max-w-md">
           <DialogHeader className="text-left">
             <p className="eyebrow text-muted-foreground">Published</p>
-            <DialogTitle className="mt-2 font-display text-3xl font-normal leading-tight">
+            <DialogTitle className="mt-2 font-ui text-3xl font-semibold leading-tight tracking-[-0.02em]">
               Your invitation is live.
             </DialogTitle>
             <DialogDescription className="leading-relaxed">
@@ -2440,7 +2440,7 @@ export default function Editor() {
         <DialogContent className="rounded-none border-border sm:max-w-md">
           <DialogHeader className="text-left">
             <p className="eyebrow text-muted-foreground">Guest updates</p>
-            <DialogTitle className="mt-2 font-display text-2xl font-normal leading-tight">
+            <DialogTitle className="mt-2 font-ui text-2xl font-semibold leading-tight tracking-[-0.015em]">
               {composerOpen === "reminder"
                 ? "Remind guests who haven't replied"
                 : "Write to your guests"}
@@ -2523,7 +2523,7 @@ export default function Editor() {
         <DialogContent className="rounded-none border-border sm:max-w-sm">
           <DialogHeader className="text-left">
             <p className="eyebrow text-muted-foreground">Guest details</p>
-            <DialogTitle className="mt-2 font-display text-2xl font-normal">
+            <DialogTitle className="mt-2 font-ui text-2xl font-semibold tracking-[-0.015em]">
               {contactTarget?.name}
             </DialogTitle>
             <DialogDescription className="leading-relaxed">
@@ -2583,7 +2583,7 @@ export default function Editor() {
       >
         <AlertDialogContent className="rounded-none">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-2xl font-normal">
+            <AlertDialogTitle className="font-ui text-2xl font-semibold tracking-[-0.015em]">
               Remove this guest?
             </AlertDialogTitle>
             <AlertDialogDescription className="leading-relaxed">

@@ -60,6 +60,8 @@ interface StudioCanvasProps {
   onAltDuplicate?: () => void;
   onTextCommit?: (id: string, text: string) => void;
   onContextAction?: (action: CanvasContextAction) => void;
+  /** Reports inline text editing so the studio can protect the layer. */
+  onEditingChange?: (editing: boolean) => void;
 }
 
 const SNAP_THRESHOLD = 7;
@@ -244,6 +246,7 @@ export function StudioCanvas({
   onAltDuplicate,
   onTextCommit,
   onContextAction,
+  onEditingChange,
 }: StudioCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const designRef = useRef<HTMLDivElement | null>(null);
@@ -270,6 +273,15 @@ export function StudioCanvas({
   const editingElement = editing
     ? page.elements.find((element) => element.id === editing.id) ?? null
     : null;
+
+  // Inline editing is local to the canvas; the studio needs to know so it can
+  // disable Delete while a caret is inside a text layer.
+  useEffect(() => {
+    onEditingChange?.(Boolean(editing));
+    return () => {
+      if (editing) onEditingChange?.(false);
+    };
+  }, [editing, onEditingChange]);
 
   useEffect(() => {
     const node = hostRef.current;
