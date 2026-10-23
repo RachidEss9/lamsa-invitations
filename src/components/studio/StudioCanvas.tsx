@@ -259,6 +259,15 @@ export function StudioCanvas({
   const panOrigin = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const isCoarseTouch = useMemo(
+    () =>
+      typeof window !== "undefined"
+        ? window.matchMedia("(pointer: coarse)").matches
+        : false,
+    [],
+  );
+  const handleSize = isCoarseTouch ? 18 : 11;
+  const rotateSize = isCoarseTouch ? 20 : 15;
   const pinch = useRef<{
     distance: number;
     zoom: number;
@@ -893,75 +902,109 @@ export function StudioCanvas({
               );
             })}
 
-            {single && !single.locked && !editing && (
-              <div
-                className="pointer-events-none absolute"
-                style={{
-                  left: single.x,
-                  top: single.y,
-                  width: single.w,
-                  height: single.h,
-                  transform: `rotate(${single.rotation}deg)`,
-                  zIndex: 60,
-                }}
-              >
-                {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as Handle[]).map(
-                  (handle) => {
-                    const positions: Record<Handle, { left: string; top: string; cursor: string }> = {
-                      nw: { left: "0", top: "0", cursor: "nwse-resize" },
-                      n: { left: "50%", top: "0", cursor: "ns-resize" },
-                      ne: { left: "100%", top: "0", cursor: "nesw-resize" },
-                      e: { left: "100%", top: "50%", cursor: "ew-resize" },
-                      se: { left: "100%", top: "100%", cursor: "nwse-resize" },
-                      s: { left: "50%", top: "100%", cursor: "ns-resize" },
-                      sw: { left: "0", top: "100%", cursor: "nesw-resize" },
-                      w: { left: "0", top: "50%", cursor: "ew-resize" },
-                    };
+            {single && !single.locked && !editing && (                    <button
+                      type="button"
+                      className="pointer-events-none absolute"
+                      style={{
+                        left: single.x,
+                        top: single.y,
+                        width: single.w,
+                        height: single.h,
+                        transform: `rotate(${single.rotation}deg)`,
+                        zIndex: 60,
+                      }}
+                      aria-hidden="true"
+                    >
+                      {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as Handle[]).map(
+                        (handle) => {
+                          const positions: Record<Handle, { left: string; top: string; cursor: string }> = {
+                            nw: { left: "0", top: "0", cursor: "nwse-resize" },
+                            n: { left: "50%", top: "0", cursor: "ns-resize" },
+                            ne: { left: "100%", top: "0", cursor: "nesw-resize" },
+                            e: { left: "100%", top: "50%", cursor: "ew-resize" },
+                            se: { left: "100%", top: "100%", cursor: "nwse-resize" },
+                            s: { left: "50%", top: "100%", cursor: "ns-resize" },
+                            sw: { left: "0", top: "100%", cursor: "nesw-resize" },
+                            w: { left: "0", top: "50%", cursor: "ew-resize" },
+                          };
                     const position = positions[handle];
                     return (
-                      <span
+                      <button
+                        type="button"
                         key={handle}
-                        className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 border border-[#710014] bg-[#f2f1ed]"
+                        className={cn(
+                          "pointer-events-auto rounded-full border",
+                          "inset-0 -translate-x-1/2 -translate-y-1/2",
+                          isCoarseTouch || handle.length === 1
+                            ? "bg-[#710014]/20"
+                            : "border-[#710014] bg-[#f2f1ed]",
+                        )}
                         style={{
                           left: position.left,
                           top: position.top,
-                          width: 11 / scale,
-                          height: 11 / scale,
+                          width: handleSize / scale,
+                          height: handleSize / scale,
                           borderWidth: 1.5 / scale,
                           cursor: position.cursor,
                           touchAction: "none",
                         }}
-                        onPointerDown={(event) =>
-                          beginHandle(event as ReactPointerEvent, single, "resize", handle)
-                        }
-                      />
-                    );
+              aria-label={`Resize ${handle}`}
+              onPointerDown={(event) =>
+                beginHandle(event as ReactPointerEvent, single, "resize", handle)
+              }
+              onTouchStart={(event) =>
+                beginHandle(event as unknown as ReactPointerEvent, single, "resize", handle)
+              }
+            >
+              {isCoarseTouch || handle.length === 1 ? (
+                <span
+                  className="ring-1 ring-[#710014]"
+                  style={{ width: 3 / scale, height: 3 / scale, margin: "auto", display: "block" }}
+                />
+              ) : null}
+            </button>
+          );
                   },
                 )}
-                <span
-                  className="pointer-events-auto absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border border-[#710014] bg-[#f2f1ed]"
+                <button
+                  type="button"
+                  className="pointer-events-auto rounded-full border cursor-grab bg-[#f2f1ed] -translate-x-1/2 -translate-y-1/2"
                   style={{
-                    width: 15 / scale,
-                    height: 15 / scale,
-                    marginTop: -26 / scale,
+                    left: "50%",
+                    top: -(rotateSize / scale + 9 / scale),
+                    width: rotateSize / scale,
+                    height: rotateSize / scale,
                     borderWidth: 1.5 / scale,
                     touchAction: "none",
                   }}
+                  aria-label="Rotate"
                   onPointerDown={(event) =>
                     beginHandle(event as ReactPointerEvent, single, "rotate")
                   }
-                />
-              </div>
+                  onTouchStart={(event) =>
+                    beginHandle(event as unknown as ReactPointerEvent, single, "rotate")
+                  }
+                  onPointerMove={(event) => event.stopPropagation()}
+                  onTouchMove={(event) => event.stopPropagation()}                />
+              </div
             )}
 
-            {/* The inline text editor sits in design coordinates so its type,
+{}/* The inline text editor sits in design coordinates so its type,
                 wrapping and rotation match the final rendering exactly. */}
             {editing && editingElement && (
-              <div
-                className="absolute"
-                style={{
-                  left: editingElement.x,
-                  top: editingElement.y,
+<div>
+<div>
+  <div>
+</div>
+
+<div>
+<div>
+  <BoxGuideHandles x={guidesForRender.x} y={guidesForRender.y} zIndex={55} />
+</div>
+</div>
+</div>
+</div>}
+
                   width: editingElement.w,
                   height: editingElement.h,
                   transform: `rotate(${editingElement.rotation}deg)`,
@@ -1039,19 +1082,28 @@ export function StudioCanvas({
                 style={{ left: x, background: "rgba(113,0,20,0.55)", zIndex: 55 }}
               />
             ))}
-            {guidesForRender.y.map((y) => (
-              <div
+            {guidesForRender.y.map((y) => (                <div
                 key={`gy-${y}`}
                 className="pointer-events-none absolute inset-x-0 h-px"
-                style={{ top: y, background: "rgba(113,0,20,0.55)", zIndex: 55 }}
-              />
+                style={{ top: y, background: isFinePrintActive ? "rgba(113,0,20,0.35)" : "rgba(113,0,20,0.55)", zIndex: 55 }}              />
             ))}
           </div>
         </div>
       </div>
 
-      <p className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap font-meta text-[9px] uppercase tracking-[0.18em] text-ink/35">
-        1000 × 1333 · 3:4 · Space + drag to pan · ⌘/Ctrl + wheel to zoom
+      <BoxGuideHandles x={guidesForRender.x} y={guidesForRender.y} zIndex={55} />
+
+      <p className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap font-meta text-[9px] text-ink/40">
+          {t({ width: Math.round(sizeDraftValue.width), height: Math.round(sizeDraftValue.height), unit: "px" })}
+          · {guideLabel}
+          · Space + drag to pan · ⌘/Ctrl + wheel to zoom
+          {drag ? " · moving" : ""}
+        </p>
+
+
+        {t({ width: Math.round(sizeDraftValue.width), height: Math.round(sizeDraftValue.height), unit: "px" })}
+        · {guideLabel}
+        · Space + drag to pan · ⌘/Ctrl + wheel to zoom
         {drag ? " · moving" : ""}
       </p>
 
@@ -1062,9 +1114,20 @@ export function StudioCanvas({
           hidden={Boolean(menu.elementId) && selected.every((element) => element.hidden)}
           hasSelection={selectedIds.length > 0}
           onAction={(action) => onContextAction?.(action)}
-          onClose={() => setMenu(null)}
-        />
+          onClose={() => setMenu(null)}      <BoxGuideHandles x={guidesForRender.x} y={guidesForRender.y} zIndex={55} />
       )}
     </div>
   );
 }
+
+/*------------------------------------------------------------------------**/
+/* Box composition behaviour around layer handles                           **/
+/*------------------------------------------------------------------------**/
+
+/**
+ * All editing on the Canvas shares a core behaviour model: the box is the
+ * anchor for transform, resize and rotate, and while it is focused it owns
+ * pointer handling so nothing else on the page fights for the pointer.
+ */
+
+const BOX_COMMENT = "";
