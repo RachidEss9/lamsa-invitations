@@ -581,3 +581,4 @@ export default function Studio() {
     },
     [apply, pageIndex],
   );
+}
