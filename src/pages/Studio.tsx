@@ -246,6 +246,14 @@ function ToolbarButton({
   danger?: boolean
   subtle?: boolean
   onClick: () => void
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
   children: React.ReactNode
   className?: string
 }) {
@@ -275,6 +283,22 @@ function ToolbarButton({
 }
 
 function ToolbarIconButton({
+  label,
+  active,
+  danger,
+  subtle,
+  onClick,
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  className?: string
+}) {
   label,
   active,
   danger,
@@ -374,6 +398,18 @@ function ToolbarChip({
   onMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void
   className?: string
 }) {
+  label,
+  active,
+  onClick,
+  onMouseDown,
+  className,
+}: {
+  label: string
+  active?: boolean
+  onClick: () => void
+  onMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void
+  className?: string
+}) {
   return (
     <button
       type="button"
@@ -401,6 +437,12 @@ function ToolbarChipGroup({
   children: React.ReactNode
   className?: string
 }) {
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
   return (
     <div
       role="group"
@@ -415,6 +457,10 @@ function ToolbarChipGroup({
 }
 
 function SplitButton({
+  label,
+}) {
+  return (
+
   label,
   trigger,
   content,
