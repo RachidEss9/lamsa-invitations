@@ -7,10 +7,12 @@ import {
   pageSizeOf,
   personalize,
   type DesignPage,
+  type EnvelopeSettings,
   type OpeningSettings,
   type OpeningToneId,
 } from "@/lib/design";
 import { fontFamilyFor } from "@/lib/fonts";
+import { envelopeStageBox, usableLining } from "@/lib/envelope";
 import { pageEntranceEnd } from "@/lib/journey";
 import {
   openingFrame,
@@ -136,23 +138,27 @@ function InvitationCard({
 /* Envelope                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const ENVELOPE = { left: 90, top: 70, width: 820, height: 1263 };
-const FLAP_HEIGHT = 660;
-const SEAL_TOP = ENVELOPE.top + FLAP_HEIGHT - 22;
-
 function EnvelopeScene({
   frame,
   palette,
   card,
   guestName,
   tone,
+  stationery,
 }: {
   frame: OpeningFrame;
   palette: Palette;
   card: ReactNode;
   guestName?: string | null;
   tone: OpeningToneId;
+  stationery?: EnvelopeSettings;
 }) {
+  // The envelope is a real object with a real size; older openings without a
+  // stationery choice keep the exact legacy box.
+  const box = envelopeStageBox(stationery);
+  const liningOverride = usableLining(stationery?.lining);
+  const sealColour = usableLining(stationery?.sealColor) ?? palette.accent;
+  const sealInitials = (stationery?.sealInitials ?? "").trim().slice(0, 3);
   const body =
     tone === "ink"
       ? `linear-gradient(155deg, ${palette.ink} 0%, #0d0c0b 100%)`
@@ -163,9 +169,10 @@ function EnvelopeScene({
           )} 58%, ${rgba(palette.accent, 0.16)} 100%)`
         : `linear-gradient(150deg, ${palette.accent} 0%, ${rgba(palette.accent, 1)} 45%, ${rgba("#2b0007", 1)} 100%)`;
   const lining =
-    tone === "ink"
+    liningOverride ??
+    (tone === "ink"
       ? `linear-gradient(180deg, ${rgba(palette.accent, 0.55)}, ${rgba(palette.ink, 1)})`
-      : `linear-gradient(180deg, ${rgba("#9c1930", 1)}, ${palette.accent})`;
+      : `linear-gradient(180deg, ${rgba("#9c1930", 1)}, ${palette.accent})`);
   const address = tone === "ivory" ? palette.accent : palette.background;
   const edge =
     tone === "ivory"
@@ -189,10 +196,10 @@ function EnvelopeScene({
       <div
         className="absolute overflow-hidden"
         style={{
-          left: ENVELOPE.left,
-          top: ENVELOPE.top,
-          width: ENVELOPE.width,
-          height: ENVELOPE.height,
+          left: box.left,
+          top: box.top,
+          width: box.width,
+          height: box.height,
           background: body,
           borderRadius: 6,
           boxShadow: `0 40px 90px ${rgba("#000000", 0.35)}`,
@@ -202,7 +209,7 @@ function EnvelopeScene({
         <div
           className="absolute inset-x-0 top-0"
           style={{
-            height: FLAP_HEIGHT + 80,
+            height: box.flapHeight + 80,
             background: `linear-gradient(180deg, ${rgba("#000000", 0.34)}, ${rgba(
               "#000000",
               0.06,
@@ -225,10 +232,10 @@ function EnvelopeScene({
       <div
         className="absolute overflow-hidden"
         style={{
-          left: ENVELOPE.left,
-          top: ENVELOPE.top + 560,
-          width: ENVELOPE.width,
-          height: ENVELOPE.height - 560,
+          left: box.left,
+          top: box.pocketTop,
+          width: box.width,
+          height: box.top + box.height - box.pocketTop,
           background: body,
           // The pocket's folded edge rises to meet the flap's point, so the
           // envelope reads shut while the card waits behind it.
@@ -274,10 +281,10 @@ function EnvelopeScene({
       <div
         className="absolute"
         style={{
-          left: ENVELOPE.left,
-          top: ENVELOPE.top,
-          width: ENVELOPE.width,
-          height: FLAP_HEIGHT,
+          left: box.left,
+          top: box.top,
+          width: box.width,
+          height: box.flapHeight,
           perspective: 1600,
           transformStyle: "preserve-3d",
           zIndex: 3,
@@ -315,8 +322,8 @@ function EnvelopeScene({
         aria-hidden
         className="absolute"
         style={{
-          left: ENVELOPE.left + ENVELOPE.width / 2,
-          top: SEAL_TOP,
+          left: box.left + box.width / 2,
+          top: box.sealTop,
           width: sealSize,
           height: sealSize,
           transform: "translate(-50%, -50%)",
@@ -328,7 +335,7 @@ function EnvelopeScene({
             key={side}
             className="absolute inset-0 grid place-items-center rounded-full"
             style={{
-              background: `radial-gradient(circle at 34% 28%, #b3263c, ${palette.accent} 58%, #3c0009)`,
+              background: `radial-gradient(circle at 34% 28%, ${rgba("#ffffff", 0.28)}, ${sealColour} 58%, ${rgba("#000000", 0.55)})`,
               clipPath:
                 side < 0
                   ? "polygon(0 0, 52% 0, 46% 40%, 54% 66%, 44% 100%, 0 100%)"
@@ -344,10 +351,17 @@ function EnvelopeScene({
             }}
           >
             <span
-              className="text-white/70"
-              style={{ fontSize: Math.round(sealSize * 0.24) }}
+              className="text-white/75"
+              style={{
+                fontSize: Math.round(
+                  sealSize * (sealInitials.length > 2 ? 0.17 : 0.24),
+                ),
+                letterSpacing: sealInitials ? "0.08em" : undefined,
+                fontFamily: '"Cormorant Garamond", Georgia, serif',
+                fontWeight: 600,
+              }}
             >
-              ✦
+              {sealInitials || "✦"}
             </span>
           </div>
         ))}
@@ -1256,6 +1270,7 @@ export function OpeningStage({
           card={card}
           guestName={guestName}
           tone={tone}
+          stationery={opening.stationery}
         />
       );
       break;
@@ -1267,6 +1282,7 @@ export function OpeningStage({
           card={card}
           guestName={guestName}
           tone={tone}
+          stationery={opening.stationery}
         />
       );
       break;

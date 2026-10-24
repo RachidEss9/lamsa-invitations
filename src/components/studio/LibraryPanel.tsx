@@ -1371,12 +1371,12 @@ export function LibraryPanel({
                         key={experience.id}
                         type="button"
                         onClick={() => {
+                          // Only the experience changes here: the suite's
+                          // materials, envelope size, and palette stay.
                           onApplyOpening({
+                            ...design.opening,
                             experience: experience.id as OpeningSettings["experience"],
-                            duration: design.opening.duration,
-                            autoOpen: design.opening.autoOpen,
-                            welcome: design.opening.welcome,
-                          } as OpeningSettings);
+                          });
                           onClose();
                         }}
                         className="flex flex-col gap-2 border border-ink/12 p-3 text-left transition-colors hover:border-ink/40"

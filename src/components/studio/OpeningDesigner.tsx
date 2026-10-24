@@ -13,8 +13,16 @@ import {
   OPENING_EXPERIENCES,
   OPENING_TONES,
   type DesignPage,
+  type EnvelopeSettings,
   type OpeningSettings,
 } from "@/lib/design";
+import {
+  ENVELOPE_PRESETS,
+  defaultEnvelopeSettings,
+  envelopeMillimetres,
+  envelopePresetFor,
+  usableLining,
+} from "@/lib/envelope";
 import {
   OPENING_STAGES,
   OPENING_STORE_KEY,
@@ -99,6 +107,9 @@ export function OpeningDesigner({
   const [stillStage, setStillStage] = useState<string | null>(null);
   const [presetName, setPresetName] = useState("");
   const [libraryVersion, setLibraryVersion] = useState(0);
+  const stationery = opening.stationery;
+  const envelopeMm = envelopeMillimetres(stationery);
+  const envelopePreset = envelopePresetFor(stationery);
 
   const saved = useMemo(
     () => (open ? readLibrary() : []),
@@ -117,6 +128,19 @@ export function OpeningDesigner({
 
   const patchPalette = (next: { accent?: string; hull?: string; paper?: string }) =>
     onChange({ ...opening, palette: { ...opening.palette, ...next } });
+
+  // Stationery starts from the effective size the suite is already showing, so
+  // nudging one dimension never jumps the envelope to an unrelated preset.
+  const stationeryBase = (): EnvelopeSettings => ({
+    ...defaultEnvelopeSettings(),
+    width: envelopeMm.width,
+    height: envelopeMm.height,
+    ...(opening.stationery ?? {}),
+  });
+  const patchStationery = (next: Partial<EnvelopeSettings>) =>
+    patch({ stationery: { ...stationeryBase(), ...next } });
+  const patchStationeryLive = (next: Partial<EnvelopeSettings>) =>
+    patchLive({ stationery: { ...stationeryBase(), ...next } });
 
   const replay = () => {
     setStillStage(null);
@@ -138,7 +162,7 @@ export function OpeningDesigner({
   // Materials and colours restart the preview so the change is visible at once;
   // the emergence sliders do not, because dragging them would restart the run
   // dozens of times a second. The replay control shows the new choreography.
-  const previewKey = `${runToken}-${stillStage ?? "play"}-${opening.experience}-${opening.tone ?? ""}-${opening.palette?.accent ?? ""}-${opening.palette?.hull ?? ""}-${opening.palette?.paper ?? ""}`;
+  const previewKey = `${runToken}-${stillStage ?? "play"}-${opening.experience}-${opening.tone ?? ""}-${opening.palette?.accent ?? ""}-${opening.palette?.hull ?? ""}-${opening.palette?.paper ?? ""}-${stationery?.width ?? ""}x${stationery?.height ?? ""}-${stationery?.flapDepth ?? ""}-${stationery?.lining ?? ""}-${stationery?.sealColor ?? ""}-${stationery?.sealInitials ?? ""}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -288,6 +312,176 @@ export function OpeningDesigner({
                     </button>
                   ))}
                 </div>
+              </section>
+            )}
+
+            {hasMaterial && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+                    Envelope
+                  </p>
+                  <span className="font-meta text-[9px] tabular-nums text-ink/35">
+                    {envelopeMm.width} × {envelopeMm.height} mm
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {ENVELOPE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      title={preset.note}
+                      aria-pressed={envelopePreset?.id === preset.id}
+                      onClick={() =>
+                        patchStationery({
+                          width: preset.width,
+                          height: preset.height,
+                        })
+                      }
+                      className={cn(
+                        "border px-1.5 py-1.5 text-[9px] uppercase tracking-[0.08em] transition-colors",
+                        envelopePreset?.id === preset.id
+                          ? "border-[var(--red)] bg-[var(--red)]/8 text-ink"
+                          : "border-ink/15 text-ink/55 hover:border-ink/40 hover:text-ink",
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                      Width mm
+                    </span>
+                    <Input
+                      type="number"
+                      min={40}
+                      max={500}
+                      value={envelopeMm.width}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        if (!Number.isFinite(value)) return;
+                        patchStationery({
+                          width: Math.min(500, Math.max(40, value)),
+                        });
+                      }}
+                      className="h-8 rounded-none text-[11px] tabular-nums"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                      Height mm
+                    </span>
+                    <Input
+                      type="number"
+                      min={40}
+                      max={500}
+                      value={envelopeMm.height}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        if (!Number.isFinite(value)) return;
+                        patchStationery({
+                          height: Math.min(500, Math.max(40, value)),
+                        });
+                      }}
+                      className="h-8 rounded-none text-[11px] tabular-nums"
+                    />
+                  </label>
+                </div>
+                <RangeRow
+                  label="Flap depth"
+                  value={`${Math.round((stationery?.flapDepth ?? 0.523) * 100)}%`}
+                  min={20}
+                  max={75}
+                  step={1}
+                  current={Math.round((stationery?.flapDepth ?? 0.523) * 100)}
+                  onInput={(value) => patchStationeryLive({ flapDepth: value / 100 })}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                      Lining
+                    </span>
+                    <span className="flex items-center gap-1 border border-ink/15 px-1">
+                      <input
+                        type="color"
+                        aria-label="Envelope lining colour"
+                        value={usableLining(stationery?.lining) ?? "#9c1930"}
+                        onChange={(event) =>
+                          patchStationery({ lining: event.target.value })
+                        }
+                        className="h-6 w-6 shrink-0 cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-[9px] uppercase tracking-[0.06em] text-ink/40">
+                        {usableLining(stationery?.lining) ?? "suite tone"}
+                      </span>
+                      {stationery?.lining && (
+                        <button
+                          type="button"
+                          onClick={() => patchStationery({ lining: undefined })}
+                          className="shrink-0 px-1 text-[8px] uppercase text-ink/35 hover:text-[var(--red)]"
+                        >
+                          Auto
+                        </button>
+                      )}
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                      Wax
+                    </span>
+                    <span className="flex items-center gap-1 border border-ink/15 px-1">
+                      <input
+                        type="color"
+                        aria-label="Wax seal colour"
+                        value={usableLining(stationery?.sealColor) ?? accent}
+                        onChange={(event) =>
+                          patchStationery({ sealColor: event.target.value })
+                        }
+                        className="h-6 w-6 shrink-0 cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-[9px] uppercase tracking-[0.06em] text-ink/40">
+                        {usableLining(stationery?.sealColor) ?? "suite accent"}
+                      </span>
+                      {stationery?.sealColor && (
+                        <button
+                          type="button"
+                          onClick={() => patchStationery({ sealColor: undefined })}
+                          className="shrink-0 px-1 text-[8px] uppercase text-ink/35 hover:text-[var(--red)]"
+                        >
+                          Auto
+                        </button>
+                      )}
+                    </span>
+                  </label>
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                    Seal initials
+                  </span>
+                  <Input
+                    value={stationery?.sealInitials ?? ""}
+                    maxLength={3}
+                    placeholder="A & J"
+                    onChange={(event) =>
+                      patchStationery({
+                        sealInitials: event.target.value.slice(0, 3),
+                      })
+                    }
+                    className="h-8 rounded-none text-[11px]"
+                  />
+                  <span className="mt-1 block text-[9px] text-ink/35">
+                    Up to three characters, stamped into the wax.
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => patch({ stationery: undefined })}
+                  className="text-[9px] uppercase tracking-[0.1em] text-ink/40 hover:text-[var(--red)]"
+                >
+                  Use the classic suite
+                </button>
               </section>
             )}
 

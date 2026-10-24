@@ -20,6 +20,13 @@ const base: OpeningSettings = {
   tone: "ivory",
   palette: { accent: "#7b1027", paper: "#f4ecdd" },
   motion: { startScale: 0.7, rise: 420, cardStart: 0.3 },
+  stationery: {
+    width: 162,
+    height: 229,
+    flapDepth: 0.48,
+    lining: "#efe6d6",
+    sealInitials: "A&J",
+  },
 };
 
 const colours = { accent: "#710014", paper: "#f2f1ed", hull: "#161616" };
@@ -102,6 +109,7 @@ describe("saved opening configurations", () => {
     expect(applied.tone).toBe("ivory");
     expect(applied.palette).toEqual(base.palette);
     expect(applied.motion).toEqual(base.motion);
+    expect(applied.stationery).toEqual(base.stationery);
     expect(applied.welcome).toBe("You are invited");
     expect(applied.coverStorageId).toBe("storage-b");
     expect(applied.autoOpen).toBe(false);

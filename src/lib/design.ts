@@ -521,6 +521,23 @@ export interface OpeningPalette {
   paper?: string;
 }
 
+/**
+ * The physical suite around the card. Sizes are in millimetres, the way an
+ * envelope is sold; the renderer converts them into the opening artboard.
+ */
+export interface EnvelopeSettings {
+  width: number;
+  height: number;
+  /** Hinge depth as a fraction of the height, 0.2–0.75. */
+  flapDepth?: number;
+  /** Flat lining colour; omitted uses the suite tone. */
+  lining?: string;
+  /** Up to three characters stamped into the wax seal. */
+  sealInitials?: string;
+  /** Flat wax colour; omitted uses the suite accent. */
+  sealColor?: string;
+}
+
 export interface OpeningSettings {
   experience: OpeningExperienceId;
   duration: number;
@@ -531,6 +548,8 @@ export interface OpeningSettings {
   tone?: OpeningToneId;
   palette?: OpeningPalette;
   motion?: OpeningMotion;
+  /** Optional physical envelope; omitted keeps the classic suite. */
+  stationery?: EnvelopeSettings;
 }
 
 export type ClosingStyleId = "message" | "seal" | "curtain" | "fade";

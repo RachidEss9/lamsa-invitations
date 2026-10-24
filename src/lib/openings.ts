@@ -62,6 +62,9 @@ function payloadOf(settings: OpeningSettings): OpeningSettings {
     tone: settings.tone,
     palette: settings.palette,
     motion: settings.motion,
+    // The physical suite travels with a saved opening: an envelope size is part
+    // of the look, not a per-invitation afterthought.
+    stationery: settings.stationery,
   };
 }
 
@@ -135,6 +138,7 @@ export function applySavedOpening(
     tone: saved.opening.tone,
     palette: saved.opening.palette,
     motion: saved.opening.motion,
+    stationery: saved.opening.stationery,
   };
 }
 
@@ -144,6 +148,9 @@ export function openingSummary(settings: OpeningSettings): string {
   const parts = [
     `${Math.round(settings.duration / 100) / 10}s`,
     OPENING_TONES.find((entry) => entry.id === tone)?.label ?? tone,
+    ...(settings.stationery
+      ? [`${Math.round(settings.stationery.width)}×${Math.round(settings.stationery.height)} mm`]
+      : []),
   ];
   if (settings.motion?.startScale !== undefined) {
     parts.push(`${Math.round(settings.motion.startScale * 100)}% start`);
