@@ -1,14 +1,20 @@
-import type { DesignElement, DesignPage } from "@/lib/design";
+import { makeId, type DesignElement, type DesignPage } from "@/lib/design";
 import {
   GRADIENT_PRESETS,
   PALETTES,
   PALETTE_GROUPS,
+  paletteFromPage,
   readRecentColours,
   readSavedColours,
+  readSavedPalettes,
   rememberColour,
   removeSavedColour,
+  removeSavedPalette,
   saveColour,
+  upsertSavedPalette,
+  writeSavedPalettes,
   type ColourPalette,
+  type SavedPalette,
 } from "@/lib/palettes";
 import { cn } from "@/lib/utils";
 import { Plus, X } from "lucide-react";
@@ -89,6 +95,11 @@ export function ColourPanel({
   const [saved, setSaved] = useState<string[]>(() => readSavedColours());
   const [recent, setRecent] = useState<string[]>(() => readRecentColours());
   const [group, setGroup] = useState<string>("Luxury");
+  const [customPalettes, setCustomPalettes] = useState<SavedPalette[]>(() =>
+    readSavedPalettes(),
+  );
+  const [paletteName, setPaletteName] = useState("");
+  const derivedPalette = useMemo(() => paletteFromPage(page), [page]);
 
   const current = target.value || page.background;
   const safe = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(current) ? current : "#f2f1ed";
@@ -178,6 +189,120 @@ export function ColourPanel({
           </div>
         </div>
       )}
+
+      <div className="border-b border-ink/12 p-3">
+        <p className="mb-2 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/40">
+          Your palettes
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="flex overflow-hidden border border-ink/15">
+            {[derivedPalette.paper, derivedPalette.ink, derivedPalette.accent].map(
+              (colour) => (
+                <span
+                  key={colour}
+                  className="block size-5"
+                  style={{ background: colour }}
+                  title={colour}
+                />
+              ),
+            )}
+          </span>
+          <span className="text-[9px] text-ink/40">from this page</span>
+        </div>
+        <div className="mt-2 flex gap-1.5">
+          <input
+            value={paletteName}
+            onChange={(event) => setPaletteName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              const name = paletteName.trim();
+              if (!name) return;
+              setCustomPalettes((current) =>
+                writeSavedPalettes(
+                  upsertSavedPalette(current, {
+                    id: makeId("palette"),
+                    name,
+                    ...derivedPalette,
+                  }),
+                ),
+              );
+              setPaletteName("");
+            }}
+            placeholder="Name this palette"
+            aria-label="Palette name"
+            maxLength={60}
+            className="h-7 min-w-0 flex-1 border border-ink/20 bg-transparent px-2 text-[10px] outline-none focus:border-ink"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const name =
+                paletteName.trim() || `My palette ${customPalettes.length + 1}`;
+              setCustomPalettes((current) =>
+                writeSavedPalettes(
+                  upsertSavedPalette(current, {
+                    id: makeId("palette"),
+                    name,
+                    ...derivedPalette,
+                  }),
+                ),
+              );
+              setPaletteName("");
+            }}
+            className="shrink-0 border border-ink/20 px-2 text-[8px] uppercase tracking-[0.1em] text-ink/60 hover:border-ink hover:text-ink"
+          >
+            Save
+          </button>
+        </div>
+        {customPalettes.length > 0 && (
+          <ul className="mt-2 divide-y divide-ink/10 border border-ink/10">
+            {customPalettes.map((palette) => (
+              <li key={palette.id} className="flex items-center gap-1 px-1.5 py-1">
+                <span className="flex shrink-0 overflow-hidden border border-ink/10">
+                  {[palette.paper, palette.ink, palette.accent].map((colour) => (
+                    <span
+                      key={colour}
+                      className="block size-3.5"
+                      style={{ background: colour }}
+                    />
+                  ))}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[10px] text-ink/70">
+                  {palette.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onApplyPalette({
+                      id: palette.id,
+                      name: palette.name,
+                      group: "Yours",
+                      paper: palette.paper,
+                      ink: palette.ink,
+                      accent: palette.accent,
+                    })
+                  }
+                  className="shrink-0 border border-ink/20 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.1em] text-ink/60 hover:border-ink hover:text-ink"
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete ${palette.name}`}
+                  onClick={() =>
+                    setCustomPalettes((current) =>
+                      writeSavedPalettes(removeSavedPalette(current, palette.id)),
+                    )
+                  }
+                  className="shrink-0 p-0.5 text-ink/35 hover:text-[var(--red)]"
+                >
+                  <X className="size-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {recent.length > 0 && (
         <div className="border-b border-ink/12 p-3">

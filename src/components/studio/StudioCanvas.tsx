@@ -46,6 +46,10 @@ interface StudioCanvasProps {
   rtl?: boolean;
   aspectLocked: boolean;
   ignoreExit?: boolean;
+  /** Canvas overlays. They are drawing aids only and never saved. */
+  showGrid?: boolean;
+  showRulers?: boolean;
+  showSafeArea?: boolean;
   resetViewToken?: number;
   editRequest?: { id: string; token: number } | null;
   onZoom: (value: number) => void;
@@ -232,6 +236,9 @@ export function StudioCanvas({
   rtl,
   aspectLocked,
   ignoreExit,
+  showGrid = false,
+  showRulers = false,
+  showSafeArea = false,
   resetViewToken = 0,
   editRequest,
   onZoom,
@@ -267,6 +274,25 @@ export function StudioCanvas({
   const scale = Math.max(0.05, fit * zoom);
   const size = pageSizeOf(page);
   const selected = page.elements.filter((element) => selectedIds.includes(element.id));
+
+  // Overlay geometry. The grid is a percentage of the artboard, so it looks
+  // the same on a 1000 px card and a 2480 px A4 print canvas. The safe area
+  // uses the page's saved print margin, or a sensible 4% when none is set.
+  const gridStep = Math.max(20, size.width / 20);
+  const safeMargin = Math.max(
+    0,
+    page.margin && page.margin > 0
+      ? page.margin
+      : Math.round(size.width * 0.04),
+  );
+  const rulerTicks = (() => {
+    const step = size.width > 1600 ? 200 : 100;
+    const ticks: { value: number; major: boolean }[] = [];
+    for (let value = 0; value <= size.width + 0.5; value += step) {
+      ticks.push({ value, major: value % (step * 2) === 0 });
+    }
+    return ticks;
+  })();
 
 
   // Inline editing is local to the canvas; the studio needs to know so it can
@@ -786,6 +812,34 @@ export function StudioCanvas({
             className="shadow-none"
           />
 
+          {/* Grid and safe-area overlays: drawing aids, never printed, never
+              saved. Both live in design coordinates so they scale with zoom. */}
+          {showGrid && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.5]"
+              style={{
+                zIndex: 4,
+                backgroundImage:
+                  "linear-gradient(to right, rgba(113,0,20,0.14) 1px, transparent 1px), linear-gradient(to bottom, rgba(113,0,20,0.14) 1px, transparent 1px)",
+                backgroundSize: `${gridStep}px ${gridStep}px`,
+              }}
+            />
+          )}
+          {showSafeArea && safeMargin > 0 && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute border border-dashed border-[#710014]/35"
+              style={{
+                zIndex: 5,
+                left: safeMargin,
+                top: safeMargin,
+                width: Math.max(1, size.width - safeMargin * 2),
+                height: Math.max(1, size.height - safeMargin * 2),
+              }}
+            />
+          )}
+
           {/* Selection and hit layer, in the same design coordinates. */}
           <div className="absolute inset-0" style={{ zIndex: 50 }}>
             {page.elements.map((element, index) => {
@@ -874,6 +928,64 @@ export function StudioCanvas({
             </div>
           )}
         </div>
+
+        {showRulers && (
+          <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute border border-ink/15 bg-[var(--paper-light)] text-[8px] text-ink/45"
+              style={{
+                left: 0,
+                top: -16,
+                height: 14,
+                width: size.width * scale,
+                zIndex: 60,
+              }}
+            >
+              {rulerTicks.map((tick) => (
+                <span
+                  key={`x-${tick.value}`}
+                  className="absolute top-0 h-full"
+                  style={{ left: tick.value * scale }}
+                >
+                  <span
+                    className="absolute left-0 top-0 w-px bg-ink/25"
+                    style={{ height: tick.major ? 7 : 4 }}
+                  />
+                  {tick.major && (
+                    <span className="absolute left-1 top-1/2 -translate-y-1/2 whitespace-nowrap tabular-nums">
+                      {Math.round(tick.value)}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute border border-ink/15 bg-[var(--paper-light)]"
+              style={{
+                left: -16,
+                top: 0,
+                width: 14,
+                height: size.height * scale,
+                zIndex: 60,
+              }}
+            >
+              {rulerTicks.map((tick) => (
+                <span
+                  key={`y-${tick.value}`}
+                  className="absolute left-0 w-full"
+                  style={{ top: tick.value * scale }}
+                >
+                  <span
+                    className="absolute left-0 top-0 h-px bg-ink/25"
+                    style={{ width: tick.major ? 7 : 4 }}
+                  />
+                </span>
+              ))}
+            </div>
+          </>
+        )}
       </div>          {menu && (
         <ContextMenu
           menu={menu}

@@ -369,9 +369,53 @@ export function preflightDesign(
   currentIndex: number,
   measurements: PreflightMeasurements = {},
 ): PreflightIssue[] {
-  return pagesForPrint(design, settings, currentIndex).flatMap(({ page }) =>
+  const pages = pagesForPrint(design, settings, currentIndex);
+  const issues = pages.flatMap(({ page }) =>
     preflightPage(page, settings, measurements),
   );
+
+  const paper = paperDimensions(settings);
+  const paperEdges = [paper.widthMm, paper.heightMm].sort((a, b) => a - b);
+
+  // A design created from a physical brief should be printed at that size.
+  // Orientation is ignored here because turning the sheet is intentional.
+  if (design.format) {
+    const brief = formatToMillimetres(design.format);
+    const briefEdges = [brief.widthMm, brief.heightMm].sort((a, b) => a - b);
+    const offBy = Math.max(
+      Math.abs(paperEdges[0] - briefEdges[0]),
+      Math.abs(paperEdges[1] - briefEdges[1]),
+    );
+    if (offBy > 2) {
+      issues.push({
+        id: "paper-format",
+        severity: "info",
+        title: "Paper differs from the design's own size",
+        detail: `This invitation was set up at ${formatMeasurement(brief.widthMm, settings.unit)} × ${formatMeasurement(brief.heightMm, settings.unit)}; the sheet here is ${formatMeasurement(paper.widthMm, settings.unit)} × ${formatMeasurement(paper.heightMm, settings.unit)}. The artwork will be ${settings.fit === "fill" ? "cropped to fill" : "centred and fitted"}.`,
+      });
+    }
+  }
+
+  // Fill always loses the edges that do not match the sheet's proportions.
+  if (settings.fit === "fill") {
+    const area = printableArea(settings);
+    const sheetAspect = area.w / area.h;
+    const mismatched = pages.some(
+      ({ page }) =>
+        Math.abs(pageAspectOf(page) - sheetAspect) / sheetAspect > 0.03,
+    );
+    if (mismatched) {
+      issues.push({
+        id: "fill-crop",
+        severity: "info",
+        title: "Fill crops the edges",
+        detail:
+          "The artwork proportions differ from the sheet, so Fill will trim one pair of edges. Choose Fit inside to keep the whole card visible.",
+      });
+    }
+  }
+
+  return issues;
 }
 
 /**

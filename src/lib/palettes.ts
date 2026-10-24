@@ -1,4 +1,4 @@
-import type { DesignDocument } from "@/lib/design";
+import type { DesignDocument, DesignPage } from "@/lib/design";
 
 /**
  * Curated invitation palettes.
@@ -412,4 +412,116 @@ export function recolourDesign(
       })),
     })),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Saved palettes                                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface SavedPalette {
+  id: string;
+  name: string;
+  paper: string;
+  ink: string;
+  accent: string;
+}
+
+export const SAVED_PALETTES_KEY = "lamsa.savedPalettes.v1";
+export const MAX_SAVED_PALETTES = 24;
+
+/** The three working roles of the current page, read from its own layers. */
+export function paletteFromPage(page: DesignPage): Omit<SavedPalette, "id" | "name"> {
+  const paper = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(page.background)
+    ? page.background
+    : "#f2f1ed";
+  const type = new Map<string, number>();
+  const ornament = new Map<string, number>();
+  const add = (map: Map<string, number>, colour?: string) => {
+    if (!colour || colour === "transparent") return;
+    map.set(colour, (map.get(colour) ?? 0) + 1);
+  };
+  for (const element of page.elements) {
+    if (element.kind === "text" || element.kind === "motif") add(type, element.color);
+    if (element.kind === "shape" || element.kind === "image") {
+      add(ornament, element.fill);
+      add(ornament, element.stroke);
+    }
+  }
+  const ink =
+    [...type.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    [...ornament.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "#161616";
+  const accent =
+    [...ornament.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([colour]) => colour)
+      .find((colour) => colour.toLowerCase() !== ink.toLowerCase()) ?? "#b38f6f";
+  return { paper, ink, accent };
+}
+
+/** Replaces a palette with the same id, otherwise adds it at the front. */
+export function upsertSavedPalette(
+  list: SavedPalette[],
+  entry: SavedPalette,
+): SavedPalette[] {
+  return [entry, ...list.filter((item) => item.id !== entry.id)].slice(
+    0,
+    MAX_SAVED_PALETTES,
+  );
+}
+
+export function removeSavedPalette(
+  list: SavedPalette[],
+  id: string,
+): SavedPalette[] {
+  return list.filter((item) => item.id !== id);
+}
+
+function paletteStorage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function readSavedPalettes(
+  store: Storage | null = paletteStorage(),
+): SavedPalette[] {
+  if (!store) return [];
+  try {
+    const raw = store.getItem(SAVED_PALETTES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (item): item is SavedPalette =>
+          Boolean(item) &&
+          typeof item === "object" &&
+          typeof (item as SavedPalette).id === "string" &&
+          typeof (item as SavedPalette).name === "string" &&
+          typeof (item as SavedPalette).paper === "string" &&
+          typeof (item as SavedPalette).ink === "string" &&
+          typeof (item as SavedPalette).accent === "string",
+      )
+      .slice(0, MAX_SAVED_PALETTES);
+  } catch {
+    return [];
+  }
+}
+
+export function writeSavedPalettes(
+  list: SavedPalette[],
+  store: Storage | null = paletteStorage(),
+): SavedPalette[] {
+  const next = list.slice(0, MAX_SAVED_PALETTES);
+  if (store) {
+    try {
+      store.setItem(SAVED_PALETTES_KEY, JSON.stringify(next));
+    } catch {
+      // Losing a palette preference never affects the design.
+    }
+  }
+  return next;
 }

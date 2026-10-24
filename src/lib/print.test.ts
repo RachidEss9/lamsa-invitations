@@ -567,6 +567,79 @@ describe("print preflight", () => {
     );
     expect(issues.map((issue) => issue.elementId)).toEqual(["b"]);
   });
+
+  it("mentions when the chosen paper differs from the saved brief", () => {
+    const design = {
+      ...makeDesign([makePage("p0", "Invitation", [])]),
+      format: {
+        output: "print" as const,
+        unit: "mm" as const,
+        width: 105,
+        height: 148,
+        margin: 0,
+        bleed: 0,
+      },
+    };
+    const issues = preflightDesign(
+      design,
+      { ...settings, paper: "a4", orientation: "portrait" },
+      0,
+    );
+    expect(issues).toEqual([
+      expect.objectContaining({ id: "paper-format", severity: "info" }),
+    ]);
+  });
+
+  it("stays quiet when the paper matches the brief in either orientation", () => {
+    const design = {
+      ...makeDesign([makePage("p0", "Invitation", [])]),
+      format: {
+        output: "both" as const,
+        unit: "mm" as const,
+        width: 148,
+        height: 210,
+        margin: 0,
+        bleed: 3,
+      },
+    };
+    expect(
+      preflightDesign(
+        design,
+        { ...settings, paper: "a5", orientation: "landscape" },
+        0,
+      ),
+    ).toEqual([]);
+  });
+
+  it("notes that Fill crops an off-proportion card", () => {
+    const design = makeDesign([makePage("p0", "Invitation", [])]);
+    const issues = preflightDesign(design, { ...settings, fit: "fill" }, 0);
+    expect(issues).toEqual([
+      expect.objectContaining({ id: "fill-crop", severity: "info" }),
+    ]);
+  });
+
+  it("does not warn about Fill when the proportions agree", () => {
+    const design = makeDesign([
+      makePage("p0", "Square", []),
+    ]);
+    const square = { ...design.pages[0], width: 400, height: 400 };
+    const squareDesign = { ...design, pages: [square] };
+    const issues = preflightDesign(
+      squareDesign,
+      {
+        ...settings,
+        paper: "custom",
+        customWidth: 150,
+        customHeight: 150,
+        unit: "mm",
+        fit: "fill",
+        margins: { top: 6, right: 6, bottom: 6, left: 6 },
+      },
+      0,
+    );
+    expect(issues.map((issue) => issue.id)).not.toContain("fill-crop");
+  });
 });
 
 describe("print filenames", () => {

@@ -79,6 +79,7 @@ import {
   selectionAfterDelete,
   undoHistory,
 } from "@/lib/studio-edit";
+import { applyTypeStyle, type TypeStyle } from "@/lib/type-styles";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -91,6 +92,8 @@ import {
   Eye,
   EyeOff,
   FileText,
+  Frame,
+  Grid2x2,
   Heart,
   History,
   Image as ImageIcon,
@@ -108,6 +111,7 @@ import {
   Play,
   Plus,
   Redo2,
+  Ruler,
   Shapes,
   Share2,
   Smartphone,
@@ -258,6 +262,39 @@ export default function Studio() {
   const [animating, setAnimating] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [device, setDevice] = useState<Device>("desktop");
+  // Drawing aids are per-browser preferences, not part of the invitation, so
+  // they live here and never touch the saved design.
+  const [overlays, setOverlays] = useState<{
+    grid: boolean;
+    rulers: boolean;
+    safe: boolean;
+  }>(() => {
+    const fallback = { grid: false, rulers: false, safe: false };
+    if (typeof window === "undefined") return fallback;
+    try {
+      const raw = JSON.parse(
+        window.localStorage.getItem("lamsa.canvas.overlays") ?? "null",
+      ) as Partial<typeof fallback> | null;
+      if (!raw || typeof raw !== "object") return fallback;
+      return {
+        grid: Boolean(raw.grid),
+        rulers: Boolean(raw.rulers),
+        safe: Boolean(raw.safe),
+      };
+    } catch {
+      return fallback;
+    }
+  });
+  const toggleOverlay = (key: keyof typeof overlays) =>
+    setOverlays((current) => {
+      const next = { ...current, [key]: !current[key] };
+      try {
+        window.localStorage.setItem("lamsa.canvas.overlays", JSON.stringify(next));
+      } catch {
+        // Losing a drawing-aid preference is harmless.
+      }
+      return next;
+    });
   const [aspectLocked, setAspectLocked] = useState(false);
   const [showHidden, setShowHidden] = useState(true);
   const [revealPreview, setRevealPreview] = useState<Set<string>>(new Set());
@@ -1451,6 +1488,28 @@ export default function Studio() {
     );
   };
 
+  const applyTypeStyleToSelection = (style: TypeStyle) => {
+    const textIds = new Set(
+      selected.filter((element) => element.kind === "text").map((element) => element.id),
+    );
+    if (textIds.size === 0) {
+      toast.error("Select a text layer before applying a type style.");
+      return;
+    }
+    apply((current) => ({
+      ...current,
+      pages: current.pages.map((page) => ({
+        ...page,
+        elements: page.elements.map((element) =>
+          textIds.has(element.id) ? applyTypeStyle(element, style) : element,
+        ),
+      })),
+    }));
+    toast.success(
+      `Type style applied to ${textIds.size} text layer${textIds.size === 1 ? "" : "s"}.`,
+    );
+  };
+
   const applyFont = async (fontId: string) => {
     if (selectedIds.length === 0) return;
     const element = page?.elements.find((candidate) => candidate.id === selectedIds[0]);
@@ -2534,6 +2593,10 @@ export default function Studio() {
           <IconButton label="Tablet canvas" active={device === "tablet"} onClick={() => setDevice("tablet")}><Tablet className="size-3.5" /></IconButton>
           <IconButton label="Phone canvas" active={device === "phone"} onClick={() => setDevice("phone")}><Smartphone className="size-3.5" /></IconButton>
           <span className="mx-1 h-5 w-px bg-ink/12" />
+          <IconButton label="Grid" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
+          <IconButton label="Rulers" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
+          <IconButton label="Safe area" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
+          <span className="mx-1 h-5 w-px bg-ink/12" />
           <IconButton label="Toggle left panel" active={leftOpen} onClick={() => setLeftOpen((value) => !value)}><PanelLeft className="size-3.5" /></IconButton>
           <IconButton label="Toggle properties" active={rightOpen} onClick={() => setRightOpen((value) => !value)}><PanelRight className="size-3.5" /></IconButton>
           <span className="mx-1 h-5 w-px bg-ink/12" />
@@ -2648,6 +2711,9 @@ export default function Studio() {
                 rtl={Boolean(content.rtl)}
                 aspectLocked={aspectLocked}
                 ignoreExit={!animating}
+                showGrid={overlays.grid}
+                showRulers={overlays.rulers}
+                showSafeArea={overlays.safe}
                 resetViewToken={resetViewToken}
                 editRequest={editTextRequest}
                 onZoom={setZoom}
@@ -3077,6 +3143,7 @@ export default function Studio() {
         onAddPageLayout={addPageLayout}
         onApplyBuiltinAsset={applyBuiltinAsset}
         onAddRevealPreset={addRevealPreset}
+        onApplyTypeStyle={applyTypeStyleToSelection}
       />
 
       {guestOpen && (

@@ -37,6 +37,7 @@ import {
   MousePointer,
   Palette,
   Save,
+  Star,
   Trash2,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -44,6 +45,17 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
+import {
+  favouriteKey,
+  readFavourites,
+  toggleFavouriteKey,
+  writeFavourites,
+} from "@/lib/library-favourites";
+import {
+  describeTypeStyle,
+  extractTypeStyle,
+  type TypeStyle,
+} from "@/lib/type-styles";
 import {
   makeElement,
   makeId,
@@ -160,6 +172,47 @@ interface LibraryPanelProps {
   onAddPageLayout: (layoutId: string) => void;
   onApplyBuiltinAsset: (asset: BuiltinAsset) => void;
   onAddRevealPreset: (preset: RevealPreset) => void;
+  /** Applies saved lettering to the current text selection. */
+  onApplyTypeStyle?: (style: TypeStyle) => void;
+}
+
+function FavouriteToggle({
+  active,
+  label,
+  onToggle,
+  className,
+}: {
+  active: boolean;
+  label: string;
+  onToggle: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={active ? `Remove ${label} from favourites` : `Add ${label} to favourites`}
+      title={active ? "Remove from favourites" : "Add to favourites"}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+      className={cn(
+        "grid size-6 place-items-center rounded-full border bg-[var(--paper-light)]/90 backdrop-blur-sm transition-colors",
+        active
+          ? "border-[var(--gold)]/60 text-[var(--gold)]"
+          : "border-ink/10 text-ink/30 hover:border-ink/30 hover:text-ink/60",
+        className,
+      )}
+    >
+      <Star
+        className="size-3.5"
+        strokeWidth={1.6}
+        fill={active ? "currentColor" : "none"}
+      />
+    </button>
+  );
 }
 
 function TemplateCard({
@@ -487,6 +540,7 @@ export function LibraryPanel({
   onAddPageLayout,
   onApplyBuiltinAsset,
   onAddRevealPreset,
+  onApplyTypeStyle,
 }: LibraryPanelProps) {
   const [tab, setTab] = useState<LibraryTab>("templates");
   const [query, setQuery] = useState("");
@@ -494,15 +548,44 @@ export function LibraryPanel({
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [favourites, setFavourites] = useState<string[]>(() => readFavourites());
+  const [onlyFavourites, setOnlyFavourites] = useState(false);
+  const [typeStyleName, setTypeStyleName] = useState("");
+  const [savingTypeStyle, setSavingTypeStyle] = useState(false);
+
+  const selectedText = useMemo(() => {
+    if (selectedIds.length === 0) return null;
+    for (const page of design.pages) {
+      for (const element of page.elements) {
+        if (element.kind === "text" && selectedIds.includes(element.id)) {
+          return element;
+        }
+      }
+    }
+    return null;
+  }, [design, selectedIds]);
+
+  const togglePin = useCallback((key: string) => {
+    setFavourites((current) => writeFavourites(toggleFavouriteKey(current, key)));
+  }, []);
 
   // The owner's own saved templates live in Convex, next to the invitation
   // itself, so they survive a new browser and are never shared with guests.
   const savedItems = useQuery(
     api.library.listMine,
-    open ? { kind: "template" as const } : "skip",
+    open ? {} : "skip",
   );
   const createLibraryItem = useMutation(api.library.create);
   const removeLibraryItem = useMutation(api.library.remove);
+
+  const savedTemplates = useMemo(
+    () => (savedItems ?? []).filter((item) => item.kind === "template"),
+    [savedItems],
+  );
+  const savedTypeStyles = useMemo(
+    () => (savedItems ?? []).filter((item) => item.kind === "style"),
+    [savedItems],
+  );
 
   const handleApplyTemplate = useCallback(
     (template: InvitationTemplate) => {
@@ -562,6 +645,55 @@ export function LibraryPanel({
     }
   };
 
+  const saveCurrentTypeStyle = async () => {
+    if (!selectedText) {
+      toast.error("Select a text layer to save its lettering.");
+      return;
+    }
+    const style = extractTypeStyle(selectedText);
+    if (Object.keys(style).length === 0) {
+      toast.error("This layer has no type settings to save.");
+      return;
+    }
+    const fontLabel = fontById(selectedText.font ?? "cormorant-garamond").name;
+    const name =
+      typeStyleName.trim() ||
+      `${fontLabel} ${Math.round(style.fontSize ?? 0)} px`.trim();
+    setSavingTypeStyle(true);
+    try {
+      await createLibraryItem({
+        kind: "style",
+        name,
+        category: "typography",
+        description: describeTypeStyle(style, fontLabel),
+        payload: { style },
+      });
+      setTypeStyleName("");
+      toast.success("Type style saved. Apply it to any text layer.");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "The type style could not be saved.",
+      );
+    } finally {
+      setSavingTypeStyle(false);
+    }
+  };
+
+  const applySavedTypeStyle = (item: { name: string; payload: unknown }) => {
+    const style = (item.payload as { style?: TypeStyle } | null)?.style;
+    if (!style || typeof style !== "object") {
+      toast.error("This saved style has no lettering data.");
+      return;
+    }
+    if (!onApplyTypeStyle) {
+      toast.error("Select a text layer before applying a type style.");
+      return;
+    }
+    onApplyTypeStyle(style);
+  };
+
   const applySavedTemplate = (item: { name: string; payload: unknown }) => {
     const savedDesign = (item.payload as { design?: DesignDocument } | null)
       ?.design;
@@ -586,59 +718,94 @@ export function LibraryPanel({
   };
 
   const filteredSaved = useMemo(() => {
-    const items = savedItems ?? [];
+    const items = savedTemplates;
     const needle = query.trim().toLowerCase();
-    if (!needle) return items;
-    return items.filter(
-      (item) =>
+    return items.filter((item) => {
+      if (
+        onlyFavourites &&
+        !favourites.includes(favouriteKey("saved", item._id))
+      ) {
+        return false;
+      }
+      if (!needle) return true;
+      return (
         item.name.toLowerCase().includes(needle) ||
-        (item.description ?? "").toLowerCase().includes(needle),
-    );
-  }, [savedItems, query]);
+        (item.description ?? "").toLowerCase().includes(needle)
+      );
+    });
+  }, [savedTemplates, query, onlyFavourites, favourites]);
 
   const filteredTemplates = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return TEMPLATES;
-    return TEMPLATES.filter(
-      (t) =>
-        t.name.toLowerCase().includes(needle) ||
-        t.description.toLowerCase().includes(needle) ||
-        t.occasion.toLowerCase().includes(needle),
-    );
-  }, [query]);
+    return TEMPLATES.filter((template) => {
+      if (
+        onlyFavourites &&
+        !favourites.includes(favouriteKey("template", template.id))
+      ) {
+        return false;
+      }
+      if (!needle) return true;
+      return (
+        template.name.toLowerCase().includes(needle) ||
+        template.description.toLowerCase().includes(needle) ||
+        template.occasion.toLowerCase().includes(needle)
+      );
+    });
+  }, [query, onlyFavourites, favourites]);
 
   const filteredStyles = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return BUILTIN_STYLES;
-    return BUILTIN_STYLES.filter(
-      (s) =>
-        s.name.toLowerCase().includes(needle) ||
-        s.note.toLowerCase().includes(needle),
-    );
-  }, [query]);
+    return BUILTIN_STYLES.filter((style) => {
+      if (
+        onlyFavourites &&
+        !favourites.includes(favouriteKey("style", style.name))
+      ) {
+        return false;
+      }
+      if (!needle) return true;
+      return (
+        style.name.toLowerCase().includes(needle) ||
+        style.note.toLowerCase().includes(needle)
+      );
+    });
+  }, [query, onlyFavourites, favourites]);
 
   const filteredFonts = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return FONT_LIBRARY.filter(
-      (font) =>
-        !needle ||
+    return FONT_LIBRARY.filter((font) => {
+      if (
+        onlyFavourites &&
+        !favourites.includes(favouriteKey("font", font.id))
+      ) {
+        return false;
+      }
+      if (!needle) return true;
+      return (
         font.name.toLowerCase().includes(needle) ||
         font.categories.join(" ").toLowerCase().includes(needle) ||
-        (font.note ?? "").toLowerCase().includes(needle),
-    );
-  }, [query]);
+        (font.note ?? "").toLowerCase().includes(needle)
+      );
+    });
+  }, [query, onlyFavourites, favourites]);
 
   const filteredAssets = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return BUILTIN_ASSETS.filter(
-      (asset) =>
-        (!assetCategory || asset.category === assetCategory) &&
-        (!needle ||
-          asset.name.toLowerCase().includes(needle) ||
-          asset.category.toLowerCase().includes(needle) ||
-          asset.note.toLowerCase().includes(needle)),
-    );
-  }, [query, assetCategory]);
+    return BUILTIN_ASSETS.filter((asset) => {
+      if (!assetCategory || asset.category !== assetCategory) return false;
+      if (
+        onlyFavourites &&
+        !favourites.includes(favouriteKey("asset", asset.id))
+      ) {
+        return false;
+      }
+      if (!needle) return true;
+      return (
+        asset.name.toLowerCase().includes(needle) ||
+        asset.category.toLowerCase().includes(needle) ||
+        asset.note.toLowerCase().includes(needle)
+      );
+    });
+  }, [query, assetCategory, onlyFavourites, favourites]);
 
   const filteredReveals = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -703,8 +870,8 @@ export function LibraryPanel({
           ))}
         </div>
 
-        <div className="border-b border-ink/12 px-5 py-3">
-          <label className="relative block">
+        <div className="flex items-center gap-2 border-b border-ink/12 px-5 py-3">
+          <label className="relative block min-w-0 flex-1">
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -730,24 +897,68 @@ export function LibraryPanel({
             />
             <MousePointer className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink/35" />
           </label>
+          <button
+            type="button"
+            aria-pressed={onlyFavourites}
+            aria-label="Show favourites only"
+            title="Show favourites only"
+            onClick={() => setOnlyFavourites((value) => !value)}
+            className={cn(
+              "flex h-8 shrink-0 items-center gap-1.5 border px-2 text-[9px] uppercase tracking-[0.1em] transition-colors",
+              onlyFavourites
+                ? "border-[var(--gold)]/70 bg-[var(--gold)]/10 text-[#7a5f2a]"
+                : "border-ink/20 text-ink/45 hover:border-ink/40 hover:text-ink",
+            )}
+          >
+            <Star
+              className="size-3.5"
+              fill={onlyFavourites ? "currentColor" : "none"}
+              strokeWidth={1.6}
+            />
+            <span className="hidden sm:inline">Favourites</span>
+          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {onlyFavourites &&
+            (tab === "templates" ||
+              tab === "saved" ||
+              tab === "styles" ||
+              tab === "type" ||
+              tab === "assets") && (
+              <p className="mb-3 flex items-center gap-1.5 border border-[var(--gold)]/40 bg-[var(--gold)]/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-[#6b5334]">
+                <Star className="size-3 shrink-0" fill="currentColor" />
+                Showing favourites only. Star any item to keep it here.
+              </p>
+            )}
           {tab === "templates" && (
             <div>
               {filteredTemplates.length === 0 ? (
                 <p className="py-10 text-center text-[12px] text-ink/45">
-                  No templates match that search.
+                  {onlyFavourites
+                    ? "No favourite templates yet. Star one to keep it here."
+                    : "No templates match that search."}
                 </p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {filteredTemplates.map((template) => (
-                    <TemplateCard
-                      key={template.id}
-                      template={template}
-                      selected={content?.templateId === template.id}
-                      onApply={() => handleApplyTemplate(template)}
-                    />
+                    <div key={template.id} className="relative">
+                      <TemplateCard
+                        template={template}
+                        selected={content?.templateId === template.id}
+                        onApply={() => handleApplyTemplate(template)}
+                      />
+                      <FavouriteToggle
+                        className="absolute right-2 top-2"
+                        active={favourites.includes(
+                          favouriteKey("template", template.id),
+                        )}
+                        label={template.name}
+                        onToggle={() =>
+                          togglePin(favouriteKey("template", template.id))
+                        }
+                      />
+                    </div>
                   ))}
                 </div>
               )}
@@ -810,6 +1021,15 @@ export function LibraryPanel({
                         <span className="min-w-0 flex-1 truncate font-ui text-[13px] font-semibold">
                           {item.name}
                         </span>
+                        <FavouriteToggle
+                          active={favourites.includes(
+                            favouriteKey("saved", item._id),
+                          )}
+                          label={item.name}
+                          onToggle={() =>
+                            togglePin(favouriteKey("saved", item._id))
+                          }
+                        />
                       </div>
                       {item.description && (
                         <p className="text-[10px] leading-relaxed text-ink/55">
@@ -873,17 +1093,30 @@ export function LibraryPanel({
             <div>
               {filteredStyles.length === 0 ? (
                 <p className="py-10 text-center text-[12px] text-ink/45">
-                  No styles match that search.
+                  {onlyFavourites
+                    ? "No favourite styles yet. Star one to keep it here."
+                    : "No styles match that search."}
                 </p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {filteredStyles.map((style) => (
-                    <StyleCard
-                      key={style.name}
-                      style={style}
-                      selected={false}
-                      onApply={() => handleApplyStyle(style)}
-                    />
+                    <div key={style.name} className="relative">
+                      <StyleCard
+                        style={style}
+                        selected={false}
+                        onApply={() => handleApplyStyle(style)}
+                      />
+                      <FavouriteToggle
+                        className="absolute right-2 top-2"
+                        active={favourites.includes(
+                          favouriteKey("style", style.name),
+                        )}
+                        label={style.name}
+                        onToggle={() =>
+                          togglePin(favouriteKey("style", style.name))
+                        }
+                      />
+                    </div>
                   ))}
                 </div>
               )}
@@ -894,20 +1127,120 @@ export function LibraryPanel({
             <div>
               {filteredFonts.length === 0 ? (
                 <p className="py-10 text-center text-[12px] text-ink/45">
-                  No fonts match that search.
+                  {onlyFavourites
+                    ? "No favourite fonts yet. Star one to keep it here."
+                    : "No fonts match that search."}
                 </p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredFonts.map((font) => (
-                    <FontCard
-                      key={font.id}
-                      font={font}
-                      selected={font.id === selectedFontId}
-                      onApply={() => handleApplyFont(font.id)}
-                    />
+                    <div key={font.id} className="relative">
+                      <FontCard
+                        font={font}
+                        selected={font.id === selectedFontId}
+                        onApply={() => handleApplyFont(font.id)}
+                      />
+                      <FavouriteToggle
+                        className="absolute right-2 top-2"
+                        active={favourites.includes(favouriteKey("font", font.id))}
+                        label={font.name}
+                        onToggle={() => togglePin(favouriteKey("font", font.id))}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
+              <div className="mt-5 border-t border-ink/10 pt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
+                    Saved type styles
+                  </p>
+                  {selectedText && (
+                    <span className="truncate text-[9px] text-ink/40">
+                      from “{selectedText.name}”
+                    </span>
+                  )}
+                </div>
+                {selectedText ? (
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      value={typeStyleName}
+                      onChange={(event) => setTypeStyleName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void saveCurrentTypeStyle();
+                      }}
+                      placeholder={`${fontById(selectedText.font ?? "cormorant-garamond").name} ${Math.round(selectedText.fontSize ?? 0)} px`}
+                      maxLength={80}
+                      className="h-8 rounded-none border-ink/20 text-[12px]"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void saveCurrentTypeStyle()}
+                      disabled={savingTypeStyle}
+                      className="h-8 shrink-0 rounded-none px-3 text-[9px] uppercase tracking-[0.12em]"
+                    >
+                      <Save className="size-3.5" />
+                      {savingTypeStyle ? "Saving" : "Save"}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[10px] leading-relaxed text-ink/45">
+                    Select a text layer to save its family, size, weight,
+                    spacing, case, and ink as a reusable style.
+                  </p>
+                )}
+                {savedTypeStyles.length > 0 && (
+                  <ul className="mt-2 divide-y divide-ink/10 border border-ink/10">
+                    {savedTypeStyles.map((item) => (
+                      <li
+                        key={item._id}
+                        className="flex items-center gap-1.5 px-2 py-1.5"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => applySavedTypeStyle(item)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className="block truncate text-[11px] text-ink/80">
+                            {item.name}
+                          </span>
+                          <span className="block truncate text-[8.5px] uppercase tracking-[0.08em] text-ink/35">
+                            {item.description ?? "Type style"}
+                          </span>
+                        </button>
+                        {confirmDelete === item._id ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => void deleteSavedTemplate(item._id)}
+                              className="shrink-0 px-1 text-[9px] uppercase text-[var(--red)]"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDelete(null)}
+                              className="shrink-0 px-1 text-[9px] uppercase text-ink/40"
+                            >
+                              No
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label={`Delete ${item.name}`}
+                            onClick={() => setConfirmDelete(item._id)}
+                            className="shrink-0 p-1 text-ink/35 hover:text-[var(--red)]"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <p className="mt-4 border-t border-ink/10 pt-3 text-[9px] leading-relaxed text-ink/40">
                 {FONT_LIBRARY.length} open-source families. Applied to the
                 selected text layer when one is chosen, otherwise shown for
@@ -941,16 +1274,29 @@ export function LibraryPanel({
               <div>
                 {filteredAssets.length === 0 ? (
                   <p className="py-10 text-center text-[12px] text-ink/45">
-                    No assets match that search.
+                    {onlyFavourites
+                      ? "No favourite assets yet. Star one to keep it here."
+                      : "No assets match that search."}
                   </p>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {filteredAssets.map((asset) => (
-                      <AssetCard
-                        key={asset.id}
-                        asset={asset}
-                        onApply={() => onApplyBuiltinAsset(asset)}
-                      />
+                      <div key={asset.id} className="relative">
+                        <AssetCard
+                          asset={asset}
+                          onApply={() => onApplyBuiltinAsset(asset)}
+                        />
+                        <FavouriteToggle
+                          className="absolute right-2 top-2"
+                          active={favourites.includes(
+                            favouriteKey("asset", asset.id),
+                          )}
+                          label={asset.name}
+                          onToggle={() =>
+                            togglePin(favouriteKey("asset", asset.id))
+                          }
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
