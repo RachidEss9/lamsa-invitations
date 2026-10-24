@@ -4,6 +4,7 @@ import {
   FRAME_GROUPS,
   frameBounds,
   frameById,
+  frameLayerIndex,
   framesInGroup,
   type FrameSpec,
 } from "./frames";
@@ -227,5 +228,43 @@ describe("newly added frames", () => {
     expect(copies).toHaveLength(2);
     expect(copies.every((copy) => copy.frameArt === frame.id)).toBe(true);
     expect(copies[1].id).not.toBe(saved.id);
+  });
+});
+
+describe("frame layer order", () => {
+  const page = { width: 1050, height: 1500 };
+  const full = { x: 0, y: 0, w: 1050, h: 1500 };
+
+  it("goes to the bottom of an empty or text-only page", () => {
+    expect(frameLayerIndex([], page)).toBe(0);
+    expect(
+      frameLayerIndex([{ x: 120, y: 480, w: 800, h: 200 }], page),
+    ).toBe(0);
+  });
+
+  it("stays beneath the wording and photographs already on the card", () => {
+    const elements = [
+      { x: 120, y: 480, w: 800, h: 200 },
+      { x: 100, y: 900, w: 500, h: 340 },
+    ];
+    // Inserting at 0 leaves both existing layers on top of the frame.
+    expect(frameLayerIndex(elements, page)).toBe(0);
+  });
+
+  it("sits above a backdrop that fills the page, so the artwork shows", () => {
+    const elements = [full, { x: 120, y: 480, w: 800, h: 200 }];
+    expect(frameLayerIndex(elements, page)).toBe(1);
+
+    // Two stacked full-page washes: the frame belongs above both.
+    expect(frameLayerIndex([full, full], page)).toBe(2);
+  });
+
+  it("treats a near-full-page photograph as a backdrop", () => {
+    const bleedImage = { x: -10, y: -10, w: 1070, h: 1520 };
+    expect(frameLayerIndex([bleedImage], page)).toBe(1);
+
+    // Half-page artwork is content, not a backdrop.
+    const halfPage = { x: 0, y: 0, w: 1050, h: 750 };
+    expect(frameLayerIndex([halfPage], page)).toBe(0);
   });
 });

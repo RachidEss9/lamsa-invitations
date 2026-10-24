@@ -1382,7 +1382,9 @@ export function LibraryPanel({
                     : "No frames match that search."}
                 </p>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                /* Two columns on a phone keeps each frame small enough to scan
+                   without turning the sheet into a long scroll. */
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
                   {filteredFrames.map((frame) => (
                     <div key={frame.id} className="relative">
                       <button

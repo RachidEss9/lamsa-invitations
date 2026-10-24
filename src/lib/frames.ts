@@ -292,6 +292,29 @@ export function frameBounds(
   };
 }
 
+/**
+ * Where a newly added frame belongs in the layer stack.
+ *
+ * A frame is stroke-only artwork, but its element box spans the page. Left on
+ * top it would swallow every click meant for the wording and photographs
+ * beneath it, so frames go under the content — and just above any backdrop
+ * layer that already fills the page (a full-page photograph or colour wash)
+ * so the artwork stays visible.
+ */
+export function frameLayerIndex(
+  elements: Array<{ x: number; y: number; w: number; h: number }>,
+  page: { width: number; height: number },
+): number {
+  const pageArea = Math.max(1, page.width * page.height);
+  let index = 0;
+  for (const element of elements) {
+    const coversPage = element.w * element.h >= pageArea * 0.9;
+    if (!coversPage) break;
+    index += 1;
+  }
+  return index;
+}
+
 export function frameById(id: string | undefined): FrameSpec | undefined {
   if (!id) return undefined;
   return FRAMES.find((frame) => frame.id === id);

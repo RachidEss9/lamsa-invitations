@@ -72,7 +72,7 @@ import {
   contentFromInvitation,
   type InvitationContent,
 } from "@/lib/invitation";
-import { FRAMES, frameBounds, type FrameSpec } from "@/lib/frames";
+import { FRAMES, frameBounds, frameLayerIndex, type FrameSpec } from "@/lib/frames";
 import { pageLayoutById } from "@/lib/layouts";
 import { ensureFont, fontById } from "@/lib/fonts";
 import { recolourDesign, type ColourPalette } from "@/lib/palettes";
@@ -729,8 +729,19 @@ export default function Studio() {
     [applyCanvasSize, sizeDraftValue],
   );
 
-  const addElement = (element: DesignElement) => {
-    setPageElements((elements) => [...elements, element]);
+  /**
+   * Adds a layer to the current page. `insertIndex` places it at a specific
+   * depth in the stack (frames go beneath the content, above any backdrop);
+   * everything else appends on top.
+   */
+  const addElement = (element: DesignElement, insertIndex?: number) => {
+    setPageElements((elements) => {
+      const at =
+        insertIndex === undefined
+          ? elements.length
+          : Math.max(0, Math.min(insertIndex, elements.length));
+      return [...elements.slice(0, at), element, ...elements.slice(at)];
+    });
     setSelectedIds([element.id]);
     setAnimating(false);
   };
@@ -1106,7 +1117,8 @@ export default function Studio() {
    */
   const addFrame = (frame: FrameSpec) => {
     if (!page || !content) return;
-    const bounds = frameBounds(pageSizeOf(page));
+    const pageSize = pageSizeOf(page);
+    const bounds = frameBounds(pageSize);
     addElement(
       makeElement("shape", {
         name: frame.name,
@@ -1123,12 +1135,15 @@ export default function Studio() {
         opacity: 0.85,
         animation: defaultAnimation("fade", 200),
       }),
+      // Beneath the wording and photographs, above a full-page backdrop, so
+      // adding a frame never stops you selecting what is already on the card.
+      frameLayerIndex(page.elements, pageSize),
     );
     setLibrariesOpen(false);
     setAnimating(false);
     setPlaying(false);
     toast.success(
-      `${frame.name} frame added. Resize, rotate, or recolour it like any layer.`,
+      `${frame.name} frame added under your content. Resize, rotate, or recolour it like any layer.`,
     );
   };
 
@@ -2138,7 +2153,9 @@ export default function Studio() {
                     }
                     className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
                   >
-                    {element.kind === "text" ? (
+                    {element.frameArt ? (
+                      <Frame className="size-3 shrink-0 text-[var(--red)]" />
+                    ) : element.kind === "text" ? (
                       <Type className="size-3 shrink-0" />
                     ) : element.kind === "image" ? (
                       <ImageIcon className="size-3 shrink-0" />
