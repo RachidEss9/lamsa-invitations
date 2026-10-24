@@ -1,4 +1,11 @@
-import { DESIGN_ASPECT, type DesignDocument, type DesignPage } from "@/lib/design";
+import {
+  DESIGN_ASPECT,
+  pageAspectOf,
+  pageSizeOf,
+  type DesignDocument,
+  type DesignFormat,
+  type DesignPage,
+} from "@/lib/design";
 
 /**
  * Print preparation for the invitation canvas.
@@ -111,6 +118,21 @@ export function paperDimensions(settings: PrintSettings): PageDimensions {
     : { widthMm, heightMm };
 }
 
+/**
+ * A design's physical brief in millimetres. Pixel-sized canvases are measured
+ * at the studio's fixed 96 px per inch, so even a screen-first document has a
+ * sensible paper size when its host decides to print it.
+ */
+export function formatToMillimetres(format: DesignFormat) {
+  const mmPerUnit =
+    format.unit === "px" ? 25.4 / 96 : toMm(1, format.unit);
+  return {
+    widthMm: Math.max(20, format.width * mmPerUnit),
+    heightMm: Math.max(20, format.height * mmPerUnit),
+    bleedMm: Math.max(0, format.bleed * mmPerUnit),
+  };
+}
+
 /** The actual PDF media size: the trim page plus any bleed band. */
 export function outputDimensions(settings: PrintSettings): PageDimensions {
   const page = paperDimensions(settings);
@@ -137,10 +159,17 @@ export function printableArea(settings: PrintSettings): PrintRect {
   return { x: Math.min(left, page.widthMm - 10), y: Math.min(top, page.heightMm - 10), w, h };
 }
 
-/** Where the 3:4 artwork lands inside the printable area. */
-export function artworkRect(settings: PrintSettings): PrintRect {
+/**
+ * Where the artwork lands inside the printable area. The aspect comes from the
+ * page being printed, so a square, A5, or story-sized canvas is never forced
+ * into the classic 3:4 card.
+ */
+export function artworkRect(
+  settings: PrintSettings,
+  aspect: number = DESIGN_ASPECT,
+): PrintRect {
   const area = printableArea(settings);
-  const artAspect = DESIGN_ASPECT;
+  const artAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : DESIGN_ASPECT;
   const areaAspect = area.w / area.h;
   if (settings.fit === "fill") {
     if (areaAspect > artAspect) {
@@ -162,15 +191,24 @@ export function artworkRect(settings: PrintSettings): PrintRect {
   return { x: area.x, y: area.y + (area.h - h) / 2, w, h };
 }
 
+/** The artwork rectangle for one specific saved page. */
+export function pageArtworkRect(
+  settings: PrintSettings,
+  page: DesignPage | null | undefined,
+): PrintRect {
+  return artworkRect(settings, pageAspectOf(page));
+}
+
 /** Layers that sit outside the canvas will be cropped by any physical page. */
 export function overflowElements(page: DesignPage) {
+  const { width, height } = pageSizeOf(page);
   return page.elements.filter(
     (element) =>
       !element.hidden &&
       (element.x < -0.5 ||
         element.y < -0.5 ||
-        element.x + element.w > 1000.5 ||
-        element.y + element.h > 1333.5),
+        element.x + element.w > width + 0.5 ||
+        element.y + element.h > height + 0.5),
   );
 }
 
@@ -215,6 +253,8 @@ export interface PrintCapture {
   /** The page background, kept for diagnostics; the PDF sheet stays white. */
   background: string;
   label: string;
+  /** The rendered page's width ÷ height. Defaults to the classic card. */
+  aspect?: number;
 }
 
 /**
@@ -239,9 +279,11 @@ export async function buildPrintPdf(
   const totalH = page.heightMm + bleed * 2;
   const pageW = mmToPt(totalW);
   const pageH = mmToPt(totalH);
-  const art = artworkRect(settings);
 
   for (const capture of captures) {
+    // Each page is placed with its own proportions: a mixed document (a
+    // portrait card followed by a landscape insert) keeps both as designed.
+    const art = artworkRect(settings, capture.aspect);
     const pdfPage = pdf.addPage([pageW, pageH]);
     // The sheet itself is white; the artwork (with its own page background)
     // sits inside the margins, exactly as the preview shows.

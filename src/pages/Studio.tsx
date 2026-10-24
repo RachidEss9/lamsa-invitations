@@ -92,6 +92,7 @@ import {
   EyeOff,
   FileText,
   Heart,
+  History,
   Image as ImageIcon,
   Layers,
   Layout,
@@ -242,6 +243,10 @@ export default function Studio() {
   const publishInvitation = useMutation(api.invitations.publish);
   const unpublishInvitation = useMutation(api.invitations.unpublish);
   const generateUploadUrl = useMutation(api.library.generateUploadUrl);
+  const saveDesignVersionMutation = useMutation(api.invitations.saveDesignVersion);
+  const restoreDesignVersionMutation = useMutation(
+    api.invitations.restoreDesignVersion,
+  );
 
   const [design, setDesignState] = useState<DesignDocument | null>(null);
   const designRef = useRef<DesignDocument | null>(null);
@@ -283,6 +288,12 @@ export default function Studio() {
   const [historyTick, setHistoryTick] = useState(0);
   const [historyFlags, setHistoryFlags] = useState({ undo: false, redo: false });
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [versionBusy, setVersionBusy] = useState(false);
+  const designVersions = useQuery(
+    api.invitations.listDesignVersions,
+    historyOpen && idIsValid ? { id: invitationId } : "skip",
+  );
   const [resetViewToken, setResetViewToken] = useState(0);
   const [editTextRequest, setEditTextRequest] = useState<{
     id: string;
@@ -350,6 +361,67 @@ export default function Studio() {
       }, 800);
     },
     [persistDesign],
+  );
+
+  /** A named bookmark the host creates from the history dialog. */
+  const snapshotVersion = useCallback(async () => {
+    if (versionBusy) return;
+    setVersionBusy(true);
+    try {
+      await saveDesignVersionMutation({ id: invitationId });
+      toast.success("Version saved.");
+    } catch (error) {
+      toast.error(messageOf(error));
+    } finally {
+      setVersionBusy(false);
+    }
+  }, [invitationId, saveDesignVersionMutation, versionBusy]);
+
+  /**
+   * Replaces the canvas with a saved snapshot. The server keeps the state that
+   * was replaced, and the local undo stack is cleared because the restored
+   * document is now the starting point.
+   */
+  const restoreVersion = useCallback(
+    async (versionId: Id<"designVersions">) => {
+      if (versionBusy || !content) return;
+      setVersionBusy(true);
+      try {
+        if (saveTimer.current) {
+          window.clearTimeout(saveTimer.current);
+          saveTimer.current = null;
+          if (designRef.current) await persistDesign(designRef.current);
+        }
+        const restored = await restoreDesignVersionMutation({
+          id: invitationId,
+          versionId,
+        });
+        const next = normalizeDesign(restored, content);
+        designRef.current = next;
+        setDesignState(next);
+        setSelectedIds([]);
+        setPageIndex(0);
+        pastRef.current = [];
+        futureRef.current = [];
+        setHistoryFlags({ undo: false, redo: false });
+        setHistoryTick((tick) => tick + 1);
+        setSaveState("saved");
+        hydratedRef.current = invitationId;
+        toast.success("Version restored.");
+        setHistoryOpen(false);
+      } catch (error) {
+        toast.error(messageOf(error));
+      } finally {
+        setVersionBusy(false);
+      }
+    },
+    [
+      content,
+      invitationId,
+      persistDesign,
+      restoreDesignVersionMutation,
+      versionBusy,
+    ],
   );
 
   // Hydrate the studio once per invitation. Older invitations with no canvas
@@ -2464,6 +2536,8 @@ export default function Studio() {
           <span className="mx-1 h-5 w-px bg-ink/12" />
           <IconButton label="Toggle left panel" active={leftOpen} onClick={() => setLeftOpen((value) => !value)}><PanelLeft className="size-3.5" /></IconButton>
           <IconButton label="Toggle properties" active={rightOpen} onClick={() => setRightOpen((value) => !value)}><PanelRight className="size-3.5" /></IconButton>
+          <span className="mx-1 h-5 w-px bg-ink/12" />
+          <IconButton label="Version history" onClick={() => setHistoryOpen(true)}><History className="size-3.5" /></IconButton>
         </div>
 
         <div className="ml-1 flex items-center gap-1.5">
@@ -2870,6 +2944,7 @@ export default function Studio() {
           { id: "properties" as const, label: "Props", icon: PanelRight },
           { id: "pages" as const, label: "Pages", icon: Layout },
           { id: "timeline" as const, label: "Motion", icon: Play },
+          { id: "history" as const, label: "History", icon: History },
         ].map(({ id: sheet, label, icon: Icon }) => (
           <button
             key={sheet}
@@ -2877,6 +2952,10 @@ export default function Studio() {
             onClick={() => {
               if (sheet === "libraries") {
                 setLibrariesOpen(true);
+                return;
+              }
+              if (sheet === "history") {
+                setHistoryOpen(true);
                 return;
               }
               setMobileSheet((current) => (current === sheet ? null : sheet));
@@ -3103,6 +3182,76 @@ export default function Studio() {
           </div>
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={historyOpen}
+        onOpenChange={(open) => !versionBusy && setHistoryOpen(open)}
+      >
+        <DialogContent className="max-h-[86vh] max-w-[520px] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-ui text-xl font-semibold tracking-[-0.01em]">
+              Version history
+            </DialogTitle>
+            <DialogDescription className="text-[12px] leading-relaxed">
+              A snapshot of this canvas is saved automatically as you edit, at
+              most every few minutes. Save one before a big change, or restore
+              an earlier state at any time. Restoring is itself reversible.
+            </DialogDescription>
+          </DialogHeader>
+          <Button
+            type="button"
+            onClick={() => void snapshotVersion()}
+            disabled={versionBusy}
+            className="h-9 w-full rounded-none text-[10px] uppercase tracking-[0.14em]"
+          >
+            {versionBusy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Plus className="size-3.5" />
+            )}
+            Save current version
+          </Button>
+          <div className="space-y-1.5">
+            {designVersions === undefined ? (
+              <p className="flex items-center gap-1.5 py-2 text-[11px] text-ink/45">
+                <Loader2 className="size-3 animate-spin" /> Loading versions…
+              </p>
+            ) : designVersions.length === 0 ? (
+              <p className="border border-dashed border-ink/15 px-3 py-4 text-[11px] leading-relaxed text-ink/50">
+                No versions yet. Keep editing, or save one now before you make a
+                large change.
+              </p>
+            ) : (
+              designVersions.map((version) => (
+                <div
+                  key={version._id}
+                  className="flex items-center justify-between gap-3 border border-ink/12 p-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-medium">
+                      {version.label ?? "Automatic snapshot"}
+                    </p>
+                    <p className="text-[9px] uppercase tracking-[0.08em] text-ink/40">
+                      {new Date(version.createdAt).toLocaleString()} ·{" "}
+                      {version.pageCount} page{version.pageCount === 1 ? "" : "s"} ·{" "}
+                      {version.elementCount} layer{version.elementCount === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void restoreVersion(version._id)}
+                    disabled={versionBusy}
+                    className="h-7 shrink-0 rounded-none px-2 text-[9px] uppercase tracking-[0.1em]"
+                  >
+                    Restore
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <ShortcutReference open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 
       <span className="sr-only" aria-live="polite">

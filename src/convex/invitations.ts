@@ -185,6 +185,70 @@ export const create = mutation({
  * studio autosaves only design data, so it can never overwrite the host's
  * words, guests, or photos, and the details editor can never wipe a design.
  */
+/* -------------------------------------------------------------------------- */
+/* Version history                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** Snapshots are taken at most this often while autosaving. */
+const VERSION_INTERVAL_MS = 5 * 60_000;
+const MAX_VERSIONS = 30;
+
+function designStats(design: unknown) {
+  const pages = (design as { pages?: unknown } | null | undefined)?.pages;
+  if (!Array.isArray(pages)) return { pageCount: 0, elementCount: 0 };
+  return {
+    pageCount: pages.length,
+    elementCount: pages.reduce((total, page) => {
+      const elements = (page as { elements?: unknown } | null)?.elements;
+      return total + (Array.isArray(elements) ? elements.length : 0);
+    }, 0),
+  };
+}
+
+function hasPages(design: unknown): boolean {
+  const pages = (design as { pages?: unknown } | null | undefined)?.pages;
+  return Array.isArray(pages) && pages.length > 0;
+}
+
+async function pruneVersions(
+  ctx: MutationCtx,
+  invitationId: Id<"invitations">,
+) {
+  const versions = await ctx.db
+    .query("designVersions")
+    .withIndex("by_invitation", (q) => q.eq("invitationId", invitationId))
+    .order("desc")
+    .collect();
+  for (const version of versions.slice(MAX_VERSIONS)) {
+    await ctx.db.delete(version._id);
+  }
+}
+
+async function recordDesignVersion(
+  ctx: MutationCtx,
+  invitation: Doc<"invitations">,
+  design: unknown,
+  options: { label?: string; force?: boolean } = {},
+) {
+  if (!hasPages(design)) return;
+  if (!options.force) {
+    const latest = await ctx.db
+      .query("designVersions")
+      .withIndex("by_invitation", (q) => q.eq("invitationId", invitation._id))
+      .order("desc")
+      .first();
+    if (latest && Date.now() - latest.createdAt < VERSION_INTERVAL_MS) return;
+  }
+  await ctx.db.insert("designVersions", {
+    invitationId: invitation._id,
+    ownerId: invitation.ownerId,
+    design,
+    label: options.label?.trim().slice(0, 60) || undefined,
+    createdAt: Date.now(),
+  });
+  await pruneVersions(ctx, invitation._id);
+}
+
 export const saveDesign = mutation({
   args: { id: v.id("invitations"), design: v.any() },
   handler: async (ctx, args) => {
@@ -199,7 +263,84 @@ export const saveDesign = mutation({
       designUpdatedAt: Date.now(),
       updatedAt: Date.now(),
     });
+    // A rolling safety net: the canvas keeps a few minutes of history without
+    // storing every keystroke.
+    await recordDesignVersion(ctx, invitation, args.design);
     return null;
+  },
+});
+
+/** Version metadata only: the designs themselves are restored by id. */
+export const listDesignVersions = query({
+  args: { id: v.id("invitations") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const invitation = await ctx.db.get(args.id);
+    if (!invitation || invitation.ownerId !== userId) return [];
+    const versions = await ctx.db
+      .query("designVersions")
+      .withIndex("by_invitation", (q) => q.eq("invitationId", invitation._id))
+      .order("desc")
+      .take(MAX_VERSIONS);
+    return versions.map((version) => ({
+      _id: version._id,
+      createdAt: version.createdAt,
+      label: version.label,
+      ...designStats(version.design),
+    }));
+  },
+});
+
+/** An explicit bookmark the host names, kept alongside the automatic ones. */
+export const saveDesignVersion = mutation({
+  args: { id: v.id("invitations"), label: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const invitation = await requireOwnedInvitation(ctx, args.id, userId);
+    if (!invitation.design) {
+      throw new Error("This invitation has no canvas to save yet.");
+    }
+    await recordDesignVersion(ctx, invitation, invitation.design, {
+      label: args.label?.trim() || "Manual snapshot",
+      force: true,
+    });
+    return null;
+  },
+});
+
+/**
+ * Puts a saved snapshot back on the canvas. The state being replaced is
+ * snapshotted first, so a restore is itself reversible.
+ */
+export const restoreDesignVersion = mutation({
+  args: { id: v.id("invitations"), versionId: v.id("designVersions") },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const invitation = await requireOwnedInvitation(ctx, args.id, userId);
+    const version = await ctx.db.get(args.versionId);
+    if (
+      !version ||
+      version.invitationId !== invitation._id ||
+      version.ownerId !== userId
+    ) {
+      throw new Error("That version could not be found.");
+    }
+    if (!hasPages(version.design)) {
+      throw new Error("That version has no canvas pages to restore.");
+    }
+    if (invitation.design) {
+      await recordDesignVersion(ctx, invitation, invitation.design, {
+        label: "Before restore",
+        force: true,
+      });
+    }
+    await ctx.db.patch(invitation._id, {
+      design: version.design,
+      designUpdatedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    return version.design as unknown;
   },
 });
 

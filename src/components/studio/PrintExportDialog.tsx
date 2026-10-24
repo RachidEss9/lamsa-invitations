@@ -20,13 +20,14 @@ import { cn } from "@/lib/utils";
 import {
   DEFAULT_PRINT_SETTINGS,
   PAPER_SIZES,
-  artworkRect,
   buildPrintPdf,
   downloadBlob,
   formatMeasurement,
+  formatToMillimetres,
   fromMm,
   outputDimensions,
   overflowElements,
+  pageArtworkRect,
   pagesForPrint,
   paperDimensions,
   printableArea,
@@ -36,7 +37,12 @@ import {
   type PrintSettings,
   type PrintUnit,
 } from "@/lib/print";
-import type { DesignDocument, DesignPage } from "@/lib/design";
+import {
+  pageAspectOf,
+  pageSizeOf,
+  type DesignDocument,
+  type DesignPage,
+} from "@/lib/design";
 import { AlertCircle, Check, Download, FileText, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -129,6 +135,7 @@ export function PrintExportDialog({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const captureRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const appliedFormat = useRef<string | null>(null);
 
   const patch = (value: Partial<PrintSettings>) =>
     setSettings((current) => ({ ...current, ...value }));
@@ -140,6 +147,34 @@ export function PrintExportDialog({
       // Settings persistence is a convenience; export still works.
     }
   }, [settings]);
+
+  // A design created from a blank canvas carries the exact size the host asked
+  // for. Printing starts from that brief instead of assuming A5, so the PDF is
+  // the stationery they designed — the dialog can still override it.
+  useEffect(() => {
+    if (!open) return;
+    const format = design.format;
+    if (!format) return;
+    const key = `${format.unit}:${format.width}x${format.height}:${format.bleed}`;
+    if (appliedFormat.current === key) return;
+    appliedFormat.current = key;
+    const dims = formatToMillimetres(format);
+    const landscape = dims.widthMm > dims.heightMm;
+    const shortEdge = Math.min(dims.widthMm, dims.heightMm);
+    const longEdge = Math.max(dims.widthMm, dims.heightMm);
+    setSettings((current) => {
+      const unit: PrintUnit = format.unit === "px" ? "mm" : format.unit;
+      return {
+        ...current,
+        paper: "custom",
+        orientation: landscape ? "landscape" : "portrait",
+        unit,
+        customWidth: Math.round(fromMm(shortEdge, unit) * 10) / 10,
+        customHeight: Math.round(fromMm(longEdge, unit) * 10) / 10,
+        bleed: dims.bleedMm >= 2.5 ? 3 : 0,
+      };
+    });
+  }, [open, design.format]);
 
   const selectedPages = useMemo(
     () => pagesForPrint(design, settings, pageIndex),
@@ -154,7 +189,9 @@ export function PrintExportDialog({
   const page = paperDimensions(settings);
   const outputDims = outputDimensions(settings);
   const area = printableArea(settings);
-  const art = artworkRect(settings);
+  // The placed artwork keeps the proportions of the page being printed, not a
+  // fixed 3:4 card, so custom document sizes are never letterboxed wrongly.
+  const art = pageArtworkRect(settings, previewEntry?.page);
   const overflow = previewEntry ? overflowElements(previewEntry.page) : [];
   const bleedPage = {
     x: settings.bleed,
@@ -177,15 +214,22 @@ export function PrintExportDialog({
       if (document.fonts?.ready) await document.fonts.ready;
       await new Promise((resolve) => window.setTimeout(resolve, 220));
       const { snapdom } = await import("@zumer/snapdom");
-      const captures: { image: string; background: string; label: string }[] = [];
-      const artWidthPx = Math.round((art.w / 25.4) * settings.dpi);
-      const scale = Math.min(6, Math.max(0.5, artWidthPx / 1000));
+      const captures: {
+        image: string;
+        background: string;
+        label: string;
+        aspect: number;
+      }[] = [];
 
       for (let index = 0; index < selectedPages.length; index += 1) {
         const entry = selectedPages[index];
         setBusy(`Drawing page ${index + 1} of ${selectedPages.length}`);
         const node = captureRefs.current[entry.page.id];
         if (!node) throw new Error("The print canvas did not mount. Please reopen this window.");
+        const size = pageSizeOf(entry.page);
+        const pageArt = pageArtworkRect(settings, entry.page);
+        const artWidthPx = Math.round((pageArt.w / 25.4) * settings.dpi);
+        const scale = Math.min(6, Math.max(0.5, artWidthPx / size.width));
         const shot = await snapdom(node, {
           scale,
           dpr: 1,
@@ -203,6 +247,7 @@ export function PrintExportDialog({
               : "#ffffff"
             : "#ffffff",
           label: entry.page.name,
+          aspect: pageAspectOf(entry.page),
         });
         // Release the intermediate canvas early on long invitations.
         canvas.width = 1;
@@ -612,7 +657,7 @@ export function PrintExportDialog({
                 ref={(node) => {
                   captureRefs.current[entry.page.id] = node;
                 }}
-                style={{ width: 1000, height: 1333.33, overflow: "hidden" }}
+                style={{ ...pageSizeOf(entry.page), overflow: "hidden" }}
               >
                 <DesignPageView
                   page={exportPage(entry.page)}

@@ -4,6 +4,9 @@ import {
   outputDimensions,
   printableArea,
   artworkRect,
+  formatToMillimetres,
+  overflowElements,
+  pageArtworkRect,
   pagesForPrint,
   printablePage,
   safeFilename,
@@ -121,6 +124,111 @@ describe("print geometry", () => {
     // Fill uses full height: h=210, w=210*0.75=157.5
     expect(art.w).toBeCloseTo(157.5, 1);
     expect(art.h).toBeCloseTo(210, 0);
+  });
+});
+
+describe("page-aware print geometry", () => {
+  it("places a square page as a square, not a 3:4 card", () => {
+    const settings: PrintSettings = {
+      ...DEFAULT_PRINT_SETTINGS,
+      paper: "custom",
+      customWidth: 150,
+      customHeight: 150,
+      unit: "mm",
+      margins: { top: 5, right: 5, bottom: 5, left: 5 },
+      fit: "fit",
+    };
+    const page = { ...makePage("p", "Square", []), width: 600, height: 600 };
+    const art = pageArtworkRect(settings, page);
+    expect(art.w / art.h).toBeCloseTo(1, 4);
+    expect(art.w).toBeCloseTo(140, 4);
+  });
+
+  it("places a landscape page at its own aspect", () => {
+    const settings: PrintSettings = {
+      ...DEFAULT_PRINT_SETTINGS,
+      paper: "a5",
+      orientation: "portrait",
+      margins: { top: 0, right: 0, bottom: 0, left: 0 },
+      fit: "fit",
+    };
+    const page = { ...makePage("p", "Wide", []), width: 1600, height: 900 };
+    const art = pageArtworkRect(settings, page);
+    expect(art.w / art.h).toBeCloseTo(16 / 9, 4);
+    expect(art.w).toBeCloseTo(148, 4);
+  });
+
+  it("uses the classic card when no page is supplied", () => {
+    const settings: PrintSettings = {
+      ...DEFAULT_PRINT_SETTINGS,
+      paper: "a4",
+      margins: { top: 10, right: 10, bottom: 10, left: 10 },
+    };
+    expect(pageArtworkRect(settings, null)).toEqual(artworkRect(settings));
+  });
+
+  it("reads a millimetre brief directly", () => {
+    expect(
+      formatToMillimetres({
+        output: "print",
+        unit: "mm",
+        width: 148,
+        height: 210,
+        margin: 6,
+        bleed: 3,
+      }),
+    ).toEqual({ widthMm: 148, heightMm: 210, bleedMm: 3 });
+  });
+
+  it("converts a pixel brief at 96 px per inch", () => {
+    const dims = formatToMillimetres({
+      output: "digital",
+      unit: "px",
+      width: 1080,
+      height: 1920,
+      margin: 0,
+      bleed: 0,
+    });
+    expect(dims.widthMm).toBeCloseTo(285.75, 2);
+    expect(dims.heightMm).toBeCloseTo(508, 2);
+  });
+
+  it("flags overflow against the page's real bounds", () => {
+    const element = (id: string, x: number, y: number, w: number, h: number): DesignElement => ({
+      id,
+      kind: "shape",
+      name: id,
+      x,
+      y,
+      w,
+      h,
+      fill: "#000",
+      hidden: false,
+      rotation: 0,
+      opacity: 1,
+      locked: false,
+      animation: {
+        enabled: true,
+        preset: "fade",
+        trigger: "load",
+        delay: 0,
+        duration: 1000,
+        easing: "easeOut",
+      },
+    });
+    const page = {
+      ...makePage("p", "Small", [
+        element("inside", 10, 10, 50, 50),
+        element("right", 590, 10, 40, 40),
+        element("bottom", 10, 580, 40, 40),
+      ]),
+      width: 600,
+      height: 600,
+    };
+    expect(overflowElements(page).map((item) => item.id)).toEqual([
+      "right",
+      "bottom",
+    ]);
   });
 });
 

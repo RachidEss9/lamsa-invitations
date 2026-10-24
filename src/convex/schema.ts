@@ -70,6 +70,19 @@ const schema = defineSchema(
       .index("by_owner", ["ownerId"])
       .index("by_slug", ["slug"]),
 
+    // Saved snapshots of the canvas document. The studio writes one at most
+    // every few minutes while editing, plus an explicit snapshot on request, so
+    // a host can go back to an earlier state without touching the live design.
+    designVersions: defineTable({
+      invitationId: v.id("invitations"),
+      ownerId: v.id("users"),
+      design: v.any(),
+      label: v.optional(v.string()),
+      createdAt: v.number(),
+    })
+      .index("by_invitation", ["invitationId"])
+      .index("by_owner", ["ownerId"]),
+
     // Personalized recipients. A guest token is only meaningful with its
     // parent invitation and never grants edit access. Email and RSVP answers
     // are optional and collected from the guest's personal link.
