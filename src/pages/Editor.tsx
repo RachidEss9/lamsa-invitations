@@ -696,7 +696,7 @@ export default function Editor() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <header className="flex h-16 items-center border-b border-border/70 px-5">
-          <Wordmark />
+          <Wordmark className="h-[22px]" />
         </header>
         <div className="flex flex-1 items-center justify-center">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />

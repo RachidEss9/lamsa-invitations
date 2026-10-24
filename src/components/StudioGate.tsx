@@ -6,6 +6,7 @@ import {
   type StudioSessionValue,
 } from "@/components/auth/studio-context";
 import { api } from "@/convex/_generated/api";
+import { brand } from "@/lib/brand";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   clearPendingClaim,
@@ -27,12 +28,11 @@ import { toast } from "sonner";
 function StudioLoading() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background">
-      <div className="flex items-baseline gap-2">
-        <span className="font-display text-[1.5rem] leading-none tracking-[0.16em]">
-          LAMSA
-        </span>
-        <span className="mb-[0.55em] size-[4px] bg-[var(--red)]" />
-      </div>
+      <img
+        src={brand.logos.lockupCrimson}
+        alt={brand.name}
+        className="h-[28px] w-auto select-none"
+      />
       <span className="mt-4 flex items-center gap-2 font-meta text-[0.52rem] uppercase tracking-[0.16em] text-ink/56">
         <Loader2 className="size-3 animate-spin" />
         Opening the studio

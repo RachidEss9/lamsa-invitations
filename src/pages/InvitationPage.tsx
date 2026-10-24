@@ -80,7 +80,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
       {children}
       <footer className="relative z-10 mt-16 border-t border-border/60">
         <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center justify-between gap-3 px-5 py-6 sm:flex-row sm:px-8">
-          <Wordmark className="text-[0.95rem] tracking-[0.2em] text-ink/62" />
+          <Wordmark className="h-[16px] opacity-70" />
           <p className="font-meta text-[0.5rem] uppercase tracking-[0.14em] text-ink/56">
             Composed once · Kept by you · © 2026
           </p>

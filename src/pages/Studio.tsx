@@ -1695,7 +1695,7 @@ export default function Studio() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <header className="flex h-14 items-center border-b border-ink/15 px-5">
-          <Wordmark />
+          <Wordmark className="h-[20px]" />
         </header>
         <div className="flex flex-1 items-center justify-center">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -2426,7 +2426,7 @@ export default function Studio() {
         >
           <ArrowLeft className="size-3.5" />
         </button>
-        <Wordmark className="hidden text-[1rem] sm:inline-flex" />
+        <Wordmark className="hidden h-[17px] sm:block" />
         <div className="mx-1 hidden h-6 w-px bg-ink/15 sm:block" />
         <div className="min-w-0 flex-1">
           <p className="truncate font-ui text-[15px] font-semibold leading-tight">{content.title}</p>

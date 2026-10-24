@@ -3,7 +3,8 @@
  *
  * The atelier palette is paper, ink, and one vermilion. Type is set in
  * Instrument Serif for display, Archivo for interface, and Space Mono for
- * folios and file numbers. No logo mark is used: the wordmark is set in type.
+ * folios and file numbers. The supplied logo set in `public/brand` carries the
+ * arch symbol and lowercase wordmark on every surface.
  */
 export const brand = {
   name: "LAMSA",
@@ -23,6 +24,15 @@ export const brand = {
     line: "#dcd9cf",
     olive: "#6d5539",
     gold: "#b38f6f",
+  },
+  /** Logo artwork, exactly as supplied. Fixed fills: pick the matching tone. */
+  logos: {
+    lockupCrimson: "/brand/lamsa-lockup-crimson.svg",
+    lockupInk: "/brand/lamsa-lockup-ink.svg",
+    lockupPaper: "/brand/lamsa-lockup-paper.svg",
+    wordmarkCrimson: "/brand/lamsa-wordmark-crimson.svg",
+    symbolCrimson: "/brand/lamsa-symbol-crimson.svg",
+    icon: "/brand/lamsa-icon.svg",
   },
   fonts: {
     display: '"Sorgena", "Bodoni Moda", "Instrument Serif", serif',

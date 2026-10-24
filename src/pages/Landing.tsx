@@ -750,7 +750,7 @@ export default function Landing() {
         <div className="mx-auto w-full max-w-[1480px] border-t border-[#f2f1ed]/12 px-5 py-10 sm:px-8 lg:px-12">
           <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
             <div>
-              <Wordmark className="text-[1.35rem] text-[#f2f1ed]" />
+              <Wordmark tone="paper" className="h-[24px]" />
               <p className="mt-3 max-w-[18rem] text-[0.74rem] leading-relaxed text-[#f2f1ed]/45">
                 An invitation atelier. Composed in Tangier, opened wherever your
                 guests are.

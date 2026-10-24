@@ -143,7 +143,7 @@ export function StudioShell({
                 inside this account.
               </p>
               <div className="mt-6 flex items-center gap-2">
-                <Wordmark className="text-[0.82rem] tracking-[0.2em] text-ink/62" />
+                <Wordmark className="h-[14px] opacity-70" />
                 <span className="font-meta text-[0.5rem] uppercase tracking-[0.12em] text-ink/52">
                   Atelier rules, since 2026
                 </span>

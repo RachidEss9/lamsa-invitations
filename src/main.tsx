@@ -15,6 +15,7 @@ import {
 } from "react-router";
 import "./index.css";
 import { ensureSorgena } from "./lib/sorgena";
+import { brand } from "./lib/brand";
 
 // Register the licensed brand display face when the webfonts are present. Runs
 // before the first paint's font resolution; absent files keep the fallbacks.
@@ -38,12 +39,11 @@ const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 function RouteLoading() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-      <div className="flex items-baseline gap-2">
-        <span className="font-display text-[1.5rem] leading-none tracking-[0.16em]">
-          LAMSA
-        </span>
-        <span className="mb-[0.55em] size-[4px] bg-[var(--red)]" />
-      </div>
+      <img
+        src={brand.logos.lockupCrimson}
+        alt={brand.name}
+        className="h-[28px] w-auto select-none"
+      />
       <span className="relative mt-5 block h-px w-20 overflow-hidden bg-border">
         <span className="absolute inset-y-0 left-0 w-1/3 animate-pulse bg-foreground/40" />
       </span>

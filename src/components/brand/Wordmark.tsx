@@ -2,49 +2,59 @@ import { Link } from "react-router";
 import { cn } from "@/lib/utils";
 import { brand } from "@/lib/brand";
 
+export type WordmarkTone = "crimson" | "ink" | "paper";
+
+/** The supplied logo set: one lockup per surface, never recoloured inline. */
+const LOCKUP: Record<WordmarkTone, string> = {
+  crimson: brand.logos.lockupCrimson,
+  ink: brand.logos.lockupInk,
+  paper: brand.logos.lockupPaper,
+};
+
 /**
- * The wordmark is set in type: LAMSA in the display serif, tracked wide,
- * with a vermilion register mark. No invented logo.
+ * The studio logo: the LAMSA lockup (arch symbol + lowercase wordmark), taken
+ * from the brand SVG set so navigation, editor and public pages all carry the
+ * same mark. Sizing is height-based; the artwork keeps its own aspect ratio.
  */
-export function Wordmark({ className }: { className?: string }) {
+export function Wordmark({
+  className,
+  tone = "crimson",
+}: {
+  className?: string;
+  tone?: WordmarkTone;
+}) {
   return (
-    <span
+    <img
+      src={LOCKUP[tone]}
+      alt={brand.name}
+      draggable={false}
       className={cn(
-        "font-display inline-flex items-baseline gap-[0.18em] text-[1.28rem] leading-none tracking-[0.16em] text-foreground",
+        "block h-[26px] w-auto shrink-0 select-none",
         className,
       )}
-      aria-label={brand.name}
-    >
-      {brand.name}
-      <span
-        aria-hidden
-        className="mb-[0.55em] size-[4px] shrink-0 bg-[var(--red)]"
-      />
-    </span>
+    />
   );
 }
 
 export function BrandLink({
   className,
-  tone = "ink",
+  tone = "crimson",
 }: {
   className?: string;
-  tone?: "ink" | "paper";
+  tone?: WordmarkTone;
 }) {
   return (
     <Link
       to="/"
       className={cn(
         "group inline-flex flex-col justify-center transition-opacity hover:opacity-70",
-        tone === "paper" ? "text-[#f7f2e5]" : "text-foreground",
         className,
       )}
       aria-label="LAMSA home"
     >
       <Wordmark
-        className={cn(
-          tone === "paper" ? "text-[#f7f2e5]" : undefined,
-        )}
+        tone={tone}
+        className="h-[24px] transition-transform duration-300 group-hover:-translate-y-px sm:h-[27px]"
       />
       <span
         className={cn(
