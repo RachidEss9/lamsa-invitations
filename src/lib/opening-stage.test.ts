@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
-import type { DesignPage } from "./design";
+import type { DesignPage, OpeningSettings } from "./design";
 
 let queue: FrameRequestCallback[] = [];
 let root: Root | null = null;
@@ -75,7 +75,11 @@ function page(): DesignPage {
   };
 }
 
-function mount(reducedMotion = false) {
+function mount(
+  reducedMotion = false,
+  overrides: Partial<OpeningSettings> = {},
+  stillAt?: number,
+) {
   const onDone = vi.fn();
   host = document.createElement("div");
   document.body.appendChild(host);
@@ -88,6 +92,7 @@ function mount(reducedMotion = false) {
           duration: 1200,
           autoOpen: false,
           welcome: "For {{guest}}",
+          ...overrides,
         },
         page: page(),
         imageUrls: {},
@@ -97,6 +102,7 @@ function mount(reducedMotion = false) {
         guestName: "Amara",
         names: "Amelia & Søren",
         reducedMotion,
+        stillAt,
         onDone,
       }),
     ),
@@ -165,6 +171,38 @@ describe("opening stage", () => {
     frame(0);
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Amelia & Søren");
+    expect(container.textContent).not.toContain("Break the seal");
+  });
+
+  it("wears the saved material and emergence", () => {
+    const { container } = mount(false, {
+      tone: "ivory",
+      palette: { accent: "#7b1027", paper: "#f4ecdd", hull: "#1b1a18" },
+      motion: { startScale: 0.7, rise: 420, cardStart: 0.3 },
+    });
+    // The card waits where the host designed it, not at the preset's default.
+    expect(cardTransform(container)).toContain("scale(0.7)");
+    expect(cardTransform(container)).toContain("translate3d(0, 420px, 0)");
+    // The suite's own colour comes from the saved opening palette.
+    expect(container.innerHTML.toLowerCase()).toContain("244, 236, 221");
+    click(container, "Break the seal");
+  });
+
+  it("holds one stage of the sequence still for the designer", () => {
+    const { container, onDone } = mount(
+      false,
+      { motion: { startScale: 0.7, rise: 420, cardStart: 0.3 } },
+      0.68,
+    );
+    const still = cardTransform(container);
+    const scale = Number(still.match(/scale\(([\d.]+)\)/)?.[1]);
+    const offset = Number(still.match(/translate3d\(0, (-?[\d.]+)px/)?.[1]);
+    expect(scale).toBeGreaterThan(0.7);
+    expect(scale).toBeLessThan(1);
+    expect(offset).toBeGreaterThan(0);
+    expect(offset).toBeLessThan(420);
+    // A still is never a guest state: it does not play or hand over.
+    expect(onDone).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("Break the seal");
   });
 

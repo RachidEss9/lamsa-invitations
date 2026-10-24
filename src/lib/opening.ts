@@ -218,6 +218,46 @@ export function openingPresetOf(
   return experience === "none" ? null : experience;
 }
 
+function clampNumber(
+  value: number | undefined,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+export interface OpeningMotionInput {
+  startScale?: number;
+  rise?: number;
+  cardStart?: number;
+}
+
+/**
+ * The preset's timeline with the designer's saved overrides applied. Values are
+ * clamped to a believable range so a saved configuration can never place the
+ * card off the artboard or hold it inside the frame forever.
+ */
+export function openingTimeline(
+  preset: OpeningPresetId,
+  motion?: OpeningMotionInput,
+): OpeningTimeline {
+  const base = OPENING_TIMELINES[preset] ?? OPENING_TIMELINES.fade;
+  if (!motion) return base;
+  const fromScale = clampNumber(motion.startScale, 0.35, 1.15, base.fromScale);
+  const fromY = clampNumber(motion.rise, 0, 900, base.fromY);
+  const cardStart = clampNumber(motion.cardStart, 0, 0.7, base.cardStart);
+  return {
+    ...base,
+    fromScale,
+    fromY,
+    cardStart,
+    // The emergence always gets at least a fifth of the run to read as motion.
+    cardEnd: Math.max(base.cardEnd, cardStart + 0.2),
+  };
+}
+
 /**
  * Evaluates the opening at a moment in time. Pure, so the tests can assert the
  * card really is inside the envelope before the flap moves and really has
@@ -226,8 +266,9 @@ export function openingPresetOf(
 export function openingFrame(
   preset: OpeningPresetId,
   progress: number,
+  motion?: OpeningMotionInput,
 ): OpeningFrame {
-  const timeline = OPENING_TIMELINES[preset] ?? OPENING_TIMELINES.fade;
+  const timeline = openingTimeline(preset, motion);
   const raw = clamp01(progress);
   const card = windowProgress(raw, timeline.cardStart, timeline.cardEnd);
   const frame = windowProgress(raw, timeline.frameStart, timeline.frameEnd);

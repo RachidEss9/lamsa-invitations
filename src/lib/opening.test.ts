@@ -6,6 +6,7 @@ import {
   openingFrame,
   openingPresetOf,
   openingRunDuration,
+  openingTimeline,
   type OpeningPresetId,
 } from "./opening";
 
@@ -99,6 +100,53 @@ describe("opening choreography", () => {
     const curtain = openingFrame("curtain", 0.5);
     expect(curtain.frame).toBeGreaterThan(0.5);
     expect(curtain.card).toBeGreaterThan(0.3);
+  });
+
+  it("applies a saved emergence without breaking the hand-off", () => {
+    const motion = { startScale: 0.72, rise: 420, cardStart: 0.3 };
+    const timeline = openingTimeline("envelope", motion);
+    expect(timeline.fromScale).toBeCloseTo(0.72, 5);
+    expect(timeline.fromY).toBe(420);
+    expect(timeline.cardStart).toBeCloseTo(0.3, 5);
+
+    // Still held inside before its own cue, partly out during the travel.
+    expect(openingFrame("envelope", 0, motion).cardScale).toBeCloseTo(0.72, 5);
+    const midway = openingFrame("envelope", 0.6, motion);
+    expect(midway.card).toBeGreaterThan(0);
+    expect(midway.card).toBeLessThan(1);
+    expect(midway.cardOffsetY).toBeGreaterThan(0);
+    expect(midway.cardOffsetY).toBeLessThan(420);
+
+    // Every preset settles at full frame whatever was configured.
+    for (const preset of presets) {
+      const settled = openingFrame(preset, 1, motion);
+      expect(settled.card, preset).toBe(1);
+      expect(settled.cardScale, preset).toBeCloseTo(1, 5);
+      expect(settled.cardOffsetY, preset).toBeCloseTo(0, 5);
+    }
+  });
+
+  it("clamps a saved emergence to a believable range", () => {
+    const wild = openingTimeline("envelope", {
+      startScale: 0.01,
+      rise: 9000,
+      cardStart: 0.99,
+    });
+    expect(wild.fromScale).toBe(0.35);
+    expect(wild.fromY).toBe(900);
+    expect(wild.cardStart).toBe(0.7);
+    // The card still has room to travel before the opening ends.
+    expect(wild.cardEnd).toBeGreaterThan(wild.cardStart + 0.15);
+
+    const negative = openingTimeline("door", { rise: -200, cardStart: -1 });
+    expect(negative.fromY).toBe(0);
+    expect(negative.cardStart).toBe(0);
+  });
+
+  it("keeps each preset's own timeline when nothing is configured", () => {
+    for (const preset of presets) {
+      expect(openingTimeline(preset, undefined)).toEqual(OPENING_TIMELINES[preset]);
+    }
   });
 
   it("reads a saved duration, with a readable floor and a hard ceiling", () => {

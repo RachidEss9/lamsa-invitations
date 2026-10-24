@@ -8,6 +8,7 @@ import {
   personalize,
   type DesignPage,
   type OpeningSettings,
+  type OpeningToneId,
 } from "@/lib/design";
 import { fontFamilyFor } from "@/lib/fonts";
 import { pageEntranceEnd } from "@/lib/journey";
@@ -17,6 +18,7 @@ import {
   openingRunDuration,
   type OpeningFrame,
 } from "@/lib/opening";
+import { openingPaletteOf, openingToneOf } from "@/lib/openings";
 import { cn } from "@/lib/utils";
 import {
   useEffect,
@@ -45,6 +47,11 @@ interface OpeningStageProps {
   autoOpen?: boolean;
   reducedMotion?: boolean;
   coverUrl?: string;
+  /**
+   * Holds the opening on one still frame instead of playing it, so the Opening
+   * Designer can show exactly what each stage of the sequence looks like.
+   */
+  stillAt?: number;
   /** Fires once the invitation has settled and the opening is finished. */
   onDone: () => void;
   className?: string;
@@ -144,17 +151,26 @@ function EnvelopeScene({
   palette: Palette;
   card: ReactNode;
   guestName?: string | null;
-  tone: "crimson" | "ink";
+  tone: OpeningToneId;
 }) {
   const body =
     tone === "ink"
       ? `linear-gradient(155deg, ${palette.ink} 0%, #0d0c0b 100%)`
-      : `linear-gradient(150deg, ${palette.accent} 0%, ${rgba(palette.accent, 1)} 45%, ${rgba("#2b0007", 1)} 100%)`;
+      : tone === "ivory"
+        ? `linear-gradient(155deg, ${rgba(palette.background, 1)} 0%, ${rgba(
+            palette.background,
+            0.9,
+          )} 58%, ${rgba(palette.accent, 0.16)} 100%)`
+        : `linear-gradient(150deg, ${palette.accent} 0%, ${rgba(palette.accent, 1)} 45%, ${rgba("#2b0007", 1)} 100%)`;
   const lining =
     tone === "ink"
       ? `linear-gradient(180deg, ${rgba(palette.accent, 0.55)}, ${rgba(palette.ink, 1)})`
       : `linear-gradient(180deg, ${rgba("#9c1930", 1)}, ${palette.accent})`;
-  const address = palette.background;
+  const address = tone === "ivory" ? palette.accent : palette.background;
+  const edge =
+    tone === "ivory"
+      ? rgba(palette.accent, 0.45)
+      : rgba(palette.background, 0.14);
   // Once the card has cleared the pocket the envelope drops away beneath it.
   // The pocket stays fully opaque while it is in front of the card, so the card
   // reads as emerging from inside rather than fading through the paper.
@@ -180,7 +196,7 @@ function EnvelopeScene({
           background: body,
           borderRadius: 6,
           boxShadow: `0 40px 90px ${rgba("#000000", 0.35)}`,
-          border: `1px solid ${rgba(palette.background, 0.14)}`,
+          border: `1px solid ${edge}`,
         }}
       >
         <div
@@ -1060,11 +1076,15 @@ export function OpeningStage({
   autoOpen = false,
   reducedMotion = false,
   coverUrl,
+  stillAt,
   onDone,
   className,
 }: OpeningStageProps) {
   const preset = openingPresetOf(opening.experience) ?? "fade";
   const duration = openingRunDuration(opening.duration);
+  // A still is a design tool, not a guest state: it never plays and never
+  // reports completion, so the designer can freeze any stage of the sequence.
+  const still = typeof stillAt === "number";
   // The opening is composed on the classic artboard and centred inside the
   // page's own frame, so a landscape or story invitation still opens with the
   // same proportions and hands over to the journey without a jump.
@@ -1116,25 +1136,25 @@ export function OpeningStage({
   };
 
   useEffect(() => {
-    if (!autoOpen) return;
+    if (!autoOpen || still) return;
     const timer = window.setTimeout(begin, 550);
     return () => window.clearTimeout(timer);
     // The auto-open timer is intentionally armed once per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoOpen]);
+  }, [autoOpen, still]);
 
   // Reduced motion: the card is simply present, and the guest can go on at once.
   useEffect(() => {
-    if (!reducedMotion) return;
+    if (!reducedMotion || still) return;
     const frame = requestAnimationFrame(() => {
       setScale((current) => (current || 1));
       finish();
     });
     return () => cancelAnimationFrame(frame);
-  }, [reducedMotion]);
+  }, [reducedMotion, still]);
 
   useEffect(() => {
-    if (phase !== "playing" || reducedMotion) return;
+    if (phase !== "playing" || reducedMotion || still) return;
     let frame = 0;
     let start: number | null = null;
     const tick = (now: number) => {
@@ -1146,20 +1166,39 @@ export function OpeningStage({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [duration, phase, reducedMotion]);
+  }, [duration, phase, reducedMotion, still]);
 
   // If animation frames never arrive (a throttled tab, a stalled compositor),
   // the guest must still reach the invitation.
   useEffect(() => {
-    if (phase !== "playing") return;
+    if (phase !== "playing" || still) return;
     const timer = window.setTimeout(finish, duration + 1600);
     return () => window.clearTimeout(timer);
-  }, [duration, phase]);
+  }, [duration, phase, still]);
 
-  const frame = openingFrame(preset, progress);
+  const frame = openingFrame(
+    preset,
+    still ? stillAt : progress,
+    opening.motion,
+  );
+  const tone = openingToneOf(opening);
   const hint = openingHint(opening.experience) || "Open the invitation";
   const welcome = personalize(opening.welcome, guestName);
-  const palette: Palette = { accent, background, ink };
+  // Material overrides from the Opening Designer apply to the suite only: the
+  // invitation card keeps the design's own palette.
+  const colours = openingPaletteOf(
+    {
+      accent,
+      paper: flatBackgroundOf(page?.background ?? background),
+      hull: ink,
+    },
+    opening,
+  );
+  const palette: Palette = {
+    accent: colours.accent,
+    background: colours.paper,
+    ink: colours.hull,
+  };
   const pageBackground = page?.background ?? background;
   // Tints and translucent plates need one flat colour; a saved wash cannot be
   // tinted, so those surfaces fall back to the studio ivory.
@@ -1216,7 +1255,7 @@ export function OpeningStage({
           palette={palette}
           card={card}
           guestName={guestName}
-          tone="crimson"
+          tone={tone}
         />
       );
       break;
@@ -1227,7 +1266,7 @@ export function OpeningStage({
           palette={palette}
           card={card}
           guestName={guestName}
-          tone="ink"
+          tone={tone}
         />
       );
       break;
@@ -1344,7 +1383,7 @@ export function OpeningStage({
         </div>
       </div>
 
-      {phase === "idle" && !reducedMotion ? (
+      {phase === "idle" && !reducedMotion && !still ? (
         <button
           type="button"
           onClick={begin}

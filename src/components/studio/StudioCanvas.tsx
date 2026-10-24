@@ -8,7 +8,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -715,8 +714,6 @@ export function StudioCanvas({
     onZoom(next);
   };
 
-  const _guidesForRender = useMemo(() => guides, [guides]);
-
   return (
     <div
       ref={hostRef}
@@ -851,6 +848,31 @@ export function StudioCanvas({
               );
             })}
           </div>
+
+          {/* Centre guides the drag is currently snapping to. They sit above
+              the artwork but below the handles so they never hide a control. */}
+          {(guides.x.length > 0 || guides.y.length > 0) && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{ zIndex: 55 }}
+            >
+              {guides.x.map((x) => (
+                <span
+                  key={`x-${x}`}
+                  className="absolute inset-y-0 w-px bg-[#710014]/70"
+                  style={{ left: x }}
+                />
+              ))}
+              {guides.y.map((y) => (
+                <span
+                  key={`y-${y}`}
+                  className="absolute inset-x-0 h-px bg-[#710014]/70"
+                  style={{ top: y }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>          {menu && (
         <ContextMenu

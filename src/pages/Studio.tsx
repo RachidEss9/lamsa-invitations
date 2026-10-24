@@ -9,6 +9,7 @@ import { SequentialGuestPreview } from "@/components/studio/SequentialGuestPrevi
 import { ColourPanel } from "@/components/studio/ColourPanel";
 import { Inspector } from "@/components/studio/Inspector";
 import { LibraryPanel, ShapePreview } from "@/components/studio/LibraryPanel";
+import { OpeningDesigner } from "@/components/studio/OpeningDesigner";
 import { PrintExportDialog } from "@/components/studio/PrintExportDialog";
 import { StudioCanvas, type CanvasContextAction } from "@/components/studio/StudioCanvas";
 import { ShortcutReference } from "@/components/studio/ShortcutReference";
@@ -273,6 +274,7 @@ export default function Studio() {
   const [publishing, setPublishing] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(0);
   const [showOpeningPreview, setShowOpeningPreview] = useState(false);
+  const [showOpeningDesigner, setShowOpeningDesigner] = useState(false);
   const [showClosingPreview, setShowClosingPreview] = useState(false);
   const [closingPreviewKey, setClosingPreviewKey] = useState(0);
   const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({});
@@ -1357,6 +1359,11 @@ export default function Studio() {
     apply((current) => ({ ...current, opening }));
   };
 
+  // Used by the Opening Designer's sliders: live changes, one undo step.
+  const applyOpeningLive = (opening: OpeningSettings) => {
+    applyGesture((current) => ({ ...current, opening }));
+  };
+
   const applyClosing = (closing: ClosingSettings) => {
     apply((current) => ({ ...current, closing }));
   };
@@ -1729,6 +1736,28 @@ export default function Studio() {
           ? "Save failed"
           : "All changes saved";
 
+  const openingDesigner = (
+    <OpeningDesigner
+      open={showOpeningDesigner}
+      onOpenChange={setShowOpeningDesigner}
+      opening={design.opening}
+      onChange={applyOpening}
+      onLiveChange={applyOpeningLive}
+      page={design.pages.find((candidate) => !candidate.hidden) ?? design.pages[0] ?? null}
+      imageUrls={imageUrls}
+      accent={content.palette.accent}
+      background={content.palette.background}
+      ink={content.palette.ink}
+      guestName="Amelia"
+      names={namesLabel}
+      coverUrl={
+        design.opening.coverStorageId
+          ? imageUrls[design.opening.coverStorageId]
+          : undefined
+      }
+    />
+  );
+
   const openingStagePreview = (
     <Dialog open={showOpeningPreview} onOpenChange={setShowOpeningPreview}>
       <DialogContent className="max-w-[440px] overflow-hidden p-0">
@@ -2091,17 +2120,26 @@ export default function Studio() {
                 />
               </label>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 w-full rounded-none text-[10px]"
-              onClick={() => {
-                setOpeningPreview((value) => value + 1);
-                setShowOpeningPreview(true);
-              }}
-            >
-              <Play className="size-3.5" /> Preview opening
-            </Button>
+            <div className="grid grid-cols-2 gap-1">
+              <Button
+                type="button"
+                className="h-8 rounded-none text-[10px]"
+                onClick={() => setShowOpeningDesigner(true)}
+              >
+                <Sparkles className="size-3.5" /> Design opening
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 rounded-none text-[10px]"
+                onClick={() => {
+                  setOpeningPreview((value) => value + 1);
+                  setShowOpeningPreview(true);
+                }}
+              >
+                <Play className="size-3.5" /> Preview
+              </Button>
+            </div>
             <p className="text-[9px] leading-relaxed text-ink/35">
               Envelope, arch, curtain, doors, layered paper, cinematic fade, and a
               personalised welcome. The opening never replays on page navigation.
@@ -3000,6 +3038,7 @@ export default function Studio() {
         rtl={Boolean(content.rtl)}
       />
 
+      {openingDesigner}
       {openingStagePreview}
       {closingPreview}
 

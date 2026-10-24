@@ -21,7 +21,6 @@ import {
 import {
   blankInvitationContent,
   scratchInvitation,
-  type ScratchBackground,
   type ScratchDesignInput,
 } from "@/lib/dashboard";
 import {
@@ -54,7 +53,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const PREVIEW_LIMIT = 9;
 const PRESET_STORE = "lamsa.sizePresets.v1";
@@ -215,16 +214,13 @@ export function CreateInvitationDialog({
 
   const [presetLabel, setPresetLabel] = useState("");
 
-  const [savedPresets, setSavedPresetsState] = useState(() => readSavedPresets());
-
-  // Keep presets in sync when the dialog opens, without a synchronous effect.
-  useEffect(() => {
-    if (!open) return;
-    const outsiderPresets = readSavedPresets();
-    if (outsiderPresets.length !== savedPresets.length) {
-      setSavedPresetsState(outsiderPresets);
-    }
-  }, [open]);
+  // Presets live in local storage; the dialog reads them whenever it opens or
+  // one is added or removed, so there is no state to keep in sync.
+  const [presetVersion, setPresetVersion] = useState(0);
+  const savedPresets = useMemo(
+    () => (open ? readSavedPresets() : []),
+    [open, presetVersion],
+  );
 
 
 
@@ -317,15 +313,15 @@ export function CreateInvitationDialog({
       },
       ...savedPresets.filter((preset) => preset.label !== label),
     ].slice(0, 12);
-    setSavedPresetsState(next);
     writeSavedPresets(next);
+    setPresetVersion((value) => value + 1);
     setPresetLabel("");
   };
 
   const removeSavedPreset = (id: string) => {
     const next = savedPresets.filter((preset) => preset.id !== id);
-    setSavedPresetsState(next);
     writeSavedPresets(next);
+    setPresetVersion((value) => value + 1);
   };
 
   const chooseOccasion = (next: Occasion) => {
@@ -743,13 +739,6 @@ function ScratchSetup({
 }) {
   const widthPx = toDesignPx(Math.max(1, Number(width) || 1), unit);
   const heightPx = toDesignPx(Math.max(1, Number(height) || 1), unit);
-  const bg: ScratchBackground = {
-    color: bgColor,
-    gradient: gradientOn
-      ? { from: gradientFrom, to: gradientTo, angle: 145 }
-      : null,
-  };
-
   return (
     <div className="grid min-h-0 flex-1 lg:grid-cols-[1.08fr_0.92fr]">
       <div className="min-h-0 space-y-6 overflow-y-auto px-5 py-5 sm:px-8">

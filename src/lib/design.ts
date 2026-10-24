@@ -485,12 +485,52 @@ export const OPENING_EXPERIENCES: {
   { id: "none", label: "No opening", note: "Opens directly on the first page" },
 ];
 
+export type OpeningToneId = "crimson" | "ink" | "ivory";
+
+export const OPENING_TONES: {
+  id: OpeningToneId;
+  label: string;
+  note: string;
+  swatch: string;
+}[] = [
+  { id: "crimson", label: "Burgundy", note: "Dyed cotton stock", swatch: "#710014" },
+  { id: "ink", label: "Charcoal", note: "Deep matte board", swatch: "#1b1a18" },
+  { id: "ivory", label: "Ivory", note: "Warm pressed paper", swatch: "#efe9dd" },
+];
+
+/**
+ * Optional choreography overrides from the Opening Designer. Every field falls
+ * back to the preset's own timeline, so an untouched opening behaves exactly as
+ * it always has and older saved designs keep their motion.
+ */
+export interface OpeningMotion {
+  /** Scale the card starts at, before it leaves the frame. */
+  startScale?: number;
+  /** How far below its resting place the card begins, in design pixels. */
+  rise?: number;
+  /** Fraction of the opening at which the card starts to emerge. */
+  cardStart?: number;
+}
+
+/** Colours used by the opening only; the invitation keeps its own palette. */
+export interface OpeningPalette {
+  accent?: string;
+  /** The envelope, door or deep surface colour. */
+  hull?: string;
+  /** The paper colour of the suite. */
+  paper?: string;
+}
+
 export interface OpeningSettings {
   experience: OpeningExperienceId;
   duration: number;
   autoOpen: boolean;
   welcome: string;
   coverStorageId?: string;
+  /** Material treatment of the frame. */
+  tone?: OpeningToneId;
+  palette?: OpeningPalette;
+  motion?: OpeningMotion;
 }
 
 export type ClosingStyleId = "message" | "seal" | "curtain" | "fade";
