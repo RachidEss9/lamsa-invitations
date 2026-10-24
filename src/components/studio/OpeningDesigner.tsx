@@ -180,14 +180,14 @@ export function OpeningDesigner({
             <Button
               type="button"
               variant="outline"
-              className="h-8 rounded-none px-3 text-[10px] uppercase tracking-[0.14em]"
+              className="h-8 rounded-md px-3 text-[10px] uppercase tracking-[0.14em]"
               onClick={() => setStillStage("sealed")}
             >
               Hold frame
             </Button>
             <Button
               type="button"
-              className="h-8 rounded-none px-3 text-[10px] uppercase tracking-[0.14em]"
+              className="h-8 rounded-md px-3 text-[10px] uppercase tracking-[0.14em]"
               onClick={replay}
             >
               <Play className="size-3" /> Replay
@@ -216,7 +216,7 @@ export function OpeningDesigner({
                 />
               </div>
 
-              <p className="mt-2 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/40">
+              <p className="mt-2 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
                 {stillProgress === null
                   ? "Playing the full sequence"
                   : `Held at ${OPENING_STAGES.find((stage) => stage.id === stillStage)?.label ?? ""}`}
@@ -236,10 +236,10 @@ export function OpeningDesigner({
                     aria-pressed={stillStage === stage.id}
                     title={stage.note}
                     className={cn(
-                      "border px-1 py-1.5 text-[8.5px] uppercase tracking-[0.1em] transition-colors",
+                      "rounded-md border px-1.5 py-1.5 text-[8.5px] uppercase tracking-[0.09em] transition-[background-color,border-color,color] duration-150",
                       stillStage === stage.id
-                        ? "border-[var(--red)] bg-[var(--red)]/8 text-ink"
-                        : "border-ink/15 text-ink/50 hover:border-ink/40 hover:text-ink",
+                        ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
+                        : "border-ink/15 text-ink/50 hover:border-ink/45 hover:text-ink",
                     )}
                   >
                     {stage.label}
@@ -249,7 +249,7 @@ export function OpeningDesigner({
               <button
                 type="button"
                 onClick={replay}
-                className="mt-1.5 flex w-full items-center justify-center gap-1.5 border border-ink/15 py-1.5 text-[9px] uppercase tracking-[0.14em] text-ink/55 transition-colors hover:border-ink hover:text-ink"
+                className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-ink/15 py-1.5 text-[9px] uppercase tracking-[0.14em] text-ink/55 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
               >
                 <RotateCcw className="size-3" /> Play the full opening
               </button>
@@ -262,7 +262,7 @@ export function OpeningDesigner({
               <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
                 Suite
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-1">
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
                 {OPENING_EXPERIENCES.map((experience) => (
                   <button
                     key={experience.id}
@@ -270,10 +270,10 @@ export function OpeningDesigner({
                     onClick={() => patch({ experience: experience.id })}
                     aria-pressed={opening.experience === experience.id}
                     className={cn(
-                      "border px-2 py-1.5 text-left text-[10px] leading-tight transition-colors",
+                      "rounded-md border px-2 py-1.5 text-left text-[10px] leading-tight transition-[background-color,border-color,color] duration-150",
                       opening.experience === experience.id
-                        ? "border-[var(--red)] bg-[var(--red)]/8 text-ink"
-                        : "border-ink/15 text-ink/60 hover:border-ink/40 hover:text-ink",
+                        ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
+                        : "border-ink/15 text-ink/60 hover:border-ink/45 hover:text-ink",
                     )}
                   >
                     {experience.label}
@@ -287,7 +287,7 @@ export function OpeningDesigner({
                 <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
                   Material
                 </p>
-                <div className="mt-2 grid grid-cols-3 gap-1">
+                <div className="mt-2 grid grid-cols-3 gap-1.5">
                   {OPENING_TONES.map((tone) => (
                     <button
                       key={tone.id}
@@ -295,17 +295,17 @@ export function OpeningDesigner({
                       onClick={() => patch({ tone: tone.id })}
                       aria-pressed={(opening.tone ?? "crimson") === tone.id}
                       className={cn(
-                        "border p-1.5 text-left transition-colors",
+                        "rounded-md border p-1.5 text-left transition-[background-color,border-color,color] duration-150",
                         (opening.tone ?? "crimson") === tone.id
-                          ? "border-[var(--red)]"
-                          : "border-ink/15 hover:border-ink/40",
+                          ? "border-[var(--red)]/70"
+                          : "border-ink/15 hover:border-ink/45",
                       )}
                     >
                       <span
-                        className="block h-5 w-full border border-ink/10"
+                        className="block h-5 w-full border border-ink/10 rounded-md"
                         style={{ background: tone.swatch }}
                       />
-                      <span className="mt-1 block text-[10px] text-ink/70">{tone.label}</span>
+                      <span className="mt-1.5 block text-[10px] text-ink/70">{tone.label}</span>
                       <span className="block text-[8.5px] leading-tight text-ink/35">
                         {tone.note}
                       </span>
@@ -325,7 +325,7 @@ export function OpeningDesigner({
                     {envelopeMm.width} × {envelopeMm.height} mm
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-3 gap-1.5">
                   {ENVELOPE_PRESETS.map((preset) => (
                     <button
                       key={preset.id}
@@ -339,10 +339,10 @@ export function OpeningDesigner({
                         })
                       }
                       className={cn(
-                        "border px-1.5 py-1.5 text-[9px] uppercase tracking-[0.08em] transition-colors",
+                        "rounded-md border px-1.5 py-1.5 text-[9px] uppercase tracking-[0.08em] transition-[background-color,border-color,color] duration-150",
                         envelopePreset?.id === preset.id
-                          ? "border-[var(--red)] bg-[var(--red)]/8 text-ink"
-                          : "border-ink/15 text-ink/55 hover:border-ink/40 hover:text-ink",
+                          ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
+                          : "border-ink/15 text-ink/55 hover:border-ink/45 hover:text-ink",
                       )}
                     >
                       {preset.label}
@@ -366,7 +366,7 @@ export function OpeningDesigner({
                           width: Math.min(500, Math.max(40, value)),
                         });
                       }}
-                      className="h-8 rounded-none text-[11px] tabular-nums"
+                      className="h-8 rounded-md text-[11px] tabular-nums"
                     />
                   </label>
                   <label className="block">
@@ -385,7 +385,7 @@ export function OpeningDesigner({
                           height: Math.min(500, Math.max(40, value)),
                         });
                       }}
-                      className="h-8 rounded-none text-[11px] tabular-nums"
+                      className="h-8 rounded-md text-[11px] tabular-nums"
                     />
                   </label>
                 </div>
@@ -403,7 +403,7 @@ export function OpeningDesigner({
                     <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
                       Lining
                     </span>
-                    <span className="flex items-center gap-1 border border-ink/15 px-1">
+                    <span className="flex items-center gap-1 rounded-md border border-ink/15 px-1">
                       <input
                         type="color"
                         aria-label="Envelope lining colour"
@@ -411,7 +411,7 @@ export function OpeningDesigner({
                         onChange={(event) =>
                           patchStationery({ lining: event.target.value })
                         }
-                        className="h-6 w-6 shrink-0 cursor-pointer border-0 bg-transparent p-0"
+                        className="h-6 w-6 shrink-0 cursor-pointer border-0 bg-transparent p-0 rounded-full"
                       />
                       <span className="min-w-0 flex-1 truncate text-[9px] uppercase tracking-[0.06em] text-ink/40">
                         {usableLining(stationery?.lining) ?? "suite tone"}
@@ -420,7 +420,7 @@ export function OpeningDesigner({
                         <button
                           type="button"
                           onClick={() => patchStationery({ lining: undefined })}
-                          className="shrink-0 px-1 text-[8px] uppercase text-ink/35 hover:text-[var(--red)]"
+                          className="shrink-0 rounded px-1 text-[8px] uppercase text-ink/35 hover:text-[var(--red)]"
                         >
                           Auto
                         </button>
@@ -431,7 +431,7 @@ export function OpeningDesigner({
                     <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
                       Wax
                     </span>
-                    <span className="flex items-center gap-1 border border-ink/15 px-1">
+                    <span className="flex items-center gap-1 rounded-md border border-ink/15 px-1">
                       <input
                         type="color"
                         aria-label="Wax seal colour"
@@ -439,7 +439,7 @@ export function OpeningDesigner({
                         onChange={(event) =>
                           patchStationery({ sealColor: event.target.value })
                         }
-                        className="h-6 w-6 shrink-0 cursor-pointer border-0 bg-transparent p-0"
+                        className="h-6 w-6 shrink-0 cursor-pointer border-0 bg-transparent p-0 rounded-full"
                       />
                       <span className="min-w-0 flex-1 truncate text-[9px] uppercase tracking-[0.06em] text-ink/40">
                         {usableLining(stationery?.sealColor) ?? "suite accent"}
@@ -448,7 +448,7 @@ export function OpeningDesigner({
                         <button
                           type="button"
                           onClick={() => patchStationery({ sealColor: undefined })}
-                          className="shrink-0 px-1 text-[8px] uppercase text-ink/35 hover:text-[var(--red)]"
+                          className="shrink-0 rounded px-1 text-[8px] uppercase text-ink/35 hover:text-[var(--red)]"
                         >
                           Auto
                         </button>
@@ -478,7 +478,7 @@ export function OpeningDesigner({
                 <button
                   type="button"
                   onClick={() => patch({ stationery: undefined })}
-                  className="text-[9px] uppercase tracking-[0.1em] text-ink/40 hover:text-[var(--red)]"
+                  className="rounded px-2 text-[9px] uppercase tracking-[0.1em] text-ink/45 transition-[background-color,color] duration-150 hover:bg-ink/[0.03] hover:text-[var(--red)]"
                 >
                   Use the classic suite
                 </button>
@@ -493,7 +493,7 @@ export function OpeningDesigner({
                 <button
                   type="button"
                   onClick={() => patch({ palette: undefined })}
-                  className="text-[9px] uppercase tracking-[0.1em] text-ink/40 hover:text-[var(--red)]"
+                  className="rounded px-2 text-[9px] uppercase tracking-[0.1em] text-ink/45 transition-[background-color,color] duration-150 hover:bg-ink/[0.03] hover:text-[var(--red)]"
                 >
                   Use design palette
                 </button>
@@ -513,24 +513,24 @@ export function OpeningDesigner({
                       <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
                         {entry.label}
                       </span>
-                      <span className="flex items-center gap-1 border border-ink/15 px-1">
-                        <input
-                          type="color"
-                          value={flat}
-                          aria-label={`${entry.label} colour`}
-                          onChange={(event) => patchPalette({ [entry.key]: event.target.value })}
-                          className="h-6 w-6 shrink-0 cursor-pointer border-0 bg-transparent p-0"
-                        />
-                        <input
-                          value={value}
-                          placeholder="design"
-                          aria-label={`${entry.label} hex`}
-                          onChange={(event) =>
-                            patchPalette({ [entry.key]: event.target.value || undefined })
-                          }
-                          className="h-7 w-full min-w-0 bg-transparent text-[10px] outline-none placeholder:text-ink/25"
-                        />
-                      </span>
+                  <span className="flex items-center gap-1 rounded-md border border-ink/15 px-1">
+                    <input
+                      type="color"
+                      value={flat}
+                      aria-label={`${entry.label} colour`}
+                      onChange={(event) => patchPalette({ [entry.key]: event.target.value })}
+                      className="h-6 w-6 shrink-0 cursor-pointer border-0 bg-transparent p-0 rounded-full"
+                    />
+                    <input
+                      value={value}
+                      placeholder="design"
+                      aria-label={`${entry.label} hex`}
+                      onChange={(event) =>
+                        patchPalette({ [entry.key]: event.target.value || undefined })
+                      }
+                      className="h-7 min-w-0 bg-transparent text-[10px] outline-none placeholder:text-ink/25"
+                    />
+                  </span>
                     </label>
                   );
                 })}
@@ -571,7 +571,7 @@ export function OpeningDesigner({
               <button
                 type="button"
                 onClick={() => patch({ motion: undefined })}
-                className="text-[9px] uppercase tracking-[0.1em] text-ink/40 hover:text-[var(--red)]"
+                className="rounded px-2 text-[9px] uppercase tracking-[0.1em] text-ink/45 transition-[background-color,color] duration-150 hover:bg-ink/[0.03] hover:text-[var(--red)]"
               >
                 Reset to the suite's own choreography
               </button>
@@ -623,21 +623,21 @@ export function OpeningDesigner({
                   placeholder="Name this opening"
                   onChange={(event) => setPresetName(event.target.value)}
                   className="h-8 rounded-none text-[11px]"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-8 shrink-0 rounded-none px-3 text-[10px] uppercase tracking-[0.1em]"
-                  onClick={() => {
-                    writeLibrary(
-                      upsertSavedOpening(readLibrary(), opening, presetName),
-                    );
-                    setPresetName("");
-                    setLibraryVersion((value) => value + 1);
-                  }}
-                >
-                  Save
-                </Button>
+                />                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 shrink-0 rounded-md px-3 text-[10px] uppercase tracking-[0.1em]"
+                    onClick={() => {
+                      writeLibrary(
+                        upsertSavedOpening(readLibrary(), opening, presetName),
+                      );
+                      setPresetName("");
+                      setLibraryVersion((value) => value + 1);
+                    }}
+                  >
+                    Save
+                  </Button>
+
               </div>
               {saved.length === 0 ? (
                 <p className="mt-2 text-[9px] leading-relaxed text-ink/35">
@@ -647,14 +647,14 @@ export function OpeningDesigner({
               ) : (
                 <ul className="mt-2 divide-y divide-ink/10 border border-ink/10">
                   {saved.map((entry) => (
-                    <li key={entry.id} className="flex items-center gap-2 px-2 py-1.5">
+                    <li key={entry.id} className="flex items-center gap-2 rounded-md px-2 py-1.5">
                       <button
                         type="button"
                         onClick={() => {
                           onChange(applySavedOpening(opening, entry));
                           replay();
                         }}
-                        className="min-w-0 flex-1 text-left"
+                        className="min-w-0 flex-1 rounded-md text-left"
                       >
                         <span className="block truncate text-[10.5px] text-ink/80">
                           {entry.label}
@@ -670,9 +670,9 @@ export function OpeningDesigner({
                           writeLibrary(removeSavedOpening(readLibrary(), entry.id));
                           setLibraryVersion((value) => value + 1);
                         }}
-                        className="shrink-0 p-1 text-ink/35 hover:text-[var(--red)]"
+                        className="shrink-0 rounded-full p-1 text-ink/40 hover:bg-[var(--red)]/[0.06] hover:text-[var(--red)]"
                       >
-                        <Trash2 className="size-3" />
+                        <Trash2 className="size-3.5" />
                       </button>
                     </li>
                   ))}

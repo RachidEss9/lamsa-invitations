@@ -827,7 +827,7 @@ export function LibraryPanel({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[88vh] sm:max-w-[min(920px,calc(100%_-_2rem))] gap-0 overflow-y-auto p-0">
         <DialogHeader className="border-b border-ink/12 px-4 py-3">
-          <DialogTitle className="flex items-center gap-2 font-ui text-xl font-semibold tracking-[-0.01em]">
+          <DialogTitle className="flex items-center gap-2.5 font-ui text-xl font-semibold tracking-[-0.01em]">
             <Palette className="size-4 text-[var(--red)]" />
             Libraries
           </DialogTitle>
@@ -858,10 +858,10 @@ export function LibraryPanel({
                 setQuery("");
               }}
               className={cn(
-                "shrink-0 whitespace-nowrap border-t-2 border-transparent px-3 py-2 text-[9px] uppercase tracking-[0.12em] transition-colors hover:border-ink/30",
+                "shrink-0 whitespace-nowrap rounded-t-md border-t-2 border-transparent px-3 py-2 text-[9px] uppercase tracking-[0.1em] transition-[background-color,border-color,color] duration-150",
                 tab === id
                   ? "border-[var(--red)] text-ink"
-                  : "text-ink/50",
+                  : "text-ink/50 hover:text-ink/80",
               )}
             >
               <Icon className="inline size-3 mr-1" />
@@ -904,10 +904,10 @@ export function LibraryPanel({
             title="Show favourites only"
             onClick={() => setOnlyFavourites((value) => !value)}
             className={cn(
-              "flex h-8 shrink-0 items-center gap-1.5 border px-2 text-[9px] uppercase tracking-[0.1em] transition-colors",
+              "flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[9px] uppercase tracking-[0.1em] transition-[background-color,border-color,color] duration-150",
               onlyFavourites
-                ? "border-[var(--gold)]/70 bg-[var(--gold)]/10 text-[#7a5f2a]"
-                : "border-ink/20 text-ink/45 hover:border-ink/40 hover:text-ink",
+                ? "border-[var(--gold)]/80 bg-[var(--gold)]/10 text-[#7a5f2a]"
+                : "border-ink/20 text-ink/45 hover:border-ink/45 hover:text-ink",
             )}
           >
             <Star
@@ -926,7 +926,7 @@ export function LibraryPanel({
               tab === "styles" ||
               tab === "type" ||
               tab === "assets") && (
-              <p className="mb-3 flex items-center gap-1.5 border border-[var(--gold)]/40 bg-[var(--gold)]/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-[#6b5334]">
+              <p className="mb-3 flex items-center gap-1.5 rounded-md border border-[var(--gold)]/50 bg-[var(--gold)]/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-[#7a5f2a]">
                 <Star className="size-3 shrink-0" fill="currentColor" />
                 Showing favourites only. Star any item to keep it here.
               </p>
@@ -966,38 +966,38 @@ export function LibraryPanel({
           )}
 
           {tab === "saved" && (
-            <div className="space-y-4">
-              <div className="border border-ink/12 bg-[var(--paper-deep)]/60 p-3">
-                <p className="text-[11px] font-semibold">
-                  Save this design as a template
-                </p>
-                <p className="mt-1 text-[10px] leading-relaxed text-ink/50">
-                  Pages, layers, type, colours, and motion are copied into your
-                  private library. This invitation keeps its own words, guests,
-                  RSVP, and public link.
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <Input
-                    value={saveName}
-                    onChange={(event) => setSaveName(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") void saveCurrentTemplate();
-                    }}
-                    placeholder="Template name"
-                    maxLength={80}
-                    className="h-8 rounded-none border-ink/20 text-[12px]"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => void saveCurrentTemplate()}
-                    disabled={saving || !saveName.trim()}
-                    className="h-8 shrink-0 rounded-none px-3 text-[9px] uppercase tracking-[0.12em]"
-                  >
-                    <Save className="size-3.5" />
-                    {saving ? "Saving" : "Save"}
-                  </Button>
+            <div className="space-y-4">                <div className="rounded-md border border-ink/12 bg-[var(--paper-deep)]/60 p-3">
+                  <p className="text-[11px] font-semibold">
+                    Save this design as a template
+                  </p>
+                  <p className="mt-1 text-[10px] leading-relaxed text-ink/50">
+                    Pages, layers, type, colours, and motion are copied into your
+                    private library. This invitation keeps its own words, guests,
+                    RSVP, and public link.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      value={saveName}
+                      onChange={(event) => setSaveName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void saveCurrentTemplate();
+                      }}
+                      placeholder="Template name"
+                      maxLength={80}
+                      className="h-8 rounded-md border-ink/20 text-[12px]"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => void saveCurrentTemplate()}
+                      disabled={saving || !saveName.trim()}
+                      className="h-8 shrink-0 rounded-md px-3 text-[9px] uppercase tracking-[0.12em]"
+                    >
+                      <Save className="size-3.5" />
+                      {saving ? "Saving" : "Save"}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+
 
               {savedItems === undefined ? (
                 <p className="py-6 text-center text-[11px] text-ink/45">
@@ -1011,78 +1011,78 @@ export function LibraryPanel({
                 </p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {filteredSaved.map((item) => (
-                    <div
-                      key={item._id}
-                      className="flex flex-col gap-2 border border-ink/12 p-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Bookmark className="size-3.5 shrink-0 text-[var(--red)]" />
-                        <span className="min-w-0 flex-1 truncate font-ui text-[13px] font-semibold">
-                          {item.name}
-                        </span>
-                        <FavouriteToggle
-                          active={favourites.includes(
-                            favouriteKey("saved", item._id),
-                          )}
-                          label={item.name}
-                          onToggle={() =>
-                            togglePin(favouriteKey("saved", item._id))
-                          }
-                        />
-                      </div>
-                      {item.description && (
-                        <p className="text-[10px] leading-relaxed text-ink/55">
-                          {item.description}
+                  {filteredSaved.map((item) => (                      <div
+                        key={item._id}
+                        className="flex flex-col gap-2 rounded-md border border-ink/12 p-3"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Bookmark className="size-3.5 shrink-0 text-[var(--red)]" />
+                          <span className="min-w-0 flex-1 truncate font-ui text-[13px] font-semibold">
+                            {item.name}
+                          </span>
+                          <FavouriteToggle
+                            active={favourites.includes(
+                              favouriteKey("saved", item._id),
+                            )}
+                            label={item.name}
+                            onToggle={() =>
+                              togglePin(favouriteKey("saved", item._id))
+                            }
+                          />
+                        </div>
+                        {item.description && (
+                          <p className="text-[10px] leading-relaxed text-ink/55">
+                            {item.description}
+                          </p>
+                        )}
+                        <p className="text-[9px] uppercase tracking-[0.08em] text-ink/35">
+                          Saved {new Date(item.updatedAt).toLocaleDateString()}
                         </p>
-                      )}
-                      <p className="text-[9px] uppercase tracking-[0.08em] text-ink/35">
-                        Saved {new Date(item.updatedAt).toLocaleDateString()}
-                      </p>
-                      <div className="mt-auto flex items-center gap-1.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => applySavedTemplate(item)}
-                          className="h-7 flex-1 rounded-none px-2 text-[9px] uppercase tracking-[0.1em]"
-                        >
-                          Use template
-                        </Button>
-                        {confirmDelete === item._id ? (
-                          <>
-                            <Button
-                              type="button"
-                              onClick={() => void deleteSavedTemplate(item._id)}
-                              className="h-7 rounded-none px-2 text-[9px] uppercase tracking-[0.1em]"
-                            >
-                              Delete
-                            </Button>
+                        <div className="mt-auto flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => applySavedTemplate(item)}
+                            className="h-7 flex-1 rounded-md px-2 text-[9px] uppercase tracking-[0.1em]"
+                          >
+                            Use template
+                          </Button>
+                          {confirmDelete === item._id ? (
+                            <>
+                              <Button
+                                type="button"
+                                onClick={() => void deleteSavedTemplate(item._id)}
+                                className="h-7 rounded-md px-2 text-[9px] uppercase tracking-[0.1em]"
+                              >
+                                Delete
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setConfirmDelete(null)}
+                                className="h-7 rounded-md px-2 text-[9px] uppercase"
+                              >
+                                No
+                              </Button>
+                            </>
+                          ) : (
                             <Button
                               type="button"
                               variant="ghost"
-                              onClick={() => setConfirmDelete(null)}
-                              className="h-7 rounded-none px-2 text-[9px] uppercase"
+                              aria-label={`Delete ${item.name}`}
+                              onClick={() => setConfirmDelete(item._id)}
+                              className="h-7 rounded-md px-2 text-ink/45"
                             >
-                              No
+                              <Trash2 className="size-3.5" />
                             </Button>
-                          </>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            aria-label={`Delete ${item.name}`}
-                            onClick={() => setConfirmDelete(item._id)}
-                            className="h-7 rounded-none px-2 text-ink/45"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
+
                   ))}
                 </div>
               )}
-              <p className="border-t border-ink/10 pt-3 text-[9px] leading-relaxed text-ink/40">
+              <p className="border-t border-ink/10 pt-3 rounded-b-md text-[9px] leading-relaxed text-ink/40">
                 Saved templates are stored with your own invitations and are
                 never visible to guests or on a public link.
               </p>
@@ -1250,27 +1250,27 @@ export function LibraryPanel({
           )}
 
           {tab === "assets" && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-1">
-                {BUILTIN_ASSET_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => {
-                      setAssetCategory(cat);
-                      setQuery("");
-                    }}
-                    className={cn(
-                      "border px-2 py-1 text-[9px] uppercase tracking-[0.1em]",
-                      assetCategory === cat
-                        ? "border-[var(--red)] bg-[var(--red)] text-white"
-                        : "border-ink/15 text-ink/50 hover:border-ink",
-                    )}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
+            <div className="space-y-4">                <div className="flex flex-wrap gap-1.5">
+                  {BUILTIN_ASSET_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        setAssetCategory(cat);
+                        setQuery("");
+                      }}
+                      className={cn(
+                        "rounded-md border px-2 py-1 text-[9px] uppercase tracking-[0.1em]",
+                        assetCategory === cat
+                          ? "border-[var(--red)] bg-[var(--red)] text-white"
+                          : "border-ink/15 text-ink/50 hover:border-ink/45 hover:text-ink",
+                      )}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
               <div>
                 {filteredAssets.length === 0 ? (
                   <p className="py-10 text-center text-[12px] text-ink/45">
@@ -1337,22 +1337,22 @@ export function LibraryPanel({
           )}
 
           {tab === "reveals" && (
-            <div>
-              {filteredReveals.length === 0 ? (
-                <p className="py-10 text-center text-[12px] text-ink/45">
-                  No reveal presets match that search.
-                </p>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {filteredReveals.map((preset) => (
-                    <RevealCard
-                      key={preset.id}
-                      preset={preset}
-                      onAdd={() => onAddRevealPreset(preset)}
-                    />
-                  ))}
-                </div>
-              )}
+            <div>                {filteredReveals.length === 0 ? (
+                  <p className="py-10 text-center text-[12px] text-ink/45">
+                    No reveal presets match that search.
+                  </p>
+                ) : (
+                  <div className="rounded-lg border border-ink/10 p-2 sm:grid-cols-2 grid gap-2">
+                    {filteredReveals.map((preset) => (
+                      <RevealCard
+                        key={preset.id}
+                        preset={preset}
+                        onAdd={() => onAddRevealPreset(preset)}
+                      />
+                    ))}
+                  </div>
+                )}
+
             </div>
           )}
 
@@ -1379,7 +1379,7 @@ export function LibraryPanel({
                           });
                           onClose();
                         }}
-                        className="flex flex-col gap-2 border border-ink/12 p-3 text-left transition-colors hover:border-ink/40"
+                        className="flex flex-col gap-2 rounded-md border border-ink/12 p-3 text-left transition-[background-color,border-color,color] duration-150 hover:border-ink/40"
                       >
                         <div className="flex items-center gap-2.5">
                           <Sparkle className="size-4 text-[var(--red)]" />

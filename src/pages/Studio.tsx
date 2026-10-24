@@ -167,10 +167,11 @@ function usePrefersReducedMotion() {
 function PanelHeading({ title, note }: { title: string; note?: string }) {
   return (
     <div className="border-b border-ink/12 px-4 py-3">
-      <p className="font-meta text-[9px] uppercase tracking-[0.2em] text-ink/40">
+      <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/40">
         {title}
       </p>
-      {note && <p className="mt-1 text-[10px] leading-relaxed text-ink/45">{note}</p>}
+      {note &&            <p className="mt-1 text-[11px] leading-relaxed text-ink/50">{note}</p>
+}
     </div>
   );
 }
@@ -190,12 +191,12 @@ function AddButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-start gap-2.5 border border-ink/15 p-2.5 text-left transition-colors hover:border-ink hover:bg-ink/[0.03]"
+      className="flex h-[58px] w-full items-start gap-3 border border-ink/15 px-3 text-left transition-[background-color,border-color,color] duration-150 hover:border-ink/50 hover:bg-ink/[0.03]"
     >
-      <Icon className="mt-0.5 size-4 shrink-0 text-[var(--red)]" />
-      <span>
-        <span className="block text-[11px] font-medium">{label}</span>
-        <span className="mt-0.5 block text-[9px] leading-relaxed text-ink/40">{note}</span>
+      <Icon className="mt-0.5 h-[22px] w-[22px] shrink-0 stroke-[1.6px] text-[var(--red)]" />
+      <span className="min-w-0">
+        <span className="block text-[12px] font-medium leading-tight">{label}</span>
+        <span className="mt-0.5 block text-[10px] leading-relaxed text-ink/40">{note}</span>
       </span>
     </button>
   );
@@ -2515,12 +2516,11 @@ export default function Studio() {
   };
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">
-      <header className="z-40 flex h-[60px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-ink/10 bg-[var(--paper-light)]/95 px-2 backdrop-blur-xl sm:gap-2 sm:px-4">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">        <header className="z-40 flex h-[60px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-ink/10 bg-[var(--paper-light)]/95 px-2 backdrop-blur-xl sm:gap-2 sm:px-4">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
-          className="grid size-8 shrink-0 place-items-center rounded-md border border-ink/15 text-ink/60 transition-colors hover:border-ink/45 hover:text-ink"
+          className="grid size-8 shrink-0 place-items-center rounded-md border border-ink/15 text-ink/60 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
           aria-label="Back to the studio"
         >
           <ArrowLeft className="size-3.5" />
@@ -2533,8 +2533,12 @@ export default function Studio() {
             type="button"
             onClick={() => void persistDesign(design)}
             className={cn(
-              "flex items-center gap-1 text-[8px] uppercase tracking-[0.16em]",
-              saveState === "error" ? "text-[var(--red)]" : "text-ink/40",
+              "flex items-center gap-1 font-meta text-[8px] uppercase tracking-[0.16em]",
+              saveState === "error"
+                ? "text-[var(--red)]"
+                : saveState === "saved"
+                  ? "text-ink/55"
+                  : "text-ink/40",
             )}
           >
             {saveState === "saving" ? (
@@ -2585,7 +2589,7 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setLibrariesOpen(true)}
-            className="hidden h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em] sm:inline-flex"
+            className="hidden h-8 rounded-md px-2 text-[9px] uppercase tracking-[0.12em] sm:inline-flex"
           >
             <Library className="size-3.5" />
             <span className="hidden sm:inline">Libraries</span>
@@ -2602,7 +2606,7 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setTimelinePreviewOpen(true)}
-            className="hidden h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em] lg:inline-flex"
+            className="hidden h-8 rounded-md px-2 text-[9px] uppercase tracking-[0.12em] lg:inline-flex"
           >
             <Play className="size-3.5" />
             Timeline
@@ -2613,7 +2617,7 @@ export default function Studio() {
             onClick={() => setGuestOpen(true)}
             aria-label="Guest preview"
             title="Guest preview"
-            className="h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em]"
+            className="h-8 rounded-md px-2 text-[9px] uppercase tracking-[0.12em]"
           >
             <Eye className="size-3.5" />
             <span className="hidden sm:inline">Guest preview</span>
@@ -2622,7 +2626,7 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setPrintOpen(true)}
-            className="h-8 rounded-none px-2 text-[9px] uppercase tracking-[0.12em]"
+            className="h-8 rounded-md px-2 text-[9px] uppercase tracking-[0.12em]"
             aria-label="Export a print-ready PDF"
             title="Export a print-ready PDF"
           >
@@ -2633,13 +2637,14 @@ export default function Studio() {
             type="button"
             onClick={handlePublish}
             disabled={publishing}
-            className="h-8 rounded-none px-3 text-[9px] uppercase tracking-[0.14em]"
+            className="h-8 rounded-md px-3 text-[9px] uppercase tracking-[0.14em]"
           >
             {publishing ? <Loader2 className="size-3.5 animate-spin" /> : published ? <Share2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
             {published ? "Share" : "Publish"}
           </Button>
         </div>
       </header>
+
 
       <div className="flex min-h-0 flex-1">
         <aside
@@ -2790,11 +2795,11 @@ export default function Studio() {
             )}
 
             <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col gap-1">
-              <span className="pointer-events-auto border border-ink/15 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-ink/55 backdrop-blur">
+              <span className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-ink/55 backdrop-blur">
                 {page.name} · {page.elements.length} layers
               </span>
               {selected.length > 0 && (
-                <span className="pointer-events-auto border border-[var(--red)]/30 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-[var(--red)] backdrop-blur">
+                <span className="pointer-events-auto rounded-md border border-[var(--red)]/30 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-[var(--red)] backdrop-blur">
                   {selected.length === 1 ? selected[0].name : `${selected.length} selected`}
                 </span>
               )}
@@ -2806,12 +2811,12 @@ export default function Studio() {
                 selected.length > 0 ? "bottom-[54px]" : "bottom-3",
               )}
             >
-              <div className="pointer-events-auto flex border border-ink/15 bg-[var(--paper-light)]/90 backdrop-blur">
+              <div className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 backdrop-blur">
                 <button
                   type="button"
                   onClick={() => setZoom((value) => Math.max(0.4, value / 1.2))}
                   aria-label="Zoom out"
-                  className="grid size-6 place-items-center text-ink/55 hover:text-ink"
+                  className="grid size-6 place-items-center text-ink/55 transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
                 >
                   <Minus className="size-3" />
                 </button>
@@ -2819,7 +2824,7 @@ export default function Studio() {
                   type="button"
                   onClick={() => setZoom((value) => Math.min(2.4, value * 1.2))}
                   aria-label="Zoom in"
-                  className="grid size-6 place-items-center text-ink/55 hover:text-ink"
+                  className="grid size-6 place-items-center text-ink/55 transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
                 >
                   <Plus className="size-3" />
                 </button>
@@ -2827,7 +2832,7 @@ export default function Studio() {
               <button
                 type="button"
                 onClick={() => setShowHidden((value) => !value)}
-                className="pointer-events-auto border border-ink/15 bg-[var(--paper-light)]/90 p-1.5 text-ink/50 backdrop-blur hover:text-ink"
+                className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 p-1.5 text-ink/50 backdrop-blur transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
                 title={showHidden ? "Hide hidden layers" : "Show hidden layers"}
               >
                 {showHidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
@@ -2835,7 +2840,7 @@ export default function Studio() {
               <button
                 type="button"
                 onClick={fitCanvas}
-                className="pointer-events-auto border border-ink/15 bg-[var(--paper-light)]/90 px-1.5 py-1 font-meta text-[8px] text-ink/50 backdrop-blur hover:text-ink"
+                className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 px-1.5 py-1 font-meta text-[8px] text-ink/50 backdrop-blur transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
                 title="Fit canvas (⌘/Ctrl + 0)"
               >
                 {Math.round(zoom * 100)}%
@@ -3027,7 +3032,7 @@ export default function Studio() {
               <span className="font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
                 {mobileSheet}
               </span>
-              <button type="button" onClick={() => setMobileSheet(null)} className="text-[10px] uppercase tracking-[0.1em] text-ink/50">
+              <button type="button" onClick={() => setMobileSheet(null)} className="rounded-md text-[10px] uppercase tracking-[0.1em] text-ink/50 transition-[background-color,color] duration-150 hover:bg-ink/[0.03] hover:text-ink">
                 Close
               </button>
             </div>
@@ -3285,7 +3290,7 @@ export default function Studio() {
                     variant="outline"
                     onClick={() => void restoreVersion(version._id)}
                     disabled={versionBusy}
-                    className="h-7 shrink-0 rounded-none px-2 text-[9px] uppercase tracking-[0.1em]"
+                    className="h-7 shrink-0 rounded-md px-2 text-[9px] uppercase tracking-[0.1em]"
                   >
                     Restore
                   </Button>

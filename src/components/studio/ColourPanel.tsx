@@ -124,14 +124,14 @@ export function ColourPanel({
   return (
     <div className="pb-4">
       <div className="border-b border-ink/12 px-4 py-3">
-        <p className="font-meta text-[9px] uppercase tracking-[0.2em] text-ink/40">
+        <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/40">
           Colour
         </p>
         <p className="mt-1 truncate text-[11px] text-ink/70">{target.label}</p>
       </div>
 
       <div className="space-y-2 border-b border-ink/12 p-3">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <input
             type="color"
             value={safe}
@@ -156,7 +156,7 @@ export function ColourPanel({
             type="button"
             onClick={() => setSaved(saveColour(current))}
             title="Save this colour"
-            className="grid size-8 shrink-0 place-items-center border border-ink/20 text-ink/60 hover:border-ink hover:text-ink"
+            className="grid size-8 shrink-0 place-items-center rounded-md border border-ink/15 text-ink/60 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
           >
             <Plus className="size-3.5" />
           </button>
@@ -164,7 +164,7 @@ export function ColourPanel({
         <button
           type="button"
           onClick={() => apply(current)}
-          className="h-7 w-full border border-ink/20 text-[9px] uppercase tracking-[0.12em] text-ink/60 hover:border-ink hover:text-ink"
+          className="h-7 w-full rounded-md border border-ink/15 text-[10px] uppercase tracking-[0.1em] text-ink/70 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
         >
           Apply to {element ? target.label.split(" · ")[1] ?? "layer" : "page"}
         </button>
@@ -195,7 +195,7 @@ export function ColourPanel({
           Your palettes
         </p>
         <div className="flex items-center gap-2">
-          <span className="flex overflow-hidden border border-ink/15">
+          <span className="flex overflow-hidden border border-ink/15 rounded-md">
             {[derivedPalette.paper, derivedPalette.ink, derivedPalette.accent].map(
               (colour) => (
                 <span
@@ -249,7 +249,7 @@ export function ColourPanel({
               );
               setPaletteName("");
             }}
-            className="shrink-0 border border-ink/20 px-2 text-[8px] uppercase tracking-[0.1em] text-ink/60 hover:border-ink hover:text-ink"
+            className="shrink-0 rounded-md border border-ink/15 px-2 text-[8px] uppercase tracking-[0.1em] text-ink/60 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
           >
             Save
           </button>
@@ -257,8 +257,8 @@ export function ColourPanel({
         {customPalettes.length > 0 && (
           <ul className="mt-2 divide-y divide-ink/10 border border-ink/10">
             {customPalettes.map((palette) => (
-              <li key={palette.id} className="flex items-center gap-1 px-1.5 py-1">
-                <span className="flex shrink-0 overflow-hidden border border-ink/10">
+              <li key={palette.id} className="flex items-center gap-1.5 px-1.5 py-1.5 rounded-md border border-ink/12">
+                <span className="flex shrink-0 overflow-hidden border border-ink/10 rounded-md">
                   {[palette.paper, palette.ink, palette.accent].map((colour) => (
                     <span
                       key={colour}
@@ -282,7 +282,7 @@ export function ColourPanel({
                       accent: palette.accent,
                     })
                   }
-                  className="shrink-0 border border-ink/20 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.1em] text-ink/60 hover:border-ink hover:text-ink"
+                  className="shrink-0 rounded-md border border-ink/15 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.1em] text-ink/60 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
                 >
                   Apply
                 </button>
@@ -294,9 +294,9 @@ export function ColourPanel({
                       writeSavedPalettes(removeSavedPalette(current, palette.id)),
                     )
                   }
-                  className="shrink-0 p-0.5 text-ink/35 hover:text-[var(--red)]"
+                  className="shrink-0 rounded-full p-0.5 text-ink/40 hover:bg-[var(--red)]/[0.06] hover:text-[var(--red)]"
                 >
-                  <X className="size-3" />
+                  <X className="size-3.5" />
                 </button>
               </li>
             ))}
@@ -321,17 +321,17 @@ export function ColourPanel({
         <p className="mb-2 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/40">
           Palettes
         </p>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {groups.map((name) => (
             <button
               key={name}
               type="button"
               onClick={() => setGroup(name)}
               className={cn(
-                "border px-1.5 py-1 text-[8px] uppercase tracking-[0.08em]",
+                "rounded-md border px-1.5 py-1 text-[8px] uppercase tracking-[0.1em]",
                 group === name
-                  ? "border-ink bg-ink text-[#f2f1ed]"
-                  : "border-ink/15 text-ink/55 hover:border-ink",
+                  ? "border-ink/90 bg-ink/90 text-[#f2f1ed]"
+                  : "border-ink/15 text-ink/60 hover:border-ink/45 hover:text-ink",
               )}
             >
               {name}
@@ -342,13 +342,13 @@ export function ColourPanel({
 
       <div className="space-y-2 p-3">
         {shown.map((palette) => (
-          <div key={palette.id} className="border border-ink/12 p-2">
+          <div key={palette.id} className="rounded-md border border-ink/12 p-2">
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-[10px] text-ink/70">{palette.name}</span>
               <button
                 type="button"
                 onClick={() => onApplyPalette(palette)}
-                className="shrink-0 border border-ink/20 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.1em] text-ink/60 hover:border-ink hover:text-ink"
+                className="shrink-0 rounded-md border border-ink/15 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.1em] text-ink/60 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
               >
                 Apply all
               </button>
@@ -382,14 +382,15 @@ export function ColourPanel({
                 setRecent(rememberColour(gradient.value));
               }}
               className={cn(
-                "flex h-9 items-end border px-1.5 pb-1 text-[8px] uppercase tracking-[0.08em]",
+                "flex h-9 min-w-0 items-end justify-between gap-1.5 rounded-md border px-1.5 pb-1 text-left text-[8px] uppercase tracking-[0.08em]",
                 page.background === gradient.value
-                  ? "border-[var(--red)] text-ink"
-                  : "border-ink/15 text-ink/60 hover:border-ink",
+                  ? "border-[var(--red)]/60 text-ink"
+                  : "border-ink/15 text-ink/60 hover:border-ink/45 hover:text-ink",
               )}
               style={{ background: gradient.value }}
             >
-              {gradient.name}
+              <span className="truncate">{gradient.name}</span>
+              <span className="shrink-0 font-meta text-[7px] text-ink/40">use</span>
             </button>
           ))}
         </div>
