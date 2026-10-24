@@ -11,6 +11,18 @@ const LOCKUP: Record<WordmarkTone, string> = {
   paper: brand.logos.lockupPaper,
 };
 
+const WORDMARK: Record<WordmarkTone, string> = {
+  crimson: brand.logos.wordmarkCrimson,
+  ink: brand.logos.wordmarkInk,
+  paper: brand.logos.wordmarkPaper,
+};
+
+const SYMBOL: Record<WordmarkTone, string> = {
+  crimson: brand.logos.symbolCrimson,
+  ink: brand.logos.symbolInk,
+  paper: brand.logos.symbolPaper,
+};
+
 /**
  * The studio logo: the LAMSA lockup (arch symbol + lowercase wordmark), taken
  * from the brand SVG set so navigation, editor and public pages all carry the
@@ -65,5 +77,48 @@ export function BrandLink({
         Atelier
       </span>
     </Link>
+  );
+}
+
+/** The arch symbol alone, for compact headers, tabs, and app corners. */
+export function BrandSymbol({
+  className,
+  tone = "crimson",
+}: {
+  className?: string;
+  tone?: WordmarkTone;
+}) {
+  return (
+    <img
+      src={SYMBOL[tone]}
+      alt=""
+      aria-hidden
+      draggable={false}
+      className={cn(
+        "block h-[14px] w-auto shrink-0 select-none",
+        className,
+      )}
+    />
+  );
+}
+
+/** The wordmark alone, for dense UIs that already have an icon somewhere. */
+export function BrandWordmark({
+  className,
+  tone = "crimson",
+}: {
+  className?: string;
+  tone?: WordmarkTone;
+}) {
+  return (
+    <img
+      src={WORDMARK[tone]}
+      alt={brand.name}
+      draggable={false}
+      className={cn(
+        "block h-[13px] w-auto shrink-0 select-none tracking-tight",
+        className,
+      )}
+    />
   );
 }

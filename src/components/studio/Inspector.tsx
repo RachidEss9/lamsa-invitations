@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldRow } from "@/components/ui/field";
 import {
   ANIMATION_PRESETS,
   EASINGS,
@@ -25,6 +27,8 @@ import { fontById } from "@/lib/fonts";
 import { MOTIFS } from "@/lib/invitation";
 import { FontPicker } from "@/components/studio/FontPicker";
 import { cn } from "@/lib/utils";
+import { useRef, type ReactNode } from "react";
+
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -49,7 +53,6 @@ import {
   Ungroup,
   Unlock,
 } from "lucide-react";
-import { useRef, type ReactNode } from "react";
 
 interface InspectorProps {
   page: DesignPage;
@@ -74,31 +77,32 @@ interface InspectorProps {
   onEditText?: (id: string) => void;
 }
 
-function Section({
-  title,
-  children,
-  className,
-}: {
+type SectionProps = {
   title: string;
   children: ReactNode;
   className?: string;
-}) {
+  footer?: ReactNode;
+};
+
+function Section({ title, children, className, footer }: SectionProps) {
   return (
-    <section className={cn("border-b border-ink/12 px-4 py-3", className)}>
-      <p className="mb-3 font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+    <section className={cn("border-b border-ink/12 bg-transparent px-4 py-3.5", className)}>
+      <p className="mb-2.5 font-meta text-[9px] uppercase tracking-[0.18em] text-ink/40">
         {title}
       </p>
-      <div className="space-y-3">{children}</div>
+      <div className="min-h-[2px]">{children}</div>
+      {footer && (
+        <div className="mt-3 border-t border-ink/10 pt-2.5">{footer}</div>
+      )}
     </section>
   );
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="flex items-center justify-between gap-3">
-      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
-      <div className="min-w-0 flex-1">{children}</div>
-    </label>
+    <FieldRow label={label}>
+      {children}
+    </FieldRow>
   );
 }
 
@@ -437,25 +441,42 @@ export function Inspector({
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-1">
-          <button type="button" onClick={() => onLayer("back")} className="flex h-8 items-center justify-center border border-ink/15 text-ink/65 hover:border-ink" title="Send to back">
-            <ArrowDownToLine className="size-3.5" />
-          </button>
-          <button type="button" onClick={() => onLayer("down")} className="flex h-8 items-center justify-center border border-ink/15 text-ink/65 hover:border-ink" title="Send backward">
-            <MoveDown className="size-3.5" />
-          </button>
-          <button type="button" onClick={() => onLayer("up")} className="flex h-8 items-center justify-center border border-ink/15 text-ink/65 hover:border-ink" title="Bring forward">
-            <MoveUp className="size-3.5" />
-          </button>
-          <button type="button" onClick={() => onLayer("front")} className="flex h-8 items-center justify-center border border-ink/15 text-ink/65 hover:border-ink" title="Bring to front">
-            <ArrowUpToLine className="size-3.5" />
-          </button>
-          <button type="button" onClick={() => patch({ locked: !element.locked })} className="flex h-8 items-center justify-center border border-ink/15 text-ink/65 hover:border-ink" title="Lock">
-            {element.locked ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />}
-          </button>
-          <button type="button" onClick={() => patch({ hidden: !element.hidden })} className="flex h-8 items-center justify-center border border-ink/15 text-ink/65 hover:border-ink" title="Hide">
-            {element.hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-          </button>
+        <div className="grid grid-cols-3 gap-1">            <IconButton
+              label="Send to back"
+              onClick={() => onLayer("back")}
+            >
+              <ArrowDownToLine className="size-3.5" />
+            </IconButton>
+            <IconButton
+              label="Send backward"
+              onClick={() => onLayer("down")}
+            >
+              <MoveDown className="size-3.5" />
+            </IconButton>
+            <IconButton
+              label="Bring forward"
+              onClick={() => onLayer("up")}
+            >
+              <MoveUp className="size-3.5" />
+            </IconButton>
+            <IconButton
+              label="Bring to front"
+              onClick={() => onLayer("front")}
+            >
+              <ArrowUpToLine className="size-3.5" />
+            </IconButton>
+            <IconButton
+              label={element.locked ? "Unlock layer" : "Lock layer"}
+              onClick={() => patch({ locked: !element.locked })}
+            >
+              {element.locked ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />}
+            </IconButton>
+            <IconButton
+              label={element.hidden ? "Show layer" : "Hide layer"}
+              onClick={() => patch({ hidden: !element.hidden })}
+            >
+              {element.hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            </IconButton>
         </div>
       </Section>
 

@@ -19,22 +19,22 @@ export { Badge } from "./badge";           // ~2KB - Status badges
 export { Label } from "./label";           // ~1KB - Form labels
 export { Separator } from "./separator";   // ~1KB - Visual dividers
 export { Skeleton } from "./skeleton";     // ~1KB - Loading placeholders
-
+export { PanelSection, PanelRow, PanelGrid } from "./panel"; // ~1KB - Panel scaffolding
 // Form Inputs
-export { Button } from "./button";         // ~3KB - Primary button component
+export { Button, buttonVariants } from "./button";         // ~3KB - Primary button component
+export { IconButton } from "./icon-button";               // ~2KB - Compact icon control
 export { Input } from "./input";           // ~2KB - Text input
 export { Textarea } from "./textarea";     // ~2KB - Multi-line text input
 export { Checkbox } from "./checkbox";     // ~3KB - Checkbox input
 export { Switch } from "./switch";         // ~3KB - Toggle switch
 export { Slider } from "./slider";         // ~4KB - Range slider
 export { RadioGroup } from "./radio-group"; // ~3KB - Radio button group
-
+export { FieldRow } from "./field";        // ~1KB - Compact field row
 // Display Components
 export { Avatar } from "./avatar";         // ~3KB - User avatars
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from "./card"; // ~2KB - Content cards
 export { Progress } from "./progress";     // ~2KB - Progress bars
 export { AspectRatio } from "./aspect-ratio"; // ~1KB - Maintain aspect ratios
-
 // ============================================================================
 // INTERACTIVE COMPONENTS (Medium bundle size)
 // ============================================================================
@@ -58,7 +58,7 @@ export { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, C
 export { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarLabel, MenubarCheckboxItem, MenubarRadioGroup, MenubarRadioItem, MenubarPortal, MenubarSubContent, MenubarSubTrigger, MenubarGroup, MenubarSub, MenubarShortcut } from "./menubar"; // ~8KB
 
 // Form Components
-export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectLabel, SelectItem, SelectSeparator, SelectScrollUpButton, SelectScrollDownButton } from "./select"; // ~6KB - Dropdown select
+export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectLabel, SelectItem, SelectSeparator } from "./select"; // ~6KB - Dropdown select
 export { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage, FormField } from "./form"; // ~4KB - Form wrapper with validation
 export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "./input-otp"; // ~5KB - OTP input
 
@@ -92,59 +92,3 @@ export { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLe
 // Notifications
 export { Toaster } from "./sonner"; // ~8KB - Toast notifications
 
-// ============================================================================
-// USAGE EXAMPLES FOR AI AGENTS
-// ============================================================================
-
-/**
- * Example: Building a simple form
- *
- * import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
- * import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui";
- * import { Input, Button } from "@/components/ui";
- *
- * Small bundle impact: ~12KB total
- */
-
-/**
- * Example: Building a complex dashboard
- *
- * import { Card, Tabs, Chart } from "@/components/ui";
- * import { Select, Button } from "@/components/ui";
- *
- * Large bundle impact: ~35KB+ (due to Chart/recharts)
- * Consider lazy loading: const Chart = lazy(() => import("@/components/ui/chart"));
- */
-
-/**
- * Example: Building a navigation menu
- *
- * import { NavigationMenu, DropdownMenu } from "@/components/ui";
- * import { Button, Avatar } from "@/components/ui";
- *
- * Medium bundle impact: ~15KB total
- */
-
-// ============================================================================
-// OPTIMIZATION TIPS FOR AI AGENTS
-// ============================================================================
-
-/**
- * 1. Import only what you need:
- *    ✅ import { Button, Input } from "@/components/ui";
- *    ❌ import * as UI from "@/components/ui";
- *
- * 2. Lazy load heavy components:
- *    const Chart = lazy(() => import("@/components/ui").then(m => ({ default: m.Chart })));
- *    const Calendar = lazy(() => import("@/components/ui/calendar").then(m => ({ default: m.Calendar })));
- *
- * 3. Group imports by route:
- *    - Landing page: Button, Card, Badge (small components only)
- *    - Dashboard: + Chart, Tabs, Select (add medium components)
- *    - Admin: + Command, Carousel (add large components as needed)
- *
- * 4. Prefer native HTML when possible:
- *    - Use <input> instead of Input for simple cases
- *    - Use <button> instead of Button for basic buttons
- *    - Use these components when you need the styling/accessibility features
- */

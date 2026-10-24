@@ -31,7 +31,11 @@ export const brand = {
     lockupInk: "/brand/lamsa-lockup-ink.svg",
     lockupPaper: "/brand/lamsa-lockup-paper.svg",
     wordmarkCrimson: "/brand/lamsa-wordmark-crimson.svg",
+    wordmarkInk: "/brand/lamsa-wordmark-ink.svg",
+    wordmarkPaper: "/brand/lamsa-wordmark-paper.svg",
     symbolCrimson: "/brand/lamsa-symbol-crimson.svg",
+    symbolInk: "/brand/lamsa-symbol-ink.svg",
+    symbolPaper: "/brand/lamsa-symbol-paper.svg",
     icon: "/brand/lamsa-icon.svg",
   },
   fonts: {
