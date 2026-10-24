@@ -84,7 +84,7 @@ function Section({
   className?: string;
 }) {
   return (
-    <section className={cn("border-b border-ink/12 px-4 py-4", className)}>
+    <section className={cn("border-b border-ink/12 px-4 py-3", className)}>
       <p className="mb-3 font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
         {title}
       </p>

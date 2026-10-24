@@ -80,6 +80,7 @@ import {
   undoHistory,
 } from "@/lib/studio-edit";
 import { applyTypeStyle, type TypeStyle } from "@/lib/type-styles";
+import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -129,7 +130,6 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type ReactNode,
 } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -162,38 +162,6 @@ function usePrefersReducedMotion() {
     return () => query.removeEventListener("change", update);
   }, []);
   return reduced;
-}
-
-function IconButton({
-  label,
-  onClick,
-  active,
-  disabled,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  active?: boolean;
-  disabled?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      aria-label={label}
-      className={cn(
-        "grid size-8 place-items-center border transition-colors disabled:cursor-not-allowed disabled:opacity-30",
-        active
-          ? "border-ink bg-ink text-[#f2f1ed]"
-          : "border-ink/18 text-ink/60 hover:border-ink hover:text-ink",
-      )}
-    >
-      {children}
-    </button>
-  );
 }
 
 function PanelHeading({ title, note }: { title: string; note?: string }) {
@@ -2552,7 +2520,7 @@ export default function Studio() {
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
-          className="grid size-8 shrink-0 place-items-center border border-ink/18 text-ink/60 hover:border-ink hover:text-ink"
+          className="grid size-8 shrink-0 place-items-center rounded-md border border-ink/15 text-ink/60 transition-colors hover:border-ink/45 hover:text-ink"
           aria-label="Back to the studio"
         >
           <ArrowLeft className="size-3.5" />
@@ -2587,7 +2555,16 @@ export default function Studio() {
           <IconButton label="Redo" onClick={redo} disabled={!historyFlags.redo}><Redo2 className="size-3.5" /></IconButton>
         </div>
 
-        <div className="hidden items-center gap-1 md:flex">
+        {/* Medium headers keep only the drawing aids: showing every workspace
+            toggle here clipped the title and the publish action. */}
+        <div className="hidden items-center gap-1 md:flex lg:hidden">
+          <span className="mx-1 h-5 w-px bg-ink/12" />
+          <IconButton label="Grid" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
+          <IconButton label="Rulers" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
+          <IconButton label="Safe area" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
+        </div>
+
+        <div className="hidden items-center gap-1 lg:flex">
           <span className="mx-1 h-5 w-px bg-ink/12" />
           <IconButton label="Desktop canvas" active={device === "desktop"} onClick={() => setDevice("desktop")}><Monitor className="size-3.5" /></IconButton>
           <IconButton label="Tablet canvas" active={device === "tablet"} onClick={() => setDevice("tablet")}><Tablet className="size-3.5" /></IconButton>
@@ -3001,7 +2978,7 @@ export default function Studio() {
       </div>
 
       {/* Mobile navigation */}
-      <nav className="flex shrink-0 items-stretch border-t border-ink/15 bg-[var(--paper-light)] lg:hidden">
+      <nav className="flex shrink-0 items-stretch border-t border-ink/15 bg-[var(--paper-light)] pb-[env(safe-area-inset-bottom)] lg:hidden">
         {[
           { id: "add" as const, label: "Add", icon: Plus },
           { id: "libraries" as const, label: "Library", icon: Library },
@@ -3043,7 +3020,7 @@ export default function Studio() {
       {mobileSheet && (
         <div className="fixed inset-0 z-[70] flex flex-col justify-end bg-black/25 lg:hidden" onClick={() => setMobileSheet(null)}>
           <div
-            className="flex max-h-[70vh] flex-col overflow-hidden border-t border-ink/20 bg-[var(--paper-light)]"
+            className="flex max-h-[min(78dvh,calc(100dvh-3rem))] flex-col overflow-hidden border-t border-ink/20 bg-[var(--paper-light)] pb-[env(safe-area-inset-bottom)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-ink/12 px-3 py-2">

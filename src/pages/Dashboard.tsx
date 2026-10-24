@@ -305,7 +305,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   aria-label="Studio settings"
-                  className="grid size-10 place-items-center border border-ink/15 text-ink/55 transition-colors hover:border-ink/40 hover:text-ink focus-visible:border-ink focus-visible:outline-none"
+                  className="grid size-8 place-items-center rounded-md border border-ink/15 text-ink/55 transition-colors hover:border-ink/40 hover:text-ink focus-visible:border-ink focus-visible:outline-none"
                 >
                   <Settings2 className="size-4" aria-hidden />
                 </button>
@@ -776,7 +776,7 @@ export default function Dashboard() {
                     setFilter("all");
                     setLimit(GALLERY_PAGE_SIZE);
                   }}
-                  className="mt-5 inline-flex h-10 items-center gap-2 border border-ink/20 px-4 font-meta text-[0.5rem] tracking-[0.18em] uppercase transition-colors hover:border-ink"
+                  className="mt-5 inline-flex h-9 items-center gap-2 rounded-md border border-ink/20 px-4 font-meta text-[0.5rem] tracking-[0.18em] uppercase transition-colors hover:border-ink"
                 >
                   Clear filters
                 </button>

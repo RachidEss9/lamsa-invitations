@@ -74,7 +74,14 @@
 }
 
 :root {
-  --radius: 0px;
+  /* One control language: compact 30–32 px controls with soft corners and a
+     single elevation token for every floating surface. */
+  --radius: 8px;
+  --control-h: 2rem;
+  --control-h-sm: 1.75rem;
+  --panel-px: 1rem;
+  --panel-py: 0.75rem;
+  --shadow-pop: 0 18px 44px rgba(21, 21, 21, 0.14);
   /* Soft Pearl + Obsidian Black, with Crimson Depth as the only primary ink. */
   --background: #f4f3ef;
   --foreground: #151515;
@@ -613,6 +620,30 @@
   .invitation-backdrop *{
     animation: none !important;
   }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Control language bridge                                                   */
+/* Older panels still ask for square corners locally. Controls resolve to the */
+/* shared radius without touching invitation artwork or circular icon seals.  */
+/* ------------------------------------------------------------------------- */
+
+/* One visible focus treatment for every interactive element, keyboard-first. */
+:where(button, a[href], [role="button"], summary):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+button[class*="rounded-none"],
+input[class*="rounded-none"],
+textarea[class*="rounded-none"],
+[data-slot="select-trigger"][class*="rounded-none"] {
+  border-radius: var(--radius-md);
+}
+
+[data-slot="dialog-content"][class*="rounded-none"],
+[role="dialog"][class*="rounded-none"] {
+  border-radius: var(--radius-lg);
 }
 
 @media print {

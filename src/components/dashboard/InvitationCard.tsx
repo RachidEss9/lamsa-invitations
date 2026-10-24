@@ -139,7 +139,7 @@ export function InvitationCard({
               />
               <span
                 className={cn(
-                  "absolute left-2 top-2 inline-flex items-center gap-1.5 border px-1.5 py-1 font-meta text-[8px] uppercase tracking-[0.14em] backdrop-blur-sm sm:left-2.5 sm:top-2.5",
+                  "absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-1 font-meta text-[8px] uppercase tracking-[0.14em] backdrop-blur-sm sm:left-2.5 sm:top-2.5",
                   published
                     ? "border-[var(--olive)]/25 bg-[var(--paper-light)]/92 text-[var(--olive)]"
                     : "border-ink/12 bg-[var(--paper-light)]/92 text-ink/62",
@@ -197,7 +197,7 @@ export function InvitationCard({
 
         {/* Mouse convenience: the same actions are always available in the
             always-visible menu above, which is also the touch and keyboard path. */}
-        <div className="pointer-events-none absolute inset-x-2 bottom-2 z-10 hidden items-center gap-1 border border-ink/10 bg-[var(--paper-light)]/94 p-1 shadow-[0_10px_24px_rgba(21,21,21,0.1)] backdrop-blur-sm opacity-0 transition-opacity duration-300 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 sm:flex">
+        <div className="pointer-events-none absolute inset-x-2 bottom-2 z-10 hidden items-center gap-1 rounded-md border border-ink/10 bg-[var(--paper-light)]/94 p-1 shadow-[0_10px_24px_rgba(21,21,21,0.1)] backdrop-blur-sm opacity-0 transition-opacity duration-300 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 sm:flex">
           <Link
             to={studioPath}
             className="flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 font-ui text-[9px] uppercase tracking-[0.16em] text-ink/72 transition-colors hover:bg-ink/[0.05] hover:text-ink"

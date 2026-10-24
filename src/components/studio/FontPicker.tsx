@@ -269,7 +269,7 @@ export function FontPicker({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="grid max-h-[88vh] sm:max-w-[min(768px,calc(100%_-_2rem))] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-ink/20 p-0">
-          <DialogHeader className="border-b border-ink/12 px-5 py-4">
+          <DialogHeader className="border-b border-ink/12 px-4 py-3">
             <DialogTitle className="font-ui text-2xl font-semibold tracking-[-0.015em]">Type library</DialogTitle>
             <DialogDescription className="text-[11px] leading-relaxed text-ink/50">
               {FONT_LIBRARY.length} open-source families, loaded from Google Fonts only
@@ -278,7 +278,7 @@ export function FontPicker({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-3 border-b border-ink/12 px-5 py-3">
+          <div className="flex flex-col gap-2.5 border-b border-ink/12 px-4 py-2.5">
             <div className="flex flex-col gap-2 sm:flex-row">
               <label className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink/35" />

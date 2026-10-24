@@ -826,7 +826,7 @@ export function LibraryPanel({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[88vh] sm:max-w-[min(920px,calc(100%_-_2rem))] gap-0 overflow-y-auto p-0">
-        <DialogHeader className="border-b border-ink/12 px-5 py-4">
+        <DialogHeader className="border-b border-ink/12 px-4 py-3">
           <DialogTitle className="flex items-center gap-2 font-ui text-xl font-semibold tracking-[-0.01em]">
             <Palette className="size-4 text-[var(--red)]" />
             Libraries
@@ -837,7 +837,7 @@ export function LibraryPanel({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex border-b border-ink/12 px-3 py-1">
+        <div className="flex min-w-0 overflow-x-auto border-b border-ink/12 px-2 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {(
             [
               ["templates", "Templates", MousePointer],
@@ -858,7 +858,7 @@ export function LibraryPanel({
                 setQuery("");
               }}
               className={cn(
-                "flex-1 border-t-2 border-transparent py-2 text-[10px] uppercase tracking-[0.14em] transition-colors hover:border-ink/30",
+                "shrink-0 whitespace-nowrap border-t-2 border-transparent px-3 py-2 text-[9px] uppercase tracking-[0.12em] transition-colors hover:border-ink/30",
                 tab === id
                   ? "border-[var(--red)] text-ink"
                   : "text-ink/50",
@@ -870,7 +870,7 @@ export function LibraryPanel({
           ))}
         </div>
 
-        <div className="flex items-center gap-2 border-b border-ink/12 px-5 py-3">
+        <div className="flex items-center gap-2 border-b border-ink/12 px-4 py-2.5">
           <label className="relative block min-w-0 flex-1">
             <Input
               value={query}
@@ -919,7 +919,7 @@ export function LibraryPanel({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {onlyFavourites &&
             (tab === "templates" ||
               tab === "saved" ||
@@ -1396,7 +1396,7 @@ export function LibraryPanel({
           )}
         </div>
 
-        <div className="border-t border-ink/12 px-5 py-2.5 text-[9px] text-ink/40">
+        <div className="border-t border-ink/12 px-4 py-2 text-[9px] text-ink/40">
           {tab === "templates" &&
             `${filteredTemplates.length} templates`}
           {tab === "saved" &&

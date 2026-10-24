@@ -257,7 +257,7 @@ export function OpeningDesigner({
           </div>
 
           {/* Controls */}
-          <div className="min-h-0 space-y-5 overflow-y-auto px-4 py-4">
+          <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-3">
             <section>
               <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
                 Suite
