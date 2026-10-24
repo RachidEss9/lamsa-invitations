@@ -16,6 +16,14 @@ import { ShortcutReference } from "@/components/studio/ShortcutReference";
 import { Timeline } from "@/components/studio/Timeline";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuShortcut,
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,7 +31,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -31,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -68,7 +84,12 @@ import {
 } from "@/lib/invitation";
 import { pageLayoutById } from "@/lib/layouts";
 import { ensureFont, fontById } from "@/lib/fonts";
-import { recolourDesign, type ColourPalette } from "@/lib/palettes";
+import {
+  recolourDesign,
+  type ColourPalette,
+  PALETTES,
+  PALETTE_GROUPS,
+} from "@/lib/palettes";
 import type { BuiltinAsset } from "@/lib/assets";
 import type { RevealPreset } from "@/lib/reveals";
 import {
@@ -79,9 +100,8 @@ import {
   selectionAfterDelete,
   undoHistory,
 } from "@/lib/studio-edit";
-import { applyTypeStyle, type TypeStyle } from "@/lib/type-styles";
+import { applyTypeStyle, type TypeStyle } from "@/lib/type-styles";import { cn } from "@/lib/utils";
 import { IconButton } from "@/components/ui/icon-button";
-import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
   AlertCircle,
@@ -123,6 +143,7 @@ import {
   Undo2,
   Unlock,
 } from "lucide-react";
+import React from "react";
 import {
   useCallback,
   useEffect,
@@ -135,6 +156,8 @@ import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
+type ToolbarButtonSize = "sm" | "md" | "lg";
+type ToolbarButtonVariant = "default" | "subtle" | "outline" | "ghost";
 type Device = "desktop" | "tablet" | "phone";
 type LeftPanel = "add" | "layers" | "colour" | "opening" | "pages";
 type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline";
@@ -170,8 +193,423 @@ function PanelHeading({ title, note }: { title: string; note?: string }) {
       <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/40">
         {title}
       </p>
-      {note &&            <p className="mt-1 text-[11px] leading-relaxed text-ink/50">{note}</p>
+      {note && (
+        <p className="mt-1 text-[11px] leading-relaxed text-ink/50">{note}</p>
+      )}
+    </div>
+  );
 }
+
+function ToolbarButton({
+  label,
+  active,
+  danger,
+  subtle,
+  onClick,
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  className?: string
+}) {
+  label,
+  active,
+  danger,
+  subtle,
+  onClick,
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={active !== undefined ? active : undefined}
+      className={cn(
+        "grid shrink-0 place-items-center rounded-md border transition-[background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-35",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]",
+        active
+          ? "border-ink/80 bg-ink/90 text-[#f2f1ed]"
+          : danger
+            ? "border-transparent text-ink/55 hover:border-[var(--red)]/40 hover:bg-[var(--red)]/[0.06] hover:text-[var(--red)]"
+            : subtle
+              ? "border-ink/12 text-ink/50 hover:border-ink/30 hover:text-ink"
+              : "border-ink/15 text-ink/60 hover:border-ink/45 hover:text-ink",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ToolbarIconButton({
+  label,
+  active,
+  danger,
+  subtle,
+  onClick,
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  className?: string
+}) {
+  label,
+  active,
+  danger,
+  subtle,
+  onClick,
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  className?: string
+}) {
+  label,
+  active,
+  danger,
+  subtle,
+  onClick,
+  children,
+  className,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  subtle?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={active !== undefined ? active : undefined}
+      className={cn(
+        "grid shrink-0 place-items-center rounded-md border transition-[background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-35",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]",
+        "size-8",
+        active
+          ? "border-ink/80 bg-ink/90 text-[#f2f1ed]"
+          : danger
+            ? "border-transparent text-ink/55 hover:border-[var(--red)]/40 hover:bg-[var(--red)]/[0.06] hover:text-[var(--red)]"
+            : subtle
+              ? "border-ink/12 text-ink/50 hover:border-ink/30 hover:text-ink"
+              : "border-ink/15 text-ink/60 hover:border-ink/45 hover:text-ink",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ToolbarChip({
+  label,
+  active,
+  onClick,
+  onMouseDown,
+  className,
+}: {
+  label: string
+  active?: boolean
+  onClick: () => void
+  onMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void
+  className?: string
+}) {
+  label,
+  active,
+  onClick,
+  onMouseDown,
+  className,
+}: {
+  label: string
+  active?: boolean
+  onClick: () => void
+  onMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseDown={onMouseDown}
+      aria-pressed={active !== undefined ? active : undefined}
+      className={cn(
+        "inline-flex h-9 items-center gap-2 rounded-md border px-3 text-[0.62rem] uppercase tracking-[0.18em] transition-[background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-35",
+        "font-meta",
+        active
+          ? "border-ink bg-ink text-[var(--paper)]"
+          : "border-ink/15 text-ink/55 hover:border-ink/40 hover:text-ink",
+        className
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ToolbarChipGroup({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      role="group"
+      className={cn(
+        "flex items-center gap-1 rounded-md border border-ink/12 bg-transparent p-[1px]",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SplitButton({
+  label,
+  trigger,
+  content,
+  align,
+  sideOffset,
+  className,
+}: {
+  label?: string
+  trigger: React.ReactNode
+  content: React.ReactNode
+  align?: "start" | "center" | "end"
+  sideOffset?: number
+  className?: string
+}) {
+  label,
+  trigger,
+  content,
+  align,
+  sideOffset,
+  className,
+}: {
+  label?: string
+  trigger: React.ReactNode
+  content: React.ReactNode
+  align?: "start" | "center" | "end"
+  sideOffset?: number
+  className?: string
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        {label ? (
+          <Button
+            type="button"
+            variant="subtle"
+            className={cn("h-8.5 px-2.5 text-[0.62rem]", className)}
+          >
+            {trigger}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="subtle"
+            size="icon"
+            className={cn("size-8", className)}
+          >
+            {trigger}
+          </Button>
+        )}
+      </PopoverTrigger>
+      <PopoverContent align={align ?? "end"} sideOffset={sideOffset ?? 2} className="w-64 p-1">
+        {content}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function PropertyStepper({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  unit,
+  className,
+}: {
+  label: string
+  value: number
+  min?: number
+  max?: number
+  step?: number
+  onChange: (value: number) => void
+  unit?: string
+  className?: string
+}) {
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min ?? -Infinity, value - (step ?? 1)))}
+          className="grid size-7 place-items-center rounded border border-ink/15 text-ink/60 transition-colors hover:border-ink/40 hover:text-ink"
+          aria-label={`Decrease ${label}`}
+        >
+          <Minus className="size-3.5" aria-hidden />
+        </button>
+        <input
+          type="number"
+          inputMode="decimal"
+          value={value}
+          onChange={(event) => {
+            const next = parseFloat(event.target.value);
+            if (!Number.isFinite(next)) return;
+            const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, next));
+            onChange(clamped);
+          }}
+          className="w-16 h-7 rounded-md border border-ink/15 bg-transparent px-1 text-center text-[0.78rem] text-ink tabular-nums outline-none transition-colors focus:border-ink focus:ring-1 focus:ring-ink/20"
+          aria-label={label}
+        />
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max ?? Infinity, value + (step ?? 1)))}
+          className="grid size-7 place-items-center rounded border border-ink/15 text-ink/60 transition-colors hover:border-ink/40 hover:text-ink"
+          aria-label={`Increase ${label}`}
+        >
+          <Plus className="size-3.5" aria-hidden />
+        </button>
+      </div>
+      {unit && <span className="shrink-0 text-[11px] text-ink/50">{unit}</span>}
+    </div>
+  );
+}
+
+function PropertySlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  className,
+}: {
+  label: string
+  value: number
+  min?: number
+  max?: number
+  step?: number
+  onChange: (value: number) => void
+  className?: string
+}) {
+  return (
+    <div className={cn("flex items-center gap-3", className)}>
+      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
+      <Slider
+        value={[value]}
+        min={min ?? 0}
+        max={max ?? 100}
+        step={step ?? 1}
+        onValueChange={([next]) => onChange(next)}
+        className="flex-1"
+      />
+      <span className="shrink-0 w-12 text-right text-[11px] text-ink/60 tabular-nums">
+        {Math.round(value)}
+      </span>
+    </div>
+  );
+}
+
+function PropertyToggle({
+  label,
+  checked,
+  onCheckedChange,
+  className,
+}: {
+  label: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+  className?: string
+}) {
+  return (
+    <div className={cn("flex items-center justify-between gap-3", className)}>
+      <span className="text-[11px] text-ink/60">{label}</span>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
+    </div>
+  );
+}
+
+function PropertyTextField({
+  label,
+  value,
+  onChange,
+  type,
+  placeholder,
+  className,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  type?: string
+  placeholder?: string
+  className?: string
+}) {
+  return (
+    <div className={cn("flex items-center gap-3", className)}>
+      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
+      <Input
+        type={type ?? "text"}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-40 text-[0.78rem] text-ink tabular-nums"
+        aria-label={label}
+      />
     </div>
   );
 }
@@ -191,11 +629,11 @@ function AddButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-[58px] w-full items-start gap-3 border border-ink/15 px-3 text-left transition-[background-color,border-color,color] duration-150 hover:border-ink/50 hover:bg-ink/[0.03]"
+      className="flex h-[54px] w-full items-start gap-3 border border-ink/15 px-3 text-left transition-[background-color,border-color] duration-150 rounded-md hover:border-ink/50 hover:bg-ink/[0.03]"
     >
-      <Icon className="mt-0.5 h-[22px] w-[22px] shrink-0 stroke-[1.6px] text-[var(--red)]" />
+      <Icon className="mt-0.5 h-[20px] w-[20px] shrink-0 stroke-[1.6px] text-[var(--red)]" />
       <span className="min-w-0">
-        <span className="block text-[12px] font-medium leading-tight">{label}</span>
+        <span className="block text-[11px] font-medium leading-tight">{label}</span>
         <span className="mt-0.5 block text-[10px] leading-relaxed text-ink/40">{note}</span>
       </span>
     </button>
