@@ -7,7 +7,8 @@ const sizeMap = {
   lg: "size-9",
 } as const;
 
-const ring = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]";
+const ring =
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]";
 
 interface StudioIconButtonProps {
   label: string;
@@ -15,13 +16,14 @@ interface StudioIconButtonProps {
   active?: boolean;
   danger?: boolean;
   subtle?: boolean;
+  disabled?: boolean;
   children: ReactNode;
   size?: "sm" | "md" | "lg";
   className?: string;
 }
 
 /**
- * The compact icon control that every studio surface now shares.
+ * The compact icon control that every studio surface shares.
  *
  * One size, one corner radius, one focus ring, and one set of states so the
  * toolbar, panels, popovers, and dropdowns all look like one product.
@@ -32,6 +34,7 @@ export function StudioIconButton({
   active,
   danger,
   subtle,
+  disabled,
   children,
   size = "md",
   className,
@@ -40,6 +43,7 @@ export function StudioIconButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       title={label}
       aria-label={label}
       aria-pressed={active !== undefined ? active : undefined}

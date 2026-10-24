@@ -9,7 +9,9 @@ import {
   type RevealConfig,
 } from "@/lib/design";
 import { ensureDesignFonts, fontFamilyFor } from "@/lib/fonts";
+import { frameById } from "@/lib/frames";
 import { cn } from "@/lib/utils";
+import { FrameArt } from "./FrameArt";
 import { Motif } from "./Motif";
 import {
   useEffect,
@@ -293,6 +295,23 @@ function ElementVisual({
           strokeWidth={element.strokeWidth ?? 0.8}
         />
       </div>
+    );
+  }
+
+  // A decorative frame is drawn as vector artwork instead of a plain keyline.
+  // It is still a shape layer, so nothing else about editing changes.
+  const frame = frameById(element.frameArt);
+  if (frame) {
+    return (
+      <FrameArt
+        frame={frame}
+        color={
+          element.stroke && element.stroke !== "transparent"
+            ? element.stroke
+            : (element.color ?? element.fill ?? "#710014")
+        }
+        strokeWidth={element.strokeWidth ?? 2}
+      />
     );
   }
 

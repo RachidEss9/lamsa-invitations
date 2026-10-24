@@ -1,23 +1,13 @@
 import { BrandLink, Wordmark } from "@/components/brand/Wordmark";
 import { Button } from "@/components/ui/button";
+import { brand } from "@/lib/brand";
 import { cn } from "@/lib/utils";
-import { useStudio } from "@/components/auth/studio-context";
-import { motion, useReducedMotion } from "framer-motion";
-import { Mail, Lock, Wrench, ArrowRight } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { motion } from "framer-motion";
+import { ArrowRight, Lock, PenLine, Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 
-const STUDIO_HREF = "/studio";
-
-function reduceTransition(reduced: boolean, delay = 0) {
-  return reduced
-    ? { transition: { duration: 0 } }
-    : {
-        initial: { opacity: 0, y: 14 },
-        animate: { opacity: 1, y: 0 },
-        transition: { duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] },
-      };
-}
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 function Reveal({
   children,
@@ -28,14 +18,12 @@ function Reveal({
   delay?: number;
   className?: string;
 }) {
-  const reduce = useReducedMotion();
-  const { initial, animate, transition } = reduceTransition(reduce, delay);
   return (
     <motion.div
       className={className}
-      initial={initial}
-      animate={animate}
-      transition={transition}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.65, delay, ease: EASE }}
     >
       {children}
     </motion.div>
@@ -44,225 +32,192 @@ function Reveal({
 
 function Folio({ label }: { label: string }) {
   return (
-    <span className="font-meta text-[0.58rem] uppercase tracking-[0.2em] text-ink/40">
+    <span className="font-meta text-[0.52rem] tracking-[0.22em] text-ink/40 uppercase">
       {label}
     </span>
   );
 }
 
+/**
+ * The studio's front door.
+ *
+ * There is one owner, so this page is not marketing: it introduces the atelier
+ * and opens the private studio. Sign-in, the email verification and the PIN all
+ * live inside `StudioGate`, which protects every studio route.
+ */
 export default function Landing() {
-  const { email, lock } = useStudio();
-  const reduce = useReducedMotion();
-  const [pin, setPin] = useState("");
-  const [pinError, setPinError] = useState("");
-  const [leaving, setLeaving] = useState(false);
-
-  const handlePinKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      if (lock && pin === lock) {
-        window.location.href = STUDIO_HREF;
-        return;
-      }
-      setPinError("That PIN didn’t match. Try again.");
-    }
-  };
-
-  const handlePinPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
-    const text = event.clipboardData.getData("text");
-    if (/^\d{6}$/.test(text.trim())) {
-      setPin(text.trim());
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[var(--paper)] font-ui text-ink selection:bg-[var(--red)]/15 selection:text-[var(--red)]">
-      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(120%_80%_at_50%_-10%,rgba(113,0,20,0.06),transparent_60%)]" />
+    <div className="min-h-dvh bg-[var(--paper)] font-ui text-ink selection:bg-[var(--red)]/15 selection:text-[var(--red)]">
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(120%_80%_at_50%_-10%,rgba(113,0,20,0.06),transparent_60%)]"
+      />
 
-      <header className="relative z-40 border-b border-ink/10 bg-[var(--paper)]/90 backdrop-blur">
-        <div className="mx-auto flex h-[72px] w-full max-w-[1280px] items-center justify-between px-5 sm:px-8 lg:px-12">
+      <header className="relative z-20 border-b border-ink/10">
+        <div className="mx-auto flex h-[76px] w-full max-w-[1240px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
           <BrandLink className="shrink-0" />
-          <Folio label="Private studio" />
-          <div className="flex items-center gap-3">
-            <span className="hidden text-[0.62rem] uppercase tracking-[0.18em] text-ink/45 sm:inline">
-              Owner only
+          <Folio label="Private atelier" />
+          <div className="flex items-center gap-2 text-ink/40">
+            <Lock className="size-3.5" aria-hidden />
+            <span className="hidden text-[0.56rem] tracking-[0.2em] uppercase sm:inline">
+              One owner
             </span>
-            <Lock className="size-3.5 text-ink/40" />
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-[1280px] px-5 sm:px-8 lg:px-12">
-        <div className="mt-20 sm:mt-28 lg:mt-36">
-          <Reveal delay={0.05}>
-            <div className="mb-4 flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-ink/12 bg-[var(--paper-light)] font-meta text-[0.55rem] uppercase tracking-[0.2em] text-ink/55">
-                LAMSA
-              </span>
-              <span className="h-6 w-6 bg-ink/5" />
-              <Folio label="Studio directory" />
-            </div>
-          </Reveal>
-
-          <Reveal delay={0.12}>
-            <div className="max-w-[760px]">
-              <p className="font-meta text-[0.62rem] uppercase tracking-[0.2em] text-ink/45">
-                {email ? `Signed in as ${email}` : "Sign in to continue"}
-              </p>
-              <h1 className="mt-5 font-display text-[clamp(2.6rem,5.6vw,4.6rem)] leading-[0.96] tracking-[-0.02em] sm:text-[5.2rem]">
-                Your atelier.
-                <br />
-                No public front desk.
-              </h1>
-              <p className="mt-6 max-w-[540px] text-[1.04rem] leading-[1.72] text-ink/64 sm:text-[1.12rem]">
-                LAMSA is a private invitation studio for one owner. There’s no public
-                landing page, no open gallery, and no front-door marketing. The only
-                door is the one you open from here.
-              </p>
-            </div>
-          </Reveal>
-
-          <Reveal delay={0.2}>
-            <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:gap-6">
-              <Button
-                asChild
-                size="lg"
-                className="h-12 px-7 sm:px-9"
-                onClick={() => {
-                  if (lock && pin !== lock) {
-                    setPinError("Enter the studio PIN first.");
-                    return;
-                  }
-                  if (lock) {
-                    window.location.href = STUDIO_HREF;
-                    return;
-                  }
-                  setLeaving(true);
-                  window.location.href = "/auth?returnTo=" + encodeURIComponent(STUDIO_HREF);
-                }}
-              >
-                <span className="flex items-center gap-2.5">
-                  {lock ? (
-                    <Lock className="size-4" />
-                  ) : (
-                    <Mail className="size-4" />
-                  )}
-                  {lock ? "Open the studio" : "Sign in to the studio"}
-                  <ArrowRight className="size-4" />
-                </span>
-              </Button>
-              <p className="text-[0.7rem] uppercase tracking-[0.16em] text-ink/40">
-                {lock
-                  ? "Your studio is private. Only this PIN opens it."
-                  : "One verified email. A private studio behind it."}
-              </p>
-            </div>
-          </Reveal>
-
-          {pinError && (
-            <Reveal>
-              <div className="mt-5 flex items-center gap-2 rounded-md border border-[var(--red)]/40 bg-[var(--red)]/[0.05] px-3 py-2 text-[0.72rem] uppercase tracking-[0.1em] text-[var(--red)]">
-                <Wrench className="size-3.5 shrink-0" />
-                {pinError}
+      <main className="relative z-10 mx-auto w-full max-w-[1240px] px-5 sm:px-8 lg:px-12">
+        <div className="grid items-center gap-14 pt-16 pb-16 sm:pt-24 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:pt-28">
+          <div>
+            <Reveal delay={0.04}>
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden
+                  className="size-1.5 rounded-full bg-[var(--red)]"
+                />
+                <Folio label="Digital & printed invitations" />
               </div>
             </Reveal>
-          )}
 
-          <Reveal delay={0.28}>
-            <div className="mt-12 border-t border-ink/10 pt-8">
-              <p className="font-meta text-[0.58rem] uppercase tracking-[0.2em] text-ink/40">
-                What you get inside
+            <Reveal delay={0.1}>
+              <h1 className="mt-6 text-[clamp(2.5rem,6vw,4.4rem)] leading-[0.94] font-semibold tracking-[-0.045em] text-balance">
+                Your atelier,
+                <br />
+                <span className="text-ink/45">open only to you.</span>
+              </h1>
+              <p className="mt-6 max-w-[46ch] text-[0.98rem] leading-[1.75] text-ink/60">
+                {brand.name} is a private invitation studio. Design from a blank
+                page or a template, set the typography, frame and opening, then
+                send one considered link to the people you love.
               </p>
-              <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {[
-                  {
-                    label: "Your invitation studio",
-                    copy: "Design, compose, and publish from one private workspace — not a public homepage.",
-                  },
-                  {
-                    label: "Your invitations",
-                    copy: "A private gallery of the invitations you actually created, edited, and published.",
-                  },
-                  {
-                    label: "A private door for guests",
-                    copy: "Guests reach invitations only through the links you send them, not through a public listing.",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-md border border-ink/12 bg-[var(--paper-light)]/40 p-4"
-                  >
-                    <p className="font-ui text-[1.02rem] font-semibold leading-snug">
-                      {item.label}
-                    </p>
-                    <p className="mt-1.5 text-[0.82rem] leading-relaxed text-ink/58">
-                      {item.copy}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Reveal>
+            </Reveal>
 
-          {lock && (
-            <Reveal delay={0.34}>
-              <div className="mt-8 rounded-md border border-ink/12 bg-[var(--paper-light)]/40 p-4">
-                <p className="font-meta text-[0.58rem] uppercase tracking-[0.2em] text-ink/40">
-                  Studio access
-                </p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={pin}
-                    onChange={(event) => {
-                      setPin(event.target.value.replace(/\D/g, ""));
-                      setPinError("");
-                    }}
-                    onKeyDown={handlePinKeyDown}
-                    onPaste={handlePinPaste}
-                    aria-label="Studio PIN"
-                    className="h-10 w-28 rounded-md border border-ink/20 bg-[var(--paper)] px-3 text-center text-[1rem] uppercase tracking-[0.2em] font-mono outline-none focus:border-[var(--red)] focus:ring-1 focus:ring-[var(--red)]/30"
-                    placeholder="••••••"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-10 px-4"
-                    onClick={() => {
-                      if (lock && pin === lock) {
-                        window.location.href = STUDIO_HREF;
-                      } else {
-                        setPinError("Enter the correct studio PIN.");
-                      }
-                    }}
-                  >
-                    Open
-                  </Button>
+            <Reveal delay={0.18}>
+              <div className="mt-9 flex flex-wrap items-center gap-3">
+                <Button asChild className="h-12 gap-2 px-6">
+                  <Link to="/dashboard">
+                    Open the studio
+                    <ArrowRight className="size-4" aria-hidden />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="subtle"
+                  className="h-12 gap-2 px-5"
+                >
+                  <Link to="/dashboard">
+                    <PenLine className="size-4" aria-hidden />
+                    Start an invitation
+                  </Link>
+                </Button>
+              </div>
+              <p className="mt-4 max-w-[42ch] text-[0.72rem] leading-relaxed text-ink/45">
+                A verified email and your six-digit studio PIN open the atelier.
+                Guests never see this page — only the invitation you send them.
+              </p>
+            </Reveal>
+          </div>
+
+          <Reveal delay={0.22} className="relative">
+            <div className="relative mx-auto w-full max-w-[420px]">
+              <div
+                aria-hidden
+                className="absolute -inset-6 rounded-[2rem] opacity-70 blur-3xl"
+                style={{
+                  background:
+                    "radial-gradient(circle at 60% 35%, rgba(179,143,111,0.22), transparent 70%)",
+                }}
+              />
+              <div className="relative overflow-hidden rounded-xl border border-ink/12 bg-[var(--paper-light)] p-7 shadow-[0_28px_60px_rgba(21,21,21,0.12)]">
+                <div className="flex items-center justify-between border-b border-ink/10 pb-4">
+                  <Wordmark className="h-[18px]" />
+                  <Folio label="No. 001" />
+                </div>
+                <div className="mt-8 text-center">
+                  <p className="font-meta text-[0.5rem] tracking-[0.28em] text-ink/40 uppercase">
+                    Together with their families
+                  </p>
+                  <p className="mt-5 font-display text-[2.1rem] leading-[1.05] tracking-tight">
+                    Alexandra
+                    <span className="mx-2 text-ink/30">&</span>
+                    Omar
+                  </p>
+                  <p className="mt-6 font-meta text-[0.52rem] tracking-[0.22em] text-ink/45 uppercase">
+                    Riad El Fenn · Marrakech
+                  </p>
+                  <div className="mx-auto mt-5 h-px w-16 bg-[var(--gold)]/60" />
+                  <p className="mt-5 text-[0.78rem] leading-relaxed text-ink/55">
+                    A specimen page, to show the paper, the type and the frame —
+                    your own wording replaces every word of it.
+                  </p>
+                </div>
+                <div className="mt-8 flex items-center justify-between border-t border-ink/10 pt-4">
+                  <span className="flex items-center gap-1.5 font-meta text-[0.48rem] tracking-[0.18em] text-ink/40 uppercase">
+                    <Sparkles className="size-3" aria-hidden />
+                    Blank canvas or template
+                  </span>
+                  <span className="font-meta text-[0.48rem] tracking-[0.18em] text-ink/40 uppercase">
+                    A5 · 148 × 210 mm
+                  </span>
                 </div>
               </div>
-            </Reveal>
-          )}
+            </div>
+          </Reveal>
         </div>
+
+        <Reveal delay={0.28}>
+          <section className="border-t border-ink/12 pt-8 pb-20">
+            <Folio label="Inside the studio" />
+            <div className="mt-6 grid gap-px overflow-hidden rounded-lg border border-ink/12 bg-ink/10 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  label: "Blank canvas",
+                  copy: "Custom size, units, bleed, margins and paper — then build from nothing.",
+                },
+                {
+                  label: "Decorative frames",
+                  copy: "Fifteen drawn frames from botanicals to Art Deco and zellige, as editable vectors.",
+                },
+                {
+                  label: "Real stationery",
+                  copy: "Envelopes, seals, gatefolds and boxes whose openings play on the invitation.",
+                },
+                {
+                  label: "Print & publish",
+                  copy: "Print-ready artwork and one private guest link from the same design.",
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className={cn(
+                    "bg-[var(--paper-light)] p-5",
+                    "transition-colors duration-300 hover:bg-[var(--paper)]",
+                  )}
+                >
+                  <p className="text-[0.9rem] font-semibold tracking-tight">
+                    {item.label}
+                  </p>
+                  <p className="mt-2 text-[0.78rem] leading-relaxed text-ink/55">
+                    {item.copy}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </Reveal>
       </main>
 
-      <footer className="relative z-10 mt-24 border-t border-ink/10 pt-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Wordmark tone="ink" className="h-[18px]" />
-            <span className="text-[0.62rem] uppercase tracking-[0.2em] text-ink/40">
-              Private invitation studio
-            </span>
-          </div>
-          <p className="text-[0.62rem] uppercase tracking-[0.18em] text-ink/40">
-            {lock
-              ? "Signed in with a private studio PIN"
-              : "Sign in to open the studio"}
+      <footer className="relative z-10 border-t border-ink/10">
+        <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-3 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
+          <p className="font-meta text-[0.48rem] tracking-[0.22em] text-ink/40 uppercase">
+            {brand.name} · An atelier for invitations
+          </p>
+          <p className="flex items-center gap-2 font-meta text-[0.48rem] tracking-[0.22em] text-ink/40 uppercase">
+            <Lock className="size-3" aria-hidden />
+            Private studio
           </p>
         </div>
       </footer>
-
-      {leaving && <span className="sr-only" aria-live="polite">Opening the studio…</span>}
     </div>
   );
 }

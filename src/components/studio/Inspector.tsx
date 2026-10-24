@@ -24,6 +24,7 @@ import {
   type RevealEffect,
 } from "@/lib/design";
 import { fontById } from "@/lib/fonts";
+import { frameById } from "@/lib/frames";
 import { MOTIFS } from "@/lib/invitation";
 import { FontPicker } from "@/components/studio/FontPicker";
 import { cn } from "@/lib/utils";
@@ -765,6 +766,27 @@ export function Inspector({
             A photograph placed into an arch, heart, leaf, ellipse, star, or frame is
             clipped to that form in the editor and on the published invitation.
           </p>
+          {element.frameArt ? (
+            <div className="rounded-md border border-[var(--gold)]/45 bg-[var(--gold)]/[0.08] p-2">
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-[9px] uppercase tracking-[0.12em] text-[#7a5f2a]">
+                  {frameById(element.frameArt)?.name ?? "Decorative frame"} frame
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => patch({ frameArt: "" })}
+                  className="h-6 px-1.5 text-[9px] uppercase tracking-[0.1em] text-ink/50"
+                >
+                  Remove
+                </Button>
+              </div>
+              <p className="mt-1 text-[9px] leading-relaxed text-ink/45">
+                Vector artwork on this layer. Stroke sets its ink and weight;
+                resizing keeps the corner ornaments square.
+              </p>
+            </div>
+          ) : null}
           <Row label="Form">
             <Select value={element.shape ?? "rect"} onValueChange={(shape) => patch({ shape: shape as DesignElement["shape"] })}>
               <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>

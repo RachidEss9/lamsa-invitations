@@ -6,7 +6,7 @@ export type BuiltinAssetCategory =
   | "Botanical"
   | "Ornaments"
   | "Shapes"
-  | "Frames & borders"
+  | "Keylines"
   | "Dividers"
   | "Seals"
   | "Masks"
@@ -357,7 +357,7 @@ export const BUILTIN_ASSETS: BuiltinAsset[] = [
   {
     id: "frame-thin",
     name: "Thin keyline",
-    category: "Frames & borders",
+    category: "Keylines",
     note: "A single hairline inset from the trim.",
     elements: [{ kind: "shape", shape: "frame", name: "Keyline frame", x: 46, y: 46, w: 908, h: 1241, strokeToken: "accent", strokeWidth: 1.5, radius: 0, opacity: 0.7 }],
     preview: { type: "shape", shape: "frame" },
@@ -365,7 +365,7 @@ export const BUILTIN_ASSETS: BuiltinAsset[] = [
   {
     id: "frame-double",
     name: "Double rule",
-    category: "Frames & borders",
+    category: "Keylines",
     note: "Two keylines for a traditional card.",
     elements: [
       { kind: "shape", shape: "frame", name: "Outer frame", x: 38, y: 38, w: 924, h: 1257, strokeToken: "accent", strokeWidth: 2, opacity: 0.7 },
@@ -376,7 +376,7 @@ export const BUILTIN_ASSETS: BuiltinAsset[] = [
   {
     id: "frame-rounded",
     name: "Soft rounded frame",
-    category: "Frames & borders",
+    category: "Keylines",
     note: "A generous radius for modern invitations.",
     elements: [{ kind: "shape", shape: "frame", name: "Rounded frame", x: 54, y: 54, w: 892, h: 1225, strokeToken: "accent", strokeWidth: 2, radius: 28, opacity: 0.65 }],
     preview: { type: "shape", shape: "frame" },
@@ -384,7 +384,7 @@ export const BUILTIN_ASSETS: BuiltinAsset[] = [
   {
     id: "frame-motif",
     name: "Ornamental frame",
-    category: "Frames & borders",
+    category: "Keylines",
     note: "A fine drawn frame with decorative corners.",
     elements: [motif("Ornamental frame", "frame", { x: 34, y: 34, w: 932, h: 1265, opacity: 0.55 })],
     preview: { type: "motif", motif: "frame" },
@@ -543,7 +543,7 @@ export const BUILTIN_ASSET_CATEGORIES = [
   "Botanical",
   "Ornaments",
   "Shapes",
-  "Frames & borders",
+  "Keylines",
   "Dividers",
   "Seals",
   "Masks",

@@ -12,6 +12,7 @@ export type FavouriteKind =
   | "style"
   | "font"
   | "asset"
+  | "frame"
   | "opening"
   | "saved"
   | "palette";

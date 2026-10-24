@@ -13,6 +13,13 @@ import {
   type BuiltinAsset,
 } from "@/lib/assets";
 import { PAGE_LAYOUTS } from "@/lib/layouts";
+import {
+  FRAMES,
+  FRAME_GROUPS,
+  type FrameGroup,
+  type FrameSpec,
+} from "@/lib/frames";
+import { FrameThumb } from "@/components/invitation/FrameArt";
 import { REVEAL_PRESETS, type RevealPreset } from "@/lib/reveals";
 import { BUILTIN_STYLES, type BuiltinStyle } from "@/lib/styles";
 import { FONT_LIBRARY, fontById, fontSamples } from "@/lib/fonts";
@@ -33,6 +40,7 @@ import {
   Sparkles,
   Sparkle,
   Film,
+  Frame as FrameIcon,
   Eye,
   MousePointer,
   Palette,
@@ -147,12 +155,13 @@ export function ShapePreview({ shape, fill, stroke }: { shape: ShapeKind; fill?:
 /* Library panel                                                              */
 /* -------------------------------------------------------------------------- */
 
-type LibraryTab =
+export type LibraryTab =
   | "templates"
   | "saved"
   | "styles"
   | "type"
   | "assets"
+  | "frames"
   | "layouts"
   | "reveals"
   | "opening";
@@ -171,7 +180,11 @@ interface LibraryPanelProps {
   onApplyStyle: (style: BuiltinStyle) => void;
   onAddPageLayout: (layoutId: string) => void;
   onApplyBuiltinAsset: (asset: BuiltinAsset) => void;
+  onAddFrame: (frame: FrameSpec) => void;
   onAddRevealPreset: (preset: RevealPreset) => void;
+  /** Current tab, when the studio wants to preselect one (e.g. Frames). */
+  tab?: LibraryTab;
+  onTabChange?: (tab: LibraryTab) => void;
   /** Applies saved lettering to the current text selection. */
   onApplyTypeStyle?: (style: TypeStyle) => void;
 }
@@ -539,12 +552,18 @@ export function LibraryPanel({
   onApplyStyle,
   onAddPageLayout,
   onApplyBuiltinAsset,
+  onAddFrame,
   onAddRevealPreset,
   onApplyTypeStyle,
+  tab: tabProp,
+  onTabChange,
 }: LibraryPanelProps) {
-  const [tab, setTab] = useState<LibraryTab>("templates");
+  const [innerTab, setInnerTab] = useState<LibraryTab>("templates");
+  const tab = tabProp ?? innerTab;
+  const setTab = onTabChange ?? setInnerTab;
   const [query, setQuery] = useState("");
   const [assetCategory, setAssetCategory] = useState<string>("Backgrounds");
+  const [frameGroup, setFrameGroup] = useState<FrameGroup | "All">("All");
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -807,6 +826,25 @@ export function LibraryPanel({
     });
   }, [query, assetCategory, onlyFavourites, favourites]);
 
+  const filteredFrames = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return FRAMES.filter((frame) => {
+      if (frameGroup !== "All" && frame.group !== frameGroup) return false;
+      if (
+        onlyFavourites &&
+        !favourites.includes(favouriteKey("frame", frame.id))
+      ) {
+        return false;
+      }
+      if (!needle) return true;
+      return (
+        frame.name.toLowerCase().includes(needle) ||
+        frame.group.toLowerCase().includes(needle) ||
+        frame.note.toLowerCase().includes(needle)
+      );
+    });
+  }, [query, frameGroup, onlyFavourites, favourites]);
+
   const filteredReveals = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return REVEAL_PRESETS;
@@ -831,13 +869,13 @@ export function LibraryPanel({
             <Palette className="size-4 text-[var(--red)]" />
             Libraries
           </DialogTitle>
-          <DialogDescription className="text-[11px] leading-relaxed text-ink/50">
-            Templates, styles, type, assets, page layouts, and reveal presets.
-            Every library item is real and applies to this design.
+          <DialogDescription className="text-[12px] leading-relaxed text-ink/55">
+            Templates, styles, type, frames, assets, page layouts, and reveal
+            presets. Every library item is real and applies to this design.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex min-w-0 overflow-x-auto border-b border-ink/12 px-2 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 gap-1 overflow-x-auto border-b border-ink/12 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {(
             [
               ["templates", "Templates", MousePointer],
@@ -845,6 +883,7 @@ export function LibraryPanel({
               ["styles", "Styles", Palette],
               ["type", "Type", Type],
               ["assets", "Assets", Sparkles],
+              ["frames", "Frames", FrameIcon],
               ["layouts", "Pages", Film],
               ["reveals", "Reveals", Eye],
               ["opening", "Opening", Sparkle],
@@ -857,14 +896,15 @@ export function LibraryPanel({
                 setTab(id);
                 setQuery("");
               }}
+              aria-pressed={tab === id}
               className={cn(
-                "shrink-0 whitespace-nowrap rounded-t-md border-t-2 border-transparent px-3 py-2 text-[9px] uppercase tracking-[0.1em] transition-[background-color,border-color,color] duration-150",
+                "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-[10px] uppercase tracking-[0.09em] transition-[background-color,border-color,color] duration-150",
                 tab === id
-                  ? "border-[var(--red)] text-ink"
-                  : "text-ink/50 hover:text-ink/80",
+                  ? "border-ink/20 bg-[var(--paper-light)] text-ink shadow-[0_1px_2px_rgba(21,21,21,0.06)]"
+                  : "border-transparent text-ink/50 hover:border-ink/15 hover:bg-ink/[0.03] hover:text-ink/80",
               )}
             >
-              <Icon className="inline size-3 mr-1" />
+              <Icon className="size-3.5 shrink-0" />
               {label}
             </button>
           ))}
@@ -886,16 +926,19 @@ export function LibraryPanel({
                   ? "Search Playfair, Naskh…"
                   : tab === "assets"
                   ? "Search backgrounds, motifs…"
+                  : tab === "frames"
+                  ? "Search frames, botanical, deco…"
                   : tab === "layouts"
                   ? "Search page layouts…"
                   : tab === "opening"
                   ? "Search opening experiences…"
                   : "Search reveal presets…"
               }
-              className="h-8 rounded-none border-ink/20 pl-8 text-[12px]"
+              aria-label="Search the library"
+              className="h-9 rounded-md border-ink/20 pl-9 text-[12px]"
               autoFocus
             />
-            <MousePointer className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink/35" />
+            <MousePointer className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink/35" />
           </label>
           <button
             type="button"
@@ -904,7 +947,7 @@ export function LibraryPanel({
             title="Show favourites only"
             onClick={() => setOnlyFavourites((value) => !value)}
             className={cn(
-              "flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[9px] uppercase tracking-[0.1em] transition-[background-color,border-color,color] duration-150",
+              "flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[10px] uppercase tracking-[0.09em] transition-[background-color,border-color,color] duration-150",
               onlyFavourites
                 ? "border-[var(--gold)]/80 bg-[var(--gold)]/10 text-[#7a5f2a]"
                 : "border-ink/20 text-ink/45 hover:border-ink/45 hover:text-ink",
@@ -919,13 +962,14 @@ export function LibraryPanel({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {onlyFavourites &&
             (tab === "templates" ||
               tab === "saved" ||
               tab === "styles" ||
               tab === "type" ||
-              tab === "assets") && (
+              tab === "assets" ||
+              tab === "frames") && (
               <p className="mb-3 flex items-center gap-1.5 rounded-md border border-[var(--gold)]/50 bg-[var(--gold)]/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-[#7a5f2a]">
                 <Star className="size-3 shrink-0" fill="currentColor" />
                 Showing favourites only. Star any item to keep it here.
@@ -1301,6 +1345,77 @@ export function LibraryPanel({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {tab === "frames" && (
+            <div className="space-y-4">
+              <div className="-mx-1 flex flex-wrap gap-1.5">
+                {(["All", ...FRAME_GROUPS] as const).map((group) => (
+                  <button
+                    key={group}
+                    type="button"
+                    aria-pressed={frameGroup === group}
+                    onClick={() => setFrameGroup(group)}
+                    className={cn(
+                      "min-h-7 rounded-full border px-2.5 text-[10px] uppercase tracking-[0.08em] transition-[background-color,border-color,color] duration-150",
+                      frameGroup === group
+                        ? "border-[var(--red)] bg-[var(--red)] text-white"
+                        : "border-ink/15 text-ink/55 hover:border-ink/40 hover:text-ink",
+                    )}
+                  >
+                    {group}
+                  </button>
+                ))}
+              </div>
+
+              <p className="rounded-md border border-ink/10 bg-[var(--paper-deep)]/50 px-3 py-2 text-[11px] leading-relaxed text-ink/50">
+                Each frame is vector artwork on its own layer. Add it, then
+                move, resize, rotate, recolour, or change its stroke weight like
+                any other shape.
+              </p>
+
+              {filteredFrames.length === 0 ? (
+                <p className="py-8 text-center text-[12px] text-ink/45">
+                  {onlyFavourites
+                    ? "No favourite frames yet. Star one to keep it here."
+                    : "No frames match that search."}
+                </p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {filteredFrames.map((frame) => (
+                    <div key={frame.id} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => onAddFrame(frame)}
+                        aria-label={`Add the ${frame.name} frame`}
+                        className="group flex w-full flex-col gap-2 rounded-xl border border-ink/12 bg-card p-2 text-left transition-[transform,box-shadow,border-color] duration-200 ease-[var(--ease-premium)] hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-[0_10px_24px_rgba(21,21,21,0.08)] focus-visible:ring-2 focus-visible:ring-[var(--gold)]/60 focus-visible:outline-none"
+                      >
+                        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border border-ink/10 bg-[var(--paper-light)]">
+                          <FrameThumb frame={frame} />
+                          <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-md bg-ink/85 py-1 text-center text-[9px] uppercase tracking-[0.12em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            Add frame
+                          </span>
+                        </div>
+                        <span className="block truncate pr-7 text-[12px] font-medium tracking-[0.01em]">
+                          {frame.name}
+                        </span>
+                        <span className="block truncate text-[9.5px] uppercase tracking-[0.1em] text-ink/45">
+                          {frame.group}
+                        </span>
+                      </button>
+                      <FavouriteToggle
+                        className="absolute top-2 right-2"
+                        active={favourites.includes(
+                          favouriteKey("frame", frame.id),
+                        )}
+                        label={frame.name}
+                        onToggle={() => togglePin(favouriteKey("frame", frame.id))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

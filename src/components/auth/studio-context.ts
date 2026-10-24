@@ -1,9 +1,10 @@
 import { createContext, useContext } from "react";
 
 export interface StudioSessionValue {
+  /** The verified owner's email, when the studio is open. */
   email: string | null;
-  lock: string | null;
-  lockFn: () => void;
+  /** Locks the studio in this tab; the PIN is required again to reopen it. */
+  lock: () => void;
 }
 
 export const StudioSessionContext =

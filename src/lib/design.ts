@@ -205,6 +205,12 @@ export interface DesignElement {
   stroke?: string;
   strokeWidth?: number;
   radius?: number;
+  /**
+   * Decorative frame artwork (an id from `FRAME_LIBRARY`). A frame stays an
+   * ordinary shape element, so it keeps the editor's selection, resizing,
+   * rotation, layer order, colour, weight, saving, and publishing behaviour.
+   */
+  frameArt?: string;
 
   motif?: MotifId;
 

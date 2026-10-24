@@ -8,21 +8,18 @@ import { GuestExperience } from "@/components/studio/GuestExperience";
 import { SequentialGuestPreview } from "@/components/studio/SequentialGuestPreview";
 import { ColourPanel } from "@/components/studio/ColourPanel";
 import { Inspector } from "@/components/studio/Inspector";
-import { LibraryPanel, ShapePreview } from "@/components/studio/LibraryPanel";
+import {
+  LibraryPanel,
+  ShapePreview,
+  type LibraryTab,
+} from "@/components/studio/LibraryPanel";
+import { FrameThumb } from "@/components/invitation/FrameArt";
 import { OpeningDesigner } from "@/components/studio/OpeningDesigner";
 import { PrintExportDialog } from "@/components/studio/PrintExportDialog";
 import { StudioCanvas, type CanvasContextAction } from "@/components/studio/StudioCanvas";
 import { ShortcutReference } from "@/components/studio/ShortcutReference";
 import { Timeline } from "@/components/studio/Timeline";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuShortcut,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -33,12 +30,6 @@ import {
 } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -46,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -82,14 +72,10 @@ import {
   contentFromInvitation,
   type InvitationContent,
 } from "@/lib/invitation";
+import { FRAMES, frameBounds, type FrameSpec } from "@/lib/frames";
 import { pageLayoutById } from "@/lib/layouts";
 import { ensureFont, fontById } from "@/lib/fonts";
-import {
-  recolourDesign,
-  type ColourPalette,
-  PALETTES,
-  PALETTE_GROUPS,
-} from "@/lib/palettes";
+import { recolourDesign, type ColourPalette } from "@/lib/palettes";
 import type { BuiltinAsset } from "@/lib/assets";
 import type { RevealPreset } from "@/lib/reveals";
 import {
@@ -100,8 +86,8 @@ import {
   selectionAfterDelete,
   undoHistory,
 } from "@/lib/studio-edit";
-import { applyTypeStyle, type TypeStyle } from "@/lib/type-styles";import { cn } from "@/lib/utils";
-import { IconButton } from "@/components/ui/icon-button";
+import { applyTypeStyle, type TypeStyle } from "@/lib/type-styles";
+import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
   AlertCircle,
@@ -156,8 +142,6 @@ import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
-type ToolbarButtonSize = "sm" | "md" | "lg";
-type ToolbarButtonVariant = "default" | "subtle" | "outline" | "ghost";
 type Device = "desktop" | "tablet" | "phone";
 type LeftPanel = "add" | "layers" | "colour" | "opening" | "pages";
 type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline";
@@ -196,466 +180,6 @@ function PanelHeading({ title, note }: { title: string; note?: string }) {
       {note && (
         <p className="mt-1 text-[11px] leading-relaxed text-ink/50">{note}</p>
       )}
-    </div>
-  );
-}
-
-function ToolbarButton({
-  label,
-  active,
-  danger,
-  subtle,
-  onClick,
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children: React.ReactNode
-  className?: string
-}) {
-  label,
-  active,
-  danger,
-  subtle,
-  onClick,
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      aria-pressed={active !== undefined ? active : undefined}
-      className={cn(
-        "grid shrink-0 place-items-center rounded-md border transition-[background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-35",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]",
-        active
-          ? "border-ink/80 bg-ink/90 text-[#f2f1ed]"
-          : danger
-            ? "border-transparent text-ink/55 hover:border-[var(--red)]/40 hover:bg-[var(--red)]/[0.06] hover:text-[var(--red)]"
-            : subtle
-              ? "border-ink/12 text-ink/50 hover:border-ink/30 hover:text-ink"
-              : "border-ink/15 text-ink/60 hover:border-ink/45 hover:text-ink",
-        className
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ToolbarIconButton({
-  label,
-  active,
-  danger,
-  subtle,
-  onClick,
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children: React.ReactNode
-  className?: string
-}) {
-  label,
-  active,
-  danger,
-  subtle,
-  onClick,
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children: React.ReactNode
-  className?: string
-}) {
-  label,
-  active,
-  danger,
-  subtle,
-  onClick,
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children: React.ReactNode
-  className?: string
-}) {
-  label,
-  active,
-  danger,
-  subtle,
-  onClick,
-  children,
-  className,
-}: {
-  label: string
-  active?: boolean
-  danger?: boolean
-  subtle?: boolean
-  onClick: () => void
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      aria-pressed={active !== undefined ? active : undefined}
-      className={cn(
-        "grid shrink-0 place-items-center rounded-md border transition-[background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-35",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]",
-        "size-8",
-        active
-          ? "border-ink/80 bg-ink/90 text-[#f2f1ed]"
-          : danger
-            ? "border-transparent text-ink/55 hover:border-[var(--red)]/40 hover:bg-[var(--red)]/[0.06] hover:text-[var(--red)]"
-            : subtle
-              ? "border-ink/12 text-ink/50 hover:border-ink/30 hover:text-ink"
-              : "border-ink/15 text-ink/60 hover:border-ink/45 hover:text-ink",
-        className
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ToolbarChip({
-  label,
-  active,
-  onClick,
-  onMouseDown,
-  className,
-}: {
-  label: string
-  active?: boolean
-  onClick: () => void
-  onMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void
-  className?: string
-}) {
-  label,
-  active,
-  onClick,
-  onMouseDown,
-  className,
-}: {
-  label: string
-  active?: boolean
-  onClick: () => void
-  onMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void
-  className?: string
-}) {
-  label,
-  active,
-  onClick,
-  onMouseDown,
-  className,
-}: {
-  label: string
-  active?: boolean
-  onClick: () => void
-  onMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void
-  className?: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseDown={onMouseDown}
-      aria-pressed={active !== undefined ? active : undefined}
-      className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-md border px-3 text-[0.62rem] uppercase tracking-[0.18em] transition-[background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-35",
-        "font-meta",
-        active
-          ? "border-ink bg-ink text-[var(--paper)]"
-          : "border-ink/15 text-ink/55 hover:border-ink/40 hover:text-ink",
-        className
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-function ToolbarChipGroup({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <div
-      role="group"
-      className={cn(
-        "flex items-center gap-1 rounded-md border border-ink/12 bg-transparent p-[1px]",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SplitButton({
-  label,
-}) {
-  return (
-
-  label,
-  trigger,
-  content,
-  align,
-  sideOffset,
-  className,
-}: {
-  label?: string
-  trigger: React.ReactNode
-  content: React.ReactNode
-  align?: "start" | "center" | "end"
-  sideOffset?: number
-  className?: string
-}) {
-  label,
-  trigger,
-  content,
-  align,
-  sideOffset,
-  className,
-}: {
-  label?: string
-  trigger: React.ReactNode
-  content: React.ReactNode
-  align?: "start" | "center" | "end"
-  sideOffset?: number
-  className?: string
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        {label ? (
-          <Button
-            type="button"
-            variant="subtle"
-            className={cn("h-8.5 px-2.5 text-[0.62rem]", className)}
-          >
-            {trigger}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="subtle"
-            size="icon"
-            className={cn("size-8", className)}
-          >
-            {trigger}
-          </Button>
-        )}
-      </PopoverTrigger>
-      <PopoverContent align={align ?? "end"} sideOffset={sideOffset ?? 2} className="w-64 p-1">
-        {content}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function PropertyStepper({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  unit,
-  className,
-}: {
-  label: string
-  value: number
-  min?: number
-  max?: number
-  step?: number
-  onChange: (value: number) => void
-  unit?: string
-  className?: string
-}) {
-  return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(min ?? -Infinity, value - (step ?? 1)))}
-          className="grid size-7 place-items-center rounded border border-ink/15 text-ink/60 transition-colors hover:border-ink/40 hover:text-ink"
-          aria-label={`Decrease ${label}`}
-        >
-          <Minus className="size-3.5" aria-hidden />
-        </button>
-        <input
-          type="number"
-          inputMode="decimal"
-          value={value}
-          onChange={(event) => {
-            const next = parseFloat(event.target.value);
-            if (!Number.isFinite(next)) return;
-            const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, next));
-            onChange(clamped);
-          }}
-          className="w-16 h-7 rounded-md border border-ink/15 bg-transparent px-1 text-center text-[0.78rem] text-ink tabular-nums outline-none transition-colors focus:border-ink focus:ring-1 focus:ring-ink/20"
-          aria-label={label}
-        />
-        <button
-          type="button"
-          onClick={() => onChange(Math.min(max ?? Infinity, value + (step ?? 1)))}
-          className="grid size-7 place-items-center rounded border border-ink/15 text-ink/60 transition-colors hover:border-ink/40 hover:text-ink"
-          aria-label={`Increase ${label}`}
-        >
-          <Plus className="size-3.5" aria-hidden />
-        </button>
-      </div>
-      {unit && <span className="shrink-0 text-[11px] text-ink/50">{unit}</span>}
-    </div>
-  );
-}
-
-function PropertySlider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  className,
-}: {
-  label: string
-  value: number
-  min?: number
-  max?: number
-  step?: number
-  onChange: (value: number) => void
-  className?: string
-}) {
-  return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
-      <Slider
-        value={[value]}
-        min={min ?? 0}
-        max={max ?? 100}
-        step={step ?? 1}
-        onValueChange={([next]) => onChange(next)}
-        className="flex-1"
-      />
-      <span className="shrink-0 w-12 text-right text-[11px] text-ink/60 tabular-nums">
-        {Math.round(value)}
-      </span>
-    </div>
-  );
-}
-
-function PropertyToggle({
-  label,
-  checked,
-  onCheckedChange,
-  className,
-}: {
-  label: string
-  checked: boolean
-  onCheckedChange: (checked: boolean) => void
-  className?: string
-}) {
-  return (
-    <div className={cn("flex items-center justify-between gap-3", className)}>
-      <span className="text-[11px] text-ink/60">{label}</span>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
-    </div>
-  );
-}
-
-function PropertyTextField({
-  label,
-  value,
-  onChange,
-  type,
-  placeholder,
-  className,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  type?: string
-  placeholder?: string
-  className?: string
-}) {
-  return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
-      <Input
-        type={type ?? "text"}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="w-40 text-[0.78rem] text-ink tabular-nums"
-        aria-label={label}
-      />
     </div>
   );
 }
@@ -757,6 +281,7 @@ export default function Studio() {
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [pixelsPerSecond, setPixelsPerSecond] = useState(80);
   const [librariesOpen, setLibrariesOpen] = useState(false);
+  const [libraryTab, setLibraryTab] = useState<LibraryTab>("templates");
   const [guestOpen, setGuestOpen] = useState(false);
   const [timelinePreviewOpen, setTimelinePreviewOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
@@ -1570,6 +1095,40 @@ export default function Studio() {
     setLibrariesOpen(false);
     toast.success(
       `${asset.name} placed. Move, recolour, or restyle it like any other layer.`,
+    );
+  };
+
+  /**
+   * Adds a decorative frame on its own layer, inset from the page trim. A frame
+   * is an ordinary shape element carrying `frameArt`, so selection, moving,
+   * resizing, rotation, colour, weight, layer order, saving, and publishing all
+   * run through the controls the editor already has.
+   */
+  const addFrame = (frame: FrameSpec) => {
+    if (!page || !content) return;
+    const bounds = frameBounds(pageSizeOf(page));
+    addElement(
+      makeElement("shape", {
+        name: frame.name,
+        shape: "frame",
+        frameArt: frame.id,
+        x: bounds.x,
+        y: bounds.y,
+        w: bounds.w,
+        h: bounds.h,
+        fill: "transparent",
+        stroke: content.palette.accent ?? "#710014",
+        strokeWidth: 2,
+        radius: 0,
+        opacity: 0.85,
+        animation: defaultAnimation("fade", 200),
+      }),
+    );
+    setLibrariesOpen(false);
+    setAnimating(false);
+    setPlaying(false);
+    toast.success(
+      `${frame.name} frame added. Resize, rotate, or recolour it like any layer.`,
     );
   };
 
@@ -2419,13 +1978,46 @@ export default function Studio() {
                   onClick={() => addShape(shape.id)}
                   title={shape.label}
                   aria-label={`Add ${shape.label}`}
-                  className="grid aspect-square place-items-center border border-ink/12 text-ink/60 hover:border-ink hover:text-[var(--red)]"
+                  className="grid aspect-square place-items-center rounded-md border border-ink/12 bg-[var(--paper-light)] text-ink/60 transition-[border-color,color] duration-150 hover:border-ink/35 hover:text-[var(--red)] focus-visible:ring-2 focus-visible:ring-[var(--gold)]/60 focus-visible:outline-none"
                 >
                   <ShapePreview
                     shape={shape.id}
                     fill={content?.palette.accent ?? "#710014"}
                     stroke={shape.id === "frame" ? content?.palette.accent : undefined}
                   />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-ink/12 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="font-meta text-[9px] uppercase tracking-[0.16em] text-ink/40">
+                Decorative frames
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setLibraryTab("frames");
+                  setLibrariesOpen(true);
+                }}
+                className="inline-flex items-center rounded-full border border-ink/15 px-2 py-0.5 text-[9px] uppercase tracking-[0.08em] text-ink/55 transition-[background-color,border-color,color] duration-150 hover:border-ink/40 hover:text-ink"
+              >
+                All {FRAMES.length}
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {FRAMES.slice(0, 6).map((frame) => (
+                <button
+                  key={frame.id}
+                  type="button"
+                  onClick={() => addFrame(frame)}
+                  title={frame.name}
+                  aria-label={`Add the ${frame.name} frame`}
+                  className="overflow-hidden rounded-md border border-ink/12 bg-[var(--paper-light)] transition-[border-color,box-shadow] duration-150 hover:border-ink/35 hover:shadow-[0_6px_16px_rgba(21,21,21,0.08)] focus-visible:ring-2 focus-visible:ring-[var(--gold)]/60 focus-visible:outline-none"
+                >
+                  <span className="block aspect-[3/4] w-full">
+                    <FrameThumb frame={frame} />
+                  </span>
                 </button>
               ))}
             </div>
@@ -2460,7 +2052,7 @@ export default function Studio() {
                       }),
                     )
                   }
-                  className="grid aspect-square place-items-center border border-ink/12 text-ink/60 hover:border-ink hover:text-[var(--red)]"
+                  className="grid aspect-square place-items-center rounded-md border border-ink/12 bg-[var(--paper-light)] text-ink/60 transition-[border-color,color] duration-150 hover:border-ink/35 hover:text-[var(--red)] focus-visible:ring-2 focus-visible:ring-[var(--gold)]/60 focus-visible:outline-none"
                   title={motif.label}
                 >
                   <Sparkles className="size-3" />
@@ -3608,8 +3200,11 @@ export default function Studio() {
         onApplyStyle={applyStyle}
         onAddPageLayout={addPageLayout}
         onApplyBuiltinAsset={applyBuiltinAsset}
+        onAddFrame={addFrame}
         onAddRevealPreset={addRevealPreset}
         onApplyTypeStyle={applyTypeStyleToSelection}
+        tab={libraryTab}
+        onTabChange={setLibraryTab}
       />
 
       {guestOpen && (
