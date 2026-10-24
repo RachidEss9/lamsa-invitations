@@ -3,6 +3,7 @@ import {
   pageAspectOf,
   pageSizeOf,
   type DesignDocument,
+  type DesignElement,
   type DesignFormat,
   type DesignPage,
 } from "@/lib/design";
@@ -209,6 +210,167 @@ export function overflowElements(page: DesignPage) {
         element.y < -0.5 ||
         element.x + element.w > width + 0.5 ||
         element.y + element.h > height + 0.5),
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Preflight                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export type PreflightSeverity = "error" | "warning" | "info";
+
+export interface PreflightIssue {
+  /** Stable key, so repeated checks do not duplicate rows. */
+  id: string;
+  severity: PreflightSeverity;
+  title: string;
+  detail: string;
+  elementId?: string;
+}
+
+/**
+ * Measurements the browser can make but the document cannot: how wide an
+ * uploaded image really is, and how tall a line of type wants to be. Both are
+ * optional, so preflight still works without a mounted canvas.
+ */
+export interface PreflightMeasurements {
+  /** Natural pixel width of each image element's loaded file. */
+  imageWidths?: Record<string, number>;
+  /** Wanted content height vs. the height the text box gave it, canvas units. */
+  textHeights?: Record<string, { content: number; box: number }>;
+}
+
+export const MIN_PRINT_DPI = 150;
+
+function overlapBand(
+  element: DesignElement,
+  page: DesignPage,
+): boolean {
+  const margin = Math.max(0, page.margin ?? 0);
+  if (margin <= 0) return false;
+  const { width, height } = pageSizeOf(page);
+  const insideSafe =
+    element.x >= margin &&
+    element.y >= margin &&
+    element.x + element.w <= width - margin &&
+    element.y + element.h <= height - margin;
+  return !insideSafe;
+}
+
+/**
+ * Everything that can go wrong when a screen design is put on paper, checked
+ * against the real geometry the PDF will use. Nothing here blocks an export;
+ * it tells the host exactly what will be cropped, clipped, or soft.
+ */
+export function preflightPage(
+  page: DesignPage,
+  settings: PrintSettings,
+  measurements: PreflightMeasurements = {},
+): PreflightIssue[] {
+  const issues: PreflightIssue[] = [];
+  const { width, height } = pageSizeOf(page);
+  const art = pageArtworkRect(settings, page);
+
+  for (const element of page.elements) {
+    if (element.hidden) continue;
+
+    const outside =
+      element.x < -0.5 ||
+      element.y < -0.5 ||
+      element.x + element.w > width + 0.5 ||
+      element.y + element.h > height + 0.5;
+    if (outside) {
+      issues.push({
+        id: `overflow:${element.id}`,
+        severity: "warning",
+        title: `“${element.name}” sits outside the canvas`,
+        detail:
+          "Paper has no edges beyond the page, so this layer will be cropped in the PDF.",
+        elementId: element.id,
+      });
+    }
+
+    // A layer may deliberately bleed off the edge; that is not a safe-margin
+    // problem, so only flag layers that stay on the page.
+    if (!outside && overlapBand(element, page)) {
+      issues.push({
+        id: `margin:${element.id}`,
+        severity: "info",
+        title: `“${element.name}” is inside the safe margin`,
+        detail: `This page keeps a ${Math.round(page.margin ?? 0)}-unit margin. Trim and guillotine drift can reach this layer.`,
+        elementId: element.id,
+      });
+    }
+
+    if (element.kind === "image") {
+      if (!element.imageStorageId) {
+        issues.push({
+          id: `empty-image:${element.id}`,
+          severity: "warning",
+          title: `“${element.name}” has no image`,
+          detail: "The placeholder frame will print empty. Replace it with a file before printing.",
+          elementId: element.id,
+        });
+      } else {
+        const naturalWidth = measurements.imageWidths?.[element.id];
+        if (naturalWidth && naturalWidth > 0) {
+          // The placed width is the layer's share of the canvas projected onto
+          // the artwork rectangle, so DPI reflects the actual printed size.
+          const placedMm = (element.w / width) * art.w;
+          const dpi = naturalWidth / Math.max(0.01, placedMm / 25.4);
+          if (dpi < MIN_PRINT_DPI) {
+            issues.push({
+              id: `dpi:${element.id}`,
+              severity: dpi < 100 ? "error" : "warning",
+              title: `“${element.name}” is ${Math.round(dpi)} DPI`,
+              detail: `At ${Math.round(placedMm)} mm wide this file is below the ${MIN_PRINT_DPI} DPI floor and may look soft. Use a larger image or a smaller placement.`,
+              elementId: element.id,
+            });
+          }
+        }
+      }
+    }
+
+    if (element.kind === "text") {
+      const measured = measurements.textHeights?.[element.id];
+      if (measured && measured.content > measured.box + 1) {
+        issues.push({
+          id: `clipped:${element.id}`,
+          severity: "error",
+          title: `“${element.name}” is clipped`,
+          detail: `The text needs ${Math.round(measured.content)} units of height but the box gives it ${Math.round(measured.box)}. Increase the box height or reduce the type size.`,
+          elementId: element.id,
+        });
+      }
+    }
+  }
+
+  // The paper and the saved document brief can drift apart: the host may have
+  // picked a different sheet in this dialog, which is allowed but worth saying.
+  if (page.hidden) {
+    issues.push({
+      id: "hidden-page",
+      severity: "info",
+      title: "This page is hidden",
+      detail: "Hidden pages are skipped by the guest run and by every export.",
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * One summary for the whole document, so the dialog can show a single count
+ * before the host opens each page.
+ */
+export function preflightDesign(
+  design: DesignDocument,
+  settings: PrintSettings,
+  currentIndex: number,
+  measurements: PreflightMeasurements = {},
+): PreflightIssue[] {
+  return pagesForPrint(design, settings, currentIndex).flatMap(({ page }) =>
+    preflightPage(page, settings, measurements),
   );
 }
 

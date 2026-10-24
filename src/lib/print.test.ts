@@ -8,6 +8,8 @@ import {
   overflowElements,
   pageArtworkRect,
   pagesForPrint,
+  preflightDesign,
+  preflightPage,
   printablePage,
   safeFilename,
   DEFAULT_PRINT_SETTINGS,
@@ -395,6 +397,175 @@ describe("print pages", () => {
     const result = pagesForPrint(design, settings, 0);
     expect(result).toHaveLength(1);
     expect(result[0].page.id).toBe("p1");
+  });
+});
+
+describe("print preflight", () => {
+  const settings: PrintSettings = {
+    ...DEFAULT_PRINT_SETTINGS,
+    paper: "a5",
+    orientation: "portrait",
+    margins: { top: 6, right: 6, bottom: 6, left: 6 },
+  };
+
+  function element(overrides: Partial<DesignElement>): DesignElement {
+    return {
+      id: "el",
+      kind: "text",
+      name: "Layer",
+      x: 100,
+      y: 100,
+      w: 400,
+      h: 120,
+      rotation: 0,
+      opacity: 1,
+      locked: false,
+      hidden: false,
+      animation: {
+        enabled: true,
+        preset: "fade",
+        trigger: "load",
+        delay: 0,
+        duration: 800,
+        easing: "easeOut",
+      },
+      ...overrides,
+    };
+  }
+
+  it("reports nothing for a page that is ready to print", () => {
+    const page = makePage("p0", "Invitation", [
+      element({ id: "a", text: "Amara & Julian" }),
+    ]);
+    expect(preflightPage(page, settings)).toEqual([]);
+  });
+
+  it("flags text that its box clips", () => {
+    const page = makePage("p0", "Invitation", [
+      element({ id: "title", name: "Names", h: 80 }),
+    ]);
+    const issues = preflightPage(page, settings, {
+      textHeights: { title: { content: 140, box: 80 } },
+    });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      id: "clipped:title",
+      severity: "error",
+      elementId: "title",
+    });
+    expect(issues[0].detail).toContain("140");
+  });
+
+  it("accepts text that fits with a tolerance", () => {
+    const page = makePage("p0", "Invitation", [
+      element({ id: "title", h: 80 }),
+    ]);
+    expect(
+      preflightPage(page, settings, {
+        textHeights: { title: { content: 80.6, box: 80 } },
+      }),
+    ).toEqual([]);
+  });
+
+  it("warns about a low-resolution image using its placed print size", () => {
+    const page = makePage("p0", "Invitation", [
+      element({
+        id: "photo",
+        kind: "image",
+        name: "Photo",
+        x: 100,
+        y: 100,
+        w: 500,
+        h: 400,
+        imageStorageId: "storage1",
+      }),
+    ]);
+    const low = preflightPage(page, settings, {
+      imageWidths: { photo: 380 },
+    });
+    expect(low).toHaveLength(1);
+    expect(low[0].id).toBe("dpi:photo");
+    expect(low[0].severity).toBe("warning");
+
+    const sharp = preflightPage(page, settings, {
+      imageWidths: { photo: 1600 },
+    });
+    expect(sharp).toEqual([]);
+  });
+
+  it("marks a very soft image as an error", () => {
+    const page = makePage("p0", "Invitation", [
+      element({
+        id: "photo",
+        kind: "image",
+        w: 500,
+        h: 400,
+        imageStorageId: "storage1",
+      }),
+    ]);
+    const issues = preflightPage(page, settings, {
+      imageWidths: { photo: 90 },
+    });
+    expect(issues[0].severity).toBe("error");
+  });
+
+  it("warns when an image layer has no file", () => {
+    const page = makePage("p0", "Invitation", [
+      element({ id: "photo", kind: "image", name: "Portrait" }),
+    ]);
+    expect(preflightPage(page, settings)).toEqual([
+      expect.objectContaining({ id: "empty-image:photo", severity: "warning" }),
+    ]);
+  });
+
+  it("reports layers inside a saved safe margin", () => {
+    const page = {
+      ...makePage("p0", "Invitation", [
+        element({ id: "edge", x: 10, y: 10, w: 200, h: 100 }),
+      ]),
+      margin: 50,
+    };
+    const issues = preflightPage(page, settings);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      id: "margin:edge",
+      severity: "info",
+    });
+  });
+
+  it("reports overflow and clipping together without duplicates", () => {
+    const page = makePage("p0", "Invitation", [
+      element({ id: "wide", w: 1200, h: 120 }),
+    ]);
+    const issues = preflightPage(page, settings, {
+      textHeights: { wide: { content: 160, box: 120 } },
+    });
+    expect(issues.map((issue) => issue.id)).toEqual([
+      "overflow:wide",
+      "clipped:wide",
+    ]);
+  });
+
+  it("checks only the visible pages the PDF will contain", () => {
+    const design = makeDesign([
+      makePage("p0", "Cover", [element({ id: "a", kind: "image" })]),
+      makePage("p1", "Hidden", [element({ id: "b", kind: "image" })], true),
+    ]);
+    const issues = preflightDesign(design, { ...settings, scope: "all" }, 0);
+    expect(issues.map((issue) => issue.elementId)).toEqual(["a"]);
+  });
+
+  it("limits the check to the current page when that scope is chosen", () => {
+    const design = makeDesign([
+      makePage("p0", "One", [element({ id: "a", kind: "image" })]),
+      makePage("p1", "Two", [element({ id: "b", kind: "image" })]),
+    ]);
+    const issues = preflightDesign(
+      design,
+      { ...settings, scope: "current" },
+      1,
+    );
+    expect(issues.map((issue) => issue.elementId)).toEqual(["b"]);
   });
 });
 

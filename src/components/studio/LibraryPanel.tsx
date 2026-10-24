@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   BUILTIN_ASSETS,
   BUILTIN_ASSET_CATEGORIES,
@@ -25,6 +26,7 @@ import {
 import type { ShapeKind } from "@/lib/design";
 import { cn } from "@/lib/utils";
 import {
+  Bookmark,
   Heart,
   Layers,
   Type,
@@ -34,8 +36,14 @@ import {
   Eye,
   MousePointer,
   Palette,
+  Save,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 import {
   makeElement,
   makeId,
@@ -129,6 +137,7 @@ export function ShapePreview({ shape, fill, stroke }: { shape: ShapeKind; fill?:
 
 type LibraryTab =
   | "templates"
+  | "saved"
   | "styles"
   | "type"
   | "assets"
@@ -482,6 +491,18 @@ export function LibraryPanel({
   const [tab, setTab] = useState<LibraryTab>("templates");
   const [query, setQuery] = useState("");
   const [assetCategory, setAssetCategory] = useState<string>("Backgrounds");
+  const [saveName, setSaveName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // The owner's own saved templates live in Convex, next to the invitation
+  // itself, so they survive a new browser and are never shared with guests.
+  const savedItems = useQuery(
+    api.library.listMine,
+    open ? { kind: "template" as const } : "skip",
+  );
+  const createLibraryItem = useMutation(api.library.create);
+  const removeLibraryItem = useMutation(api.library.remove);
 
   const handleApplyTemplate = useCallback(
     (template: InvitationTemplate) => {
@@ -510,6 +531,70 @@ export function LibraryPanel({
     },
     [onApplyFont, onClose, selectedIds],
   );
+
+  const saveCurrentTemplate = async () => {
+    const name = saveName.trim();
+    if (!name) {
+      toast.error("Give this template a name first.");
+      return;
+    }
+    setSaving(true);
+    try {
+      // A deep copy: the saved template is a source, and later edits on this
+      // canvas must never reach back into it.
+      const snapshot = JSON.parse(JSON.stringify(design)) as DesignDocument;
+      await createLibraryItem({
+        kind: "template",
+        name,
+        description: `${snapshot.pages.length} page${
+          snapshot.pages.length === 1 ? "" : "s"
+        } · saved from this invitation`,
+        payload: { design: snapshot },
+      });
+      setSaveName("");
+      toast.success("Template saved to your library. This invitation is unchanged.");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "The template could not be saved.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const applySavedTemplate = (item: { name: string; payload: unknown }) => {
+    const savedDesign = (item.payload as { design?: DesignDocument } | null)
+      ?.design;
+    if (!savedDesign || !Array.isArray(savedDesign.pages)) {
+      toast.error("This saved template has no canvas data.");
+      return;
+    }
+    onApplyTemplate(savedDesign, item.name);
+    onClose();
+  };
+
+  const deleteSavedTemplate = async (id: string) => {
+    setConfirmDelete(null);
+    try {
+      await removeLibraryItem({ id: id as Id<"libraryItems"> });
+      toast.success("Template removed from your library.");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "The template could not be removed.",
+      );
+    }
+  };
+
+  const filteredSaved = useMemo(() => {
+    const items = savedItems ?? [];
+    const needle = query.trim().toLowerCase();
+    if (!needle) return items;
+    return items.filter(
+      (item) =>
+        item.name.toLowerCase().includes(needle) ||
+        (item.description ?? "").toLowerCase().includes(needle),
+    );
+  }, [savedItems, query]);
 
   const filteredTemplates = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -589,6 +674,7 @@ export function LibraryPanel({
           {(
             [
               ["templates", "Templates", MousePointer],
+              ["saved", "Saved", Bookmark],
               ["styles", "Styles", Palette],
               ["type", "Type", Type],
               ["assets", "Assets", Sparkles],
@@ -625,6 +711,8 @@ export function LibraryPanel({
               placeholder={
                 tab === "templates"
                   ? "Search templates…"
+                  : tab === "saved"
+                  ? "Search your saved templates…"
                   : tab === "styles"
                   ? "Search styles…"
                   : tab === "type"
@@ -663,6 +751,121 @@ export function LibraryPanel({
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {tab === "saved" && (
+            <div className="space-y-4">
+              <div className="border border-ink/12 bg-[var(--paper-deep)]/60 p-3">
+                <p className="text-[11px] font-semibold">
+                  Save this design as a template
+                </p>
+                <p className="mt-1 text-[10px] leading-relaxed text-ink/50">
+                  Pages, layers, type, colours, and motion are copied into your
+                  private library. This invitation keeps its own words, guests,
+                  RSVP, and public link.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <Input
+                    value={saveName}
+                    onChange={(event) => setSaveName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void saveCurrentTemplate();
+                    }}
+                    placeholder="Template name"
+                    maxLength={80}
+                    className="h-8 rounded-none border-ink/20 text-[12px]"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => void saveCurrentTemplate()}
+                    disabled={saving || !saveName.trim()}
+                    className="h-8 shrink-0 rounded-none px-3 text-[9px] uppercase tracking-[0.12em]"
+                  >
+                    <Save className="size-3.5" />
+                    {saving ? "Saving" : "Save"}
+                  </Button>
+                </div>
+              </div>
+
+              {savedItems === undefined ? (
+                <p className="py-6 text-center text-[11px] text-ink/45">
+                  Loading your templates…
+                </p>
+              ) : filteredSaved.length === 0 ? (
+                <p className="border border-dashed border-ink/15 px-3 py-6 text-center text-[11px] leading-relaxed text-ink/50">
+                  {savedItems.length === 0
+                    ? "No saved templates yet. Design something you love, then save it here to start the next invitation from it."
+                    : "No saved templates match that search."}
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {filteredSaved.map((item) => (
+                    <div
+                      key={item._id}
+                      className="flex flex-col gap-2 border border-ink/12 p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Bookmark className="size-3.5 shrink-0 text-[var(--red)]" />
+                        <span className="min-w-0 flex-1 truncate font-ui text-[13px] font-semibold">
+                          {item.name}
+                        </span>
+                      </div>
+                      {item.description && (
+                        <p className="text-[10px] leading-relaxed text-ink/55">
+                          {item.description}
+                        </p>
+                      )}
+                      <p className="text-[9px] uppercase tracking-[0.08em] text-ink/35">
+                        Saved {new Date(item.updatedAt).toLocaleDateString()}
+                      </p>
+                      <div className="mt-auto flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => applySavedTemplate(item)}
+                          className="h-7 flex-1 rounded-none px-2 text-[9px] uppercase tracking-[0.1em]"
+                        >
+                          Use template
+                        </Button>
+                        {confirmDelete === item._id ? (
+                          <>
+                            <Button
+                              type="button"
+                              onClick={() => void deleteSavedTemplate(item._id)}
+                              className="h-7 rounded-none px-2 text-[9px] uppercase tracking-[0.1em]"
+                            >
+                              Delete
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setConfirmDelete(null)}
+                              className="h-7 rounded-none px-2 text-[9px] uppercase"
+                            >
+                              No
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            aria-label={`Delete ${item.name}`}
+                            onClick={() => setConfirmDelete(item._id)}
+                            className="h-7 rounded-none px-2 text-ink/45"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="border-t border-ink/10 pt-3 text-[9px] leading-relaxed text-ink/40">
+                Saved templates are stored with your own invitations and are
+                never visible to guests or on a public link.
+              </p>
             </div>
           )}
 
@@ -850,6 +1053,8 @@ export function LibraryPanel({
         <div className="border-t border-ink/12 px-5 py-2.5 text-[9px] text-ink/40">
           {tab === "templates" &&
             `${filteredTemplates.length} templates`}
+          {tab === "saved" &&
+            `${filteredSaved.length} saved template${filteredSaved.length === 1 ? "" : "s"}`}
           {tab === "styles" && `${filteredStyles.length} styles`}
           {tab === "type" && `${filteredFonts.length} fonts`}
           {tab === "assets" &&
