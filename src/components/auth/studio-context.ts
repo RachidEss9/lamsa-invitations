@@ -2,7 +2,8 @@ import { createContext, useContext } from "react";
 
 export interface StudioSessionValue {
   email: string | null;
-  lock: () => void;
+  lock: string | null;
+  lockFn: () => void;
 }
 
 export const StudioSessionContext =
