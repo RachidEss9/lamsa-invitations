@@ -179,12 +179,12 @@ function usePrefersReducedMotion() {
 
 function PanelHeading({ title, note }: { title: string; note?: string }) {
   return (
-    <div className="border-b border-ink/12 px-4 py-3">
-      <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/40">
-        {title}
-      </p>
+    <div className="border-b border-[var(--edge)] px-4 py-3">
+      <p className="section-label">{title}</p>
       {note && (
-        <p className="mt-1 text-[11px] leading-relaxed text-ink/50">{note}</p>
+        <p className="mt-1 font-ui text-[0.68rem] leading-relaxed text-ink/50">
+          {note}
+        </p>
       )}
     </div>
   );
@@ -205,12 +205,18 @@ function AddButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-[54px] w-full items-start gap-3 border border-ink/15 px-3 text-left transition-[background-color,border-color] duration-150 rounded-md hover:border-ink/50 hover:bg-ink/[0.03]"
+      className="pressable group flex w-full items-center gap-2.5 rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-card)] px-2.5 py-2 text-left shadow-[var(--shadow-xs)] transition-[border-color,box-shadow,transform] duration-150 hover:border-[var(--edge-strong)] hover:shadow-[var(--shadow-card)]"
     >
-      <Icon className="mt-0.5 h-[20px] w-[20px] shrink-0 stroke-[1.6px] text-[var(--red)]" />
+      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--paper-deep)]/70 text-[var(--red)]">
+        <Icon className="size-[16px] stroke-[1.7px]" />
+      </span>
       <span className="min-w-0">
-        <span className="block text-[11px] font-medium leading-tight">{label}</span>
-        <span className="mt-0.5 block text-[10px] leading-relaxed text-ink/40">{note}</span>
+        <span className="block font-ui text-[0.72rem] font-medium leading-tight text-ink">
+          {label}
+        </span>
+        <span className="mt-0.5 block font-ui text-[0.62rem] leading-relaxed text-ink/45">
+          {note}
+        </span>
       </span>
     </button>
   );
@@ -1634,6 +1640,36 @@ export default function Studio() {
     toast.success(`${palette.name} applied.`);
   };
 
+  /**
+   * A swatch from the library: recolours the selected layers' ink/fill, or the
+   * page background when nothing is selected. Photographs are never touched.
+   */
+  const applyLibraryColour = (hex: string) => {
+    if (selectedIds.length === 0) {
+      patchPage({ background: hex });
+      toast.success("Page background updated.");
+      return;
+    }
+    const ids = new Set(selectedIds);
+    apply((current) => ({
+      ...current,
+      pages: current.pages.map((candidate, index) =>
+        index === pageIndex
+          ? {
+              ...candidate,
+              elements: candidate.elements.map((element) => {
+                if (!ids.has(element.id)) return element;
+                if (element.kind === "text") return { ...element, color: hex };
+                if (element.kind === "shape") return { ...element, fill: hex };
+                if (element.kind === "motif") return { ...element, color: hex };
+                return element;
+              }),
+            }
+          : candidate,
+      ),
+    }));
+  };
+
   const clipChange = (elementId: string, value: { start?: number; duration?: number }) => {
     setPageElements((elements) =>
       elements.map((element) =>
@@ -2660,11 +2696,11 @@ export default function Studio() {
   };
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">        <header className="z-40 flex h-[60px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-ink/10 bg-[var(--paper-light)]/95 px-2 backdrop-blur-xl sm:gap-2 sm:px-4">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">        <header className="z-40 flex h-[60px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-[var(--edge)] bg-[var(--surface-overlay)]/95 px-2 backdrop-blur-xl sm:gap-2 sm:px-4">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
-          className="grid size-8 shrink-0 place-items-center rounded-md border border-ink/15 text-ink/60 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
+          className="pressable grid size-8 shrink-0 place-items-center rounded-full border border-[var(--edge)] bg-[var(--surface-card)] text-ink/60 shadow-[var(--shadow-xs)] transition-[background-color,border-color,color] duration-150 hover:border-[var(--edge-strong)] hover:text-ink"
           aria-label="Back to the studio"
         >
           <ArrowLeft className="size-3.5" />
@@ -2698,7 +2734,7 @@ export default function Studio() {
           </button>
         </div>
 
-        <div className="flex items-center gap-0.5 rounded-full border border-ink/8 bg-white/70 p-0.5 shadow-[var(--shadow-soft)]">
+        <div className="flex items-center gap-0.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-0.5 shadow-[var(--shadow-xs)]">
           <IconButton label="Undo" onClick={undo} disabled={!historyFlags.undo} className="border-transparent"><Undo2 className="size-3.5" /></IconButton>
           <IconButton label="Redo" onClick={redo} disabled={!historyFlags.redo} className="border-transparent"><Redo2 className="size-3.5" /></IconButton>
         </div>
@@ -2714,13 +2750,13 @@ export default function Studio() {
 
         <div className="hidden items-center gap-1 lg:flex">
           <span className="mx-1 h-5 w-px bg-ink/10" />
-          <div className="flex items-center gap-0.5 rounded-full border border-ink/8 bg-white/70 p-0.5 shadow-[var(--shadow-soft)]">
+          <div className="flex items-center gap-0.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-0.5 shadow-[var(--shadow-xs)]">
             <IconButton label="Desktop canvas" className="rounded-full border-transparent" active={device === "desktop"} onClick={() => setDevice("desktop")}><Monitor className="size-3.5" /></IconButton>
             <IconButton label="Tablet canvas" className="rounded-full border-transparent" active={device === "tablet"} onClick={() => setDevice("tablet")}><Tablet className="size-3.5" /></IconButton>
             <IconButton label="Phone canvas" className="rounded-full border-transparent" active={device === "phone"} onClick={() => setDevice("phone")}><Smartphone className="size-3.5" /></IconButton>
           </div>
           <span className="mx-1 h-5 w-px bg-ink/10" />
-          <div className="flex items-center gap-0.5 rounded-full border border-ink/8 bg-white/70 p-0.5 shadow-[var(--shadow-soft)]">
+          <div className="flex items-center gap-0.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-0.5 shadow-[var(--shadow-xs)]">
             <IconButton label="Grid" className="rounded-full border-transparent" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
             <IconButton label="Rulers" className="rounded-full border-transparent" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
             <IconButton label="Safe area" className="rounded-full border-transparent" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
@@ -2755,7 +2791,7 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setTimelinePreviewOpen(true)}
-            className="hidden h-8 rounded-md px-2 text-[9px] uppercase tracking-[0.12em] lg:inline-flex"
+            className="hidden h-8 rounded-full px-3 text-[9px] uppercase tracking-[0.12em] lg:inline-flex"
           >
             <Play className="size-3.5" />
             Timeline
@@ -2796,10 +2832,10 @@ export default function Studio() {
 
 
       <div className="flex min-h-0 flex-1">
-        <aside className="relative z-20 hidden shrink-0 border-r border-ink/8 bg-[var(--paper-light)] lg:flex">
+        <aside className="relative z-20 hidden shrink-0 border-r border-[var(--edge)] bg-[var(--surface-card)] lg:flex">
           {/* Panel rail: one icon per panel, with a paper-white tooltip so the
               five workspace areas never need a row of tiny text tabs. */}
-          <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 border-r border-ink/8 py-2">
+          <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 border-r border-[var(--edge)] bg-[var(--surface-sunk)]/40 py-2">
             {([
               { id: "add" as LeftPanel, icon: Plus, label: "Add" },
               { id: "layers" as LeftPanel, icon: Layers, label: "Layers" },
@@ -2829,7 +2865,7 @@ export default function Studio() {
                 )}
               >
                 <Icon className="size-[16px]" strokeWidth={1.7} aria-hidden />
-                <span className="pointer-events-none absolute left-full z-50 ml-2 -translate-x-1 rounded-full bg-[#171716] px-2 py-1 text-[10px] font-medium whitespace-nowrap text-[#f4f2ec] opacity-0 shadow-[var(--shadow-pill)] transition-[opacity,translate] duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
+                <span className="pointer-events-none absolute left-full z-50 ml-2 -translate-x-1 rounded-full border border-[var(--edge)] bg-[var(--surface-overlay)] px-2 py-1 font-ui text-[10px] font-medium whitespace-nowrap text-ink opacity-0 shadow-[var(--shadow-pill)] transition-[opacity,translate] duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
                   {label}
                 </span>
               </button>
@@ -3122,7 +3158,7 @@ export default function Studio() {
 
         <aside
           className={cn(
-            "hidden shrink-0 overflow-y-auto border-l border-ink/15 bg-[var(--paper-light)] transition-[width] duration-200 lg:block",
+            "hidden shrink-0 overflow-y-auto border-l border-[var(--edge)] bg-[var(--surface-card)] transition-[width] duration-200 lg:block",
             rightOpen ? "w-[304px]" : "w-0 overflow-hidden border-l-0",
           )}
         >
@@ -3157,7 +3193,7 @@ export default function Studio() {
       </div>
 
       {/* Mobile navigation */}
-      <nav className="flex shrink-0 items-stretch border-t border-ink/15 bg-[var(--paper-light)] pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav className="flex shrink-0 items-stretch border-t border-[var(--edge)] bg-[var(--surface-card)] pb-[env(safe-area-inset-bottom)] lg:hidden">
         {[
           { id: "add" as const, label: "Add", icon: Plus },
           { id: "libraries" as const, label: "Library", icon: Library },
@@ -3199,14 +3235,12 @@ export default function Studio() {
       {mobileSheet && (
         <div className="fixed inset-0 z-[70] flex flex-col justify-end bg-black/25 lg:hidden" onClick={() => setMobileSheet(null)}>
           <div
-            className="flex max-h-[min(78dvh,calc(100dvh-3rem))] flex-col overflow-hidden border-t border-ink/20 bg-[var(--paper-light)] pb-[env(safe-area-inset-bottom)]"
+            className="flex max-h-[min(78dvh,calc(100dvh-3rem))] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-t border-[var(--edge)] bg-[var(--surface-overlay)] pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-sheet)]"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-ink/12 px-3 py-2">
-              <span className="font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
-                {mobileSheet}
-              </span>
-              <button type="button" onClick={() => setMobileSheet(null)} className="rounded-md text-[10px] uppercase tracking-[0.1em] text-ink/50 transition-[background-color,color] duration-150 hover:bg-ink/[0.03] hover:text-ink">
+            <div className="flex items-center justify-between border-b border-[var(--edge)] px-4 py-2.5">
+              <span className="section-label capitalize">{mobileSheet}</span>
+              <button type="button" onClick={() => setMobileSheet(null)} className="pressable rounded-full border border-[var(--edge)] px-3 py-1 font-ui text-[0.62rem] font-medium uppercase tracking-[0.1em] text-ink/55 hover:border-[var(--edge-strong)] hover:text-ink">
                 Close
               </button>
             </div>
@@ -3301,6 +3335,8 @@ export default function Studio() {
         onAddFrame={addFrame}
         onAddRevealPreset={addRevealPreset}
         onApplyTypeStyle={applyTypeStyleToSelection}
+        onApplyPalette={applyPalette}
+        onApplyColour={applyLibraryColour}
         tab={libraryTab}
         onTabChange={setLibraryTab}
       />

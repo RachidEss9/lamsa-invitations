@@ -49,7 +49,7 @@ export function StudioShell({
         {String(current).padStart(2, "0")}
       </div>
 
-      <div className="relative z-10 border-b border-ink/15 bg-[var(--paper-deep)]/60">
+      <div className="relative z-10 border-b border-[var(--edge)] bg-[var(--surface-card)]/70">
         <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between px-5 py-2 font-meta text-[0.54rem] uppercase tracking-[0.16em] text-ink/62 sm:px-8">
           <span>Private studio</span>
           <span className="hidden sm:inline">
@@ -65,7 +65,7 @@ export function StudioShell({
           <button
             type="button"
             onClick={onBack ?? (() => navigate("/"))}
-            className="flex items-center gap-2 text-[0.64rem] uppercase tracking-[0.14em] text-ink/68 transition-colors hover:text-ink"
+            className="pressable flex items-center gap-2 rounded-full border border-[var(--edge)] bg-[var(--surface-card)] px-3 py-1.5 font-ui text-[0.64rem] font-medium uppercase tracking-[0.12em] text-ink/65 shadow-[var(--shadow-xs)] transition-colors hover:border-[var(--edge-strong)] hover:text-ink"
           >
             <ArrowLeft className="size-3.5" />
             {onBack ? backLabel : "Back to the atelier"}
@@ -76,7 +76,7 @@ export function StudioShell({
       <main className="relative z-10 flex flex-1 items-stretch">
         <div className="mx-auto grid w-full max-w-[1180px] flex-1 gap-12 px-5 py-10 sm:px-8 sm:py-14 lg:grid-cols-[0.86fr_1.14fr] lg:gap-20 lg:py-16">
           {/* Left: the ledger, the promise, the specimen. */}
-          <aside className="hidden flex-col justify-between border-r border-ink/15 pr-10 lg:flex">
+          <aside className="hidden flex-col justify-between border-r border-[var(--edge)] pr-10 lg:flex">
             <div>
               <p className="eyebrow text-ink/56">Three sittings</p>
               <ol className="mt-5">
@@ -172,14 +172,14 @@ export function StudioShell({
               {description}
             </div>
 
-            <div className="mt-8 max-w-[27rem] border-t border-ink/15 pt-8">
+            <div className="mt-8 max-w-[27rem] rounded-[var(--radius-sheet)] border border-[var(--edge)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-card)] sm:p-6">
               {children}
             </div>
           </div>
         </div>
       </main>
 
-      <footer className="relative z-10 border-t border-ink/15">
+      <footer className="relative z-10 border-t border-[var(--edge)]">
         <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between px-5 py-4 font-meta text-[0.52rem] uppercase tracking-[0.14em] text-ink/56 sm:px-8">
           <span className="flex items-center gap-2">
             <span className="size-[3px] bg-[var(--red)]" />

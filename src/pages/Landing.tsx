@@ -53,7 +53,7 @@ export default function Landing() {
         className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(120%_80%_at_50%_-10%,rgba(113,0,20,0.06),transparent_60%)]"
       />
 
-      <header className="relative z-20 border-b border-ink/10">
+      <header className="relative z-20 border-b border-[var(--edge)]">
         <div className="mx-auto flex h-[76px] w-full max-w-[1240px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
           <BrandLink className="shrink-0" />
           <Folio label="Private atelier" />
@@ -128,7 +128,7 @@ export default function Landing() {
                     "radial-gradient(circle at 60% 35%, rgba(179,143,111,0.22), transparent 70%)",
                 }}
               />
-              <div className="relative overflow-hidden rounded-xl border border-ink/12 bg-[var(--paper-light)] p-7 shadow-[0_28px_60px_rgba(21,21,21,0.12)]">
+              <div className="relative overflow-hidden rounded-[var(--radius-sheet)] border border-[var(--edge)] bg-[var(--surface-card)] p-7 shadow-[var(--shadow-card)]">
                 <div className="flex items-center justify-between border-b border-ink/10 pb-4">
                   <Wordmark className="h-[18px]" />
                   <Folio label="No. 001" />
@@ -166,9 +166,9 @@ export default function Landing() {
         </div>
 
         <Reveal delay={0.28}>
-          <section className="border-t border-ink/12 pt-8 pb-20">
+          <section className="border-t border-[var(--edge)] pt-8 pb-20">
             <Folio label="Inside the studio" />
-            <div className="mt-6 grid gap-px overflow-hidden rounded-lg border border-ink/12 bg-ink/10 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 {
                   label: "Blank canvas",
@@ -190,8 +190,8 @@ export default function Landing() {
                 <div
                   key={item.label}
                   className={cn(
-                    "bg-[var(--paper-light)] p-5",
-                    "transition-colors duration-300 hover:bg-[var(--paper)]",
+                    "rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-xs)]",
+                    "lift hover:border-[var(--edge-strong)]",
                   )}
                 >
                   <p className="text-[0.9rem] font-semibold tracking-tight">

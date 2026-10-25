@@ -393,7 +393,7 @@ export default function Dashboard() {
                     <button
                       type="button"
                       aria-label="Studio settings"
-                      className="grid size-8 place-items-center rounded-full border border-ink/12 bg-white/70 text-ink/55 transition-colors hover:border-ink/35 hover:text-ink focus-visible:border-ink focus-visible:outline-none"
+                      className="grid size-8 place-items-center rounded-full border border-[var(--edge)] bg-[var(--surface-card)] text-ink/55 shadow-[var(--shadow-xs)] transition-colors hover:border-[var(--edge-strong)] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
                     >
                       <Settings2 className="size-4" aria-hidden />
                     </button>
@@ -786,7 +786,7 @@ export default function Dashboard() {
                   }}
                   placeholder="Search names, guests, venues"
                   aria-label="Search invitations"
-                  className="h-11 w-full rounded-full border border-ink/10 bg-white/70 pr-10 pl-10 text-[0.82rem] text-ink shadow-[var(--shadow-soft)] transition-colors placeholder:text-ink/35 focus:border-ink/40 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+                  className="h-11 w-full rounded-full border border-[var(--edge)] bg-[var(--surface-card)] pr-10 pl-10 font-ui text-[0.8rem] text-ink shadow-[var(--shadow-xs)] transition-colors placeholder:text-ink/35 focus:border-[var(--gold)] focus:outline-none [&::-webkit-search-cancel-button]:hidden"
                 />
                 {query && (
                   <button
@@ -840,7 +840,7 @@ export default function Dashboard() {
                     setFilter("all");
                     setLimit(GALLERY_PAGE_SIZE);
                   }}
-                  className="mt-5 inline-flex h-9 items-center gap-2 rounded-md border border-ink/20 px-4 font-meta text-[0.5rem] tracking-[0.18em] uppercase transition-colors hover:border-ink"
+                  className="pressable mt-5 inline-flex h-9 items-center gap-2 rounded-full border border-[var(--edge-strong)] px-4 font-ui text-[0.62rem] font-medium tracking-[0.14em] uppercase text-ink transition-colors hover:border-ink hover:bg-ink/[0.04]"
                 >
                   Clear filters
                 </button>

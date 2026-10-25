@@ -42,7 +42,7 @@ export function Segmented<T extends string>({
       role="group"
       aria-label={label}
       className={cn(
-        "inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-ink/8 bg-white/75 p-1 shadow-[var(--shadow-soft)] backdrop-blur-sm no-scrollbar",
+        "inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-1 shadow-[var(--shadow-xs)] backdrop-blur-sm no-scrollbar",
         stretch && "w-full",
         className,
       )}
@@ -61,7 +61,7 @@ export function Segmented<T extends string>({
               size === "sm" ? "h-6.5 px-2.5 text-[10.5px]" : "h-7.5 px-3.5 text-[11.5px]",
               stretch && "flex-1",
               active
-                ? "bg-[var(--ink)] text-[var(--paper)] shadow-[var(--shadow-pill)]"
+                ? "bg-[var(--ink)] text-[var(--paper-light)] shadow-[var(--shadow-pill)]"
                 : "text-ink/55 hover:bg-ink/[0.05] hover:text-ink",
             )}
           >
@@ -75,7 +75,7 @@ export function Segmented<T extends string>({
               <span
                 className={cn(
                   "font-meta text-[9px] tabular-nums",
-                  active ? "text-[var(--paper)]/55" : "text-ink/35",
+                  active ? "text-[var(--paper-light)]/55" : "text-ink/35",
                 )}
               >
                 {option.count}

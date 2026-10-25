@@ -83,24 +83,24 @@
   --panel-py: 0.75rem;
   --shadow-pop: 0 18px 44px rgba(21, 21, 21, 0.14);
   /* Soft Pearl + Obsidian Black, with Crimson Depth as the only primary ink. */
-  --background: #f4f3ef;
-  --foreground: #151515;
-  --card: #fbfaf7;
-  --card-foreground: #151515;
-  --popover: #fbfaf7;
-  --popover-foreground: #161616;
+  --background: #f5f2ea;
+  --foreground: #1a1917;
+  --card: #fdfbf6;
+  --card-foreground: #1a1917;
+  --popover: #fdfbf6;
+  --popover-foreground: #1a1917;
   --primary: #710014;
-  --primary-foreground: #f2f1ed;
-  --secondary: #eae8e2;
-  --secondary-foreground: #151515;
-  --muted: #eae8e2;
-  --muted-foreground: #6a665e;
-  --accent: #eae6db;
-  --accent-foreground: #161616;
+  --primary-foreground: #f8f4ea;
+  --secondary: #ede7d9;
+  --secondary-foreground: #1a1917;
+  --muted: #ede7d9;
+  --muted-foreground: #6b665b;
+  --accent: #e9e2d2;
+  --accent-foreground: #1a1917;
   --destructive: #8f1a2b;
-  --border: #e0ddd4;
-  --input: #d4d0c6;
-  --ring: #b38f6f;
+  --border: #e3ddce;
+  --input: #d9d2c1;
+  --ring: #b08d57;
   --chart-1: #710014;
   --chart-2: #b38f6f;
   --chart-3: #a3182f;
@@ -117,17 +117,17 @@
 
   /* Working inks used across the app. Quiet, high-contrast surfaces with one
      crimson accent: the LAMSA translation of a premium product page. */
-  --paper: #f4f3ef;
-  --paper-deep: #e9e7e0;
-  --paper-light: #fbfaf7;
-  --ink: #151515;
-  --ink-soft: #6a665e;
-  --rule: #e0ddd4;
+  --paper: #f5f2ea;
+  --paper-deep: #eae4d6;
+  --paper-light: #fdfbf6;
+  --ink: #1a1917;
+  --ink-soft: #6b665b;
+  --rule: #e3ddce;
   --red: #710014;
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
   /* A deeper sand for status text: the brand sand alone is decorative. */
   --olive: #6d5539;
-  --gold: #b38f6f;
+  --gold: #b08d57;
 
   /* ---------------------------------------------------------------- rail */
   /* The one dark surface in the studio. Navigation sits on it so the paper
@@ -757,16 +757,186 @@
   outline-offset: 2px;
 }
 
-button[class*="rounded-none"],
+/* ------------------------------------------------------------------------- */
+/* LAMSA v7 design system                                                    */
+/* Warm ivory paper, charcoal ink, one burgundy accent and a champagne edge. */
+/* Controls are soft pills; content sits on flat, generously spaced cards.    */
+/* ------------------------------------------------------------------------- */
+
+:root {
+  /* 4 px spacing scale. Panels, grids and toolbars only use these steps. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+
+  /* Radii: controls and tiles share one curve, sheets one softer curve. */
+  --radius-xs: 6px;
+  --radius-control: 10px;
+  --radius-tile: 14px;
+  --radius-sheet: 22px;
+
+  /* Three surfaces, no more: sunk (canvas), card (content), overlay. */
+  --surface-sunk: #efe9dc;
+  --surface-card: #fdfbf6;
+  --surface-overlay: #fffefb;
+
+  /* Elevation stays quiet: a hairline at rest, a soft lift when floating. */
+  --shadow-xs: 0 1px 2px rgba(26, 25, 23, 0.05);
+  --shadow-card:
+    0 1px 1px rgba(26, 25, 23, 0.04), 0 10px 26px -18px rgba(26, 25, 23, 0.32);
+  --shadow-sheet: 0 32px 80px -34px rgba(26, 25, 23, 0.42);
+
+  /* The champagne edge used for selected swatches and fine borders. */
+  --edge: color-mix(in oklab, var(--ink) 10%, transparent);
+  --edge-strong: color-mix(in oklab, var(--ink) 20%, transparent);
+}
+
+@layer components {
+  /* A flat content card: one border, one radius, one shadow. */
+  .surface-card {
+    background: var(--surface-card);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-tile);
+    box-shadow: var(--shadow-xs);
+  }
+
+  /* The library tile: an artwork well plus a caption, selectable as a whole. */
+  .ui-tile {
+    position: relative;
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow: hidden;
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-tile);
+    background: var(--surface-card);
+    padding: 0.5rem;
+    text-align: left;
+    transition:
+      border-color var(--dur-2) var(--ease-soft),
+      box-shadow var(--dur-2) var(--ease-soft),
+      transform var(--dur-2) var(--ease-soft);
+  }
+  .ui-tile:hover {
+    border-color: var(--edge-strong);
+    box-shadow: var(--shadow-card);
+    transform: translateY(-1px);
+  }
+  .ui-tile:active {
+    transform: translateY(0);
+  }
+  .ui-tile[data-selected="true"] {
+    border-color: var(--red);
+    box-shadow: 0 0 0 1px var(--red) inset;
+  }
+  .ui-tile-art {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border-radius: calc(var(--radius-tile) - 4px);
+    background: var(--surface-sunk);
+  }
+
+  /* One label style for every panel section, library group and footer count. */
+  .section-label {
+    font-family: var(--font-ui);
+    font-size: 0.6rem;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--ink) 45%, transparent);
+  }
+
+  /* Pill chip: library subcategories, filters, small inline actions. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--edge);
+    background: transparent;
+    padding-inline: 0.75rem;
+    font-family: var(--font-ui);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    color: color-mix(in oklab, var(--ink) 65%, transparent);
+    transition: background-color var(--dur-1) var(--ease-soft),
+      border-color var(--dur-1) var(--ease-soft),
+      color var(--dur-1) var(--ease-soft);
+  }
+  .chip:hover {
+    border-color: var(--edge-strong);
+    color: var(--ink);
+  }
+  .chip[aria-pressed="true"],
+  .chip[data-active="true"] {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--paper-light);
+  }
+
+  /* Colour dot: circular, hairline ring, selected state gets a champagne halo. */
+  .swatch-dot {
+    display: block;
+    border-radius: var(--radius-pill);
+    box-shadow: inset 0 0 0 1px rgba(26, 25, 23, 0.14);
+    transition: transform var(--dur-1) var(--ease-soft),
+      box-shadow var(--dur-2) var(--ease-soft);
+  }
+  .swatch-dot:hover {
+    transform: scale(1.06);
+  }
+  .swatch-dot[data-selected="true"] {
+    box-shadow:
+      inset 0 0 0 1px rgba(26, 25, 23, 0.16),
+      0 0 0 2px var(--paper-light),
+      0 0 0 4px var(--gold);
+  }
+
+  /* Numeric and text fields inside the studio's dense panels. */
+  .field-compact {
+    height: 1.75rem;
+    width: 100%;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--edge);
+    background: var(--surface-card);
+    padding-inline: 0.5rem;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .field-compact:focus-visible {
+    border-color: var(--gold);
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--gold) 30%, transparent);
+  }
+}
+
+/* A legacy `rounded-none` on a button resolves to the pill control shape,
+   never a square, so old panels match the current button language. */
+button[class*="rounded-none"] {
+  border-radius: var(--radius-pill);
+}
+
 input[class*="rounded-none"],
 textarea[class*="rounded-none"],
 [data-slot="select-trigger"][class*="rounded-none"] {
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
 }
 
 [data-slot="dialog-content"][class*="rounded-none"],
 [role="dialog"][class*="rounded-none"] {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sheet);
 }
 
 @media print {

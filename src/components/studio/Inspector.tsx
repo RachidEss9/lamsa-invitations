@@ -87,8 +87,8 @@ type SectionProps = {
 
 function Section({ title, children, className, footer }: SectionProps) {
   return (
-    <section className={cn("border-b border-ink/12 bg-transparent px-4 py-3.5", className)}>
-      <p className="mb-2.5 font-meta text-[9px] uppercase tracking-[0.18em] text-ink/40">
+    <section className={cn("border-b border-[var(--edge)] bg-transparent px-4 py-3.5", className)}>
+      <p className="section-label mb-2.5">
         {title}
       </p>
       <div className="min-h-[2px]">{children}</div>
@@ -253,8 +253,8 @@ export function Inspector({
   if (selected.length === 0) {
     return (
       <div className="flex h-full flex-col overflow-y-auto">
-        <div className="border-b border-ink/12 px-4 py-4">
-          <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+        <div className="border-b border-[var(--edge)] px-4 py-4">
+          <p className="section-label">
             Page
           </p>
           <h2 className="mt-1 font-ui text-xl font-semibold leading-tight tracking-[-0.015em]">{page.name}</h2>
@@ -289,8 +289,8 @@ export function Inspector({
   if (selected.length > 1) {
     return (
       <div className="flex h-full flex-col overflow-y-auto">
-        <div className="border-b border-ink/12 px-4 py-4">
-          <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+        <div className="border-b border-[var(--edge)] px-4 py-4">
+          <p className="section-label">
             Selection
           </p>
           <h2 className="mt-1 font-ui text-xl font-semibold leading-tight tracking-[-0.015em]">
@@ -358,7 +358,7 @@ export function Inspector({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <div className="border-b border-ink/12 px-4 py-4">
+      <div className="border-b border-[var(--edge)] px-4 py-4">
         <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
           {elementTypeLabel(element)}
         </p>
@@ -1006,7 +1006,7 @@ export function Inspector({
         )}
       </Section>
 
-      <div className="sticky bottom-0 mt-auto grid grid-cols-2 gap-1 border-t border-ink/12 bg-[var(--paper-light)] p-3">
+      <div className="sticky bottom-0 mt-auto grid grid-cols-2 gap-1 border-t border-[var(--edge)] bg-[var(--surface-card)]/95 p-3 backdrop-blur-sm">
         <Button type="button" variant="outline" className="h-9 rounded-none text-[10px] uppercase tracking-[0.1em]" onClick={onDuplicate}>
           <Copy className="size-3.5" /> Duplicate
         </Button>

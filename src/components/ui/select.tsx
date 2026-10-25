@@ -34,16 +34,15 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "inline-flex h-8 w-full items-center justify-between rounded-md bg-[#f7f6f2] border border-ink/20 shadow-xs ring-offset-background placeholder:text-ink/35 text-ink focus:outline-none focus:ring-2 focus:ring-[var(--gold)] focus:ring-offset-2 focus:border-ink disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-8 w-full items-center justify-between gap-1.5 rounded-[var(--radius-control)] border border-[var(--edge)] bg-[var(--surface-card)] px-2.5 font-ui text-[0.78rem] text-ink shadow-[var(--shadow-xs)] transition-[border-color,box-shadow] placeholder:text-ink/35 focus:border-[var(--gold)] focus:ring-2 focus:ring-[var(--gold)]/25 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
         karni === "button" && "h-7 w-44 justify-start text-left",
         className
       )}
-onFocus={undefined}
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon>
-        <ChevronDown className="h-4 w-4 opacity-60" />
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className="size-3.5 shrink-0 opacity-50" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -60,9 +59,8 @@ function SelectContent({
         data-slot="select-content"
         position={position}
         className={cn(
-          "bg-[#f7f6f2] text-ink data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-[var(--radix-select-trigger-height)] min-w-[var(--radix-select-trigger-width)] origin-(--radix-select-content-transform-origin) overflow-hidden rounded-md border border-ink/18 shadow-[0 18px 44px rgba(22,22,22,0.18)]",
-          position === "popper" &&
-            "data-[side=right]:-translate-x-full data-[side=left]:translate-x-full data-[side=top]:-translate-y-0.5 data-[side=bottom]:translate-y-full",
+          "z-50 max-h-[var(--radix-select-trigger-height)] min-w-[var(--radix-select-trigger-width)] origin-(--radix-select-content-transform-origin) overflow-hidden rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-overlay)] text-ink shadow-[var(--shadow-pop)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          position === "popper" && "p-1",
           className
         )}
         {...props}
@@ -78,7 +76,10 @@ function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn("px-2 py-1.5 text-[0.66rem] font-medium text-ink/60", className)}
+      className={cn(
+        "section-label px-2 py-1.5",
+        className
+      )}
       {...props}
     />
   )
@@ -93,14 +94,14 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "focus:bg-ink/8 focus:text-[#f2f1ed] relative flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[0.72rem] outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='text-'])]:text-ink/50 [&_svg:not([class*='size-'])]:size-3.5",
+        "relative flex w-full cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] px-2 py-1.5 font-ui text-[0.76rem] text-ink/80 outline-hidden data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-[var(--accent)] data-[highlighted]:text-ink [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
         className
       )}
       {...props}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-      <SelectPrimitive.ItemIndicator>
-        <Check className="h-3.5 w-3.5 opacity-70" />
+      <SelectPrimitive.ItemIndicator className="ml-auto">
+        <Check className="size-3.5 text-[var(--red)]" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   )
@@ -113,7 +114,7 @@ function SelectSeparator({
   return (
     <SelectPrimitive.Separator
       data-slot="select-separator"
-      className={cn("bg-ink/10 -mx-1 my-0.5 h-px", className)}
+      className={cn("-mx-1 my-1 h-px bg-[var(--edge)]", className)}
       {...props}
     />
   )

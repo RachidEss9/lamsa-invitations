@@ -8,6 +8,10 @@ interface PanelSectionProps {
   footer?: ReactNode;
 }
 
+/**
+ * One panel section rhythm for the whole studio: a quiet label, a compact body,
+ * and a hairline between groups. Spacing comes from the shared scale.
+ */
 export function PanelSection({
   title,
   children,
@@ -15,16 +19,11 @@ export function PanelSection({
   footer,
 }: PanelSectionProps) {
   return (
-    <section className={cn(
-      "border-b border-ink/12 bg-transparent px-4 py-3.5",
-      className
-    )}>
-      <p className="mb-2.5 font-meta text-[9px] uppercase tracking-[0.18em] text-ink/40">
-        {title}
-      </p>
+    <section className={cn("border-b border-[var(--edge)] px-4 py-3.5", className)}>
+      <p className="section-label mb-2.5">{title}</p>
       <div className="min-h-[2px]">{children}</div>
       {footer && (
-        <div className="mt-3 border-t border-ink/10 pt-2.5">{footer}</div>
+        <div className="mt-3 border-t border-[var(--edge)] pt-2.5">{footer}</div>
       )}
     </section>
   );
@@ -38,11 +37,8 @@ interface PanelRowProps {
 
 export function PanelRow({ label, children, className }: PanelRowProps) {
   return (
-    <label className={cn(
-      "flex items-center justify-between gap-3",
-      className
-    )}>
-      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
+    <label className={cn("flex items-center justify-between gap-3", className)}>
+      <span className="shrink-0 font-ui text-[0.7rem] text-ink/55">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </label>
   );
