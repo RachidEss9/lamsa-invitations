@@ -774,11 +774,14 @@
   --space-8: 2rem;
   --space-10: 2.5rem;
 
-  /* Radii: controls and tiles share one curve, sheets one softer curve. */
+  /* Radii: controls and tiles share one curve, sheets one softer curve.
+     The soft, generous corners follow the reference system: nothing square,
+     nothing pill-shaped except actual controls. */
   --radius-xs: 6px;
-  --radius-control: 10px;
-  --radius-tile: 14px;
-  --radius-sheet: 22px;
+  --radius-control: 12px;
+  --radius-tile: 16px;
+  --radius-panel: 20px;
+  --radius-sheet: 24px;
 
   /* Three surfaces, no more: sunk (canvas), card (content), overlay. */
   --surface-sunk: #efe9dc;
@@ -789,6 +792,8 @@
   --shadow-xs: 0 1px 2px rgba(26, 25, 23, 0.05);
   --shadow-card:
     0 1px 1px rgba(26, 25, 23, 0.04), 0 10px 26px -18px rgba(26, 25, 23, 0.32);
+  --shadow-float:
+    0 2px 4px rgba(26, 25, 23, 0.04), 0 18px 38px -26px rgba(26, 25, 23, 0.4);
   --shadow-sheet: 0 32px 80px -34px rgba(26, 25, 23, 0.42);
 
   /* The champagne edge used for selected swatches and fine borders. */
@@ -825,7 +830,7 @@
   }
   .ui-tile:hover {
     border-color: var(--edge-strong);
-    box-shadow: var(--shadow-card);
+    box-shadow: var(--shadow-float);
     transform: translateY(-1px);
   }
   .ui-tile:active {
@@ -863,7 +868,7 @@
     flex-shrink: 0;
     border-radius: var(--radius-pill);
     border: 1px solid var(--edge);
-    background: transparent;
+    background: var(--surface-card);
     padding-inline: 0.75rem;
     font-family: var(--font-ui);
     font-size: 0.6875rem;
@@ -876,7 +881,9 @@
   }
   .chip:hover {
     border-color: var(--edge-strong);
+    background: var(--surface-overlay);
     color: var(--ink);
+    box-shadow: var(--shadow-xs);
   }
   .chip[aria-pressed="true"],
   .chip[data-active="true"] {

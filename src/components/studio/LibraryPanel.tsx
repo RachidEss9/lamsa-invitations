@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import {
   Bookmark,
   Brush,
+  Check,
   Frame as FrameIcon,
   Eye,
   Film,
@@ -45,6 +46,7 @@ import {
   Star,
   Trash2,
   Type,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -348,7 +350,7 @@ function GroupChips<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar"
+      className="sticky top-0 z-10 -mx-3 flex gap-1.5 overflow-x-auto bg-[var(--surface-overlay)]/92 px-3 py-2 no-scrollbar backdrop-blur-sm sm:-mx-4 sm:px-4"
     >
       {(["All", ...options] as const).map((option) => (
         <button
@@ -372,17 +374,41 @@ function GroupChips<T extends string>({
 function DesignThumb({ page, className }: { page: DesignPage; className?: string }) {
   const width = page.width ?? 1000;
   const height = page.height ?? 1400;
+  // A thumbnail well is always 3:4, so a square or landscape page is centred
+  // inside it instead of being cropped: every template keeps its true shape.
+  const portrait = width / height < 1;
   return (
-    <DesignStage width={width} height={height} className={cn("pointer-events-none select-none", className)}>
-      {() => (
-        <DesignPageView
-          page={{ ...page, elements: page.elements.map((element) => ({ ...element, animation: { ...element.animation, enabled: false } })) }}
-          time={60_000}
-          imageUrls={{}}
-          className="pointer-events-none"
-        />
-      )}
-    </DesignStage>
+    <span className="grid h-full w-full place-items-center overflow-hidden">
+      <span
+        className="block"
+        style={
+          portrait
+            ? { width: "100%", aspectRatio: `${width} / ${height}` }
+            : { height: "100%", aspectRatio: `${width} / ${height}` }
+        }
+      >
+        <DesignStage
+          width={width}
+          height={height}
+          className={cn("pointer-events-none select-none", className)}
+        >
+          {() => (
+            <DesignPageView
+              page={{
+                ...page,
+                elements: page.elements.map((element) => ({
+                  ...element,
+                  animation: { ...element.animation, enabled: false },
+                })),
+              }}
+              time={60_000}
+              imageUrls={{}}
+              className="pointer-events-none"
+            />
+          )}
+        </DesignStage>
+      </span>
+    </span>
   );
 }
 
@@ -530,32 +556,55 @@ function FontTile({
 }) {
   const samples = fontSamples(font, "Alexandra & Omar");
   const arabicPrimary = font.script === "arabic";
+  const scriptLabel =
+    font.script === "both" ? "Latin + Arabic" : arabicPrimary ? "Arabic" : "Latin";
   return (
     <div className="relative">
       <button
         type="button"
         onClick={onApply}
         data-selected={selected}
-        className="ui-tile gap-1 px-2.5 py-2 sm:px-3 sm:py-2.5"
+        className="ui-tile group gap-2 p-2.5"
+        title={`Apply ${font.name}`}
       >
-        <span className="flex items-baseline justify-between gap-2 pr-6">
-          <span className="min-w-0">
-            <span className="block truncate font-ui text-[0.7rem] font-semibold text-ink">
-              {font.name}
-            </span>
-            <span className="mt-0.5 block truncate font-ui text-[0.58rem] text-ink/40">
-              {font.categories.join(" · ")}
-              {font.weights.length > 1 ? ` · ${font.weights.join("/")}` : ""}
+        <span className="flex w-full items-center gap-2.5 pr-6">
+          <span
+            className="grid size-14 shrink-0 place-items-center rounded-[10px] border border-[var(--edge)] bg-[var(--surface-sunk)] text-[27px] leading-none text-ink"
+            style={{ fontFamily: font.family }}
+            aria-hidden
+          >
+            <span dir={arabicPrimary ? "rtl" : "ltr"}>
+              {arabicPrimary ? "أب" : "Aa"}
             </span>
           </span>
-          {selected && (
-            <span className="shrink-0 rounded-full bg-[var(--red)]/8 px-1.5 py-0.5 font-ui text-[0.54rem] font-semibold uppercase tracking-[0.1em] text-[var(--red)]">
-              In use
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="truncate font-ui text-[0.74rem] font-semibold text-ink">
+                {font.name}
+              </span>
+              {selected && (
+                <span className="grid size-4 shrink-0 place-items-center rounded-full bg-[var(--red)] text-[var(--paper-light)]">
+                  <Check className="size-2.5" strokeWidth={3} />
+                </span>
+              )}
             </span>
-          )}
+            <span className="mt-0.5 block truncate font-ui text-[0.56rem] uppercase tracking-[0.09em] text-ink/40">
+              {scriptLabel} · {font.categories.slice(0, 2).join(" · ")}
+            </span>
+            <span className="mt-1 flex flex-wrap items-center gap-1">
+              {font.weights.slice(0, 4).map((weight) => (
+                <span
+                  key={weight}
+                  className="rounded-full border border-[var(--edge)] px-1.5 py-0.5 font-meta text-[8px] leading-none text-ink/45"
+                >
+                  {weight}
+                </span>
+              ))}
+            </span>
+          </span>
         </span>
         <span
-          className="mt-1 block truncate text-[19px] leading-[1.15] text-ink sm:text-[24px]"
+          className="mt-0.5 block w-full truncate border-t border-[var(--edge)] pt-2 text-[15px] leading-snug text-ink/85"
           style={{ fontFamily: font.family }}
           dir={arabicPrimary ? "rtl" : "ltr"}
         >
@@ -563,7 +612,7 @@ function FontTile({
         </span>
         {font.script !== "latin" && (
           <span
-            className="block truncate text-[12px] leading-tight text-ink/45"
+            className="block w-full truncate text-[11px] leading-tight text-ink/45"
             style={{ fontFamily: font.family }}
             dir={arabicPrimary ? "ltr" : "rtl"}
           >
@@ -662,22 +711,35 @@ function AssetTile({
   favourite: boolean;
   onFavourite: () => void;
 }) {
+  // A background is a full-bleed wash, so it gets a wide well with the art
+  // edge to edge; ornaments are cut-out artwork and sit on breathing paper.
+  const isWash = Boolean(asset.background);
   return (
     <div className="relative">
-      <button type="button" onClick={onApply} className="ui-tile group gap-1.5">
-        <span className="ui-tile-art relative aspect-square w-full overflow-hidden">
-          <span className="absolute inset-2 text-ink/80">
+      <button
+        type="button"
+        onClick={onApply}
+        className={cn("ui-tile group p-2", isWash ? "gap-1.5" : "gap-1")}
+        aria-label={`Add ${asset.name}`}
+      >
+        <span
+          className={cn(
+            "ui-tile-art relative w-full overflow-hidden",
+            isWash ? "aspect-[4/3]" : "aspect-square",
+          )}
+        >
+          <span className={cn("absolute", isWash ? "inset-0" : "inset-2.5 text-ink/80")}>
             <AssetThumb asset={asset} />
           </span>
           <span className="pointer-events-none absolute inset-x-1.5 bottom-1.5 rounded-full bg-ink/85 py-1 text-center font-ui text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
             Add
           </span>
         </span>
-        <span className="block px-1 pb-0.5">
+        <span className="block px-0.5 pb-0.5">
           <span className="block truncate font-ui text-[0.7rem] font-medium text-ink">
             {asset.name}
           </span>
-          <span className="mt-0.5 block truncate font-ui text-[0.58rem] text-ink/40">
+          <span className="mt-0.5 block truncate font-ui text-[0.56rem] uppercase tracking-[0.08em] text-ink/40">
             {asset.category}
           </span>
         </span>
@@ -731,6 +793,23 @@ function RevealTile({ preset, onAdd }: { preset: RevealPreset; onAdd: () => void
   );
 }
 
+/** Ink or paper text for a swatch, so a HEX label is always readable. */
+function inkOn(colour: string) {
+  const match = /^#([0-9a-f]{6})$/i.exec(colour.trim());
+  if (!match) return "var(--paper-light)";
+  const value = parseInt(match[1], 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.62 ? "#1d1c1a" : "#fbf7ee";
+}
+
+/**
+ * A palette card: the three real roles as stacked colour bands with their HEX
+ * values, exactly like a printed colour chip. The band order never changes, so
+ * paper, ink and accent read in the same place on every card.
+ */
 function PaletteTile({
   palette,
   onApply,
@@ -738,59 +817,49 @@ function PaletteTile({
   palette: ColourPalette;
   onApply: () => void;
 }) {
-  const roles: { label: string; colour: string }[] = [
-    { label: "Paper", colour: palette.paper },
-    { label: "Ink", colour: palette.ink },
-    { label: "Accent", colour: palette.accent },
+  const roles = [
+    { label: "Paper", colour: palette.paper, wash: palette.background },
+    { label: "Ink", colour: palette.ink, wash: undefined },
+    { label: "Accent", colour: palette.accent, wash: undefined },
   ];
   return (
     <button
       type="button"
       onClick={onApply}
-      className="ui-tile group gap-1.5 p-2"
-      title={`${palette.name} · ${palette.group}`}
+      className="ui-tile group gap-2 p-2"
+      title={`Apply the ${palette.name} palette`}
+      aria-label={`Apply the ${palette.name} palette (${palette.paper}, ${palette.ink}, ${palette.accent})`}
     >
-      <span
-        className="ui-tile-art relative grid aspect-[4/3] w-full place-items-center px-3"
-        style={{
-          backgroundImage: palette.background?.includes("gradient")
-            ? palette.background
-            : undefined,
-          backgroundColor: palette.paper,
-        }}
-      >
-        <span
-          className="block w-full truncate text-center font-display text-[17px] leading-tight"
-          style={{ color: palette.ink }}
-        >
-          {palette.name}
-        </span>
-        <span
-          className="mt-1.5 block h-px w-9"
-          style={{ background: palette.accent }}
-        />
-        <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-ink/85 py-1 text-center font-ui text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          Apply palette
-        </span>
+      <span className="flex w-full flex-col gap-1">
+        {roles.map((role) => (
+          <span
+            key={role.label}
+            className="flex h-9 items-center justify-between gap-2 overflow-hidden rounded-[9px] px-2.5 shadow-[inset_0_0_0_1px_rgba(26,25,23,0.09)]"
+            style={{
+              background: role.wash ?? role.colour,
+              color: inkOn(role.colour),
+            }}
+          >
+            <span className="font-ui text-[9px] font-semibold uppercase tracking-[0.12em] opacity-80">
+              {role.label}
+            </span>
+            <span className="font-meta text-[8.5px] tracking-[0.04em] opacity-75">
+              {role.colour.toUpperCase()}
+            </span>
+          </span>
+        ))}
       </span>
-      <span className="flex items-center justify-between gap-2 px-1 pb-0.5">
+      <span className="flex items-start justify-between gap-2 px-0.5 pb-0.5">
         <span className="min-w-0">
-          <span className="block truncate font-ui text-[0.72rem] font-medium text-ink">
+          <span className="block truncate font-ui text-[0.74rem] font-semibold text-ink">
             {palette.name}
           </span>
-          <span className="mt-0.5 block truncate font-ui text-[0.58rem] uppercase tracking-[0.08em] text-ink/40">
+          <span className="mt-0.5 block truncate font-ui text-[0.58rem] uppercase tracking-[0.09em] text-ink/40">
             {palette.group}
           </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1">
-          {roles.map((role) => (
-            <span
-              key={role.label}
-              title={`${role.label} ${role.colour}`}
-              className="swatch-dot size-4"
-              style={{ background: role.colour }}
-            />
-          ))}
+        <span className="shrink-0 rounded-full bg-ink px-2 py-1 font-ui text-[8px] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+          Apply
         </span>
       </span>
     </button>
@@ -836,6 +905,9 @@ export function LibraryPanel({
   const [onlyFavourites, setOnlyFavourites] = useState(false);
   const [typeStyleName, setTypeStyleName] = useState("");
   const [savingTypeStyle, setSavingTypeStyle] = useState(false);
+  // The swatch wall marks the colour this session last applied, so the action
+  // has a visible result in the panel as well as on the canvas.
+  const [appliedColour, setAppliedColour] = useState<string | null>(null);
 
   const selectedText = useMemo(() => {
     if (selectedIds.length === 0) return null;
@@ -1272,9 +1344,20 @@ export function LibraryPanel({
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={category.placeholder}
                   aria-label="Search the library"
-                  className="h-8 rounded-full border-[var(--edge)] bg-[var(--surface-card)] pl-8 text-[0.76rem]"
+                  className="h-8 rounded-full border-[var(--edge)] bg-[var(--surface-card)] pr-7 pl-8 text-[0.76rem]"
                 />
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink/35" />
+                {query.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    aria-label="Clear the search"
+                    title="Clear the search"
+                    className="absolute top-1/2 right-1.5 grid size-5 -translate-y-1/2 place-items-center rounded-full text-ink/40 transition-colors hover:bg-ink/[0.07] hover:text-ink"
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
               </label>
               <button
                 type="button"
@@ -1503,6 +1586,7 @@ export function LibraryPanel({
                                 onApplyPalette(palette);
                               } else {
                                 onApplyColour?.(palette.accent);
+                                setAppliedColour(palette.accent);
                               }
                             }}
                           />
@@ -1511,41 +1595,72 @@ export function LibraryPanel({
                     )}
                   </section>
 
-                  {(
-                    [
-                      ["paper", "Paper"],
-                      ["ink", "Ink"],
-                      ["accent", "Accent"],
-                    ] as const
-                  ).map(([role, label]) => {
-                    const group = paletteSwatches.filter(
-                      (swatch) => swatch.role === role,
-                    );
-                    if (group.length === 0) return null;
-                    return (
-                      <section key={role} className="space-y-2">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <h3 className="section-label">{label}</h3>
-                          <span className="font-meta text-[0.56rem] tabular-nums text-ink/35">
-                            {group.length}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {group.map((swatch) => (
+                  <section className="space-y-2.5">
+                    <div className="flex items-end justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="section-label">Single swatches</h3>
+                        <p className="mt-1 font-ui text-[0.62rem] leading-relaxed text-ink/45">
+                          Every colour in the curated palettes, with its HEX value.
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-meta text-[0.58rem] tabular-nums text-ink/35">
+                        {paletteSwatches.length}
+                      </span>
+                    </div>
+                    {paletteSwatches.length === 0 ? (
+                      <EmptyNote>No colours match that search.</EmptyNote>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 min-[380px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5">
+                        {paletteSwatches.map((swatch) => {
+                          const applied =
+                            appliedColour?.toLowerCase() === swatch.hex.toLowerCase();
+                          return (
                             <button
                               key={swatch.hex}
                               type="button"
-                              onClick={() => onApplyColour?.(swatch.hex)}
-                              title={`${swatch.hex} · ${swatch.palette}`}
+                              onClick={() => {
+                                onApplyColour?.(swatch.hex);
+                                setAppliedColour(swatch.hex);
+                              }}
+                              aria-pressed={applied}
                               aria-label={`Apply ${swatch.hex} from ${swatch.palette}`}
-                              className="swatch-dot size-8"
-                              style={{ background: swatch.hex }}
-                            />
-                          ))}
-                        </div>
-                      </section>
-                    );
-                  })}
+                              className={cn(
+                                "group overflow-hidden rounded-[12px] border bg-[var(--surface-card)] p-1.5 text-left transition-[border-color,box-shadow] duration-150",
+                                applied
+                                  ? "border-[var(--red)] shadow-[inset_0_0_0_1px_var(--red)]"
+                                  : "border-[var(--edge)] hover:border-[var(--edge-strong)] hover:shadow-[var(--shadow-xs)]",
+                              )}
+                            >
+                              <span
+                                className="flex h-12 w-full items-end justify-end rounded-[8px] p-1 shadow-[inset_0_0_0_1px_rgba(26,25,23,0.1)]"
+                                style={{
+                                  background: swatch.hex,
+                                  color: inkOn(swatch.hex),
+                                }}
+                              >
+                                {applied && (
+                                  <span className="grid size-4 place-items-center rounded-full bg-white/90 text-[var(--red)]">
+                                    <Check className="size-2.5" strokeWidth={3} />
+                                  </span>
+                                )}
+                              </span>
+                              <span className="mt-1.5 flex items-center justify-between gap-1 px-0.5">
+                                <span className="font-meta text-[9px] tracking-[0.04em] text-ink/70">
+                                  {swatch.hex.toUpperCase()}
+                                </span>
+                                <span className="font-ui text-[8px] uppercase tracking-[0.08em] text-ink/35">
+                                  {swatch.role}
+                                </span>
+                              </span>
+                              <span className="mt-0.5 block truncate px-0.5 font-ui text-[0.58rem] text-ink/40">
+                                {swatch.palette}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
                 </div>
               )}
 
@@ -1554,15 +1669,27 @@ export function LibraryPanel({
                   <div
                     role="group"
                     aria-label="Font scripts"
-                    className="flex flex-wrap gap-1.5"
+                    className="sticky top-0 z-10 -mx-3 flex flex-wrap items-center gap-1.5 bg-[var(--surface-overlay)]/92 px-3 py-2 backdrop-blur-sm sm:-mx-4 sm:px-4"
                   >
                     {(
                       [
-                        ["all", "All scripts"],
-                        ["latin", "Latin"],
-                        ["arabic", "Arabic"],
+                        ["all", "All scripts", FONT_LIBRARY.length],
+                        [
+                          "latin",
+                          "Latin",
+                          FONT_LIBRARY.filter(
+                            (font) => font.script === "latin" || font.script === "both",
+                          ).length,
+                        ],
+                        [
+                          "arabic",
+                          "Arabic",
+                          FONT_LIBRARY.filter(
+                            (font) => font.script === "arabic" || font.script === "both",
+                          ).length,
+                        ],
                       ] as const
-                    ).map(([id, label]) => (
+                    ).map(([id, label, count]) => (
                       <button
                         key={id}
                         type="button"
@@ -1571,6 +1698,9 @@ export function LibraryPanel({
                         className="chip"
                       >
                         {label}
+                        <span className="font-meta text-[0.56rem] tabular-nums opacity-45">
+                          {count}
+                        </span>
                       </button>
                     ))}
                     <span className="ml-auto self-center font-meta text-[0.56rem] tabular-nums text-ink/35">
