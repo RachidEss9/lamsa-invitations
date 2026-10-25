@@ -67,6 +67,29 @@ interface StudioCanvasProps {
 
 const SNAP_THRESHOLD = 7;
 
+/**
+ * The eight grab points of a selected layer, in fractions of its own box.
+ * They are rendered in design coordinates so they follow the layer's rotation,
+ * but their hit area is divided by the zoom, so they stay the same size on
+ * screen — and finger-sized on a phone — at any magnification.
+ */
+const HANDLES: {
+  id: Handle;
+  label: string;
+  x: number;
+  y: number;
+  cursor: string;
+}[] = [
+  { id: "nw", label: "Resize from the top left", x: 0, y: 0, cursor: "nwse-resize" },
+  { id: "n", label: "Resize from the top", x: 0.5, y: 0, cursor: "ns-resize" },
+  { id: "ne", label: "Resize from the top right", x: 1, y: 0, cursor: "nesw-resize" },
+  { id: "e", label: "Resize from the right", x: 1, y: 0.5, cursor: "ew-resize" },
+  { id: "se", label: "Resize from the bottom right", x: 1, y: 1, cursor: "nwse-resize" },
+  { id: "s", label: "Resize from the bottom", x: 0.5, y: 1, cursor: "ns-resize" },
+  { id: "sw", label: "Resize from the bottom left", x: 0, y: 1, cursor: "nesw-resize" },
+  { id: "w", label: "Resize from the left", x: 0, y: 0.5, cursor: "ew-resize" },
+];
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -275,6 +298,31 @@ export function StudioCanvas({
   const size = pageSizeOf(page);
   const selected = page.elements.filter((element) => selectedIds.includes(element.id));
 
+  // Handles are only meaningful for one unlocked layer: a multi-selection keeps
+  // its per-layer outlines and is moved together, and a locked layer has no
+  // transform at all. Inline text editing hides them so the caret is reachable.
+  const selectionBox =
+    selected.length === 1 && !selected[0].locked && !editing ? selected[0] : null;
+  const coarsePointer =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse)").matches;
+
+  /* Handle sizing. The hit box is measured in screen pixels and divided by the
+     zoom, then capped against the layer so a tiny ornament's handles can never
+     cover the artwork they belong to. */
+  const handleHit = selectionBox
+    ? Math.max(
+        6 / scale,
+        Math.min(
+          (coarsePointer ? 30 : 18) / scale,
+          Math.min(selectionBox.w, selectionBox.h) * 0.3,
+        ),
+      )
+    : 0;
+  const handleDot = Math.min(handleHit * 0.62, 11 / scale);
+  const rotateGap = (coarsePointer ? 30 : 24) / scale;
+
   // Overlay geometry. The grid is a percentage of the artboard, so it looks
   // the same on a 1000 px card and a 2480 px A4 print canvas. The safe area
   // uses the page's saved print margin, or a sensible 4% when none is set.
@@ -389,7 +437,56 @@ export function StudioCanvas({
     (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
   };
 
+  /**
+   * Starts a resize from one of the eight handles. Only the layer that owns the
+   * handle is transformed: the engine works in that layer's own axes, so a
+   * rotated card grows along its own edges instead of the screen's.
+   */
+  const beginResize = (event: ReactPointerEvent, handle: Handle) => {
+    const element = selected[0];
+    if (!element || element.locked || editing) return;
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    setMenu(null);
+    setDrag({
+      mode: "resize",
+      handle,
+      startX: event.clientX,
+      startY: event.clientY,
+      originals: new Map([[element.id, element]]),
+      anchor: element,
+      centerX: 0,
+      centerY: 0,
+      startAngle: 0,
+    });
+  };
 
+  /**
+   * Starts a rotation from the handle above the layer. The pivot is the layer's
+   * centre in screen space, which is what the engine measures its angle from.
+   */
+  const beginRotate = (event: ReactPointerEvent) => {
+    const element = selected[0];
+    if (!element || element.locked || editing) return;
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    setMenu(null);
+    const host = designRef.current?.getBoundingClientRect();
+    const centerX = (host?.left ?? 0) + (element.x + element.w / 2) * scale;
+    const centerY = (host?.top ?? 0) + (element.y + element.h / 2) * scale;
+    setDrag({
+      mode: "rotate",
+      startX: event.clientX,
+      startY: event.clientY,
+      originals: new Map([[element.id, element]]),
+      anchor: element,
+      centerX,
+      centerY,
+      startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
+    });
+  };
 
   /* ------------------------------------------------------------- drag / pan */
 
@@ -863,7 +960,11 @@ export function StudioCanvas({
                     height: element.h,
                     transform: `rotate(${element.rotation}deg)`,
                     zIndex: index,
-                    outline: isSelected ? "1.5px solid #710014" : "none",
+                    // Divided by the zoom so the selection line stays a crisp
+                    // hairline instead of dissolving when the card is fitted.
+                    outline: isSelected
+                      ? `${Math.max(1.2 / scale, 0.6)}px solid #710014`
+                      : "none",
                   }}
                   onPointerDown={(event) =>
                     beginMove(event as ReactPointerEvent, element)
@@ -902,6 +1003,101 @@ export function StudioCanvas({
               );
             })}
           </div>
+
+          {/* Direct manipulation: eight resize points and a rotation grip on the
+              selected layer. The wrapper is the layer's own box, so the whole
+              frame turns with the card; only the controls are counter-sized. */}
+          {selectionBox && (
+            <div
+              className="absolute"
+              style={{
+                left: selectionBox.x,
+                top: selectionBox.y,
+                width: selectionBox.w,
+                height: selectionBox.h,
+                transform: `rotate(${selectionBox.rotation}deg)`,
+                zIndex: 58,
+                pointerEvents: "none",
+              }}
+            >
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-1/2"
+                style={{
+                  bottom: "100%",
+                  width: Math.max(1 / scale, 1),
+                  // Reaches the centre of the grip, so the stem meets the dot.
+                  height: rotateGap + handleDot / 2,
+                  marginLeft: -Math.max(1 / scale, 1) / 2,
+                  background: "#710014",
+                  opacity: 0.55,
+                }}
+              />
+              <button
+                type="button"
+                title="Rotate layer — hold Shift for 15° steps"
+                aria-label="Rotate layer"
+                onPointerDown={beginRotate}
+                className="absolute rounded-full"
+                style={{
+                  left: "50%",
+                  bottom: `calc(100% + ${rotateGap}px)`,
+                  width: handleHit,
+                  height: handleHit,
+                  marginLeft: -handleHit / 2,
+                  marginBottom: -handleHit / 2,
+                  pointerEvents: "auto",
+                  touchAction: "none",
+                  cursor: "grab",
+                  background: "transparent",
+                }}
+              >
+                <span
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+                  style={{
+                    width: handleDot,
+                    height: handleDot,
+                    border: `${Math.max(1.4 / scale, 0.5)}px solid #710014`,
+                    boxShadow: "0 1px 3px rgba(22,22,22,0.28)",
+                  }}
+                />
+              </button>
+              {HANDLES.map((handle) => (
+                <button
+                  key={handle.id}
+                  type="button"
+                  title={handle.label}
+                  aria-label={handle.label}
+                  onPointerDown={(event) => beginResize(event, handle.id)}
+                  className="absolute"
+                  style={{
+                    left: handle.x * 100 + "%",
+                    top: handle.y * 100 + "%",
+                    width: handleHit,
+                    height: handleHit,
+                    marginLeft: -handleHit / 2,
+                    marginTop: -handleHit / 2,
+                    pointerEvents: "auto",
+                    touchAction: "none",
+                    cursor: handle.cursor,
+                    background: "transparent",
+                    border: 0,
+                    padding: 0,
+                  }}
+                >
+                  <span
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+                    style={{
+                      width: handleDot,
+                      height: handleDot,
+                      border: `${Math.max(1.4 / scale, 0.5)}px solid #710014`,
+                      boxShadow: "0 1px 3px rgba(22,22,22,0.28)",
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Centre guides the drag is currently snapping to. They sit above
               the artwork but below the handles so they never hide a control. */}
@@ -986,7 +1182,8 @@ export function StudioCanvas({
             </div>
           </>
         )}
-      </div>          {menu && (
+      </div>
+      {menu && (
         <ContextMenu
           menu={menu}
           locked={Boolean(menu.elementId) && selected.every((element) => element.locked)}
@@ -1000,14 +1197,5 @@ export function StudioCanvas({
   );
 }
 
-/*--------------------------------------------------------------------------*/
-/* Box composition behaviour around layer handles                           */
-/*--------------------------------------------------------------------------*/
-
-/**
- * All editing on the Canvas shares a core behaviour model: the box is the
- * anchor for transform, resize and rotate, and while it is focused it owns
- * pointer handling so nothing else on the page fights for the pointer.
- */
 
 
