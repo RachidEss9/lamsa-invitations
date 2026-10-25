@@ -153,6 +153,71 @@ describe("normalizeDesign save/reload consistency", () => {
     expect(String(plain)).not.toContain("scaleX");
   });
 
+  it("keeps editable layer effects through save and reload", () => {
+    const saved = normalizeDesign(
+      {
+        pages: [
+          {
+            elements: [
+              {
+                id: "s1",
+                kind: "shape",
+                effects: {
+                  shadow: {
+                    enabled: true,
+                    color: "#710014",
+                    opacity: 0.35,
+                    blur: 22,
+                    distance: 8,
+                    angle: 90,
+                  },
+                  gradient: {
+                    enabled: true,
+                    from: "#710014",
+                    to: "#c3a469",
+                    angle: 45,
+                  },
+                  outline: { enabled: true, color: "#ffffff", width: 2 },
+                },
+              },
+            ],
+          },
+        ],
+      },
+      content,
+    );
+    const reloaded = normalizeDesign(JSON.parse(JSON.stringify(saved)), content);
+    const effects = reloaded.pages[0].elements[0].effects;
+    expect(effects?.shadow?.opacity).toBe(0.35);
+    expect(effects?.shadow?.blur).toBe(22);
+    expect(effects?.gradient?.angle).toBe(45);
+    expect(effects?.outline?.width).toBe(2);
+  });
+
+  it("leaves older documents without effects, and drops corrupt ones", () => {
+    const legacyDoc = normalizeDesign(
+      { pages: [{ elements: [{ id: "t1", kind: "text", text: "Hello" }] }] },
+      content,
+    );
+    expect(legacyDoc.pages[0].elements[0].effects).toBeUndefined();
+
+    const corrupt = normalizeDesign(
+      {
+        pages: [
+          {
+            elements: [
+              { id: "t2", kind: "text", text: "Hi", effects: "glow" },
+              { id: "t3", kind: "text", text: "Hi", effects: { shadow: { blur: -4 } } },
+            ],
+          },
+        ],
+      },
+      content,
+    );
+    expect(corrupt.pages[0].elements[0].effects).toBeUndefined();
+    expect(corrupt.pages[0].elements[1].effects?.shadow?.blur).toBe(0);
+  });
+
   it("normalised output matches the DesignDocument shape after JSON storage", () => {
     const saved: DesignDocument = normalizeDesign(undefined, content);
     const stored: DesignDocument = JSON.parse(JSON.stringify(saved));

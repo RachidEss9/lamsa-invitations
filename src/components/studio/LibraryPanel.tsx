@@ -930,6 +930,7 @@ export function LibraryPanel({
   const savedItems = useQuery(api.library.listMine, open ? {} : "skip");
   const createLibraryItem = useMutation(api.library.create);
   const removeLibraryItem = useMutation(api.library.remove);
+  const updateLibraryItem = useMutation(api.library.update);
 
   const savedTemplates = useMemo(
     () => (savedItems ?? []).filter((item) => item.kind === "template"),
@@ -1028,6 +1029,36 @@ export function LibraryPanel({
       );
     } finally {
       setSavingTypeStyle(false);
+    }
+  };
+
+  const [updatingTypeStyle, setUpdatingTypeStyle] = useState<string | null>(null);
+
+  /**
+   * Re-captures a saved style from the selected text layer, so a host can refine
+   * a style they use often without deleting it and saving a new one.
+   */
+  const updateSavedTypeStyle = async (item: { _id: Id<"libraryItems">; name: string }) => {
+    if (!selectedText) {
+      toast.error("Select a text layer to update this style.");
+      return;
+    }
+    const style = extractTypeStyle(selectedText);
+    const fontName = fontById(selectedText.font ?? "cormorant-garamond").name;
+    setUpdatingTypeStyle(item._id);
+    try {
+      await updateLibraryItem({
+        id: item._id,
+        payload: { style },
+        description: describeTypeStyle(style, fontName),
+      });
+      toast.success(`“${item.name}” updated from the selected layer.`);
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "This style could not be updated.",
+      );
+    } finally {
+      setUpdatingTypeStyle(null);
     }
   };
 
@@ -1781,6 +1812,19 @@ export function LibraryPanel({
                               <span className="block truncate font-ui text-[0.6rem] uppercase tracking-[0.08em] text-ink/35">
                                 {item.description ?? "Type style"}
                               </span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={updatingTypeStyle === item._id || !selectedText}
+                              title={
+                                selectedText
+                                  ? "Replace this style with the selected layer's lettering"
+                                  : "Select a text layer first"
+                              }
+                              onClick={() => void updateSavedTypeStyle(item)}
+                              className="shrink-0 rounded-full px-1.5 py-0.5 font-ui text-[8px] font-medium uppercase tracking-[0.08em] text-ink/45 transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:opacity-35"
+                            >
+                              {updatingTypeStyle === item._id ? "…" : "Update"}
                             </button>
                             {confirmDelete === item._id ? (
                               <>

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { DesignElement } from "./design";
 import {
+  TYPE_ROLE_PRESETS,
   applyTypeStyle,
   describeTypeStyle,
   extractTypeStyle,
@@ -106,6 +107,38 @@ describe("typography styles", () => {
   it("never converts a shape into text", () => {
     const shape = textElement({ kind: "shape" });
     expect(applyTypeStyle(shape, { font: "inter" })).toBe(shape);
+  });
+
+  it("carries text decoration with the lettering", () => {
+    const style = extractTypeStyle(textElement({ textDecoration: "underline" }));
+    expect(style.textDecoration).toBe("underline");
+    expect(describeTypeStyle(style, "Cinzel")).toContain("underlined");
+  });
+
+  it("offers the five role presets as scale-only styles", () => {
+    expect(TYPE_ROLE_PRESETS.map((preset) => preset.label)).toEqual([
+      "Names",
+      "Heading",
+      "Subtitle",
+      "Date",
+      "Body",
+    ]);
+    const names = TYPE_ROLE_PRESETS[0].style;
+    const body = TYPE_ROLE_PRESETS[4].style;
+    expect(names.fontSize!).toBeGreaterThan(body.fontSize!);
+    // A preset never writes content, position or colour.
+    for (const preset of TYPE_ROLE_PRESETS) {
+      expect(preset.style).not.toHaveProperty("text");
+      expect(preset.style).not.toHaveProperty("x");
+      expect(preset.style).not.toHaveProperty("color");
+    }
+
+    const target = textElement({ id: "body", x: 20, y: 40, text: "Our story" });
+    const next = applyTypeStyle(target, TYPE_ROLE_PRESETS[0].style);
+    expect(next.fontSize).toBe(64);
+    expect(next.text).toBe("Our story");
+    expect(next.x).toBe(20);
+    expect(next.y).toBe(40);
   });
 
   it("summarises a style for the library row", () => {

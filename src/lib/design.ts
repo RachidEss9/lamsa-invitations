@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { normalizeEffects, type LayerEffects } from "@/lib/effects";
 import { fontNameFor } from "@/lib/fonts";
 import {
   formatEventDate,
@@ -195,6 +196,8 @@ export interface DesignElement {
   color?: string;
   /** Case treatment applied by CSS; the stored text is never rewritten. */
   textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+  /** Underline and strikethrough are real text decorations, not panel borders. */
+  textDecoration?: "none" | "underline" | "line-through";
   verticalAlign?: "top" | "middle" | "bottom";
   textBackground?: string;
   textBorder?: string;
@@ -224,6 +227,12 @@ export interface DesignElement {
   imageRadius?: number;
   imageBorder?: number;
   imageShadow?: boolean;
+
+  /**
+   * Editable layer effects. Optional, so every invitation saved before effects
+   * existed opens exactly as it was, with nothing switched on.
+   */
+  effects?: LayerEffects;
 
   reveal?: RevealConfig;
   animation: ElementAnimation;
@@ -981,6 +990,10 @@ export function cloneElement(element: DesignElement): DesignElement {
     reveal: element.reveal
       ? { ...element.reveal, interactionId: makeId("interaction") }
       : undefined,
+    // A copy owns its own effect settings; editing one never reaches the other.
+    effects: element.effects
+      ? (JSON.parse(JSON.stringify(element.effects)) as LayerEffects)
+      : undefined,
     animation: { ...element.animation },
     exit: element.exit ? { ...element.exit } : undefined,
   };
@@ -1410,6 +1423,14 @@ export function normalizeDesign(
         // designs load unmirrored and a flip survives every save round-trip.
         flipX: element.flipX ? true : undefined,
         flipY: element.flipY ? true : undefined,
+        textDecoration:
+          element.textDecoration === "underline" ||
+          element.textDecoration === "line-through"
+            ? element.textDecoration
+            : undefined,
+        // Effects are sanitised on load: a corrupt colour or an out-of-range
+        // blur becomes a safe default instead of breaking the whole page.
+        effects: normalizeEffects(element.effects),
         animation: {
           ...defaultAnimation(),
           ...(element.animation ?? {}),

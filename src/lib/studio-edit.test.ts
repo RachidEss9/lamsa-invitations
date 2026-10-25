@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   HISTORY_LIMIT,
+  cleanEditedText,
+  shouldCommitText,
   deletableIds,
   hasDeletableSelection,
   isDeletable,
@@ -128,6 +130,25 @@ describe("selected-element deletion", () => {
     const twice = removeElements(once.elements, ["a"]);
     expect(twice.removed).toEqual([]);
     expect(twice.elements).toBe(once.elements);
+  });
+});
+
+describe("inline text editing", () => {
+  it("normalises browser whitespace and trailing newlines", () => {
+    expect(cleanEditedText("Amelia\u00a0&\u00a0S\u00f8ren\n")).toBe("Amelia & S\u00f8ren");
+    expect(cleanEditedText("Line one\r\nLine two\n\n")).toBe("Line one\nLine two");
+    expect(cleanEditedText("  spaced  ")).toBe("  spaced  ");
+  });
+
+  it("keeps the original wording when the box is emptied", () => {
+    expect(shouldCommitText("", "Amelia & S\u00f8ren")).toBe(false);
+    expect(shouldCommitText("   \n  ", "Amelia & S\u00f8ren")).toBe(false);
+  });
+
+  it("only commits a real change", () => {
+    expect(shouldCommitText("Amelia & S\u00f8ren\n", "Amelia & S\u00f8ren")).toBe(false);
+    expect(shouldCommitText("Amelia & Soren", "Amelia & S\u00f8ren")).toBe(true);
+    expect(shouldCommitText("Our story", "Our story")).toBe(false);
   });
 });
 

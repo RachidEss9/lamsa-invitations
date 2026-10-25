@@ -88,6 +88,32 @@ export function selectionAfterDelete(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Inline text editing                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Normalises what a contenteditable reports.
+ *
+ * Browsers insert non-breaking spaces and may leave the trailing newline that
+ * closing the last line creates; neither belongs in the saved wording.
+ */
+export function cleanEditedText(value: string): string {
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/\n+$/, "");
+}
+
+/**
+ * Whether an inline edit should be written to the design. An empty box keeps
+ * the original wording, so a stray keystroke can never erase a layer.
+ */
+export function shouldCommitText(value: string, original: string): boolean {
+  const text = cleanEditedText(value);
+  return text.trim().length > 0 && text !== original;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Undo / redo                                                                */
 /* -------------------------------------------------------------------------- */
 

@@ -8,6 +8,13 @@ import {
   type DesignPage,
   type RevealConfig,
 } from "@/lib/design";
+import {
+  effectFilter,
+  gradientCss,
+  insetShadow,
+  isHexColour,
+  outlineWidth,
+} from "@/lib/effects";
 import { ensureDesignFonts, fontFamilyFor } from "@/lib/fonts";
 import { frameById } from "@/lib/frames";
 import { cn } from "@/lib/utils";
@@ -63,6 +70,12 @@ function ShapeArt({
   const stroke = element.stroke;
   const strokeWidth = element.strokeWidth ?? 0;
   const radius = shape === "capsule" ? 50 : (element.radius ?? 0);
+  // A gradient is a live paint, not a new shape: the vector path stays
+  // identical, so editing the form, stroke or effects never loses detail.
+  const gradient = element.effects?.gradient;
+  const gradientId = clipId ? `lamsa-gradient-${clipId}` : undefined;
+  const gradientActive = Boolean(gradient?.enabled && gradientId && shape !== "frame");
+  const shade = gradientActive ? `url(#${gradientId})` : fill;
 
   // The rule is a horizontal stroke, not a filled box.
   if (shape === "line") {
@@ -102,6 +115,25 @@ function ShapeArt({
             <path d={path} />
           </clipPath>
         )}
+        {gradientActive && gradient && gradientId && (
+          <linearGradient
+            id={gradientId}
+            x1="0"
+            y1="0.5"
+            x2="1"
+            y2="0.5"
+            gradientTransform={`rotate(${gradient.angle - 90} 0.5 0.5)`}
+          >
+            <stop
+              offset="0%"
+              stopColor={isHexColour(gradient.from) ? gradient.from : "#710014"}
+            />
+            <stop
+              offset="100%"
+              stopColor={isHexColour(gradient.to) ? gradient.to : "#c3a469"}
+            />
+          </linearGradient>
+        )}
       </defs>
       {shape === "rect" || shape === "frame" || shape === "capsule" ? (
         imageUrl ? (
@@ -120,7 +152,7 @@ function ShapeArt({
             width={99}
             height={99}
             rx={Math.max(0, radius)}
-            fill={shape === "frame" ? "transparent" : fill}
+            fill={shape === "frame" ? "transparent" : shade}
             stroke={stroke}
             strokeWidth={strokeWidth}
             vectorEffect="non-scaling-stroke"
@@ -142,7 +174,7 @@ function ShapeArt({
             cy={50}
             rx={49}
             ry={49}
-            fill={fill}
+            fill={shade}
             stroke={stroke}
             strokeWidth={strokeWidth}
             vectorEffect="non-scaling-stroke"
@@ -159,13 +191,13 @@ function ShapeArt({
               clipPath={`url(#${clipId})`}
             />
           ) : (
-            <path d={path} fill={fill} />
+            <path d={path} fill={shade} />
           )}
           {strokeWidth > 0 && (
             <path
               d={path}
               fill="none"
-              stroke={stroke ?? fill}
+              stroke={stroke ?? shade}
               strokeWidth={strokeWidth}
               vectorEffect="non-scaling-stroke"
             />
@@ -205,6 +237,10 @@ function ElementVisual({
     const transform =
       element.textTransform ?? (element.uppercase ? "uppercase" : "none");
     const borderWidth = element.textBorderWidth ?? 0;
+    const gradient = element.effects?.gradient;
+    const gradientText = Boolean(gradient?.enabled);
+    const glyphStroke = outlineWidth(element.effects);
+    const outline = element.effects?.outline;
     return (
       <div
         className="flex h-full w-full overflow-hidden"
@@ -234,7 +270,23 @@ function ElementVisual({
             lineHeight: element.lineHeight ?? 1.4,
             textAlign: element.align ?? "center",
             textTransform: transform,
-            color: element.color ?? "#161616",
+            color: gradientText ? "transparent" : (element.color ?? "#161616"),
+            // A gradient fill is painted as a background clipped to the
+            // glyphs, which keeps the words selectable, editable and sharp at
+            // every zoom instead of being baked into an image.
+            backgroundImage:
+              gradientText && gradient ? gradientCss(gradient) : undefined,
+            WebkitBackgroundClip: gradientText ? "text" : undefined,
+            backgroundClip: gradientText ? "text" : undefined,
+            WebkitTextFillColor: gradientText ? "transparent" : undefined,
+            textDecoration: element.textDecoration ?? "none",
+            textDecorationColor: gradientText
+              ? (element.color ?? "#161616")
+              : undefined,
+            WebkitTextStroke:
+              glyphStroke > 0 && outline
+                ? `${glyphStroke}px ${outline.color}`
+                : undefined,
             direction,
             unicodeBidi: element.direction === "auto" ? "plaintext" : "normal",
           }}
@@ -262,7 +314,7 @@ function ElementVisual({
         </div>
       );
     }
-    return (
+    const photo = (
       <img
         src={url}
         alt={element.name}
@@ -280,6 +332,21 @@ function ElementVisual({
             : undefined,
         }}
       />
+    );
+    const photoInner = insetShadow(element.effects);
+    if (!photoInner) return photo;
+    return (
+      <div className="relative h-full w-full">
+        {photo}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            boxShadow: photoInner,
+            borderRadius: element.imageRadius ?? 0,
+          }}
+        />
+      </div>
     );
   }
 
@@ -318,8 +385,28 @@ function ElementVisual({
   const coverImage = element.imageStorageId
     ? imageUrls[element.imageStorageId]
     : undefined;
-  return (
+  const shapeArt = (
     <ShapeArt element={element} clipId={clipId} imageUrl={coverImage} />
+  );
+
+  // An inner shadow only reads correctly on a closed, boxed form. The overlay
+  // is separate from the vector, so the fill, mask image and effects all stay
+  // independently editable.
+  const shape = element.shape ?? "rect";
+  const boxed = shape === "rect" || shape === "capsule" || shape === "ellipse";
+  const shapeInner = boxed ? insetShadow(element.effects) : undefined;
+  if (!shapeInner) return shapeArt;
+  const boxRadius =
+    shape === "capsule" ? "999px" : shape === "ellipse" ? "50%" : `${element.radius ?? 0}px`;
+  return (
+    <div className="relative h-full w-full">
+      {shapeArt}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{ boxShadow: shapeInner, borderRadius: boxRadius }}
+      />
+    </div>
   );
 }
 
@@ -574,6 +661,13 @@ export function DesignPageView({
               width: element.w,
               height: element.h,
               ...animated.style,
+              // Motion may already carry a filter (blur, for example); the
+              // layer's own shadow and glow compose with it rather than
+              // replacing the entrance animation's look.
+              filter:
+                [animated.style.filter, effectFilter(element.effects)]
+                  .filter(Boolean)
+                  .join(" ") || undefined,
               opacity: dimmed ? 0.25 : animated.style.opacity,
               pointerEvents: interactive ? "auto" : "none",
               outline: dimmed ? "1px dashed rgba(113,0,20,0.55)" : undefined,
@@ -607,6 +701,10 @@ export function DesignPageView({
                 height: element.h,
                 transform: animated.style.transform,
                 opacity: animated.style.opacity,
+                filter:
+                  [animated.style.filter, effectFilter(element.effects)]
+                    .filter(Boolean)
+                    .join(" ") || undefined,
                 zIndex: 20,
               }}
             >

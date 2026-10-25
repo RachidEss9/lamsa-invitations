@@ -16,6 +16,9 @@ import {
 import { createPortal } from "react-dom";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
 import { equalSpacingGuides, type SpacingSegments } from "@/lib/smart-guides";
+import { effectFilter, gradientCss, outlineWidth } from "@/lib/effects";
+import { fontFamilyFor } from "@/lib/fonts";
+import { cleanEditedText, shouldCommitText } from "@/lib/studio-edit";
 
 type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -315,12 +318,15 @@ export function StudioCanvas({
   onReveal,
   onAltDuplicate,
   onContextAction,
+  onTextCommit,
   onEditingChange,
 }: StudioCanvasProps) {
   const schedule = useFrameBatch();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const designRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
+  // Guards against a commit firing twice when Enter is followed by a blur.
+  const editFinished = useRef(false);
   const [fit, setFit] = useState(0);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
@@ -418,6 +424,7 @@ export function StudioCanvas({
     if (!element || element.kind !== "text" || element.locked) return;
     const frame = requestAnimationFrame(() => {
       setMenu(null);
+      editFinished.current = false;
       setEditing({ id: element.id, original: element.text ?? "", caret: null });
     });
     return () => cancelAnimationFrame(frame);
@@ -878,6 +885,30 @@ export function StudioCanvas({
   /* -------------------------------------------------------- inline editing */
 
 
+  /**
+   * Leaves inline editing once. `commit` is false for Escape, and an empty box
+   * keeps the original wording instead of silently deleting the layer.
+   */
+  const finishEditing = useCallback(
+    (commit: boolean) => {
+      if (editFinished.current) return;
+      editFinished.current = true;
+      const state = editing;
+      if (!state) {
+        setEditing(null);
+        return;
+      }
+      const raw = editorRef.current?.innerText ?? state.original;
+      const text = cleanEditedText(raw);
+      setEditing(null);
+      setDrag(null);
+      if (!commit) return;
+      if (!shouldCommitText(text, state.original)) return;
+      onTextCommit?.(state.id, text);
+    },
+    [editing, onTextCommit],
+  );
+
   useLayoutEffect(() => {
     if (!editing) return;
     const node = editorRef.current;
@@ -1120,6 +1151,7 @@ export function StudioCanvas({
                     event.stopPropagation();
                     setDrag(null);
                     setMenu(null);
+                    editFinished.current = false;
                     setEditing({
                       id: element.id,
                       original: element.text ?? "",
@@ -1149,6 +1181,123 @@ export function StudioCanvas({
               );
             })}
           </div>
+
+          {/* Inline text editing. The editor is drawn in the layer's own place
+              with the same family, size, leading, tracking, case, fill and
+              outline as the artwork, so what is typed is what is saved. */}
+          {editing && (() => {
+            const element = page.elements.find(
+              (candidate) => candidate.id === editing.id,
+            );
+            if (!element) return null;
+            const effects = element.effects;
+            const gradient = effects?.gradient;
+            const gradientText = Boolean(gradient?.enabled);
+            const glyphStroke = outlineWidth(effects);
+            const outline = effects?.outline;
+            const direction =
+              element.direction === "rtl"
+                ? ("rtl" as const)
+                : element.direction === "ltr"
+                  ? ("ltr" as const)
+                  : rtl
+                    ? ("rtl" as const)
+                    : ("ltr" as const);
+            const borderWidth = element.textBorderWidth ?? 0;
+            return (
+              <div
+                className="absolute"
+                style={{
+                  left: element.x,
+                  top: element.y,
+                  width: element.w,
+                  height: element.h,
+                  transform: `rotate(${element.rotation}deg)`,
+                  zIndex: 72,
+                  display: "flex",
+                  overflow: "hidden",
+                  alignItems:
+                    element.verticalAlign === "top"
+                      ? "flex-start"
+                      : element.verticalAlign === "bottom"
+                        ? "flex-end"
+                        : "center",
+                  justifyContent: "center",
+                  padding:
+                    element.textPadding ??
+                    (borderWidth || element.textBackground ? 10 : 0),
+                  background: element.textBackground,
+                  border:
+                    borderWidth > 0
+                      ? `${borderWidth}px solid ${element.textBorder ?? "transparent"}`
+                      : undefined,
+                  borderRadius: element.textRadius ?? 0,
+                  boxShadow: element.textShadow
+                    ? "0 18px 44px rgba(22,22,22,0.24)"
+                    : undefined,
+                  filter: effectFilter(effects),
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+              >
+                <div
+                  ref={editorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  role="textbox"
+                  aria-label={`Edit ${element.name}`}
+                  aria-multiline="true"
+                  spellCheck={false}
+                  dir={direction}
+                  onKeyDown={(event) => {
+                    event.stopPropagation();
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      finishEditing(false);
+                      return;
+                    }
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      finishEditing(true);
+                    }
+                  }}
+                  onBlur={() => finishEditing(true)}
+                  className="w-full whitespace-pre-wrap break-words outline-none"
+                  style={{
+                    fontFamily: fontFamilyFor(
+                      element.font ?? "cormorant-garamond",
+                    ),
+                    fontSize: element.fontSize ?? 26,
+                    fontWeight: element.fontWeight ?? 400,
+                    fontStyle: element.italic ? "italic" : "normal",
+                    letterSpacing: `${element.letterSpacing ?? 0}em`,
+                    lineHeight: element.lineHeight ?? 1.4,
+                    textAlign: element.align ?? "center",
+                    textTransform:
+                      element.textTransform ??
+                      (element.uppercase ? "uppercase" : "none"),
+                    textDecoration: element.textDecoration ?? "none",
+                    color: gradientText
+                      ? "transparent"
+                      : (element.color ?? "#161616"),
+                    backgroundImage:
+                      gradientText && gradient ? gradientCss(gradient) : undefined,
+                    WebkitBackgroundClip: gradientText ? "text" : undefined,
+                    backgroundClip: gradientText ? "text" : undefined,
+                    WebkitTextFillColor: gradientText ? "transparent" : undefined,
+                    WebkitTextStroke:
+                      glyphStroke > 0 && outline
+                        ? `${glyphStroke}px ${outline.color}`
+                        : undefined,
+                    direction,
+                    unicodeBidi:
+                      element.direction === "auto" ? "plaintext" : "normal",
+                    caretColor: element.color ?? "#710014",
+                  }}
+                />
+              </div>
+            );
+          })()}
 
           {/* Direct manipulation: eight resize points and a rotation grip on the
               selected layer. The wrapper is the layer's own box, so the whole

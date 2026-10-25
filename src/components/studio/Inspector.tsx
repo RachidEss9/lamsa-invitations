@@ -26,7 +26,8 @@ import {
 import { fontById } from "@/lib/fonts";
 import { frameById } from "@/lib/frames";
 import { MOTIFS } from "@/lib/invitation";
-import { FontPicker } from "@/components/studio/FontPicker";
+import { TypographyStudio } from "@/components/studio/TypographyStudio";
+import { EffectsInspector } from "@/components/studio/EffectsInspector";
 import { cn } from "@/lib/utils";
 import { useRef, type ReactNode } from "react";
 
@@ -504,7 +505,8 @@ export function Inspector({
       </Section>
 
       {element.kind === "text" && (
-        <Section title="Text">
+        <>
+        <Section title="Content">
           <Textarea
             value={element.text ?? ""}
             onChange={(event) => patch({ text: event.target.value })}
@@ -521,113 +523,20 @@ export function Inspector({
               Edit wording on canvas
             </Button>
           )}
-          <Row label="Typeface">
-            <FontPicker
-              value={element.font ?? "cormorant-garamond"}
-              sampleText={element.text}
-              onSelect={(font) => {
-                const next = fontById(font);
-                patch({
-                  font,
-                  fontWeight: next.weights.includes(element.fontWeight ?? 400)
-                    ? element.fontWeight
-                    : next.weights.reduce((best, weight) =>
-                        Math.abs(weight - (element.fontWeight ?? 400)) <
-                        Math.abs(best - (element.fontWeight ?? 400))
-                          ? weight
-                          : best,
-                      ),
-                  italic: next.italic ? element.italic : false,
-                });
-              }}
-            />
-          </Row>
+        </Section>
+        <Section title="Typography">
+          <TypographyStudio
+            element={element}
+            activeFont={activeFont}
+            onPatch={patch}
+            onEditText={onEditText}
+          />
+        </Section>
+        <Section title="Text box">
           <p className="text-[9px] leading-relaxed text-ink/40">
-            {activeFont.note ?? activeFont.name}
-            {activeFont.script === "latin" ? " · Arabic falls back to Naskh" : " · Arabic + Latin"}
+            The box and the type scale are independent: resize the layer on the
+            canvas to rewrap the words, and the font size stays exactly as set.
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            <Row label="Size"><NumberField value={element.fontSize ?? 26} onChange={(fontSize) => patch({ fontSize })} min={6} /></Row>
-            <Row label="Weight">
-              <Select
-                value={String(activeFont.weights.includes(element.fontWeight ?? 400) ? element.fontWeight ?? 400 : activeFont.weights[0])}
-                onValueChange={(weight) => patch({ fontWeight: Number(weight) })}
-              >
-                <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {activeFont.weights.map((weight) => (
-                    <SelectItem key={weight} value={String(weight)}>{weight}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Row>
-            <Row label="Tracking"><NumberField value={element.letterSpacing ?? 0} onChange={(letterSpacing) => patch({ letterSpacing })} step={0.01} /></Row>
-            <Row label="Leading"><NumberField value={element.lineHeight ?? 1.4} onChange={(lineHeight) => patch({ lineHeight })} step={0.05} /></Row>
-          </div>
-          <div className="grid grid-cols-3 gap-1">
-            {(["left", "center", "right"] as const).map((align) => (
-              <button
-                key={align}
-                type="button"
-                onClick={() => patch({ align })}
-                className={cn(
-                  "h-8 border text-[10px] capitalize",
-                  element.align === align
-                    ? "border-ink bg-ink text-[#f2f1ed]"
-                    : "border-ink/15 text-ink/65 hover:border-ink",
-                )}
-              >
-                {align}
-              </button>
-            ))}
-          </div>
-          <Row label="Direction">
-            <div className="flex gap-1">
-              {(["auto", "ltr", "rtl"] as const).map((direction) => (
-                <button
-                  key={direction}
-                  type="button"
-                  onClick={() => patch({ direction })}
-                  className={cn(
-                    "h-7 border px-2 text-[9px] uppercase tracking-[0.1em]",
-                    (element.direction ?? "auto") === direction
-                      ? "border-ink bg-ink text-[#f2f1ed]"
-                      : "border-ink/15 text-ink/60 hover:border-ink",
-                  )}
-                >
-                  {direction}
-                </button>
-              ))}
-            </div>
-          </Row>
-          <div className="grid grid-cols-2 gap-2">
-            <ToggleRow
-              label={activeFont.italic ? "Italic" : "Italic (unavailable)"}
-              checked={Boolean(element.italic) && Boolean(activeFont.italic)}
-              onChange={(italic) => activeFont.italic && patch({ italic })}
-            />
-            <ToggleRow label="Caps" checked={Boolean(element.uppercase)} onChange={(uppercase) => patch({ uppercase })} />
-          </div>
-          <Row label="Colour"><ColorField value={element.color ?? "#161616"} onChange={(color) => patch({ color })} /></Row>
-          <Row label="Case">
-            <Select
-              value={element.textTransform ?? (element.uppercase ? "uppercase" : "none")}
-              onValueChange={(value) =>
-                patch({
-                  textTransform: value as DesignElement["textTransform"],
-                  uppercase: value === "uppercase",
-                })
-              }
-            >
-              <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">As written</SelectItem>
-                <SelectItem value="uppercase">Uppercase</SelectItem>
-                <SelectItem value="lowercase">Lowercase</SelectItem>
-                <SelectItem value="capitalize">Capitalise</SelectItem>
-              </SelectContent>
-            </Select>
-          </Row>
           <Row label="Vertical">
             <div className="flex gap-1">
               {(["top", "middle", "bottom"] as const).map((value) => (
@@ -684,7 +593,7 @@ export function Inspector({
               </div>
             )}
             <ToggleRow
-              label="Text border"
+              label="Box border"
               checked={(element.textBorderWidth ?? 0) > 0}
               onChange={(enabled) =>
                 patch({
@@ -710,14 +619,10 @@ export function Inspector({
                   />
                 </Row>
               </div>
-            )}
-            <ToggleRow
-              label="Soft text shadow"
-              checked={Boolean(element.textShadow)}
-              onChange={(textShadow) => patch({ textShadow })}
-            />
+            )}          <ToggleRow label="Box shadow" checked={Boolean(element.textShadow)} onChange={(textShadow) => patch({ textShadow })} />
           </div>
         </Section>
+        </>
       )}
 
       {element.kind === "image" && (
@@ -846,6 +751,10 @@ export function Inspector({
           <Row label="Weight"><NumberField value={element.strokeWidth ?? 0.8} onChange={(strokeWidth) => patch({ strokeWidth })} step={0.1} min={0.1} /></Row>
         </Section>
       )}
+
+      <Section title="Effects">
+        <EffectsInspector element={element} patch={patch} />
+      </Section>
 
       {animation && (
         <Section title="Animation">
