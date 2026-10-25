@@ -6,6 +6,7 @@ import {
   InvitationPreview,
   TemplatePreview,
 } from "@/components/dashboard/InvitationPreview";
+import { StudioRail, type RailSection } from "@/components/shell/StudioRail";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Segmented } from "@/components/ui/segmented";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,10 +51,12 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   ArrowUpRight,
+  LayoutGrid,
   Loader2,
   Lock,
   Plus,
   Search,
+  Sparkles,
   Settings2,
   Trash2,
   X,
@@ -134,6 +138,20 @@ export default function Dashboard() {
   const [deleteTarget, setDeleteTarget] = useState<GalleryItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const galleryRef = useRef<HTMLElement | null>(null);
+  // The navigation rail folds to its icons, and remembers which way the host
+  // left it — the dashboard is where every session begins.
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("lamsa.rail.collapsed") === "1";
+  });
+  const setRail = (next: boolean) => {
+    setRailCollapsed(next);
+    try {
+      window.localStorage.setItem("lamsa.rail.collapsed", next ? "1" : "0");
+    } catch {
+      // A private window without storage still gets a working rail.
+    }
+  };
 
   const ready = invitations !== undefined;
   const records = useMemo(() => invitations ?? [], [invitations]);
@@ -275,76 +293,146 @@ export default function Dashboard() {
     }
   };
 
-  return (
-    <div className="min-h-dvh bg-[var(--paper)] font-ui text-ink">
-      <header className="sticky top-0 z-40 border-b border-ink/10 bg-[var(--paper)]/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] w-full max-w-[1480px] items-center gap-4 px-4 sm:px-7 lg:px-10">
-          <BrandLink className="shrink-0" />
-          <nav
-            aria-label="Studio"
-            className="ml-2 hidden items-center gap-6 md:flex"
-          >
-            <Link
-              to="/dashboard"
-              aria-current="page"
-              className="font-meta text-[0.52rem] tracking-[0.22em] text-ink uppercase"
-            >
-              Invitations
-            </Link>
-            <button
-              type="button"
-              onClick={() => openCreate("the-vow")}
-              className="font-meta text-[0.52rem] tracking-[0.22em] text-ink/45 uppercase transition-colors hover:text-ink"
-            >
-              The collection
-            </button>
-          </nav>
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Studio settings"
-                  className="grid size-8 place-items-center rounded-md border border-ink/15 text-ink/55 transition-colors hover:border-ink/40 hover:text-ink focus-visible:border-ink focus-visible:outline-none"
-                >
-                  <Settings2 className="size-4" aria-hidden />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel className="space-y-1 py-2">
-                  <span className="block font-meta text-[0.46rem] tracking-[0.24em] text-ink/40 uppercase">
-                    Studio session
-                  </span>
-                  <span className="block truncate text-[11px] font-normal tracking-normal text-ink/70 normal-case">
-                    {email ?? "Private studio"}
-                  </span>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={lock}>
-                  <Lock className="size-3.5" aria-hidden />
-                  Lock the studio
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/">
-                    <ArrowUpRight className="size-3.5" aria-hidden />
-                    About LAMSA
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              className="h-10 gap-2 px-3 text-[0.58rem] tracking-[0.14em] uppercase sm:px-5"
-              onClick={() => openCreate()}
-            >
-              <Plus className="size-4" aria-hidden />
-              <span className="hidden sm:inline">Create invitation</span>
-              <span className="sm:hidden">Create</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+  const railSections: RailSection[] = [
+    {
+      id: "studio",
+      label: "Menu",
+      entries: [
+        {
+          id: "invitations",
+          label: "Invitations",
+          icon: LayoutGrid,
+          to: "/dashboard",
+          active: true,
+          badge: counts.total,
+          children: [
+            {
+              id: "all",
+              label: "All invitations",
+              dot: "var(--gold)",
+              active: filter === "all",
+              onSelect: () => {
+                setFilter("all");
+                setLimit(GALLERY_PAGE_SIZE);
+                scrollToGallery();
+              },
+            },
+            {
+              id: "drafts",
+              label: "Drafts",
+              dot: "#ef5fa5",
+              active: filter === "draft",
+              onSelect: () => {
+                setFilter("draft");
+                setLimit(GALLERY_PAGE_SIZE);
+                scrollToGallery();
+              },
+            },
+            {
+              id: "live",
+              label: "Live",
+              dot: "#48b06a",
+              active: filter === "published",
+              onSelect: () => {
+                setFilter("published");
+                setLimit(GALLERY_PAGE_SIZE);
+                scrollToGallery();
+              },
+            },
+          ],
+        },
+        {
+          id: "create",
+          label: "Create invitation",
+          icon: Plus,
+          onSelect: () => openCreate(),
+        },
+        {
+          id: "collection",
+          label: "The collection",
+          icon: Sparkles,
+          onSelect: () => openCreate("the-vow"),
+        },
+      ],
+    },
+    {
+      id: "account",
+      label: "Other",
+      entries: [
+        { id: "lock", label: "Lock the studio", icon: Lock, onSelect: lock },
+        { id: "about", label: "About LAMSA", icon: ArrowUpRight, to: "/" },
+      ],
+    },
+  ];
 
-      <main className="mx-auto w-full max-w-[1480px] px-4 pb-20 sm:px-7 lg:px-10">
+  return (
+    <div className="min-h-dvh overflow-x-clip bg-[var(--paper)] font-ui text-ink">
+      <div className="mx-auto flex w-full max-w-[1720px] items-start">
+        <aside className="sticky top-0 hidden h-dvh shrink-0 py-4 pl-4 lg:block">
+          <StudioRail
+            sections={railSections}
+            collapsed={railCollapsed}
+            onCollapsedChange={setRail}
+            footer={
+              railCollapsed ? undefined : (
+                <p className="truncate px-3 font-meta text-[8px] uppercase tracking-[0.18em] text-[color:var(--rail-muted)]">
+                  {email ?? "A private studio"}
+                </p>
+              )
+            }
+          />
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-40 border-b border-ink/8 bg-[var(--paper)]/80 backdrop-blur-xl">
+            <div className="flex h-[64px] w-full items-center gap-3 px-4 sm:px-7 lg:px-8">
+              <BrandLink className="shrink-0 lg:hidden" />
+              <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Studio settings"
+                      className="grid size-8 place-items-center rounded-full border border-ink/12 bg-white/70 text-ink/55 transition-colors hover:border-ink/35 hover:text-ink focus-visible:border-ink focus-visible:outline-none"
+                    >
+                      <Settings2 className="size-4" aria-hidden />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel className="space-y-1 py-2">
+                      <span className="block font-meta text-[0.46rem] tracking-[0.24em] text-ink/40 uppercase">
+                        Studio session
+                      </span>
+                      <span className="block truncate text-[11px] font-normal tracking-normal text-ink/70 normal-case">
+                        {email ?? "Private studio"}
+                      </span>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={lock}>
+                      <Lock className="size-3.5" aria-hidden />
+                      Lock the studio
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/">
+                        <ArrowUpRight className="size-3.5" aria-hidden />
+                        About LAMSA
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  className="h-10 gap-2 rounded-full px-3 text-[0.58rem] tracking-[0.14em] uppercase shadow-[var(--shadow-pill)] sm:px-5"
+                  onClick={() => openCreate()}
+                >
+                  <Plus className="size-4" aria-hidden />
+                  <span className="hidden sm:inline">Create invitation</span>
+                  <span className="sm:hidden">Create</span>
+                </Button>
+              </div>
+            </div>
+          </header>
+
+          <main className="w-full px-4 pb-20 sm:px-7 lg:px-8">
         <section className="relative pt-10 sm:pt-14 lg:pt-16">
           <div
             aria-hidden
@@ -698,7 +786,7 @@ export default function Dashboard() {
                   }}
                   placeholder="Search names, guests, venues"
                   aria-label="Search invitations"
-                  className="h-11 w-full border border-ink/15 bg-transparent pr-10 pl-10 text-[0.82rem] text-ink transition-colors placeholder:text-ink/35 focus:border-ink focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+                  className="h-11 w-full rounded-full border border-ink/10 bg-white/70 pr-10 pl-10 text-[0.82rem] text-ink shadow-[var(--shadow-soft)] transition-colors placeholder:text-ink/35 focus:border-ink/40 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
                 />
                 {query && (
                   <button
@@ -714,50 +802,26 @@ export default function Dashboard() {
                   </button>
                 )}
               </div>
-              <div
-                className="flex flex-wrap items-center gap-2"
-                role="group"
-                aria-label="Filter invitations"
-              >
-                {GALLERY_FILTERS.map((option) => {
-                  const count =
+              <Segmented
+                label="Filter invitations"
+                value={filter}
+                onChange={(next) => {
+                  setFilter(next);
+                  setLimit(GALLERY_PAGE_SIZE);
+                }}
+                options={GALLERY_FILTERS.map((option) => ({
+                  id: option.id,
+                  label: option.label,
+                  count:
                     option.id === "all"
                       ? counts.total
                       : option.id === "draft"
                         ? counts.drafts
                         : option.id === "published"
                           ? counts.published
-                          : counts.recent;
-                  const active = filter === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => {
-                        setFilter(option.id);
-                        setLimit(GALLERY_PAGE_SIZE);
-                      }}
-                      className={cn(
-                        "inline-flex h-9 items-center gap-2 border px-3.5 font-meta text-[0.48rem] tracking-[0.18em] uppercase transition-colors",
-                        active
-                          ? "border-ink bg-ink text-[var(--paper)]"
-                          : "border-ink/15 text-ink/55 hover:border-ink/40 hover:text-ink",
-                      )}
-                    >
-                      {option.label}
-                      <span
-                        className={cn(
-                          "text-[0.44rem]",
-                          active ? "text-[var(--paper)]/55" : "text-ink/35",
-                        )}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                          : counts.recent,
+                }))}
+              />
             </div>
 
             {filtered.length === 0 ? (
@@ -815,8 +879,8 @@ export default function Dashboard() {
         )}
       </main>
 
-      <footer className="border-t border-ink/12">
-        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-2 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7 lg:px-10">
+      <footer className="border-t border-ink/10">
+        <div className="flex w-full flex-col gap-2 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7 lg:px-8">
           <p className="font-meta text-[0.46rem] tracking-[0.22em] text-ink/40 uppercase">
             LAMSA · An atelier for invitations
           </p>
@@ -826,6 +890,8 @@ export default function Dashboard() {
           </p>
         </div>
       </footer>
+        </div>
+      </div>
 
       <CreateInvitationDialog
         key={createSession}

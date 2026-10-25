@@ -16,6 +16,16 @@ import { makeElement, type DesignElement, type DesignPage } from "@/lib/design";
 
 let container: HTMLDivElement;
 let root: Root;
+let frames: FrameRequestCallback[] = [];
+
+/** Runs the callbacks a real browser would run on the next paint. */
+function flushFrame() {
+  const queued = frames;
+  frames = [];
+  act(() => {
+    queued.forEach((callback) => callback(0));
+  });
+}
 
 function pageWith(element: DesignElement): DesignPage {
   return {
@@ -73,6 +83,14 @@ beforeEach(() => {
       disconnect() {}
     },
   );
+  // Geometry is batched to one update per frame, so the tests own the frame
+  // clock instead of waiting on jsdom's timer.
+  frames = [];
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  vi.stubGlobal("cancelAnimationFrame", () => undefined);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -123,6 +141,7 @@ describe("canvas selection handles", () => {
     act(() => {
       window.dispatchEvent(pointer("pointermove", 560, 260));
     });
+    flushFrame();
 
     expect(onResize).toHaveBeenCalled();
     const [id, box] = onResize.mock.calls[onResize.mock.calls.length - 1];
@@ -140,7 +159,49 @@ describe("canvas selection handles", () => {
     act(() => {
       window.dispatchEvent(pointer("pointermove", 700, 400));
     });
+    flushFrame();
     expect(onResize).toHaveBeenCalledTimes(settled);
+  });
+
+  it("batches several pointer moves into one geometry update per frame", () => {
+    const element = makeElement("shape", { id: "panel", x: 100, y: 100, w: 300, h: 300 });
+    const { onResize } = render(pageWith(element));
+
+    const handle = container.querySelector('[aria-label="Resize from the bottom right"]')!;
+    act(() => {
+      handle.dispatchEvent(pointer("pointerdown", 400, 400));
+    });
+    act(() => {
+      window.dispatchEvent(pointer("pointermove", 430, 430));
+      window.dispatchEvent(pointer("pointermove", 460, 460));
+      window.dispatchEvent(pointer("pointermove", 500, 500));
+    });
+
+    // Nothing reaches the document until the frame runs…
+    expect(onResize).not.toHaveBeenCalled();
+    flushFrame();
+
+    // …and then exactly one update, carrying the final pointer position.
+    expect(onResize).toHaveBeenCalledTimes(1);
+    const coalesced = onResize.mock.calls[0][1];
+    expect(coalesced.w).toBeGreaterThan(300);
+
+    // A second drag that only ever lands on that same point produces exactly
+    // the same box, which proves the batched update used the last event and
+    // not one of the two it replaced.
+    act(() => {
+      window.dispatchEvent(pointer("pointerup", 500, 500));
+    });
+    act(() => {
+      handle.dispatchEvent(pointer("pointerdown", 400, 400));
+    });
+    act(() => {
+      window.dispatchEvent(pointer("pointermove", 500, 500));
+    });
+    flushFrame();
+
+    expect(onResize).toHaveBeenCalledTimes(2);
+    expect(onResize.mock.calls[1][1]).toEqual(coalesced);
   });
 
   it("turns the layer when the rotation grip is dragged", () => {
@@ -156,6 +217,7 @@ describe("canvas selection handles", () => {
     act(() => {
       window.dispatchEvent(pointer("pointermove", 115, 15));
     });
+    flushFrame();
 
     expect(onRotate).toHaveBeenCalled();
     const [id, rotation] = onRotate.mock.calls[onRotate.mock.calls.length - 1];

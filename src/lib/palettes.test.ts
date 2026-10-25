@@ -5,11 +5,14 @@ import {
   SAVED_PALETTES_KEY,
   paletteFromPage,
   readSavedPalettes,
+  recolourDesign,
   removeSavedPalette,
   upsertSavedPalette,
   writeSavedPalettes,
+  type ColourPalette,
   type SavedPalette,
 } from "./palettes";
+import type { DesignDocument } from "./design";
 
 function element(overrides: Partial<DesignElement>): DesignElement {
   return {
@@ -147,5 +150,57 @@ describe("saved palettes", () => {
       readSavedPalettes(fakeStorage({ [SAVED_PALETTES_KEY]: "{" })),
     ).toEqual([]);
     expect(readSavedPalettes(null)).toEqual([]);
+  });
+});
+
+const variationPalette: ColourPalette = {
+  id: "nocturne",
+  name: "Nocturne",
+  group: "Evening",
+  paper: "#101014",
+  ink: "#f4f0e6",
+  accent: "#c9a86a",
+};
+
+/** Only `pages` matter to the recolour, so a full document is not needed. */
+function designWith(elements: DesignElement[], background = "#faf6ec") {
+  return { version: 1, pages: [page(elements, background)] } as DesignDocument;
+}
+
+describe("colour variations", () => {
+  it("maps the paper, dominant ink and accent onto the chosen palette", () => {
+    const design = designWith([
+      element({ id: "heading", kind: "text", color: "#161616" }),
+      element({ id: "body", kind: "text", color: "#161616" }),
+      element({ id: "rule", kind: "shape", fill: "#710014" }),
+    ]);
+
+    const next = recolourDesign(design, variationPalette);
+    const [layer1, layer2, rule] = next.pages[0].elements;
+    expect(next.pages[0].background).toBe(variationPalette.paper);
+    expect(layer1.color).toBe(variationPalette.ink);
+    expect(layer2.color).toBe(variationPalette.ink);
+    expect(rule.fill).toBe(variationPalette.accent);
+  });
+
+  it("leaves a colour the host set by hand untouched", () => {
+    const design = designWith([
+      element({ id: "a", kind: "text", color: "#161616" }),
+      element({ id: "b", kind: "text", color: "#161616" }),
+      element({ id: "note", kind: "text", color: "#4b7f52" }),
+    ]);
+
+    const note = recolourDesign(design, variationPalette).pages[0].elements[2];
+    expect(note.color).toBe("#4b7f52");
+  });
+
+  it("never writes to the design it was given", () => {
+    const design = designWith([
+      element({ id: "a", kind: "text", color: "#161616" }),
+    ]);
+    const snapshot = JSON.parse(JSON.stringify(design));
+
+    recolourDesign(design, variationPalette);
+    expect(design).toEqual(snapshot);
   });
 });

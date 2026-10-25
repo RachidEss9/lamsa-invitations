@@ -68,6 +68,42 @@ interface StudioCanvasProps {
 const SNAP_THRESHOLD = 7;
 
 /**
+ * Coalesces pointer updates to one per animation frame.
+ *
+ * Trackpads and high-refresh phones deliver move events faster than the
+ * browser paints, and every event used to rewrite the whole design document —
+ * Studio, Inspector, layers and canvas all re-rendered in between frames. Only
+ * the latest geometry is kept, so a drag costs at most one design update per
+ * frame and still lands exactly where the pointer stopped.
+ */
+function useFrameBatch() {
+  const frame = useRef<number | null>(null);
+  const pending = useRef<(() => void) | null>(null);
+
+  const schedule = useCallback((run: () => void) => {
+    pending.current = run;
+    if (frame.current !== null) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      const next = pending.current;
+      pending.current = null;
+      next?.();
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+      frame.current = null;
+      pending.current = null;
+    },
+    [],
+  );
+
+  return schedule;
+}
+
+/**
  * The eight grab points of a selected layer, in fractions of its own box.
  * They are rendered in design coordinates so they follow the layer's rotation,
  * but their hit area is divided by the zoom, so they stay the same size on
@@ -274,6 +310,7 @@ export function StudioCanvas({
   onContextAction,
   onEditingChange,
 }: StudioCanvasProps) {
+  const schedule = useFrameBatch();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const designRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -552,7 +589,7 @@ export function StudioCanvas({
           x: Math.round(clamp(element.x + snapDx, -element.w + 40, size.width - 40)),
           y: Math.round(clamp(element.y + snapDy, -element.h + 40, size.height - 40)),
         }));
-        onMove(moves);
+        schedule(() => onMove(moves));
         return;
       }
 
@@ -566,7 +603,7 @@ export function StudioCanvas({
         // Shift snaps to a clean fifteen degrees; free rotation stays precise.
         rotation = event.shiftKey ? Math.round(rotation / 15) * 15 : Math.round(rotation);
         rotation = ((rotation % 360) + 360) % 360;
-        onRotate(current.anchor.id, rotation);
+        schedule(() => onRotate(current.anchor.id, rotation));
         return;
       }
 
@@ -652,12 +689,84 @@ export function StudioCanvas({
         y += worldY - nextWorldY;
       }
 
-      onResize(current.anchor.id, {
+      /* Resizing snaps the same way moving does: the edge being dragged lands
+         on the page, its centre line, or a neighbouring layer. Rotated layers
+         and proportional resizes stay free, because snapping either would
+         fight the ratio or the layer's own axes. */
+      if (!proportional && Math.abs(original.rotation) < 0.01) {
+        const others = page.elements.filter(
+          (candidate) =>
+            candidate.id !== original.id && !candidate.hidden && !candidate.locked,
+        );
+        const xTargets = [
+          0,
+          size.width / 2,
+          size.width,
+          ...others.flatMap((element) => [
+            element.x,
+            element.x + element.w / 2,
+            element.x + element.w,
+          ]),
+        ];
+        const yTargets = [
+          0,
+          size.height / 2,
+          size.height,
+          ...others.flatMap((element) => [
+            element.y,
+            element.y + element.h / 2,
+            element.y + element.h,
+          ]),
+        ];
+        const nearest = (value: number, targets: number[]) =>
+          targets
+            .filter((target) => Math.abs(target - value) < SNAP_THRESHOLD)
+            .sort((a, b) => Math.abs(a - value) - Math.abs(b - value))[0];
+        const linesX: number[] = [];
+        const linesY: number[] = [];
+
+        if (handle.includes("e")) {
+          const hit = nearest(x + w, xTargets);
+          if (hit !== undefined) {
+            w = Math.max(minW, hit - x);
+            linesX.push(hit);
+          }
+        }
+        if (handle.includes("w")) {
+          const right = x + w;
+          const hit = nearest(x, xTargets);
+          if (hit !== undefined) {
+            x = hit;
+            w = Math.max(minW, right - hit);
+            linesX.push(hit);
+          }
+        }
+        if (handle.includes("s")) {
+          const hit = nearest(y + h, yTargets);
+          if (hit !== undefined) {
+            h = Math.max(minH, hit - y);
+            linesY.push(hit);
+          }
+        }
+        if (handle.includes("n")) {
+          const bottom = y + h;
+          const hit = nearest(y, yTargets);
+          if (hit !== undefined) {
+            y = hit;
+            h = Math.max(minH, bottom - hit);
+            linesY.push(hit);
+          }
+        }
+        setGuides({ x: linesX, y: linesY });
+      }
+
+      const box = {
         x: Math.round(x),
         y: Math.round(y),
         w: Math.round(w),
         h: Math.round(h),
-      });
+      };
+      schedule(() => onResize(current.anchor.id, box));
     };
 
     const end = () => {
@@ -673,7 +782,7 @@ export function StudioCanvas({
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
     };
-  }, [aspectLocked, drag, onMove, onResize, onRotate, page.elements, scale]);
+  }, [aspectLocked, drag, onMove, onResize, onRotate, page.elements, scale, schedule, size.height, size.width]);
 
   useEffect(() => {
     if (!panning) return;

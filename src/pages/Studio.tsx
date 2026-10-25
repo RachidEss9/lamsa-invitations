@@ -75,7 +75,12 @@ import {
 import { FRAMES, frameBounds, frameLayerIndex, type FrameSpec } from "@/lib/frames";
 import { pageLayoutById } from "@/lib/layouts";
 import { ensureFont, fontById } from "@/lib/fonts";
-import { recolourDesign, type ColourPalette } from "@/lib/palettes";
+import {
+  PALETTES,
+  readSavedPalettes,
+  recolourDesign,
+  type ColourPalette,
+} from "@/lib/palettes";
 import type { BuiltinAsset } from "@/lib/assets";
 import type { RevealPreset } from "@/lib/reveals";
 import {
@@ -110,6 +115,7 @@ import {
   Keyboard,
   Loader2,
   Lock,
+  Mail,
   Minus,
   Monitor,
   Palette,
@@ -221,6 +227,7 @@ export default function Studio() {
     idIsValid ? { id: invitationId } : "skip",
   );
   const saveDesignMutation = useMutation(api.invitations.saveDesign);
+  const duplicateInvitation = useMutation(api.invitations.duplicate);
   const publishInvitation = useMutation(api.invitations.publish);
   const unpublishInvitation = useMutation(api.invitations.unpublish);
   const generateUploadUrl = useMutation(api.library.generateUploadUrl);
@@ -304,6 +311,8 @@ export default function Studio() {
   const [historyFlags, setHistoryFlags] = useState({ undo: false, redo: false });
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [variationsOpen, setVariationsOpen] = useState(false);
+  const [variationBusy, setVariationBusy] = useState<string | null>(null);
   const [versionBusy, setVersionBusy] = useState(false);
   const designVersions = useQuery(
     api.invitations.listDesignVersions,
@@ -397,6 +406,48 @@ export default function Studio() {
    * was replaced, and the local undo stack is cleared because the restored
    * document is now the starting point.
    */
+  /**
+   * A colour variation is a whole new invitation: the design is duplicated,
+   * recoloured onto the chosen palette and saved as a draft. The source is
+   * never written to, so comparing two treatments costs nothing but a record.
+   */
+  const createVariation = useCallback(
+    async (palette: ColourPalette) => {
+      if (!design || variationBusy) return;
+      setVariationBusy(palette.id);
+      try {
+        const copyId = await duplicateInvitation({ id: invitationId });
+        await saveDesignMutation({
+          id: copyId,
+          design: recolourDesign(design, palette),
+        });
+        toast.success(`“${palette.name}” variation filed as a new draft.`);
+        setVariationsOpen(false);
+        navigate(`/studio/${copyId}`);
+      } catch (error) {
+        toast.error(messageOf(error));
+      } finally {
+        setVariationBusy(null);
+      }
+    },
+    [
+      design,
+      duplicateInvitation,
+      invitationId,
+      navigate,
+      saveDesignMutation,
+      variationBusy,
+    ],
+  );
+
+  const variationPalettes = useMemo<ColourPalette[]>(() => {
+    const saved = readSavedPalettes().map((palette) => ({
+      ...palette,
+      group: "Saved",
+    }));
+    return [...saved, ...PALETTES];
+  }, []);
+
   const restoreVersion = useCallback(
     async (versionId: Id<"designVersions">) => {
       if (versionBusy || !content) return;
@@ -2647,9 +2698,9 @@ export default function Studio() {
           </button>
         </div>
 
-        <div className="flex items-center gap-1">
-          <IconButton label="Undo" onClick={undo} disabled={!historyFlags.undo}><Undo2 className="size-3.5" /></IconButton>
-          <IconButton label="Redo" onClick={redo} disabled={!historyFlags.redo}><Redo2 className="size-3.5" /></IconButton>
+        <div className="flex items-center gap-0.5 rounded-full border border-ink/8 bg-white/70 p-0.5 shadow-[var(--shadow-soft)]">
+          <IconButton label="Undo" onClick={undo} disabled={!historyFlags.undo} className="border-transparent"><Undo2 className="size-3.5" /></IconButton>
+          <IconButton label="Redo" onClick={redo} disabled={!historyFlags.redo} className="border-transparent"><Redo2 className="size-3.5" /></IconButton>
         </div>
 
         {/* Medium headers keep only the drawing aids: showing every workspace
@@ -2662,19 +2713,24 @@ export default function Studio() {
         </div>
 
         <div className="hidden items-center gap-1 lg:flex">
-          <span className="mx-1 h-5 w-px bg-ink/12" />
-          <IconButton label="Desktop canvas" active={device === "desktop"} onClick={() => setDevice("desktop")}><Monitor className="size-3.5" /></IconButton>
-          <IconButton label="Tablet canvas" active={device === "tablet"} onClick={() => setDevice("tablet")}><Tablet className="size-3.5" /></IconButton>
-          <IconButton label="Phone canvas" active={device === "phone"} onClick={() => setDevice("phone")}><Smartphone className="size-3.5" /></IconButton>
-          <span className="mx-1 h-5 w-px bg-ink/12" />
-          <IconButton label="Grid" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
-          <IconButton label="Rulers" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
-          <IconButton label="Safe area" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
-          <span className="mx-1 h-5 w-px bg-ink/12" />
+          <span className="mx-1 h-5 w-px bg-ink/10" />
+          <div className="flex items-center gap-0.5 rounded-full border border-ink/8 bg-white/70 p-0.5 shadow-[var(--shadow-soft)]">
+            <IconButton label="Desktop canvas" className="rounded-full border-transparent" active={device === "desktop"} onClick={() => setDevice("desktop")}><Monitor className="size-3.5" /></IconButton>
+            <IconButton label="Tablet canvas" className="rounded-full border-transparent" active={device === "tablet"} onClick={() => setDevice("tablet")}><Tablet className="size-3.5" /></IconButton>
+            <IconButton label="Phone canvas" className="rounded-full border-transparent" active={device === "phone"} onClick={() => setDevice("phone")}><Smartphone className="size-3.5" /></IconButton>
+          </div>
+          <span className="mx-1 h-5 w-px bg-ink/10" />
+          <div className="flex items-center gap-0.5 rounded-full border border-ink/8 bg-white/70 p-0.5 shadow-[var(--shadow-soft)]">
+            <IconButton label="Grid" className="rounded-full border-transparent" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
+            <IconButton label="Rulers" className="rounded-full border-transparent" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
+            <IconButton label="Safe area" className="rounded-full border-transparent" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
+          </div>
+          <span className="mx-1 h-5 w-px bg-ink/10" />
           <IconButton label="Toggle left panel" active={leftOpen} onClick={() => setLeftOpen((value) => !value)}><PanelLeft className="size-3.5" /></IconButton>
           <IconButton label="Toggle properties" active={rightOpen} onClick={() => setRightOpen((value) => !value)}><PanelRight className="size-3.5" /></IconButton>
           <span className="mx-1 h-5 w-px bg-ink/12" />
           <IconButton label="Version history" onClick={() => setHistoryOpen(true)}><History className="size-3.5" /></IconButton>
+          <IconButton label="Colour variations" onClick={() => setVariationsOpen(true)}><Palette className="size-3.5" /></IconButton>
         </div>
 
         <div className="ml-1 flex items-center gap-1.5">
@@ -2682,7 +2738,7 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setLibrariesOpen(true)}
-            className="hidden h-8 rounded-md px-2 text-[9px] uppercase tracking-[0.12em] sm:inline-flex"
+            className="hidden h-8 rounded-full px-3 text-[9px] uppercase tracking-[0.12em] sm:inline-flex"
           >
             <Library className="size-3.5" />
             <span className="hidden sm:inline">Libraries</span>
@@ -2710,7 +2766,7 @@ export default function Studio() {
             onClick={() => setGuestOpen(true)}
             aria-label="Guest preview"
             title="Guest preview"
-            className="h-8 rounded-md px-2 text-[9px] uppercase tracking-[0.12em]"
+            className="h-8 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em]"
           >
             <Eye className="size-3.5" />
             <span className="hidden sm:inline">Guest preview</span>
@@ -2719,7 +2775,7 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setPrintOpen(true)}
-            className="h-8 rounded-md px-2 text-[9px] uppercase tracking-[0.12em]"
+            className="h-8 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em]"
             aria-label="Export a print-ready PDF"
             title="Export a print-ready PDF"
           >
@@ -2730,7 +2786,7 @@ export default function Studio() {
             type="button"
             onClick={handlePublish}
             disabled={publishing}
-            className="h-8 rounded-md px-3 text-[9px] uppercase tracking-[0.14em]"
+            className="h-8 rounded-full px-3.5 text-[9px] uppercase tracking-[0.14em] shadow-[var(--shadow-pill)]"
           >
             {publishing ? <Loader2 className="size-3.5 animate-spin" /> : published ? <Share2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
             {published ? "Share" : "Publish"}
@@ -2740,31 +2796,53 @@ export default function Studio() {
 
 
       <div className="flex min-h-0 flex-1">
-        <aside
-          className={cn(
-            "hidden shrink-0 overflow-y-auto border-r border-ink/15 bg-[var(--paper-light)] transition-[width] duration-200 lg:block",
-            leftOpen ? "w-[248px]" : "w-0 overflow-hidden border-r-0",
-          )}
-        >
-          <div className="flex border-b border-ink/12">
-            {(["add", "layers", "colour", "opening", "pages"] as LeftPanel[]).map((panel) => (
+        <aside className="relative z-20 hidden shrink-0 border-r border-ink/8 bg-[var(--paper-light)] lg:flex">
+          {/* Panel rail: one icon per panel, with a paper-white tooltip so the
+              five workspace areas never need a row of tiny text tabs. */}
+          <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 border-r border-ink/8 py-2">
+            {([
+              { id: "add" as LeftPanel, icon: Plus, label: "Add" },
+              { id: "layers" as LeftPanel, icon: Layers, label: "Layers" },
+              { id: "colour" as LeftPanel, icon: Palette, label: "Colour" },
+              { id: "opening" as LeftPanel, icon: Mail, label: "Opening" },
+              { id: "pages" as LeftPanel, icon: Layout, label: "Pages" },
+            ]).map(({ id, icon: Icon, label }) => (
               <button
-                key={panel}
+                key={id}
                 type="button"
                 onClick={() => {
-                  setLeftPanel(panel);
+                  if (leftPanel === id && leftOpen) {
+                    setLeftOpen(false);
+                    return;
+                  }
+                  setLeftPanel(id);
                   setLeftOpen(true);
                 }}
+                aria-label={label}
+                aria-pressed={leftPanel === id && leftOpen}
+                title={label}
                 className={cn(
-                  "flex-1 border-r border-ink/10 py-2 font-meta text-[8px] uppercase tracking-[0.1em] last:border-r-0",
-                  leftPanel === panel ? "bg-ink text-[#f2f1ed]" : "text-ink/45 hover:text-ink",
+                  "pressable group relative grid size-8 place-items-center rounded-[11px]",
+                  leftPanel === id && leftOpen
+                    ? "bg-[var(--ink)] text-[var(--paper)] shadow-[var(--shadow-pill)]"
+                    : "text-ink/45 hover:bg-ink/[0.055] hover:text-ink",
                 )}
               >
-                {panel === "opening" ? "Open" : panel === "colour" ? "Colour" : panel}
+                <Icon className="size-[16px]" strokeWidth={1.7} aria-hidden />
+                <span className="pointer-events-none absolute left-full z-50 ml-2 -translate-x-1 rounded-full bg-[#171716] px-2 py-1 text-[10px] font-medium whitespace-nowrap text-[#f4f2ec] opacity-0 shadow-[var(--shadow-pill)] transition-[opacity,translate] duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
+                  {label}
+                </span>
               </button>
             ))}
           </div>
-          {renderLeftPanel()}
+          <div
+            className={cn(
+              "min-h-0 overflow-hidden transition-[width] duration-200 ease-[var(--ease-soft)]",
+              leftOpen ? "w-[248px]" : "w-0",
+            )}
+          >
+            <div className="h-full overflow-y-auto scroll-slim">{renderLeftPanel()}</div>
+          </div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col">
@@ -2834,7 +2912,7 @@ export default function Studio() {
              * away on desktop and mobile, and nothing is offered when the
              * selection cannot be deleted. */}
             {selected.length > 0 && (
-              <div className="relative z-30 flex shrink-0 flex-wrap items-center gap-1 border-t border-ink/15 bg-[var(--paper-light)] px-2 py-1.5">
+              <div className="relative z-30 flex shrink-0 flex-wrap items-center gap-1 border-t border-ink/8 bg-white/75 px-3 py-2 backdrop-blur-xl">
                 <span className="mr-auto min-w-0 truncate font-meta text-[8px] uppercase tracking-[0.14em] text-ink/45">
                   {selected.length === 1 ? selected[0].name : `${selected.length} layers`}
                   {canvasEditing ? " · editing text" : ""}
@@ -2879,7 +2957,7 @@ export default function Studio() {
                         ? "Delete selected layers (⌫)"
                         : "Locked layers are protected — unlock to delete"
                   }
-                  className="flex h-8 items-center gap-1.5 border border-[var(--red)] bg-[var(--red)] px-2.5 text-[9px] uppercase tracking-[0.12em] text-[#f2f1ed] transition-colors hover:bg-[#8a0318] disabled:cursor-not-allowed disabled:border-ink/15 disabled:bg-transparent disabled:text-ink/30"
+                  className="flex h-8 items-center gap-1.5 rounded-full border border-[var(--red)] bg-[var(--red)] px-3 text-[9px] uppercase tracking-[0.12em] text-[#f2f1ed] transition-colors hover:bg-[#8a0318] disabled:cursor-not-allowed disabled:border-ink/15 disabled:bg-transparent disabled:text-ink/30"
                 >
                   <Trash2 className="size-3.5" />
                   Delete
@@ -2904,28 +2982,31 @@ export default function Studio() {
                 selected.length > 0 ? "bottom-[54px]" : "bottom-3",
               )}
             >
-              <div className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 backdrop-blur">
+              <div className="pointer-events-auto flex items-center gap-0.5 overflow-hidden rounded-full border border-ink/8 bg-white/85 p-0.5 shadow-[var(--shadow-soft)] backdrop-blur">
                 <button
                   type="button"
                   onClick={() => setZoom((value) => Math.max(0.4, value / 1.2))}
                   aria-label="Zoom out"
-                  className="grid size-6 place-items-center text-ink/55 transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
+                  className="pressable grid size-7 place-items-center rounded-full text-ink/55 hover:bg-ink/5 hover:text-ink"
                 >
-                  <Minus className="size-3" />
+                  <Minus className="size-3.5" />
                 </button>
+                <span className="px-1 font-meta text-[9px] tabular-nums text-ink/45">
+                  {Math.round(zoom * 100)}%
+                </span>
                 <button
                   type="button"
                   onClick={() => setZoom((value) => Math.min(2.4, value * 1.2))}
                   aria-label="Zoom in"
-                  className="grid size-6 place-items-center text-ink/55 transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
+                  className="pressable grid size-7 place-items-center rounded-full text-ink/55 hover:bg-ink/5 hover:text-ink"
                 >
-                  <Plus className="size-3" />
+                  <Plus className="size-3.5" />
                 </button>
               </div>
               <button
                 type="button"
                 onClick={() => setShowHidden((value) => !value)}
-                className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 p-1.5 text-ink/50 backdrop-blur transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
+                className="pointer-events-auto grid size-8 place-items-center rounded-full border border-ink/8 bg-white/85 text-ink/50 shadow-[var(--shadow-soft)] backdrop-blur transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
                 title={showHidden ? "Hide hidden layers" : "Show hidden layers"}
               >
                 {showHidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
@@ -3394,6 +3475,59 @@ export default function Studio() {
               ))
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={variationsOpen}
+        onOpenChange={(open) => !variationBusy && setVariationsOpen(open)}
+      >
+        <DialogContent className="max-h-[86vh] max-w-[560px] overflow-y-auto scroll-slim">
+          <DialogHeader>
+            <DialogTitle className="font-ui text-xl font-semibold tracking-[-0.01em]">
+              Colour variations
+            </DialogTitle>
+            <DialogDescription className="text-[12px] leading-relaxed">
+              A variation is a separate invitation: the same pages, wording and
+              images, recoloured and filed as a new draft. This design is never
+              changed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {variationPalettes.map((palette) => {
+              const busy = variationBusy === palette.id;
+              return (
+                <button
+                  key={`${palette.group}-${palette.id}`}
+                  type="button"
+                  onClick={() => void createVariation(palette)}
+                  disabled={Boolean(variationBusy)}
+                  className="pressable rounded-2xl border border-ink/10 bg-white/70 p-2.5 text-left hover:border-ink/30 hover:shadow-[var(--shadow-soft)] disabled:cursor-wait disabled:opacity-45"
+                >
+                  <span className="flex gap-1.5" aria-hidden>
+                    {[palette.paper, palette.ink, palette.accent].map((colour) => (
+                      <span
+                        key={colour}
+                        className="size-5 rounded-full border border-black/10"
+                        style={{ background: colour }}
+                      />
+                    ))}
+                  </span>
+                  <span className="mt-2 block truncate text-[11.5px] font-medium">
+                    {palette.name}
+                  </span>
+                  <span className="block truncate font-meta text-[8px] tracking-[0.16em] text-ink/40 uppercase">
+                    {busy ? "Creating…" : palette.group}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="border-t border-ink/10 pt-3 text-[10px] leading-relaxed text-ink/45">
+            The page background and the design's dominant ink and accent are
+            remapped. Colours set by hand on individual layers stay exactly as
+            they are.
+          </p>
         </DialogContent>
       </Dialog>
 

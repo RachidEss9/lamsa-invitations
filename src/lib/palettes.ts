@@ -368,12 +368,10 @@ function dominantColours(
     }
   }
   const ink = top(type) ?? top(ornament);
-  const accent =
-    top(ornament) && top(ornament) !== ink
-      ? top(ornament)
-      : [...ornament.entries(), ...type.entries()].sort((a, b) => b[1] - a[1])
-          .map(([colour]) => colour)
-          .find((colour) => colour !== ink);
+  // The accent is read from ornament layers only. Falling back to a second
+  // text colour would silently recolour a line the host set by hand, which is
+  // exactly what a palette change promises not to touch.
+  const accent = top(ornament) && top(ornament) !== ink ? top(ornament) : undefined;
   return { ink, accent };
 }
 
