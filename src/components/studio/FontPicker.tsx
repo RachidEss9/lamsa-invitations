@@ -102,8 +102,10 @@ function FontPreviewCard({
   return (
     <div
       className={cn(
-        "group relative border text-left transition-colors",
-        active ? "border-ink bg-ink/[0.035]" : "border-ink/15 hover:border-ink/60",
+        "group relative overflow-hidden rounded-[var(--radius-tile)] border bg-[var(--surface-card)] text-left shadow-[var(--shadow-xs)] transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-[var(--edge-strong)] hover:shadow-[var(--shadow-card)]",
+        active
+          ? "border-[var(--red)] ring-1 ring-[var(--red)]/35"
+          : "border-[var(--edge)]",
       )}
     >
       <button
@@ -141,10 +143,8 @@ function FontPreviewCard({
             {arabicPrimary ? samples.latin : samples.arabic}
           </span>
         )}
-      </button>
-
-      <div className="flex min-h-6 items-center justify-between gap-2 border-t border-ink/8 px-3 py-1">
-        <span className="flex items-center gap-1 text-[8px] uppercase tracking-[0.14em] text-ink/35">
+      </button>        <div className="flex min-h-6 items-center justify-between gap-2 border-t border-[var(--edge)] px-3 py-1">
+        <span className="flex items-center gap-1 font-meta text-[0.54rem] uppercase tracking-[0.12em] text-ink/35">
           {status === "loading" && (
             <>
               <Loader2 className="size-2.5 animate-spin" /> Loading
@@ -164,7 +164,7 @@ function FontPreviewCard({
           }}
           aria-label={favorite ? `Remove ${font.name} from favorites` : `Favorite ${font.name}`}
           aria-pressed={favorite}
-          className="grid size-6 place-items-center text-ink/30 transition-colors hover:text-[var(--red)]"
+          className="grid size-6 place-items-center rounded-full text-ink/30 transition-colors hover:bg-ink/[0.05] hover:text-[var(--red)]"
         >
           <Star className={cn("size-3", favorite && "fill-current text-[var(--red)]")} />
         </button>
@@ -250,7 +250,7 @@ export function FontPicker({
           setOpen(true);
         }}
         className={cn(
-          "h-9 w-full justify-between rounded-none border-ink/20 px-2.5 text-left text-[11px] font-normal",
+          "h-9 w-full justify-between rounded-full border-[var(--edge)] bg-[var(--surface-card)] px-3 text-left font-ui text-[0.7rem] font-normal normal-case tracking-normal text-ink shadow-[var(--shadow-xs)]",
           className,
         )}
       >
@@ -268,17 +268,17 @@ export function FontPicker({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="grid max-h-[88vh] sm:max-w-[min(768px,calc(100%_-_2rem))] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-ink/20 p-0">
-          <DialogHeader className="border-b border-ink/12 px-4 py-3">
-            <DialogTitle className="font-ui text-2xl font-semibold tracking-[-0.015em]">Type library</DialogTitle>
-            <DialogDescription className="text-[11px] leading-relaxed text-ink/50">
+        <DialogContent className="grid h-[min(90dvh,860px)] max-h-[90dvh] grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-[min(768px,calc(100%-2rem))]">
+          <DialogHeader className="min-w-0 border-b border-[var(--edge)] px-4 py-3.5 pr-14 text-left sm:px-5">
+            <DialogTitle className="font-ui text-lg font-semibold tracking-[-0.01em]">Type library</DialogTitle>
+            <DialogDescription className="text-[0.72rem] leading-relaxed text-ink/50">
               {FONT_LIBRARY.length} open-source families, loaded from Google Fonts only
               when previewed or used. Arabic sets right-to-left; mixed lines fall back
               glyph by glyph.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-2.5 border-b border-ink/12 px-4 py-2.5">
+          <div className="flex min-w-0 flex-col gap-2 border-b border-[var(--edge)] px-4 py-3 sm:px-5">
             <div className="flex flex-col gap-2 sm:flex-row">
               <label className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink/35" />
@@ -286,7 +286,7 @@ export function FontPicker({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search Playfair, Naskh, script…"
-                  className="h-9 rounded-none border-ink/20 pl-8 text-[12px]"
+                  className="h-8 rounded-full pl-8 text-[0.76rem]"
                   autoFocus
                 />
               </label>
@@ -296,10 +296,10 @@ export function FontPicker({
                   onClick={() => setFavoritesOnly((next) => !next)}
                   aria-pressed={favoritesOnly}
                   className={cn(
-                    "flex h-9 items-center gap-1.5 border px-2.5 text-[9px] uppercase tracking-[0.12em]",
+                    "pressable flex h-8 items-center gap-1.5 rounded-full border px-3 font-ui text-[0.64rem] font-medium tracking-[0.04em]",
                     favoritesOnly
-                      ? "border-ink bg-ink text-[#f2f1ed]"
-                      : "border-ink/20 text-ink/55 hover:border-ink",
+                      ? "border-transparent bg-[var(--ink)] text-[var(--paper-light)]"
+                      : "border-[var(--edge)] text-ink/55 hover:border-[var(--edge-strong)] hover:text-ink",
                   )}
                 >
                   <Star className={cn("size-3", favoritesOnly && "fill-current")} />
@@ -308,7 +308,7 @@ export function FontPicker({
                 <button
                   type="button"
                   onClick={() => setSort((next) => (next === "az" ? "curated" : "az"))}
-                  className="flex h-9 items-center gap-1.5 border border-ink/20 px-2.5 text-[9px] uppercase tracking-[0.12em] text-ink/55 hover:border-ink"
+                  className="pressable flex h-8 items-center gap-1.5 rounded-full border border-[var(--edge)] px-3 font-ui text-[0.64rem] font-medium tracking-[0.04em] text-ink/55 hover:border-[var(--edge-strong)] hover:text-ink"
                   title="Change sort order"
                 >
                   <ArrowUpDown className="size-3" />
@@ -324,24 +324,24 @@ export function FontPicker({
                   type="button"
                   onClick={() => setScript(id)}
                   className={cn(
-                    "border px-2.5 py-1 text-[9px] uppercase tracking-[0.14em]",
+                    "h-7 shrink-0 rounded-full border px-2.5 font-ui text-[0.62rem] font-medium capitalize transition-colors",
                     script === id
-                      ? "border-[var(--red)] bg-[var(--red)] text-[#f2f1ed]"
-                      : "border-ink/15 text-ink/50 hover:border-ink",
+                      ? "border-transparent bg-[var(--red)] text-[#f8f4ea]"
+                      : "border-[var(--edge)] text-ink/55 hover:border-[var(--edge-strong)] hover:text-ink",
                   )}
                 >
                   {id === "all" ? "All scripts" : id}
                 </button>
               ))}
-              <span className="mx-1 h-4 w-px bg-ink/15" />
+              <span className="mx-1 h-4 w-px bg-[var(--edge)]" />
               <button
                 type="button"
                 onClick={() => setCategory("all")}
                 className={cn(
-                  "border px-2.5 py-1 text-[9px] uppercase tracking-[0.14em]",
+                  "h-7 shrink-0 rounded-full border px-2.5 font-ui text-[0.62rem] font-medium capitalize transition-colors",
                   category === "all"
-                    ? "border-ink bg-ink text-[#f2f1ed]"
-                    : "border-ink/15 text-ink/50 hover:border-ink",
+                    ? "border-transparent bg-[var(--ink)] text-[var(--paper-light)]"
+                    : "border-[var(--edge)] text-ink/55 hover:border-[var(--edge-strong)] hover:text-ink",
                 )}
               >
                 Every style
@@ -352,10 +352,10 @@ export function FontPicker({
                   type="button"
                   onClick={() => setCategory(item.id)}
                   className={cn(
-                    "border px-2.5 py-1 text-[9px] uppercase tracking-[0.14em]",
+                    "h-7 shrink-0 rounded-full border px-2.5 font-ui text-[0.62rem] font-medium capitalize transition-colors",
                     category === item.id
-                      ? "border-ink bg-ink text-[#f2f1ed]"
-                      : "border-ink/15 text-ink/50 hover:border-ink",
+                      ? "border-transparent bg-[var(--ink)] text-[var(--paper-light)]"
+                      : "border-[var(--edge)] text-ink/55 hover:border-[var(--edge-strong)] hover:text-ink",
                   )}
                 >
                   {item.label}
@@ -364,20 +364,18 @@ export function FontPicker({
             </div>
 
             <label className="flex items-center gap-2">
-              <span className="w-20 shrink-0 text-[9px] uppercase tracking-[0.12em] text-ink/40">
-                Preview text
-              </span>
+              <span className="section-label w-20 shrink-0">Preview</span>
               <Input
                 value={sample}
                 onChange={(event) => setSample(event.target.value)}
-                className="h-8 rounded-none border-ink/15 text-[11px]"
+                className="h-8 rounded-full text-[0.72rem]"
                 placeholder="Type your invitation wording"
               />
             </label>
 
             {recentFonts.length > 0 && !query && !favoritesOnly && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="flex items-center gap-1 text-[8px] uppercase tracking-[0.14em] text-ink/35">
+                <span className="flex items-center gap-1 font-meta text-[0.54rem] uppercase tracking-[0.12em] text-ink/35">
                   <Clock3 className="size-2.5" /> Recent
                 </span>
                 {recentFonts.map((font) => (
@@ -385,7 +383,7 @@ export function FontPicker({
                     key={font.id}
                     type="button"
                     onClick={() => pick(font)}
-                    className="border border-ink/12 px-2 py-0.5 text-[10px] hover:border-ink"
+                    className="h-6 rounded-full border border-[var(--edge)] px-2 text-[0.64rem] transition-colors hover:border-[var(--edge-strong)]"
                     style={{ fontFamily: font.family }}
                   >
                     {font.name}
@@ -395,13 +393,13 @@ export function FontPicker({
             )}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 scroll-slim sm:px-5 sm:py-4">
             {filtered.length === 0 ? (
-              <p className="py-10 text-center text-[12px] text-ink/45">
+              <p className="py-10 text-center font-ui text-[0.76rem] text-ink/45">
                 No families match that search. Try “serif”, “Arabic”, or a family name.
               </p>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                 {filtered.map((font) => (
                   <FontPreviewCard
                     key={font.id}
@@ -417,7 +415,7 @@ export function FontPicker({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ink/12 px-5 py-2.5 text-[9px] text-ink/40">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--edge)] px-4 py-2.5 font-meta text-[0.56rem] text-ink/40 sm:px-5">
             <span>{filtered.length} families shown</span>
             <span>Free fonts · SIL OFL / Apache · Latin + Arabic fallbacks</span>
           </div>

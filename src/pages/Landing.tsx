@@ -47,7 +47,7 @@ function Folio({ label }: { label: string }) {
  */
 export default function Landing() {
   return (
-    <div className="min-h-dvh bg-[var(--paper)] font-ui text-ink selection:bg-[var(--red)]/15 selection:text-[var(--red)]">
+    <div className="min-h-dvh overflow-x-clip bg-[var(--paper)] font-ui text-ink selection:bg-[var(--red)]/15 selection:text-[var(--red)]">
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(120%_80%_at_50%_-10%,rgba(113,0,20,0.06),transparent_60%)]"
@@ -122,7 +122,7 @@ export default function Landing() {
             <div className="relative mx-auto w-full max-w-[420px]">
               <div
                 aria-hidden
-                className="absolute -inset-6 rounded-[2rem] opacity-70 blur-3xl"
+                className="absolute -inset-4 rounded-[2rem] opacity-70 blur-3xl"
                 style={{
                   background:
                     "radial-gradient(circle at 60% 35%, rgba(179,143,111,0.22), transparent 70%)",

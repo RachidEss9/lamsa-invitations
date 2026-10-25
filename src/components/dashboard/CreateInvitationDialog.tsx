@@ -428,9 +428,9 @@ export function CreateInvitationDialog({
                 <button
                   type="button"
                   onClick={() => setTrack("scratch")}
-                  className="group flex w-full items-center gap-4 border border-ink/15 p-3 text-left transition-colors hover:border-ink/60"
+                  className="pressable group flex w-full items-center gap-3 rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-card)] p-3 text-left shadow-[var(--shadow-xs)] transition-[border-color,box-shadow] hover:border-[var(--edge-strong)] hover:shadow-[var(--shadow-card)] sm:gap-4"
                 >
-                  <span className="grid size-11 shrink-0 place-items-center border border-ink/15 bg-[var(--paper-light)] text-ink/70 transition-colors group-hover:border-ink group-hover:text-ink">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--paper-deep)]/70 text-[var(--red)] transition-colors sm:size-11">
                     <Ruler className="size-4" />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -450,10 +450,10 @@ export function CreateInvitationDialog({
                   onClick={() => setSelection("blank")}
                   aria-pressed={selection === "blank"}
                   className={cn(
-                    "group mt-4 flex w-full items-center gap-4 border p-3 text-left transition-colors duration-200",
+                    "pressable group mt-3 flex w-full items-center gap-3 rounded-[var(--radius-tile)] border p-3 text-left transition-[border-color,box-shadow] duration-200 sm:gap-4",
                     selection === "blank"
-                      ? "border-ink bg-[var(--paper-light)]"
-                      : "border-ink/15 hover:border-ink/40",
+                      ? "border-[var(--red)] bg-[var(--surface-card)] ring-1 ring-[var(--red)]"
+                      : "border-[var(--edge)] bg-[var(--surface-card)] shadow-[var(--shadow-xs)] hover:border-[var(--edge-strong)]",
                   )}
                 >
                   <span className="w-11 shrink-0 border border-ink/10 bg-white p-1 shadow-[0_6px_18px_rgba(21,21,21,0.08)] sm:w-12">

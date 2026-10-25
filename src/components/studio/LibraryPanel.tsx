@@ -536,7 +536,7 @@ function FontTile({
         type="button"
         onClick={onApply}
         data-selected={selected}
-        className="ui-tile gap-1 px-3 py-2.5"
+        className="ui-tile gap-1 px-2.5 py-2 sm:px-3 sm:py-2.5"
       >
         <span className="flex items-baseline justify-between gap-2 pr-6">
           <span className="min-w-0">
@@ -555,7 +555,7 @@ function FontTile({
           )}
         </span>
         <span
-          className="mt-1 block truncate text-[24px] leading-[1.15] text-ink"
+          className="mt-1 block truncate text-[19px] leading-[1.15] text-ink sm:text-[24px]"
           style={{ fontFamily: font.family }}
           dir={arabicPrimary ? "rtl" : "ltr"}
         >
@@ -828,6 +828,7 @@ export function LibraryPanel({
   const [assetCategory, setAssetCategory] = useState<string>("Backgrounds");
   const [frameGroup, setFrameGroup] = useState<FrameGroup | "All">("All");
   const [paletteGroup, setPaletteGroup] = useState<string | "All">("All");
+  const [fontScript, setFontScript] = useState<"all" | "latin" | "arabic">("all");
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -1059,6 +1060,13 @@ export function LibraryPanel({
   const filteredFonts = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return FONT_LIBRARY.filter((font) => {
+      if (
+        fontScript !== "all" &&
+        font.script !== fontScript &&
+        font.script !== "both"
+      ) {
+        return false;
+      }
       if (onlyFavourites && !favourites.includes(favouriteKey("font", font.id))) {
         return false;
       }
@@ -1069,7 +1077,7 @@ export function LibraryPanel({
         (font.note ?? "").toLowerCase().includes(needle)
       );
     });
-  }, [query, onlyFavourites, favourites]);
+  }, [query, onlyFavourites, favourites, fontScript]);
 
   const filteredAssets = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -1195,9 +1203,9 @@ export function LibraryPanel({
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
       <DialogContent
         showCloseButton
-        className="h-[min(92dvh,880px)] max-h-[92dvh] w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[min(1080px,calc(100%-2rem))]"
+        className="grid h-[min(92dvh,880px)] max-h-[92dvh] w-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[min(1080px,calc(100%-2rem))]"
       >
-        <div className="flex items-center gap-3 border-b border-[var(--edge)] px-4 py-3.5 pr-14 sm:px-5">
+        <div className="flex min-w-0 items-center gap-3 border-b border-[var(--edge)] px-4 py-3.5 pr-14 sm:px-5">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--paper-deep)] text-[var(--red)]">
             <Palette className="size-4" strokeWidth={1.6} />
           </span>
@@ -1214,11 +1222,11 @@ export function LibraryPanel({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col sm:flex-row">
+        <div className="flex min-h-0 w-full min-w-0 flex-col overflow-hidden sm:flex-row">
           {/* Category rail: horizontal on a phone, a quiet column on desktop. */}
           <nav
             aria-label="Library categories"
-            className="flex shrink-0 gap-1 overflow-x-auto border-b border-[var(--edge)] px-3 py-2 no-scrollbar sm:w-[196px] sm:flex-col sm:overflow-y-auto sm:border-b-0 sm:border-r sm:px-2.5 sm:py-3"
+            className="flex w-full min-w-0 max-w-full shrink-0 gap-1 overflow-x-auto border-b border-[var(--edge)] px-3 py-2 no-scrollbar sm:w-[196px] sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:border-b-0 sm:border-r sm:px-2.5 sm:py-3"
           >
             <p className="section-label mb-1 hidden px-2 sm:block">Categories</p>
             {CATEGORIES.map((item) => {
@@ -1503,32 +1511,72 @@ export function LibraryPanel({
                     )}
                   </section>
 
-                  <section className="space-y-2.5">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <h3 className="section-label">Swatches</h3>
-                      <span className="font-meta text-[0.58rem] tabular-nums text-ink/35">
-                        {paletteSwatches.length}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {paletteSwatches.map((swatch) => (
-                        <button
-                          key={swatch.hex}
-                          type="button"
-                          onClick={() => onApplyColour?.(swatch.hex)}
-                          title={`${swatch.hex} · ${swatch.palette}`}
-                          aria-label={`Apply ${swatch.hex} from ${swatch.palette}`}
-                          className="swatch-dot size-8"
-                          style={{ background: swatch.hex }}
-                        />
-                      ))}
-                    </div>
-                  </section>
+                  {(
+                    [
+                      ["paper", "Paper"],
+                      ["ink", "Ink"],
+                      ["accent", "Accent"],
+                    ] as const
+                  ).map(([role, label]) => {
+                    const group = paletteSwatches.filter(
+                      (swatch) => swatch.role === role,
+                    );
+                    if (group.length === 0) return null;
+                    return (
+                      <section key={role} className="space-y-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <h3 className="section-label">{label}</h3>
+                          <span className="font-meta text-[0.56rem] tabular-nums text-ink/35">
+                            {group.length}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {group.map((swatch) => (
+                            <button
+                              key={swatch.hex}
+                              type="button"
+                              onClick={() => onApplyColour?.(swatch.hex)}
+                              title={`${swatch.hex} · ${swatch.palette}`}
+                              aria-label={`Apply ${swatch.hex} from ${swatch.palette}`}
+                              className="swatch-dot size-8"
+                              style={{ background: swatch.hex }}
+                            />
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
                 </div>
               )}
 
               {tab === "type" && (
-                <div className="space-y-5">
+                <div className="space-y-4">
+                  <div
+                    role="group"
+                    aria-label="Font scripts"
+                    className="flex flex-wrap gap-1.5"
+                  >
+                    {(
+                      [
+                        ["all", "All scripts"],
+                        ["latin", "Latin"],
+                        ["arabic", "Arabic"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={fontScript === id}
+                        onClick={() => setFontScript(id)}
+                        className="chip"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    <span className="ml-auto self-center font-meta text-[0.56rem] tabular-nums text-ink/35">
+                      {filteredFonts.length}
+                    </span>
+                  </div>
                   {filteredFonts.length === 0 ? (
                     <EmptyNote>
                       {onlyFavourites
@@ -1536,7 +1584,7 @@ export function LibraryPanel({
                         : "No fonts match that search."}
                     </EmptyNote>
                   ) : (
-                    <div className="grid gap-2.5 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:gap-2.5">
                       {filteredFonts.map((font) => (
                         <FontTile
                           key={font.id}
