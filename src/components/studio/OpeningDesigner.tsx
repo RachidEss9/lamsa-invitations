@@ -167,7 +167,7 @@ export function OpeningDesigner({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[94dvh] w-[calc(100vw-0.75rem)] max-w-[1100px] gap-0 overflow-hidden p-0 sm:w-full">
-        <div className="flex flex-wrap items-center gap-3 border-b border-ink/12 px-4 py-3 pr-12">
+        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--edge)] px-4 py-3 pr-12">
           <div className="min-w-0">
             <DialogTitle className="font-ui text-[13px] uppercase tracking-[0.22em] text-ink">
               Opening designer
@@ -199,7 +199,7 @@ export function OpeningDesigner({
           {/* Live preview of the real opening */}
           <div className="border-b border-ink/10 bg-[var(--paper-deep)]/40 px-4 py-4 md:border-b-0 md:border-r">
             <div className="mx-auto w-full max-w-[320px]">
-              <div className="relative aspect-[3/4] w-full overflow-hidden border border-ink/12 bg-[var(--paper-light)] shadow-[0_18px_40px_rgba(22,22,22,0.14)]">
+              <div className="relative aspect-[3/4] w-full overflow-hidden border border-[var(--edge)] bg-[var(--paper-light)] shadow-[0_18px_40px_rgba(22,22,22,0.14)]">
                 <OpeningStage
                   key={previewKey}
                   opening={{ ...opening, autoOpen: stillProgress === null }}
@@ -216,7 +216,7 @@ export function OpeningDesigner({
                 />
               </div>
 
-              <p className="mt-2 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
+              <p className="mt-2 section-label">
                 {stillProgress === null
                   ? "Playing the full sequence"
                   : `Held at ${OPENING_STAGES.find((stage) => stage.id === stillStage)?.label ?? ""}`}
@@ -239,7 +239,7 @@ export function OpeningDesigner({
                       "rounded-md border px-1.5 py-1.5 text-[8.5px] uppercase tracking-[0.09em] transition-[background-color,border-color,color] duration-150",
                       stillStage === stage.id
                         ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
-                        : "border-ink/15 text-ink/50 hover:border-ink/45 hover:text-ink",
+                        : "border-[var(--edge)] text-ink/50 hover:border-ink/45 hover:text-ink",
                     )}
                   >
                     {stage.label}
@@ -249,7 +249,7 @@ export function OpeningDesigner({
               <button
                 type="button"
                 onClick={replay}
-                className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-ink/15 py-1.5 text-[9px] uppercase tracking-[0.14em] text-ink/55 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
+                className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-[var(--edge)] py-1.5 text-[9px] uppercase tracking-[0.14em] text-ink/55 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
               >
                 <RotateCcw className="size-3" /> Play the full opening
               </button>
@@ -259,7 +259,7 @@ export function OpeningDesigner({
           {/* Controls */}
           <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-3">
             <section>
-              <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+              <p className="section-label">
                 Suite
               </p>
               <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -273,7 +273,7 @@ export function OpeningDesigner({
                       "rounded-md border px-2 py-1.5 text-left text-[10px] leading-tight transition-[background-color,border-color,color] duration-150",
                       opening.experience === experience.id
                         ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
-                        : "border-ink/15 text-ink/60 hover:border-ink/45 hover:text-ink",
+                        : "border-[var(--edge)] text-ink/60 hover:border-ink/45 hover:text-ink",
                     )}
                   >
                     {experience.label}
@@ -284,7 +284,7 @@ export function OpeningDesigner({
 
             {hasMaterial && (
               <section>
-                <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+                <p className="section-label">
                   Material
                 </p>
                 <div className="mt-2 grid grid-cols-3 gap-1.5">
@@ -298,7 +298,7 @@ export function OpeningDesigner({
                         "rounded-md border p-1.5 text-left transition-[background-color,border-color,color] duration-150",
                         (opening.tone ?? "crimson") === tone.id
                           ? "border-[var(--red)]/70"
-                          : "border-ink/15 hover:border-ink/45",
+                          : "border-[var(--edge)] hover:border-ink/45",
                       )}
                     >
                       <span
@@ -318,10 +318,10 @@ export function OpeningDesigner({
             {hasMaterial && (
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+                  <p className="section-label">
                     Envelope
                   </p>
-                  <span className="font-meta text-[9px] tabular-nums text-ink/35">
+                  <span className="font-meta text-[0.58rem] tabular-nums text-ink/35">
                     {envelopeMm.width} × {envelopeMm.height} mm
                   </span>
                 </div>
@@ -342,7 +342,7 @@ export function OpeningDesigner({
                         "rounded-md border px-1.5 py-1.5 text-[9px] uppercase tracking-[0.08em] transition-[background-color,border-color,color] duration-150",
                         envelopePreset?.id === preset.id
                           ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
-                          : "border-ink/15 text-ink/55 hover:border-ink/45 hover:text-ink",
+                          : "border-[var(--edge)] text-ink/55 hover:border-ink/45 hover:text-ink",
                       )}
                     >
                       {preset.label}
@@ -403,7 +403,7 @@ export function OpeningDesigner({
                     <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
                       Lining
                     </span>
-                    <span className="flex items-center gap-1 rounded-md border border-ink/15 px-1">
+                    <span className="flex items-center gap-1 rounded-md border border-[var(--edge)] px-1">
                       <input
                         type="color"
                         aria-label="Envelope lining colour"
@@ -431,7 +431,7 @@ export function OpeningDesigner({
                     <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
                       Wax
                     </span>
-                    <span className="flex items-center gap-1 rounded-md border border-ink/15 px-1">
+                    <span className="flex items-center gap-1 rounded-md border border-[var(--edge)] px-1">
                       <input
                         type="color"
                         aria-label="Wax seal colour"
@@ -487,7 +487,7 @@ export function OpeningDesigner({
 
             <section>
               <div className="flex items-center justify-between">
-                <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+                <p className="section-label">
                   Suite colours
                 </p>
                 <button
@@ -513,7 +513,7 @@ export function OpeningDesigner({
                       <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
                         {entry.label}
                       </span>
-                  <span className="flex items-center gap-1 rounded-md border border-ink/15 px-1">
+                  <span className="flex items-center gap-1 rounded-md border border-[var(--edge)] px-1">
                     <input
                       type="color"
                       value={flat}
@@ -538,7 +538,7 @@ export function OpeningDesigner({
             </section>
 
             <section className="space-y-3">
-              <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+              <p className="section-label">
                 The card's emergence
               </p>
               <RangeRow
@@ -578,7 +578,7 @@ export function OpeningDesigner({
             </section>
 
             <section className="space-y-3">
-              <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+              <p className="section-label">
                 Timing and words
               </p>
               <RangeRow
@@ -614,7 +614,7 @@ export function OpeningDesigner({
             </section>
 
             <section>
-              <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
+              <p className="section-label">
                 Saved openings
               </p>
               <div className="mt-2 flex gap-1">

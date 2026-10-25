@@ -81,6 +81,7 @@ import {
   recolourDesign,
   type ColourPalette,
 } from "@/lib/palettes";
+import { recolourSelection } from "@/lib/library-colour";
 import type { BuiltinAsset } from "@/lib/assets";
 import type { RevealPreset } from "@/lib/reveals";
 import {
@@ -1650,21 +1651,11 @@ export default function Studio() {
       toast.success("Page background updated.");
       return;
     }
-    const ids = new Set(selectedIds);
     apply((current) => ({
       ...current,
       pages: current.pages.map((candidate, index) =>
         index === pageIndex
-          ? {
-              ...candidate,
-              elements: candidate.elements.map((element) => {
-                if (!ids.has(element.id)) return element;
-                if (element.kind === "text") return { ...element, color: hex };
-                if (element.kind === "shape") return { ...element, fill: hex };
-                if (element.kind === "motif") return { ...element, color: hex };
-                return element;
-              }),
-            }
+          ? recolourSelection(candidate, selectedIds, hex)
           : candidate,
       ),
     }));

@@ -76,10 +76,8 @@ function readSettings(): PrintSettings {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-b border-ink/12 px-4 py-3">
-      <p className="mb-2 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
-        {title}
-      </p>
+    <section className="border-b border-[var(--edge)] px-4 py-3">
+      <p className="section-label mb-2">{title}</p>
       <div className="space-y-2">{children}</div>
     </section>
   );
@@ -88,14 +86,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex items-center justify-between gap-2">
-      <span className="shrink-0 text-[11px] text-ink/60">{label}</span>
+      <span className="shrink-0 font-ui text-[0.68rem] text-ink/55">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </label>
   );
 }
 
 const smallInput =
-  "h-7 rounded-none border-ink/20 bg-transparent px-1.5 text-right text-[11px] tabular-nums shadow-none focus-visible:border-ink focus-visible:ring-0";
+  "field-compact h-7 border-[var(--edge)] bg-[var(--surface-card)] px-1.5 text-right text-[0.7rem] shadow-none focus-visible:ring-0";
 
 function PreflightPanel({
   issues,
@@ -121,7 +119,7 @@ function PreflightPanel({
 
   return (
     <div className="space-y-1.5">
-      <p className="flex items-center justify-between font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
+      <p className="section-label flex items-center justify-between">
         <span>Preflight</span>
         <span className={errorCount > 0 ? "text-[var(--red)]" : undefined}>
           {issues.length === 0

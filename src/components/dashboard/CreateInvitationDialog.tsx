@@ -127,9 +127,7 @@ function Field({
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <span className="block font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
-        {label}
-      </span>
+      <span className="section-label block">{label}</span>
       {children}
       {note && (
         <span className="block text-[10px] leading-relaxed text-ink/45">
@@ -158,10 +156,10 @@ function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "border px-2.5 py-1.5 text-left font-ui text-[10px] tracking-[0.02em] transition-colors",
+        "pressable h-7 rounded-full border px-2.5 text-left font-ui text-[0.66rem] font-medium tracking-[0.02em] transition-colors",
         active
-          ? "border-ink bg-ink text-[var(--paper)]"
-          : "border-ink/15 text-ink/65 hover:border-ink/45 hover:text-ink",
+          ? "border-ink bg-ink text-[var(--paper-light)]"
+          : "border-[var(--edge)] text-ink/65 hover:border-[var(--edge-strong)] hover:text-ink",
       )}
     >
       {children}
@@ -764,9 +762,7 @@ function ScratchSetup({
 
         <div className="space-y-3">
           <div className="flex items-baseline justify-between">
-            <span className="font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
-              Page size
-            </span>
+            <span className="section-label">Page size</span>
             <div className="flex gap-1">
               {DESIGN_UNITS.map((item) => (
                 <Chip

@@ -28,6 +28,7 @@ import { TEMPLATES, type InvitationTemplate } from "@/lib/invitation";
 import { OPENING_EXPERIENCES } from "@/lib/design";
 import type { ShapeKind } from "@/lib/design";
 import { PALETTES, PALETTE_GROUPS, type ColourPalette } from "@/lib/palettes";
+import { paletteSwatches as deriveSwatches } from "@/lib/library-colour";
 import { cn } from "@/lib/utils";
 import {
   Bookmark,
@@ -1126,19 +1127,10 @@ export function LibraryPanel({
   }, [query, paletteGroup]);
 
   /** The distinct colours of the curated palettes, as single swatches. */
-  const paletteSwatches = useMemo(() => {
-    const seen = new Set<string>();
-    const list: { hex: string; palette: string }[] = [];
-    for (const palette of filteredPalettes) {
-      for (const hex of [palette.paper, palette.ink, palette.accent]) {
-        const key = hex.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        list.push({ hex, palette: palette.name });
-      }
-    }
-    return list;
-  }, [filteredPalettes]);
+  const paletteSwatches = useMemo(
+    () => deriveSwatches(filteredPalettes),
+    [filteredPalettes],
+  );
 
   const selectedFontId =
     selectedIds.length === 1
