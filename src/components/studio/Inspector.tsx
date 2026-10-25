@@ -43,6 +43,8 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FlipHorizontal,
+  FlipVertical,
   Group,
   ImagePlus,
   Lock,
@@ -412,6 +414,26 @@ export function Inspector({
             />
           </Row>
         </div>
+        <Row label="Flip">
+          <div className="flex justify-end gap-1">
+            <IconButton
+              size="sm"
+              label={element.flipX ? "Undo horizontal flip" : "Flip horizontally"}
+              active={Boolean(element.flipX)}
+              onClick={() => patch({ flipX: !element.flipX })}
+            >
+              <FlipHorizontal className="size-3.5" />
+            </IconButton>
+            <IconButton
+              size="sm"
+              label={element.flipY ? "Undo vertical flip" : "Flip vertically"}
+              active={Boolean(element.flipY)}
+              onClick={() => patch({ flipY: !element.flipY })}
+            >
+              <FlipVertical className="size-3.5" />
+            </IconButton>
+          </div>
+        </Row>
         <div className="flex items-center gap-2">
           <Maximize2 className="size-3.5 text-ink/45" />
           <span className="text-[10px] text-ink/50">Lock aspect while resizing</span>

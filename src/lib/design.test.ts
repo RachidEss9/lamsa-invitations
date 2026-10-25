@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { isDesignDocument, normalizeDesign, type DesignDocument } from "./design";
+import {
+  elementStyleAt,
+  isDesignDocument,
+  normalizeDesign,
+  type DesignDocument,
+} from "./design";
 import type { InvitationContent } from "./invitation";
 
 const content: InvitationContent = {
@@ -125,6 +130,27 @@ describe("normalizeDesign save/reload consistency", () => {
     expect(isDesignDocument({})).toBe(false);
     expect(isDesignDocument({ pages: [] })).toBe(false);
     expect(isDesignDocument({ pages: [{ elements: "no" }] })).toBe(false);
+  });
+
+  it("keeps layer flips through save and reload and mirrors them when drawn", () => {
+    const saved = normalizeDesign(
+      { pages: [{ elements: [{ id: "s1", kind: "shape", flipX: true, flipY: true }] }] },
+      content,
+    );
+    const reloaded = normalizeDesign(JSON.parse(JSON.stringify(saved)), content);
+    const shape = reloaded.pages[0].elements[0];
+    expect(shape.flipX).toBe(true);
+    expect(shape.flipY).toBe(true);
+
+    const transform = String(elementStyleAt(shape, 100000).style.transform);
+    expect(transform).toContain("scaleX(-1)");
+    expect(transform).toContain("scaleY(-1)");
+
+    const plain = elementStyleAt(
+      { ...shape, flipX: undefined, flipY: undefined },
+      100000,
+    ).style.transform;
+    expect(String(plain)).not.toContain("scaleX");
   });
 
   it("normalised output matches the DesignDocument shape after JSON storage", () => {

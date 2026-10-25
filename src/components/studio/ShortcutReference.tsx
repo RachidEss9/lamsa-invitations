@@ -45,6 +45,8 @@ function shortcutsFor(mac: boolean): Shortcut[] {
     { keys: [mod, shift, "G"], action: "Ungroup selected layers", group: "Selection" },
     { keys: [mod, shift, "L"], action: "Lock or unlock selected layers", group: "Selection" },
     { keys: [mod, shift, "H"], action: "Hide or show selected layers", group: "Selection" },
+    { keys: [shift, "H"], action: "Flip selected layers horizontally", group: "Selection" },
+    { keys: [shift, "V"], action: "Flip selected layers vertically", group: "Selection" },
     { keys: [mod, "]"], action: "Bring selected layers to the front", group: "Selection" },
     { keys: [mod, "["], action: "Send selected layers to the back", group: "Selection" },
     { keys: ["↑", "↓", "←", "→"], action: "Nudge by 1 px", group: "Canvas" },

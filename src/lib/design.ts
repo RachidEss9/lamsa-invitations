@@ -172,6 +172,9 @@ export interface DesignElement {
   w: number;
   h: number;
   rotation: number;
+  /** Mirror the layer in its own axes. Purely visual: geometry never changes. */
+  flipX?: boolean;
+  flipY?: boolean;
   opacity: number;
   locked: boolean;
   hidden: boolean;
@@ -829,9 +832,13 @@ export function elementStyleAt(
   options: { seekable?: boolean; ignoreExit?: boolean } = {},
 ): AnimatedStyle {
   const animation = element.animation;
+  // Mirroring is composed after the rotation, so a flipped layer still turns
+  // around its own centre exactly as it did before it was mirrored.
+  const flip = `${element.flipX ? " scaleX(-1)" : ""}${element.flipY ? " scaleY(-1)" : ""}`;
   const base: CSSProperties = {
     opacity: element.opacity,
-    transform: `rotate(${element.rotation}deg)`,
+    transform: `rotate(${element.rotation}deg)${flip}`,
+    transformOrigin: "center center",
   };
 
   if (!animation.enabled || animation.preset === "none") {
@@ -848,7 +855,7 @@ export function elementStyleAt(
   const motion = motionFor(animation.preset, waiting ? 0 : p, 1);
 
   let opacity = element.opacity * (waiting ? 0 : motion.opacity);
-  let transform = `${motion.transform ? `${motion.transform} ` : ""}rotate(${element.rotation}deg)`;
+  let transform = `${motion.transform ? `${motion.transform} ` : ""}rotate(${element.rotation}deg)${flip}`;
   let filter = motion.filter;
   let clipPath = motion.clipPath;
 
@@ -1399,6 +1406,10 @@ export function normalizeDesign(
       const elements = (page.elements ?? []).map((element) => ({
         ...makeElement(element.kind ?? "shape"),
         ...element,
+        // Mirroring is stored as flags, never as negative geometry, so older
+        // designs load unmirrored and a flip survives every save round-trip.
+        flipX: element.flipX ? true : undefined,
+        flipY: element.flipY ? true : undefined,
         animation: {
           ...defaultAnimation(),
           ...(element.animation ?? {}),

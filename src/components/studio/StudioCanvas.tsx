@@ -15,6 +15,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
+import { equalSpacingGuides, type SpacingSegments } from "@/lib/smart-guides";
 
 type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -30,6 +31,8 @@ export type CanvasContextAction =
   | "unlock"
   | "hide"
   | "show"
+  | "flipX"
+  | "flipY"
   | "front"
   | "back"
   | "selectAll";
@@ -234,6 +237,8 @@ function ContextMenuBody({
           label: hidden ? "Show layer" : "Hide layer",
           shortcut: `${shift}${mod}H`,
         },
+        { action: "flipX", label: "Flip horizontally", shortcut: `${shift}H` },
+        { action: "flipY", label: "Flip vertically", shortcut: `${shift}V` },
         { action: "front", label: "Bring to front", shortcut: `${mod}]` },
         { action: "back", label: "Send to back", shortcut: `${mod}[` },
       ]
@@ -246,15 +251,15 @@ function ContextMenuBody({
     <div
       role="menu"
       aria-label="Canvas actions"
-      className="fixed z-[120] w-[214px] border border-ink/20 bg-[#f7f6f2] py-1 shadow-[0_18px_50px_rgba(22,22,22,0.22)]"
+      className="fixed z-[120] w-[218px] overflow-hidden rounded-[var(--radius-card)] border border-[var(--edge)] bg-[var(--surface-overlay)] py-1.5 shadow-[var(--shadow-sheet)]"
       style={{
-        left: Math.min(menu.x, window.innerWidth - 224),
-        top: Math.min(menu.y, window.innerHeight - 380),
+        left: Math.max(8, Math.min(menu.x, window.innerWidth - 230)),
+        top: Math.max(8, Math.min(menu.y, window.innerHeight - 400)),
       }}
       onPointerDown={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
     >
-      <p className="px-3 pb-1 pt-1.5 font-meta text-[8px] uppercase tracking-[0.18em] text-ink/35">
+      <p className="section-label px-3 pb-1.5 pt-1">
         {menu.elementId ? "Layer" : "Canvas"}
       </p>
       {items.map((item) => (
@@ -268,15 +273,17 @@ function ContextMenuBody({
             onClose();
           }}
           className={cn(
-            "flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] transition-colors hover:bg-ink hover:text-[#f2f1ed] disabled:cursor-not-allowed disabled:opacity-35",
-            item.divider && "mt-1 border-t border-ink/10 pt-2",
+            "mx-1 flex w-[calc(100%-0.5rem)] items-center justify-between rounded-[var(--radius-control)] px-2.5 py-1.5 text-left font-ui text-[12px] text-ink/80 transition-colors hover:bg-[var(--accent)] hover:text-ink disabled:cursor-not-allowed disabled:opacity-35",
+            item.divider && "mt-1 border-t border-[var(--edge)] pt-2",
           )}
         >
           <span>{item.label}</span>
-          {item.shortcut && <span className="text-[9px] opacity-50">{item.shortcut}</span>}
+          {item.shortcut && (
+            <span className="font-meta text-[9px] text-ink/35">{item.shortcut}</span>
+          )}
         </button>
       ))}
-      <p className="border-t border-ink/10 px-3 pb-1 pt-1.5 text-[8px] leading-relaxed text-ink/35">
+      <p className="mx-1 mt-1 border-t border-[var(--edge)] px-2 pt-1.5 pb-0.5 text-[9px] leading-relaxed text-ink/35">
         Space + drag to pan · Wheel to zoom
       </p>
     </div>
@@ -317,6 +324,8 @@ export function StudioCanvas({
   const [fit, setFit] = useState(0);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
+  // Equal-gap guides, drawn as short dashes across the two matching gaps.
+  const [spacing, setSpacing] = useState<SpacingSegments[]>([]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panning, setPanning] = useState(false);
@@ -582,6 +591,33 @@ export function StudioCanvas({
           } else {
             setGuides((previous) => ({ ...previous, y: [] }));
           }
+
+          /* Equal gaps fill only the axes an edge or centre snap did not
+             claim, so the two systems can never pull the layer apart. */
+          const spacingSnap = equalSpacingGuides(
+            {
+              x: anchor.x + snapDx,
+              y: anchor.y + snapDy,
+              w: anchor.w,
+              h: anchor.h,
+            },
+            page.elements.filter(
+              (candidate) =>
+                candidate.id !== anchor.id && !candidate.hidden && !candidate.locked,
+            ),
+            SNAP_THRESHOLD,
+          );
+          if (xSnap === undefined) snapDx += spacingSnap.dx;
+          if (ySnap === undefined) snapDy += spacingSnap.dy;
+          setSpacing(
+            spacingSnap.segments.filter((segment) =>
+              segment.orientation === "vertical"
+                ? xSnap === undefined
+                : ySnap === undefined,
+            ),
+          );
+        } else {
+          setSpacing([]);
         }
 
         const moves = [...current.originals.values()].map((element) => ({
@@ -772,6 +808,7 @@ export function StudioCanvas({
     const end = () => {
       setDrag(null);
       setGuides({ x: [], y: [] });
+      setSpacing([]);
     };
 
     window.addEventListener("pointermove", handleMove);
@@ -1210,12 +1247,35 @@ export function StudioCanvas({
 
           {/* Centre guides the drag is currently snapping to. They sit above
               the artwork but below the handles so they never hide a control. */}
-          {(guides.x.length > 0 || guides.y.length > 0) && (
+          {(guides.x.length > 0 || guides.y.length > 0 || spacing.length > 0) && (
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0"
               style={{ zIndex: 55 }}
             >
+              {spacing.map((segment, index) =>
+                segment.orientation === "vertical" ? (
+                  <span
+                    key={`spacing-v-${index}`}
+                    className="absolute border-l border-dashed border-[#710014]/55"
+                    style={{
+                      left: segment.at,
+                      top: Math.min(segment.from, segment.to),
+                      height: Math.abs(segment.to - segment.from),
+                    }}
+                  />
+                ) : (
+                  <span
+                    key={`spacing-h-${index}`}
+                    className="absolute border-t border-dashed border-[#710014]/55"
+                    style={{
+                      top: segment.at,
+                      left: Math.min(segment.from, segment.to),
+                      width: Math.abs(segment.to - segment.from),
+                    }}
+                  />
+                ),
+              )}
               {guides.x.map((x) => (
                 <span
                   key={`x-${x}`}

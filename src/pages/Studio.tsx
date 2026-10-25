@@ -8,6 +8,7 @@ import { GuestExperience } from "@/components/studio/GuestExperience";
 import { SequentialGuestPreview } from "@/components/studio/SequentialGuestPreview";
 import { ColourPanel } from "@/components/studio/ColourPanel";
 import { Inspector } from "@/components/studio/Inspector";
+import { LayersPanel } from "@/components/studio/LayersPanel";
 import {
   LibraryPanel,
   ShapePreview,
@@ -658,6 +659,21 @@ export default function Studio() {
     : [];
   const deletableSelection = selected.filter(isDeletable);
   const canDeleteSelection = !canvasEditing && deletableSelection.length > 0;
+
+  // Pictures and decorative frames keep their proportions when resized, so a
+  // portrait can never be squashed by accident. The inspector switch still
+  // unlocks the ratio deliberately, and text keeps its free box resizing.
+  const aspectDefaultKey = selectedIds.length === 1 ? selectedIds[0] : "";
+  useEffect(() => {
+    if (!aspectDefaultKey) return;
+    const current = designRef.current;
+    const element = current?.pages[pageIndex]?.elements.find(
+      (candidate) => candidate.id === aspectDefaultKey,
+    );
+    if (!element) return;
+    setAspectLocked(element.kind === "image" || Boolean(element.frameArt));
+  }, [aspectDefaultKey, pageIndex]);
+
   const selectedAnimations = selected.map((element) => element.animation);
   const published = invitation?.status === "published";
   const publicLink = invitation ? `${window.location.origin}/i/${invitation.slug}` : "";
@@ -1033,6 +1049,93 @@ export default function Studio() {
     }
   };
 
+  /* Layer-panel actions act on one explicit layer, so a row can be renamed,
+     copied, or deleted without changing what is selected on the canvas. */
+  const renameLayer = (layerId: string, name: string) => {
+    const clean = name.trim();
+    if (!clean) return;
+    setPageElements((elements) =>
+      elements.map((element) =>
+        element.id === layerId ? { ...element, name: clean } : element,
+      ),
+    );
+  };
+
+  const duplicateLayer = (layerId: string) => {
+    let created: string[] = [];
+    setPageElements((elements) => {
+      const before = new Set(elements.map((element) => element.id));
+      const next = duplicateElements(elements, [layerId]);
+      created = next
+        .filter((element) => !before.has(element.id))
+        .map((element) => element.id);
+      return next;
+    });
+    if (created.length > 0) {
+      setSelectedIds(created);
+      setAnimating(false);
+      toast.success("Layer duplicated.");
+    }
+  };
+
+  const deleteLayer = (layerId: string) => {
+    if (canvasEditing) {
+      toast.error("Finish editing the text before deleting a layer.");
+      return;
+    }
+    if (!page) return;
+    const outcome = removeElements(page.elements, [layerId]);
+    if (outcome.removed.length === 0) {
+      if (outcome.blocked.length > 0) {
+        toast.error("Locked layers are protected. Unlock to delete.");
+      }
+      return;
+    }
+    setPageElements(() => outcome.elements);
+    setSelectedIds((previous) => previous.filter((id) => id !== layerId));
+    toast.success("Layer deleted. Undo with ⌘/Ctrl + Z.");
+  };
+
+  const toggleLayerHidden = (layerId: string) => {
+    setPageElements((elements) =>
+      elements.map((element) =>
+        element.id === layerId ? { ...element, hidden: !element.hidden } : element,
+      ),
+    );
+  };
+
+  const toggleLayerLocked = (layerId: string) => {
+    setPageElements((elements) =>
+      elements.map((element) =>
+        element.id === layerId ? { ...element, locked: !element.locked } : element,
+      ),
+    );
+  };
+
+  /** +1 moves the layer towards the front of the stack. */
+  const nudgeLayer = (layerId: string, direction: -1 | 1) => {
+    setPageElements((elements) => {
+      const from = elements.findIndex((element) => element.id === layerId);
+      const to = from + direction;
+      if (from < 0 || to < 0 || to >= elements.length) return elements;
+      const next = [...elements];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+  };
+
+  const placeLayer = (layerId: string, targetId: string) => {
+    setPageElements((elements) => {
+      const from = elements.findIndex((element) => element.id === layerId);
+      const to = elements.findIndex((element) => element.id === targetId);
+      if (from < 0 || to < 0 || from === to) return elements;
+      const next = [...elements];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
   const copySelection = () => {
     if (selected.length === 0) return;
     clipboardRef.current = selected.map((element) => ({ ...element }));
@@ -1080,6 +1183,24 @@ export default function Studio() {
       ),
     );
     toast.success(hidden ? "Selection hidden." : "Selection shown.");
+  };
+
+  /** Mirrors every unlocked selected layer in its own axes. */
+  const flipSelection = (axis: "x" | "y") => {
+    const targets = selected.filter((element) => !element.locked);
+    if (targets.length === 0) {
+      toast.error("Unlock a layer to flip it.");
+      return;
+    }
+    const ids = new Set(targets.map((element) => element.id));
+    setPageElements((elements) =>
+      elements.map((element) => {
+        if (!ids.has(element.id)) return element;
+        return axis === "x"
+          ? { ...element, flipX: !element.flipX }
+          : { ...element, flipY: !element.flipY };
+      }),
+    );
   };
 
   const moveSelectionToEdge = (edge: "front" | "back") => {
@@ -1373,6 +1494,12 @@ export default function Studio() {
       case "selectAll":
         selectAll();
         break;
+      case "flipX":
+        flipSelection("x");
+        break;
+      case "flipY":
+        flipSelection("y");
+        break;
     }
   };
 
@@ -1436,15 +1563,19 @@ export default function Studio() {
 
   const alignSelection = (kind: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") => {
     if (!page) return;
+    // The page can be any size the host chose, so alignment uses its real
+    // geometry instead of the classic 1000 × 1333 card.
+    const { width, height } = pageSizeOf(page);
+    const inset = Math.max(16, Math.round(width * 0.04));
     setPageElements((elements) =>
       elements.map((element) => {
         if (!selectedIds.includes(element.id)) return element;
-        if (kind === "left") return { ...element, x: 40 };
-        if (kind === "right") return { ...element, x: 1000 - 40 - element.w };
-        if (kind === "hcenter") return { ...element, x: (1000 - element.w) / 2 };
-        if (kind === "top") return { ...element, y: 40 };
-        if (kind === "bottom") return { ...element, y: 1333.33 - 40 - element.h };
-        return { ...element, y: (1333.33 - element.h) / 2 };
+        if (kind === "left") return { ...element, x: inset };
+        if (kind === "right") return { ...element, x: width - inset - element.w };
+        if (kind === "hcenter") return { ...element, x: (width - element.w) / 2 };
+        if (kind === "top") return { ...element, y: inset };
+        if (kind === "bottom") return { ...element, y: height - inset - element.h };
+        return { ...element, y: (height - element.h) / 2 };
       }),
     );
   };
@@ -1891,6 +2022,16 @@ export default function Studio() {
         fitCanvas();
         return;
       }
+      if (!mod && event.shiftKey && key === "h") {
+        event.preventDefault();
+        flipSelection("x");
+        return;
+      }
+      if (!mod && event.shiftKey && key === "v") {
+        event.preventDefault();
+        flipSelection("y");
+        return;
+      }
       if (!mod && !event.altKey && key === "p") {
         event.preventDefault();
         setPlaying((value) => !value);
@@ -2183,109 +2324,31 @@ export default function Studio() {
 
     if (leftPanel === "layers") {
       return (
-        <>
-          <PanelHeading title="Layers" note={`${page.elements.length} layers · front to back · drag to reorder`} />
-          <div className="p-2">
-            {[...page.elements].reverse().map((element) => {
-              const active = selectedIds.includes(element.id);
-              return (
-                <div
-                  key={element.id}
-                  draggable
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/plain", element.id);
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const draggedId = event.dataTransfer.getData("text/plain");
-                    if (!draggedId || draggedId === element.id) return;
-                    setPageElements((elements) => {
-                      const visual = [...elements].reverse();
-                      const from = visual.findIndex((item) => item.id === draggedId);
-                      const to = visual.findIndex((item) => item.id === element.id);
-                      if (from < 0 || to < 0) return elements;
-                      const [moved] = visual.splice(from, 1);
-                      visual.splice(to, 0, moved);
-                      return visual.reverse();
-                    });
-                  }}
-                  className={cn(
-                    "flex w-full items-center gap-1.5 border-b border-ink/8 py-1 pl-1 pr-1.5 text-[11px]",
-                    active ? "bg-[var(--red)]/8 text-ink" : "text-ink/60 hover:bg-ink/4",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={(event) =>
-                      setSelectedIds((previous) => {
-                        if (event.shiftKey) {
-                          const next = new Set(previous);
-                          if (next.has(element.id)) next.delete(element.id);
-                          else next.add(element.id);
-                          return [...next];
-                        }
-                        return [element.id];
-                      })
-                    }
-                    className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
-                  >
-                    {element.frameArt ? (
-                      <Frame className="size-3 shrink-0 text-[var(--red)]" />
-                    ) : element.kind === "text" ? (
-                      <Type className="size-3 shrink-0" />
-                    ) : element.kind === "image" ? (
-                      <ImageIcon className="size-3 shrink-0" />
-                    ) : (
-                      <Shapes className="size-3 shrink-0" />
-                    )}
-                    <span className="min-w-0 flex-1 truncate">{element.name}</span>
-                    {element.groupId && <span className="size-1.5 rounded-full bg-[var(--gold)]" />}
-                  </button>
-                  <button
-                    type="button"
-                    title={element.hidden ? "Show layer" : "Hide layer"}
-                    aria-label={element.hidden ? "Show layer" : "Hide layer"}
-                    onClick={() =>
-                      setPageElements((elements) =>
-                        elements.map((item) =>
-                          item.id === element.id ? { ...item, hidden: !item.hidden } : item,
-                        ),
-                      )
-                    }
-                    className={cn("shrink-0 p-0.5", element.hidden ? "text-[var(--red)]" : "text-ink/35 hover:text-ink")}
-                  >
-                    {element.hidden ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
-                  </button>
-                  <button
-                    type="button"
-                    title={element.locked ? "Unlock layer" : "Lock layer"}
-                    aria-label={element.locked ? "Unlock layer" : "Lock layer"}
-                    onClick={() =>
-                      setPageElements((elements) =>
-                        elements.map((item) =>
-                          item.id === element.id ? { ...item, locked: !item.locked } : item,
-                        ),
-                      )
-                    }
-                    className={cn("shrink-0 p-0.5", element.locked ? "text-[var(--red)]" : "text-ink/35 hover:text-ink")}
-                  >
-                    {element.locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
-                  </button>
-                </div>
-              );
-            })}
-            <div className="mt-2 grid grid-cols-2 gap-1">
-              <Button type="button" variant="outline" className="h-8 rounded-none text-[10px]" onClick={groupSelection}>
-                Group
-              </Button>
-              <Button type="button" variant="outline" className="h-8 rounded-none text-[10px]" onClick={ungroupSelection}>
-                Ungroup
-              </Button>
-            </div>
-          </div>
-        </>
+        <LayersPanel
+          page={page}
+          selectedIds={selectedIds}
+          imageUrls={imageUrls}
+          onSelect={(ids) => {
+            setSelectedIds(ids);
+            setAnimating(false);
+            setPlaying(false);
+          }}
+          onPicked={mobileSheet === "layers" ? () => setMobileSheet(null) : undefined}
+          onRename={renameLayer}
+          onDuplicate={duplicateLayer}
+          onDelete={deleteLayer}
+          onToggleHidden={toggleLayerHidden}
+          onToggleLocked={toggleLayerLocked}
+          onNudge={nudgeLayer}
+          onPlace={placeLayer}
+          onGroup={groupSelection}
+          onUngroup={ungroupSelection}
+          deleteHint={
+            canvasEditing
+              ? "Finish editing the text before deleting a layer."
+              : undefined
+          }
+        />
       );
     }
 
