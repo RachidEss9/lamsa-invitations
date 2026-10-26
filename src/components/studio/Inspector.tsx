@@ -357,14 +357,13 @@ export function Inspector({
     );
   }
 
-  if (!element) return null;
-
-  return (
+  if (!element) return null;  return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="border-b border-[var(--edge)] px-4 py-4">
         <p className="font-meta text-[9px] uppercase tracking-[0.18em] text-ink/45">
           {elementTypeLabel(element)}
         </p>
+
         <Input
           value={element.name}
           onChange={(event) => patch({ name: event.target.value })}
@@ -415,6 +414,7 @@ export function Inspector({
             />
           </Row>
         </div>
+
         <Row label="Flip">
           <div className="flex justify-end gap-1">
             <IconButton
@@ -435,6 +435,7 @@ export function Inspector({
             </IconButton>
           </div>
         </Row>
+
         <div className="flex items-center gap-2">
           <Maximize2 className="size-3.5 text-ink/45" />
           <span className="text-[10px] text-ink/50">Lock aspect while resizing</span>
@@ -443,7 +444,9 @@ export function Inspector({
             onCheckedChange={onAspectLocked}
             className="ml-auto scale-90"
           />
-        </div>          <div className="grid grid-cols-6 gap-1">
+        </div>
+
+        <div className="grid grid-cols-6 gap-1">
           {[
             { kind: "left", icon: AlignStartVertical, label: "Align left" },
             { kind: "hcenter", icon: AlignCenterVertical, label: "Centre horizontally" },
@@ -464,6 +467,7 @@ export function Inspector({
             </button>
           ))}
         </div>
+
         <div className="grid grid-cols-3 gap-1">
           <IconButton
             label="Send to back"
@@ -506,123 +510,125 @@ export function Inspector({
 
       {element.kind === "text" && (
         <>
-        <Section title="Content">
-          <Textarea
-            value={element.text ?? ""}
-            onChange={(event) => patch({ text: event.target.value })}
-            rows={3}
-            className="rounded-none text-[11px] leading-relaxed"
-          />
-          {onEditText && (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 w-full rounded-none text-[9px] uppercase tracking-[0.1em]"
-              onClick={() => onEditText(element.id)}
-            >
-              Edit wording on canvas
-            </Button>
-          )}
-        </Section>
-        <Section title="Typography">
-          <TypographyStudio
-            element={element}
-            activeFont={activeFont}
-            onPatch={patch}
-            onEditText={onEditText}
-          />
-        </Section>
-        <Section title="Text box">
-          <p className="text-[9px] leading-relaxed text-ink/40">
-            The box and the type scale are independent: resize the layer on the
-            canvas to rewrap the words, and the font size stays exactly as set.
-          </p>
-          <Row label="Vertical">
-            <div className="flex gap-1">
-              {(["top", "middle", "bottom"] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => patch({ verticalAlign: value })}
-                  className={cn(
-                    "h-7 flex-1 border text-[9px] uppercase tracking-[0.08em]",
-                    (element.verticalAlign ?? "middle") === value
-                      ? "border-ink bg-ink text-[#f2f1ed]"
-                      : "border-ink/15 text-ink/60 hover:border-ink",
-                  )}
-                >
-                  {value === "middle" ? "Mid" : value}
-                </button>
-              ))}
+          <Section title="Content">
+            <Textarea
+              value={element.text ?? ""}
+              onChange={(event) => patch({ text: event.target.value })}
+              rows={3}
+              className="rounded-none text-[11px] leading-relaxed"
+            />
+            {onEditText && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 w-full rounded-none text-[9px] uppercase tracking-[0.1em]"
+                onClick={() => onEditText(element.id)}
+              >
+                Edit wording on canvas
+              </Button>
+            )}
+          </Section>
+          <Section title="Typography">
+            <TypographyStudio
+              element={element}
+              activeFont={activeFont}
+              onPatch={patch}
+              onEditText={onEditText}
+            />
+          </Section>
+          <Section title="Text box">
+            <p className="text-[9px] leading-relaxed text-ink/40">
+              The box and the type scale are independent: resize the layer on the
+              canvas to rewrap the words, and the font size stays exactly as set.
+            </p>
+            <Row label="Vertical">
+              <div className="flex gap-1">
+                {(["top", "middle", "bottom"] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => patch({ verticalAlign: value })}
+                    className={cn(
+                      "h-7 flex-1 border text-[9px] uppercase tracking-[0.08em]",
+                      (element.verticalAlign ?? "middle") === value
+                        ? "border-ink bg-ink text-[#f2f1ed]"
+                        : "border-ink/15 text-ink/60 hover:border-ink",
+                    )}
+                  >
+                    {value === "middle" ? "Mid" : value}
+                  </button>
+                ))}
+              </div>
+            </Row>
+            <div className="border-t border-ink/10 pt-2">
+              <ToggleRow
+                label="Text background"
+                checked={Boolean(element.textBackground)}
+                onChange={(enabled) =>
+                  patch({
+                    textBackground: enabled ? "#f2f1ed" : undefined,
+                    textPadding: enabled ? (element.textPadding ?? 14) : 0,
+                  })
+                }
+              />
+              {element.textBackground ? (
+                <div className="mt-2 space-y-2">
+                  <Row label="Fill">
+                    <ColorField
+                      value={element.textBackground}
+                      onChange={(textBackground) => patch({ textBackground })}
+                      allowTransparent
+                    />
+                  </Row>
+                  <Row label="Padding">
+                    <NumberField
+                      value={element.textPadding ?? 14}
+                      onChange={(textPadding) => patch({ textPadding })}
+                      min={0}
+                    />
+                  </Row>
+                  <Row label="Radius">
+                    <NumberField
+                      value={element.textRadius ?? 0}
+                      onChange={(textRadius) => patch({ textRadius })}
+                      min={0}
+                    />
+                  </Row>
+                </div>
+              ) : null}
+              <ToggleRow
+                label="Box border"
+                checked={(element.textBorderWidth ?? 0) > 0}
+                onChange={(enabled) =>
+                  patch({
+                    textBorderWidth: enabled ? 1 : 0,
+                    textBorder: enabled ? (element.textBorder ?? element.color ?? "#161616") : undefined,
+                  })
+                }
+              />
+              {(element.textBorderWidth ?? 0) > 0 && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Row label="Ink">
+                    <ColorField
+                      value={element.textBorder ?? "#161616"}
+                      onChange={(textBorder) => patch({ textBorder })}
+                    />
+                  </Row>
+                  <Row label="Width">
+                    <NumberField
+                      value={element.textBorderWidth ?? 1}
+                      onChange={(textBorderWidth) => patch({ textBorderWidth })}
+                      min={0}
+                      max={20}
+                    />
+                  </Row>
+                </div>
+              )}
             </div>
-          </Row>
-          <div className="border-t border-ink/10 pt-2">
-            <ToggleRow
-              label="Text background"
-              checked={Boolean(element.textBackground)}
-              onChange={(enabled) =>
-                patch({
-                  textBackground: enabled ? "#f2f1ed" : undefined,
-                  textPadding: enabled ? (element.textPadding ?? 14) : 0,
-                })
-              }
-            />
-            {element.textBackground && (
-              <div className="mt-2 space-y-2">
-                <Row label="Fill">
-                  <ColorField
-                    value={element.textBackground}
-                    onChange={(textBackground) => patch({ textBackground })}
-                    allowTransparent
-                  />
-                </Row>
-                <Row label="Padding">
-                  <NumberField
-                    value={element.textPadding ?? 14}
-                    onChange={(textPadding) => patch({ textPadding })}
-                    min={0}
-                  />
-                </Row>
-                <Row label="Radius">
-                  <NumberField
-                    value={element.textRadius ?? 0}
-                    onChange={(textRadius) => patch({ textRadius })}
-                    min={0}
-                  />
-                </Row>
-              </div>
-            )}
-            <ToggleRow
-              label="Box border"
-              checked={(element.textBorderWidth ?? 0) > 0}
-              onChange={(enabled) =>
-                patch({
-                  textBorderWidth: enabled ? 1 : 0,
-                  textBorder: enabled ? (element.textBorder ?? element.color ?? "#161616") : undefined,
-                })
-              }
-            />
-            {(element.textBorderWidth ?? 0) > 0 && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <Row label="Ink">
-                  <ColorField
-                    value={element.textBorder ?? "#161616"}
-                    onChange={(textBorder) => patch({ textBorder })}
-                  />
-                </Row>
-                <Row label="Width">
-                  <NumberField
-                    value={element.textBorderWidth ?? 1}
-                    onChange={(textBorderWidth) => patch({ textBorderWidth })}
-                    min={0}
-                    max={20}
-                  />
-                </Row>
-              </div>
-            )}
-          </div>
-        </Section>
-      )}
+          </Section>
+        )}
+
+
 
       {element.kind === "image" && (
         <Section title="Image">
@@ -822,8 +828,8 @@ export function Inspector({
                   <SelectItem key={preset.id} value={preset.id}>{preset.label}</SelectItem>
                 ))}
               </SelectContent>
-            </Select>
-          </Row>
+            </Select>          </Row>
+
           <Row label="Play when">
             <Select
               value={animation.trigger}
@@ -838,15 +844,18 @@ export function Inspector({
               </SelectContent>
             </Select>
           </Row>
+
           <p className="text-[9px] leading-relaxed text-ink/40">
             Entry animations run when this page opens, or wait until the card is
             scrolled into view. Retime them on the timeline, or add an interactive
             cover for a tap reveal.
           </p>
+
           <div className="grid grid-cols-2 gap-2">
             <Row label="Delay ms"><NumberField value={animation.delay} onChange={(delay) => patchAnimation({ delay })} min={0} step={50} /></Row>
             <Row label="Length ms"><NumberField value={animation.duration} onChange={(duration) => patchAnimation({ duration })} min={100} step={50} /></Row>
           </div>
+
           <Row label="Easing">
             <Select
               value={animation.easing}
@@ -860,6 +869,7 @@ export function Inspector({
               </SelectContent>
             </Select>
           </Row>
+
           <div className="border-t border-ink/10 pt-2">
             <ToggleRow
               label="Exit after time"
@@ -876,6 +886,7 @@ export function Inspector({
                 })
               }
             />
+
             {element.exit?.enabled && (
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <Row label="Exit at ms">
@@ -887,6 +898,7 @@ export function Inspector({
               </div>
             )}
           </div>
+
           <Button type="button" variant="outline" className="h-8 w-full rounded-none text-[10px]" onClick={onPreviewAnimation}>
             <RotateCw className="size-3.5" /> Preview this animation
           </Button>
@@ -1003,3 +1015,7 @@ export function Inspector({
     </div>
   );
 }
+
+
+
+
