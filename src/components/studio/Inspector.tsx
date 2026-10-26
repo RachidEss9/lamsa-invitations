@@ -619,10 +619,9 @@ export function Inspector({
                   />
                 </Row>
               </div>
-            )}          <ToggleRow label="Box shadow" checked={Boolean(element.textShadow)} onChange={(textShadow) => patch({ textShadow })} />
+            )}
           </div>
         </Section>
-        </>
       )}
 
       {element.kind === "image" && (
