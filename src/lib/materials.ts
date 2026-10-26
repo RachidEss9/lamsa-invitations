@@ -592,11 +592,18 @@ function buildTile(material: LayerMaterial): string {
       );
     }
 
+    // A raised face and a pressed cavity take the tooth differently, so each
+    // gets its own grain rather than sharing one tile.
     case "emboss":
-    case "deboss":
       return svgTile(
         noise("tooth", 0.8, 3, 47, 0.38 * i) +
           noise("mottle", 0.025, 2, 53, 0.14 * i),
+      );
+
+    case "deboss":
+      return svgTile(
+        noise("tooth", 1.05, 3, 61, 0.34 * i) +
+          noise("mottle", 0.03, 2, 67, 0.18 * i),
       );
 
     case "wax":

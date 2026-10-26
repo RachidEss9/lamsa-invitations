@@ -44,6 +44,7 @@ describe("material rendering", () => {
       y: 100,
       w: 400,
       h: 600,
+      radius: 20,
       fill: "#f2f1ed",
       material: materialForPreset("gold"),
     });
@@ -171,8 +172,10 @@ describe("material rendering", () => {
 
     const embossMarkup = render(pageWith([emboss]));
     const debossMarkup = render(pageWith([deboss]));
-    const lightFirst = /box-shadow:inset [^;]*rgba\(255, 255, 255/;
-    const darkFirst = /box-shadow:inset [^;]*rgba\(22, 22, 22/;
+    // Stopped at the first comma, so each pattern only reads the leading
+    // shadow: which edge the light falls on, not whether both are present.
+    const lightFirst = /box-shadow:inset [^,]*rgba\(255, 255, 255/;
+    const darkFirst = /box-shadow:inset [^,]*rgba\(22, 22, 22/;
 
     expect(embossMarkup).toMatch(lightFirst);
     expect(embossMarkup).not.toMatch(darkFirst);

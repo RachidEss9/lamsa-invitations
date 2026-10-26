@@ -55,8 +55,8 @@ describe("material presets", () => {
     const categories = new Set(MATERIAL_PRESETS.map((preset) => preset.category));
     expect([...categories].sort()).toEqual([
       "Embellishment",
-      "Foil",
       "Finish",
+      "Foil",
       "Paper",
       "Relief",
     ]);
@@ -170,13 +170,14 @@ describe("overlay and relief", () => {
   it("reads embossing as light on the near edge and dark on the far one", () => {
     const emboss = materialReliefShadow({ ...materialForPreset("emboss"), relief: 0.8 })!;
     expect(emboss.startsWith("inset")).toBe(true);
-    const [light, dark] = emboss.split(", ");
+    // Split between the two shadows, not on a comma inside an rgba() channel.
+    const [light, dark] = emboss.split("), inset ");
     expect(light).toContain("rgba(255, 255, 255");
     expect(dark).toContain("rgba(22, 22, 22");
 
     // A deboss is the same edge lit from the other side.
     const deboss = materialReliefShadow({ ...materialForPreset("deboss"), relief: -0.8 })!;
-    const [shadowFirst, lightSecond] = deboss.split(", ");
+    const [shadowFirst, lightSecond] = deboss.split("), inset ");
     expect(shadowFirst).toContain("rgba(22, 22, 22");
     expect(lightSecond).toContain("rgba(255, 255, 255");
   });
@@ -291,12 +292,16 @@ describe("document compatibility", () => {
   });
 
   it("drops a malformed finish instead of drawing the wrong one", () => {
-    const damaged = JSON.parse(JSON.stringify(withMaterials)) as DesignDocument & {
-      pages: { material: unknown; elements: { material: unknown }[] }[];
-    };
-    damaged.pages[0].material = { preset: "chrome", intensity: 2 };
-    damaged.pages[0].elements[0].material = "gold";
-    const repaired = normalizeDesign(damaged as unknown as DesignDocument, content);
+    const damaged = JSON.parse(JSON.stringify(withMaterials)) as DesignDocument;
+    // A loose view over the same objects, so TypeScript does not check the
+    // corruption this test deliberately writes.
+    const loose = damaged.pages as unknown as {
+      material: unknown;
+      elements: { material: unknown }[];
+    }[];
+    loose[0].material = { preset: "chrome", intensity: 2 };
+    loose[0].elements[0].material = "gold";
+    const repaired = normalizeDesign(damaged, content);
     expect(repaired.pages[0].material).toBeUndefined();
     expect(repaired.pages[0].elements[0].material).toBeUndefined();
   });
@@ -310,7 +315,8 @@ describe("duplicating a layer", () => {
       shape: "rect",
       material: materialForPreset("gold"),
     });
-    const [copy] = duplicateElements([original], ["s1"]);
+    // duplicateElements keeps the original in place and appends the copy.
+    const [, copy] = duplicateElements([original], ["s1"]);
     expect(copy.id).not.toBe(original.id);
     expect(copy.material).toEqual(original.material);
 
