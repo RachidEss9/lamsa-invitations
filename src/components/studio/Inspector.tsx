@@ -626,9 +626,8 @@ export function Inspector({
               )}
             </div>
           </Section>
-        )}
-
-
+        </>
+      )}
 
       {element.kind === "image" && (
         <Section title="Image">
@@ -784,10 +783,10 @@ export function Inspector({
                   layer box. Keep Stroke width above zero to keep the frame visible.
                 </p>
               </div>
-            )
+            )}
           </div>
         </Section>
-      )})
+      )}
 
       {element.kind === "motif" && (
         <Section title="Ornament">
@@ -804,7 +803,7 @@ export function Inspector({
           <Row label="Ink"><ColorField value={element.color ?? "#161616"} onChange={(color) => patch({ color })} /></Row>
           <Row label="Weight"><NumberField value={element.strokeWidth ?? 0.8} onChange={(strokeWidth) => patch({ strokeWidth })} step={0.1} min={0.1} /></Row>
         </Section>
-      )})
+      )}
 
       <Section title="Effects">
         <EffectsInspector element={element} patch={patch} />

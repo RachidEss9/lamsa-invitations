@@ -17,11 +17,17 @@ import {
 } from "@/lib/effects";
 import { ensureDesignFonts, fontFamilyFor } from "@/lib/fonts";
 import { frameById } from "@/lib/frames";
+import {
+  curveIsActive,
+  curvedTextLines,
+  textAnchorFor,
+} from "@/lib/text-path";
 import { cn } from "@/lib/utils";
 import { FrameArt } from "./FrameArt";
 import { Motif } from "./Motif";
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -143,13 +149,11 @@ function ShapeArt({
         maskedImage ? (
           <image
             href={imageUrl}
-            width={100}
-            height={100}
             preserveAspectRatio="xMidYMid slice"
-            x={((1 - 1 / imageScale) * 50).toFixed(3)}
-            y={((1 - 1 / imageScale) * 50).toFixed(3)}
-            width={100 / imageScale}
-            height={100 / imageScale}
+            x={((1 - imageScale) * 50).toFixed(3)}
+            y={((1 - imageScale) * 50).toFixed(3)}
+            width={100 * imageScale}
+            height={100 * imageScale}
             clipPath={clipId ? `url(#${clipId})` : undefined}
             style={{ clipPath: `inset(0 round ${radius}px)` }}
           />
@@ -182,13 +186,11 @@ function ShapeArt({
         maskedImage ? (
           <image
             href={imageUrl}
-            width={100}
-            height={100}
             preserveAspectRatio="xMidYMid slice"
-            x={((1 - 1 / imageScale) * 50).toFixed(3)}
-            y={((1 - 1 / imageScale) * 50).toFixed(3)}
-            width={100 / imageScale}
-            height={100 / imageScale}
+            x={((1 - imageScale) * 50).toFixed(3)}
+            y={((1 - imageScale) * 50).toFixed(3)}
+            width={100 * imageScale}
+            height={100 * imageScale}
             clipPath={clipId ? `url(#${clipId})` : undefined}
             style={{ clipPath: "ellipse(50% 50% at 50% 50%)" }}
           />
@@ -209,13 +211,11 @@ function ShapeArt({
           {maskedImage && clipId ? (
             <image
               href={imageUrl}
-              width={100}
-              height={100}
               preserveAspectRatio="xMidYMid slice"
-              x={((1 - 1 / imageScale) * 50).toFixed(3)}
-              y={((1 - 1 / imageScale) * 50).toFixed(3)}
-              width={100 / imageScale}
-              height={100 / imageScale}
+              x={((1 - imageScale) * 50).toFixed(3)}
+              y={((1 - imageScale) * 50).toFixed(3)}
+              width={100 * imageScale}
+              height={100 * imageScale}
               clipPath={`url(#${clipId})`}
             />
           ) : (
@@ -231,6 +231,133 @@ function ShapeArt({
             />
           )}
         </>
+      )}
+    </svg>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Curved text                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Text on a path.
+ *
+ * The words stay real SVG `<text>` riding a `<textPath>`, so the browser still
+ * shapes Arabic, resolves bidi and personalises the guest's name exactly as the
+ * straight HTML path does — only the baseline bends. Every attribute mirrors
+ * the straight renderer: same family, size, weight, tracking, ink, gradient and
+ * glyph outline, so a curved layer and a straight one differ by one number.
+ *
+ * The arc itself is an invisible path drawn first, then each line is hung on
+ * it. Ids are namespaced per component instance because a design can be on
+ * screen more than once (canvas plus a preview) and a colliding gradient id
+ * would silently borrow the other layer's paint.
+ */
+export function CurvedText({
+  element,
+  direction,
+  text,
+  viewBox,
+}: {
+  element: DesignElement;
+  direction: "ltr" | "rtl";
+  text: string;
+  /**
+   * Frames the drawing without moving the geometry. Callers that need to see
+   * an arc rise past its box — a small specimen, for instance — widen the
+   * frame instead of growing the layer.
+   */
+  viewBox?: string;
+}) {
+  const instance = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const paintId = `lamsa-curve-${instance}-${element.id}`;
+  const width = Math.max(1, element.w);
+  const height = Math.max(1, element.h);
+  const fontSize = element.fontSize ?? 26;
+  const gradient = element.effects?.gradient;
+  const gradientText = Boolean(gradient?.enabled && gradient);
+  const glyphStroke = outlineWidth(element.effects);
+  const outline = element.effects?.outline;
+  const { anchor, offset } = textAnchorFor(element.align ?? "center", direction);
+  const lines = curvedTextLines({
+    text,
+    width,
+    height,
+    curve: element.curve ?? 0,
+    fontSize,
+    lineHeight: element.lineHeight ?? 1.4,
+    transform: {
+      uppercase: element.uppercase,
+      textTransform: element.textTransform,
+    },
+  });
+
+  return (
+    <svg
+      aria-hidden
+      className="h-full w-full"
+      viewBox={viewBox ?? `0 0 ${width} ${height}`}
+      preserveAspectRatio="xMidYMid meet"
+      // The arc deliberately rises past the box, exactly like a rotated layer,
+      // so the glyphs are never shaved off by the wrapper's edge.
+      style={{ overflow: "visible" }}
+    >
+      {gradientText && gradient && (
+        <defs>
+          <linearGradient
+            id={paintId}
+            x1="0"
+            y1="0.5"
+            x2="1"
+            y2="0.5"
+            gradientTransform={`rotate(${gradient.angle - 90} 0.5 0.5)`}
+          >
+            <stop
+              offset="0%"
+              stopColor={isHexColour(gradient.from) ? gradient.from : "#710014"}
+            />
+            <stop
+              offset="100%"
+              stopColor={isHexColour(gradient.to) ? gradient.to : "#c3a469"}
+            />
+          </linearGradient>
+        </defs>
+      )}
+      {lines.map((line, index) => (
+        <path
+          key={`baseline-${index}`}
+          id={`${paintId}-${index}`}
+          d={line.d}
+          fill="none"
+        />
+      ))}
+      {lines.map((line, index) =>
+        line.text.length === 0 ? null : (
+          <text
+            key={`line-${index}`}
+            fill={
+              gradientText
+                ? `url(#${paintId})`
+                : (element.color ?? "#161616")
+            }
+            stroke={glyphStroke > 0 && outline ? outline.color : undefined}
+            strokeWidth={glyphStroke > 0 ? glyphStroke : undefined}
+            fontFamily={fontFamilyFor(element.font ?? "cormorant-garamond")}
+            fontSize={fontSize}
+            fontWeight={element.fontWeight ?? 400}
+            fontStyle={element.italic ? "italic" : "normal"}
+            letterSpacing={`${element.letterSpacing ?? 0}em`}
+            textAnchor={anchor}
+            direction={direction}
+            xmlSpace="preserve"
+            style={{ textDecoration: element.textDecoration ?? "none" }}
+          >
+            <textPath href={`#${paintId}-${index}`} startOffset={offset}>
+              {line.text}
+            </textPath>
+          </text>
+        ),
       )}
     </svg>
   );
@@ -269,9 +396,16 @@ function ElementVisual({
     const gradientText = Boolean(gradient?.enabled);
     const glyphStroke = outlineWidth(element.effects);
     const outline = element.effects?.outline;
+    const curved = curveIsActive(element.curve);
     return (
       <div
-        className="flex h-full w-full overflow-hidden"
+        className={cn(
+          "flex h-full w-full",
+          // A curve rises past its box, so it escapes the edge the way a
+          // rotated layer does. Straight wording keeps the clipping it has
+          // always had, so nothing about existing cards changes.
+          curved ? "overflow-visible" : "overflow-hidden",
+        )}
         style={{
           alignItems:
             element.verticalAlign === "top"
@@ -285,11 +419,17 @@ function ElementVisual({
           border: borderWidth > 0 ? `${borderWidth}px solid ${element.textBorder ?? "transparent"}` : undefined,
           borderRadius: element.textRadius ?? 0,
           boxShadow: element.textShadow ? "0 18px 44px rgba(22,22,22,0.24)" : undefined,
-        }}
-      >
-        <div
-          className="w-full whitespace-pre-wrap break-words"
-          style={{
+        }}        >
+          {curved ? (
+            <CurvedText
+              element={element}
+              direction={direction}
+              text={personalize(element.text, guestName)}
+            />
+          ) : (
+            <div
+              className="w-full whitespace-pre-wrap break-words"
+              style={{
             fontFamily: fontFamilyFor(element.font ?? "cormorant-garamond"),
             fontSize: element.fontSize ?? 26,
             fontWeight: element.fontWeight ?? 400,
@@ -318,12 +458,13 @@ function ElementVisual({
             direction,
             unicodeBidi: element.direction === "auto" ? "plaintext" : "normal",
           }}
-          dir={direction}
-        >
-          {personalize(element.text, guestName)}
+            dir={direction}
+          >
+            {personalize(element.text, guestName)}
+          </div>
+          )}
         </div>
-      </div>
-    );
+      );
   }
 
   if (element.kind === "image") {

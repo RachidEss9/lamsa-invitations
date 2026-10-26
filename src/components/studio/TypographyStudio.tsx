@@ -7,7 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { CurvedText } from "@/components/invitation/DesignPageView";
 import { FontPicker } from "@/components/studio/FontPicker";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -18,6 +20,7 @@ import {
   type LayerEffects,
 } from "@/lib/effects";
 import { fontById, fontFamilyFor, type FontDef } from "@/lib/fonts";
+import { curveIsActive, normalizeCurve } from "@/lib/text-path";
 import type { DesignElement } from "@/lib/design";
 import {
   TYPE_ROLE_PRESETS,
@@ -163,9 +166,13 @@ export function TypographyStudio({
     return first && first.length > 0 ? first : "Amelia & Søren";
   }, [element.text]);
 
+  const curveValue = Math.round((element.curve ?? 0) * 100);
+  const curved = curveIsActive(element.curve);
+  const previewSize = Math.max(15, Math.min(30, (element.fontSize ?? 26) * 0.52));
+
   const previewStyle = {
     fontFamily: fontFamilyFor(element.font ?? "cormorant-garamond"),
-    fontSize: Math.max(15, Math.min(30, (element.fontSize ?? 26) * 0.52)),
+    fontSize: previewSize,
     fontWeight: element.fontWeight ?? 400,
     fontStyle: element.italic ? "italic" : "normal",
     letterSpacing: `${element.letterSpacing ?? 0}em`,
@@ -257,9 +264,28 @@ export function TypographyStudio({
         <p className="mb-2 text-center font-ui text-[8px] uppercase tracking-[0.18em] text-ink/35">
           Live preview
         </p>
-        <p className="break-words" style={previewStyle} dir={direction}>
-          {previewText}
-        </p>
+        {curved ? (
+          // The specimen draws the real arc, not a mock-up: same geometry
+          // helper, same font, same ink as the layer on the card. The frame is
+          // widened rather than the layer, so a full arch still fits in view.
+          <div className="h-30">
+            <CurvedText
+              element={{
+                ...element,
+                w: 240,
+                h: 56,
+                fontSize: previewSize,
+              }}
+              viewBox="-20 -30 280 120"
+              direction={direction === "rtl" ? "rtl" : "ltr"}
+              text={previewText}
+            />
+          </div>
+        ) : (
+          <p className="break-words" style={previewStyle} dir={direction}>
+            {previewText}
+          </p>
+        )}
         <p className="mt-2 text-center font-ui text-[8px] uppercase tracking-[0.12em] text-ink/30">
           {activeFont.name} · {element.fontSize ?? 26} px · {element.fontWeight ?? 400}
           {element.italic ? " · italic" : ""}
@@ -518,6 +544,47 @@ export function TypographyStudio({
             className="h-8 w-[88px] rounded-[var(--radius-control)] border-[var(--edge)] px-2 text-left font-meta text-[10px] uppercase tracking-[0.06em]"
           />
         </div>
+      </div>
+
+      <div className="rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-card)] p-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-ink/60">Curve</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-meta text-[9px] tabular-nums text-ink/45">
+              {curveValue === 0
+                ? "Straight"
+                : `${curveValue > 0 ? "arch" : "dip"} ${Math.abs(curveValue)}`}
+            </span>
+            <button
+              type="button"
+              disabled={!curved}
+              onClick={() => onPatch({ curve: undefined })}
+              className="chip h-5 px-2 text-[9px] disabled:opacity-40"
+            >
+              Straight
+            </button>
+          </div>
+        </div>
+        <Slider
+          value={[curveValue]}
+          min={-100}
+          max={100}
+          step={1}
+          aria-label="Curve amount"
+          onValueChange={([next]) =>
+            onPatch({ curve: normalizeCurve(next / 100) })
+          }
+          className="mt-2.5"
+        />
+        <div className="mt-1 flex justify-between font-meta text-[8px] uppercase tracking-[0.1em] text-ink/30">
+          <span>Dip</span>
+          <span>Flat</span>
+          <span>Arch</span>
+        </div>
+        <p className="mt-2 text-[9px] leading-relaxed text-ink/40">
+          The words ride an arc instead of a flat baseline. One number moves the
+          curve only — the wording, the box and the type scale all stay put.
+        </p>
       </div>
 
       <div className="rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-card)] p-2.5">

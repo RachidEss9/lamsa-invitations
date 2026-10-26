@@ -6,6 +6,7 @@ import {
   type DesignDocument,
 } from "./design";
 import type { InvitationContent } from "./invitation";
+import { curveIsActive } from "./text-path";
 
 const content: InvitationContent = {
   title: "Amelia & Søren",
@@ -192,6 +193,29 @@ describe("normalizeDesign save/reload consistency", () => {
     expect(effects?.shadow?.blur).toBe(22);
     expect(effects?.gradient?.angle).toBe(45);
     expect(effects?.outline?.width).toBe(2);
+  });
+
+  it("keeps a text curve through save and reload, and clamps a wild one", () => {
+    const saved = normalizeDesign(
+      {
+        pages: [
+          {
+            elements: [
+              { id: "t1", kind: "text", text: "Amelia", curve: 0.6 },
+              { id: "t2", kind: "text", text: "Søren", curve: 9 },
+              { id: "t3", kind: "text", text: "Hello" },
+            ],
+          },
+        ],
+      },
+      content,
+    );
+    const reloaded = normalizeDesign(JSON.parse(JSON.stringify(saved)), content);
+    expect(reloaded.pages[0].elements[0].curve).toBe(0.6);
+    expect(reloaded.pages[0].elements[1].curve).toBe(1);
+    // A document that never curved stays on the straight rendering path.
+    expect(reloaded.pages[0].elements[2].curve).toBeUndefined();
+    expect(curveIsActive(reloaded.pages[0].elements[2].curve)).toBe(false);
   });
 
   it("leaves older documents without effects, and drops corrupt ones", () => {

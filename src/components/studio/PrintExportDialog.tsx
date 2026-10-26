@@ -298,7 +298,10 @@ export function PrintExportDialog({
               const image = node.querySelector("img");
               if (image?.naturalWidth) imageWidths[element.id] = image.naturalWidth;
             }
-            if (element.kind === "text") {
+            if (element.kind === "text" && !element.curve) {
+              // A curved line is drawn as SVG on an arc, so there is no DOM
+              // text box to measure — and a fake one would only invent an
+              // overflow warning the host cannot act on.
               const inner = node.firstElementChild
                 ?.firstElementChild as HTMLElement | null;
               if (!inner) continue;

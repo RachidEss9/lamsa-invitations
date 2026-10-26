@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { normalizeEffects, type LayerEffects } from "@/lib/effects";
+import { normalizeCurve } from "@/lib/text-path";
 import { fontNameFor } from "@/lib/fonts";
 import {
   formatEventDate,
@@ -199,6 +200,12 @@ export interface DesignElement {
   /** Underline and strikethrough are real text decorations, not panel borders. */
   textDecoration?: "none" | "underline" | "line-through";
   verticalAlign?: "top" | "middle" | "bottom";
+  /**
+   * Text on a path: −1 … 1. Positive arcs the words upward, negative dips
+   * them, and an absent value keeps the straight baseline the box already has.
+   * Pure geometry — the wording, the box and the type scale never move.
+   */
+  curve?: number;
   textBackground?: string;
   textBorder?: string;
   textBorderWidth?: number;
@@ -1453,6 +1460,10 @@ export function normalizeDesign(
         // Effects are sanitised on load: a corrupt colour or an out-of-range
         // blur becomes a safe default instead of breaking the whole page.
         effects: normalizeEffects(element.effects),
+        // A curve outside −1…1 would throw the arc far outside the card, so it
+        // is clamped, and a curve that rounds to nothing is dropped outright so
+        // straight text stays on the exact old rendering path.
+        curve: normalizeCurve(element.curve),
         // Image-in-shape is only set when the layer actually has an image.
         imageInShape:
           element.imageInShape && element.imageStorageId

@@ -854,7 +854,7 @@ export default function Studio() {
     );
   };
 
-  const addShape = (shape: DesignElement["shape"], withImage = false) => {
+  const addShape = (shape: DesignElement["shape"], imageStorageId?: string) => {
     const element = makeElement("shape", {
       name: shape === "line" ? "Rule" : shape === "frame" ? "Frame" : "Shape",
       shape,
@@ -873,7 +873,9 @@ export default function Studio() {
         duration: 900,
         easing: "easeOut",
       },
-      ...(withImage && imageStorageId ? { imageStorageId, imageInShape: true, imageZoom: 1 } : {}),
+      ...(imageStorageId
+        ? { imageStorageId, imageInShape: true, imageZoom: 1 }
+        : {}),
     });
     addElement(element);
   };
