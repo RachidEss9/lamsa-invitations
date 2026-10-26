@@ -443,8 +443,7 @@ export function Inspector({
             onCheckedChange={onAspectLocked}
             className="ml-auto scale-90"
           />
-        </div>
-        <div className="grid grid-cols-6 gap-1">
+        </div>          <div className="grid grid-cols-6 gap-1">
           {[
             { kind: "left", icon: AlignStartVertical, label: "Align left" },
             { kind: "hcenter", icon: AlignCenterVertical, label: "Centre horizontally" },
@@ -465,42 +464,43 @@ export function Inspector({
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-1">            <IconButton
-              label="Send to back"
-              onClick={() => onLayer("back")}
-            >
-              <ArrowDownToLine className="size-3.5" />
-            </IconButton>
-            <IconButton
-              label="Send backward"
-              onClick={() => onLayer("down")}
-            >
-              <MoveDown className="size-3.5" />
-            </IconButton>
-            <IconButton
-              label="Bring forward"
-              onClick={() => onLayer("up")}
-            >
-              <MoveUp className="size-3.5" />
-            </IconButton>
-            <IconButton
-              label="Bring to front"
-              onClick={() => onLayer("front")}
-            >
-              <ArrowUpToLine className="size-3.5" />
-            </IconButton>
-            <IconButton
-              label={element.locked ? "Unlock layer" : "Lock layer"}
-              onClick={() => patch({ locked: !element.locked })}
-            >
-              {element.locked ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />}
-            </IconButton>
-            <IconButton
-              label={element.hidden ? "Show layer" : "Hide layer"}
-              onClick={() => patch({ hidden: !element.hidden })}
-            >
-              {element.hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-            </IconButton>
+        <div className="grid grid-cols-3 gap-1">
+          <IconButton
+            label="Send to back"
+            onClick={() => onLayer("back")}
+          >
+            <ArrowDownToLine className="size-3.5" />
+          </IconButton>
+          <IconButton
+            label="Send backward"
+            onClick={() => onLayer("down")}
+          >
+            <MoveDown className="size-3.5" />
+          </IconButton>
+          <IconButton
+            label="Bring forward"
+            onClick={() => onLayer("up")}
+          >
+            <MoveUp className="size-3.5" />
+          </IconButton>
+          <IconButton
+            label="Bring to front"
+            onClick={() => onLayer("front")}
+          >
+            <ArrowUpToLine className="size-3.5" />
+          </IconButton>
+          <IconButton
+            label={element.locked ? "Unlock layer" : "Lock layer"}
+            onClick={() => patch({ locked: !element.locked })}
+          >
+            {element.locked ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />}
+          </IconButton>
+          <IconButton
+            label={element.hidden ? "Show layer" : "Hide layer"}
+            onClick={() => patch({ hidden: !element.hidden })}
+          >
+            {element.hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+          </IconButton>
         </div>
       </Section>
 
@@ -782,7 +782,7 @@ export function Inspector({
             )
           </div>
         </Section>
-      )}
+      )})
 
       {element.kind === "motif" && (
         <Section title="Ornament">
@@ -799,7 +799,7 @@ export function Inspector({
           <Row label="Ink"><ColorField value={element.color ?? "#161616"} onChange={(color) => patch({ color })} /></Row>
           <Row label="Weight"><NumberField value={element.strokeWidth ?? 0.8} onChange={(strokeWidth) => patch({ strokeWidth })} step={0.1} min={0.1} /></Row>
         </Section>
-      )}
+      )})
 
       <Section title="Effects">
         <EffectsInspector element={element} patch={patch} />
