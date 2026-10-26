@@ -854,28 +854,28 @@ export default function Studio() {
     );
   };
 
-  const addShape = (shape: DesignElement["shape"]) => {
-    addElement(
-      makeElement("shape", {
-        name: shape === "line" ? "Rule" : "Shape",
-        shape,
-        x: shape === "line" ? 380 : 380,
-        y: 640,
-        w: shape === "line" ? 240 : 240,
-        h: shape === "line" ? 2 : 240,
-        fill: content?.palette.accent ?? "#710014",
-        stroke: "transparent",
-        strokeWidth: 0,
-        animation: {
-          enabled: true,
-          preset: "scaleIn",
-          trigger: "load",
-          delay: 500,
-          duration: 900,
-          easing: "easeOut",
-        },
-      }),
-    );
+  const addShape = (shape: DesignElement["shape"], withImage = false) => {
+    const element = makeElement("shape", {
+      name: shape === "line" ? "Rule" : shape === "frame" ? "Frame" : "Shape",
+      shape,
+      x: shape === "line" ? 380 : 380,
+      y: 640,
+      w: shape === "line" ? 240 : 240,
+      h: shape === "line" ? 2 : 240,
+      fill: content?.palette.accent ?? "#710014",
+      stroke: "transparent",
+      strokeWidth: 0,
+      animation: {
+        enabled: true,
+        preset: "scaleIn",
+        trigger: "load",
+        delay: 500,
+        duration: 900,
+        easing: "easeOut",
+      },
+      ...(withImage && imageStorageId ? { imageStorageId, imageInShape: true, imageZoom: 1 } : {}),
+    });
+    addElement(element);
   };
 
   const addMotif = () => {
@@ -1015,7 +1015,17 @@ export default function Studio() {
     setUploadingImage(true);
     try {
       const { storageId } = await uploadImage(file);
-      patchElement(selected[0].id, { imageStorageId: storageId });
+      const element = selected[0];
+      if (element.kind === "shape") {
+        patchElement(selected[0].id, {
+          imageStorageId: storageId,
+          imageInShape: true,
+          imageZoom: 1,
+          imagePosition: { x: 50, y: 50 },
+        });
+      } else {
+        patchElement(selected[0].id, { imageStorageId: storageId });
+      }
     } catch (error) {
       toast.error(messageOf(error));
     } finally {
@@ -1276,6 +1286,13 @@ export default function Studio() {
         radius: spec.radius,
         opacity: spec.opacity ?? 1,
         animation: defaultAnimation("fade", 120 + index * 90),
+        // Built-in mask assets (arch, heart, ellipse covers) are shapes that
+        // should be ready to accept an image. They start with imageInShape
+        // disabled so the host can upload a photo and then enable masking.
+        ...(spec.kind === "shape" &&
+          ("mask" === spec.name?.toLowerCase().slice(-5) || spec.name?.toLowerCase().includes("mask"))
+          ? { imageInShape: false }
+          : {}),
       }),
     );
     setPageElements((elements) => [...elements, ...created]);
@@ -1293,27 +1310,40 @@ export default function Studio() {
    * is an ordinary shape element carrying `frameArt`, so selection, moving,
    * resizing, rotation, colour, weight, layer order, saving, and publishing all
    * run through the controls the editor already has.
+   *
+   * When an image is provided, the frame becomes a masked image: the photo is
+   * clipped to the frame's vector shape, with a stroke around it if desired.
    */
-  const addFrame = (frame: FrameSpec) => {
+  const addFrame = (frame: FrameSpec, imageStorageId?: string) => {
     if (!page || !content) return;
     const pageSize = pageSizeOf(page);
     const bounds = frameBounds(pageSize);
+    const element = makeElement("shape", {
+      name: frame.name,
+      shape: "frame",
+      frameArt: frame.id,
+      x: bounds.x,
+      y: bounds.y,
+      w: bounds.w,
+      h: bounds.h,
+      fill: "transparent",
+      stroke: imageStorageId ? "#b38f6f" : (content.palette.accent ?? "#710014"),
+      strokeWidth: imageStorageId ? 2 : 2,
+      radius: 0,
+      opacity: 0.85,
+      animation: defaultAnimation("fade", 200),
+      ...(imageStorageId
+        ? {
+            imageStorageId,
+            imageInShape: true,
+            imageZoom: 1,
+            imagePosition: { x: 50, y: 50 },
+            frameStrokeOnImage: true,
+          }
+        : {}),
+    });
     addElement(
-      makeElement("shape", {
-        name: frame.name,
-        shape: "frame",
-        frameArt: frame.id,
-        x: bounds.x,
-        y: bounds.y,
-        w: bounds.w,
-        h: bounds.h,
-        fill: "transparent",
-        stroke: content.palette.accent ?? "#710014",
-        strokeWidth: 2,
-        radius: 0,
-        opacity: 0.85,
-        animation: defaultAnimation("fade", 200),
-      }),
+      element,
       // Beneath the wording and photographs, above a full-page backdrop, so
       // adding a frame never stops you selecting what is already on the card.
       frameLayerIndex(page.elements, pageSize),
@@ -1322,7 +1352,9 @@ export default function Studio() {
     setAnimating(false);
     setPlaying(false);
     toast.success(
-      `${frame.name} frame added under your content. Resize, rotate, or recolour it like any layer.`,
+      imageStorageId
+        ? `${frame.name} frame with image added. Resize, rotate, or recolour it like any layer.`
+        : `${frame.name} frame added under your content. Resize, rotate, or recolour it like any layer.`,
     );
   };
 

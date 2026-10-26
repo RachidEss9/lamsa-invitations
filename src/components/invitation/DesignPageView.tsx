@@ -77,6 +77,9 @@ function ShapeArt({
   const gradientActive = Boolean(gradient?.enabled && gradientId && shape !== "frame");
   const shade = gradientActive ? `url(#${gradientId})` : fill;
 
+  // Image-in-shape: the picture is clipped to the vector, not to the box.
+  const maskedImage = element.imageInShape && imageUrl;
+
   // The rule is a horizontal stroke, not a filled box.
   if (shape === "line") {
     return (
@@ -101,6 +104,7 @@ function ShapeArt({
   }
 
   const path = SHAPE_PATHS[shape];
+  const imageScale = Math.max(0.1, element.imageZoom ?? 1);
 
   return (
     <svg
@@ -136,14 +140,30 @@ function ShapeArt({
         )}
       </defs>
       {shape === "rect" || shape === "frame" || shape === "capsule" ? (
-        imageUrl ? (
+        maskedImage ? (
           <image
             href={imageUrl}
             width={100}
             height={100}
             preserveAspectRatio="xMidYMid slice"
+            x={((1 - 1 / imageScale) * 50).toFixed(3)}
+            y={((1 - 1 / imageScale) * 50).toFixed(3)}
+            width={100 / imageScale}
+            height={100 / imageScale}
             clipPath={clipId ? `url(#${clipId})` : undefined}
             style={{ clipPath: `inset(0 round ${radius}px)` }}
+          />
+        ) : shape === "frame" ? (
+          <rect
+            x={0.5}
+            y={0.5}
+            width={99}
+            height={99}
+            rx={Math.max(0, radius)}
+            fill="transparent"
+            stroke={element.frameStrokeOnImage ? stroke ?? "#b38f6f" : "transparent"}
+            strokeWidth={strokeWidth}
+            vectorEffect="non-scaling-stroke"
           />
         ) : (
           <rect
@@ -152,19 +172,23 @@ function ShapeArt({
             width={99}
             height={99}
             rx={Math.max(0, radius)}
-            fill={shape === "frame" ? "transparent" : shade}
+            fill={shade}
             stroke={stroke}
             strokeWidth={strokeWidth}
             vectorEffect="non-scaling-stroke"
           />
         )
       ) : shape === "ellipse" ? (
-        imageUrl ? (
+        maskedImage ? (
           <image
             href={imageUrl}
             width={100}
             height={100}
             preserveAspectRatio="xMidYMid slice"
+            x={((1 - 1 / imageScale) * 50).toFixed(3)}
+            y={((1 - 1 / imageScale) * 50).toFixed(3)}
+            width={100 / imageScale}
+            height={100 / imageScale}
             clipPath={clipId ? `url(#${clipId})` : undefined}
             style={{ clipPath: "ellipse(50% 50% at 50% 50%)" }}
           />
@@ -182,18 +206,22 @@ function ShapeArt({
         )
       ) : (
         <>
-          {imageUrl && clipId ? (
+          {maskedImage && clipId ? (
             <image
               href={imageUrl}
               width={100}
               height={100}
               preserveAspectRatio="xMidYMid slice"
+              x={((1 - 1 / imageScale) * 50).toFixed(3)}
+              y={((1 - 1 / imageScale) * 50).toFixed(3)}
+              width={100 / imageScale}
+              height={100 / imageScale}
               clipPath={`url(#${clipId})`}
             />
           ) : (
             <path d={path} fill={shade} />
           )}
-          {strokeWidth > 0 && (
+          {(strokeWidth > 0 || (element.frameStrokeOnImage && stroke)) && (
             <path
               d={path}
               fill="none"

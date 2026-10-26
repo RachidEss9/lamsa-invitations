@@ -227,6 +227,22 @@ export interface DesignElement {
   imageRadius?: number;
   imageBorder?: number;
   imageShadow?: boolean;
+  /**
+   * When true, the image is clipped to the element's vector shape instead of
+   * filling its bounding box. This is what turns a shape into an image mask.
+   */
+  imageInShape?: boolean;
+  /**
+   * How far into the mask the picture sits, as a fraction of the element size.
+   * Used for repositioning and zooming a masked image without changing the
+   * element's own geometry.
+   */
+  imageZoom?: number;
+  /**
+   * A shape layer can keep its decorative stroke even when it is also carrying
+   * a masked image, so a framed photograph still reads as a framed object.
+   */
+  frameStrokeOnImage?: boolean;
 
   /**
    * Editable layer effects. Optional, so every invitation saved before effects
@@ -996,6 +1012,12 @@ export function cloneElement(element: DesignElement): DesignElement {
       : undefined,
     animation: { ...element.animation },
     exit: element.exit ? { ...element.exit } : undefined,
+    // Image-mask state is cloned so a duplicated masked photo keeps its zoom and
+    // position.
+    imagePosition:
+      element.imagePosition
+        ? { x: element.imagePosition.x, y: element.imagePosition.y }
+        : undefined,
   };
 }
 
@@ -1431,6 +1453,19 @@ export function normalizeDesign(
         // Effects are sanitised on load: a corrupt colour or an out-of-range
         // blur becomes a safe default instead of breaking the whole page.
         effects: normalizeEffects(element.effects),
+        // Image-in-shape is only set when the layer actually has an image.
+        imageInShape:
+          element.imageInShape && element.imageStorageId
+            ? true
+            : undefined,
+        imageZoom:
+          element.imageZoom != null && element.imageZoom >= 0.1
+            ? element.imageZoom
+            : undefined,
+        imagePosition:
+          element.imagePosition && element.imageStorageId
+            ? { x: Math.max(0, Math.min(100, Number(element.imagePosition.x) || 50)), y: Math.max(0, Math.min(100, Number(element.imagePosition.y) || 50)) }
+            : undefined,
         animation: {
           ...defaultAnimation(),
           ...(element.animation ?? {}),

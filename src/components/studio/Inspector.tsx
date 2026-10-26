@@ -664,6 +664,23 @@ export function Inspector({
           </div>
           <Row label="Border ink"><ColorField value={element.stroke ?? "#b38f6f"} onChange={(stroke) => patch({ stroke })} /></Row>
           <ToggleRow label="Soft shadow" checked={Boolean(element.imageShadow)} onChange={(imageShadow) => patch({ imageShadow })} />
+          <div className="border-t border-ink/10 pt-2">
+            <Row label="Zoom %">
+              <div className="flex gap-1">
+                <NumberField
+                  value={Math.round((element.imageZoom ?? 1) * 100)}
+                  onChange={(zoom) => patch({ imageZoom: Math.max(10, Math.min(500, zoom)) / 100 })}
+                  min={10}
+                  max={500}
+                />
+                <span className="min-w-[3rem] text-[11px] tabular-nums text-ink/50">%</span>
+              </div>
+            </Row>
+            <p className="text-[9px] leading-relaxed text-ink/40">
+              Reposition the image by adjusting Crop X/Y. Zoom changes how close the
+              picture sits inside its frame without changing the layer size.
+            </p>
+          </div>
         </Section>
       )}
 
@@ -689,10 +706,6 @@ export function Inspector({
               if (file) void onUploadImage(file);
             }}
           />
-          <p className="text-[9px] leading-relaxed text-ink/40">
-            A photograph placed into an arch, heart, leaf, ellipse, star, or frame is
-            clipped to that form in the editor and on the published invitation.
-          </p>
           {element.frameArt ? (
             <div className="rounded-md border border-[var(--gold)]/45 bg-[var(--gold)]/[0.08] p-2">
               <div className="flex items-center gap-2">
@@ -709,8 +722,9 @@ export function Inspector({
                 </Button>
               </div>
               <p className="mt-1 text-[9px] leading-relaxed text-ink/45">
-                Vector artwork on this layer. Stroke sets its ink and weight;
-                resizing keeps the corner ornaments square.
+                {element.imageInShape
+                  ? "A decorative frame around a clipped photograph."
+                  : "Vector artwork on this layer. Stroke sets its ink and weight."}
               </p>
             </div>
           ) : null}
@@ -724,13 +738,48 @@ export function Inspector({
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Fill"><ColorField value={element.fill ?? "#161616"} onChange={(fill) => patch({ fill })} allowTransparent /></Row>
-          <Row label="Stroke"><ColorField value={element.stroke ?? "transparent"} onChange={(stroke) => patch({ stroke })} allowTransparent /></Row>
           <div className="grid grid-cols-2 gap-2">
-            <Row label="Stroke"><NumberField value={element.strokeWidth ?? 0} onChange={(strokeWidth) => patch({ strokeWidth })} min={0} /></Row>
+            <Row label="Fill"><ColorField value={element.fill ?? "#161616"} onChange={(fill) => patch({ fill })} allowTransparent /></Row>
+            <Row label="Stroke"><ColorField value={element.stroke ?? "transparent"} onChange={(stroke) => patch({ stroke })} allowTransparent /></Row>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Row label="Stroke width"><NumberField value={element.strokeWidth ?? 0} onChange={(strokeWidth) => patch({ strokeWidth })} min={0} step={0.5} /></Row>
             {(element.shape === "rect" || element.shape === "frame") && (
               <Row label="Radius"><NumberField value={element.radius ?? 0} onChange={(radius) => patch({ radius })} min={0} /></Row>
             )}
+          </div>
+          <div className="border-t border-ink/10 pt-2">
+            <ToggleRow
+              label="Clip image to shape"
+              checked={Boolean(element.imageInShape)}
+              onChange={(imageInShape) => patch({ imageInShape: imageInShape && element.imageStorageId ? true : undefined })}
+            />
+            {element.imageInShape && (
+              <div className="mt-2 space-y-2">
+                <Row label="Frame stroke on photo">
+                  <Switch
+                    checked={Boolean(element.frameStrokeOnImage)}
+                    onCheckedChange={(frameStrokeOnImage) => patch({ frameStrokeOnImage: frameStrokeOnImage || undefined })}
+                    className="scale-90"
+                  />
+                </Row>
+                <Row label="Image zoom %">
+                  <div className="flex gap-1">
+                    <NumberField
+                      value={Math.round((element.imageZoom ?? 1) * 100)}
+                      onChange={(zoom) => patch({ imageZoom: Math.max(10, Math.min(500, zoom)) / 100 })}
+                      min={10}
+                      max={500}
+                    />
+                    <span className="min-w-[3rem] text-[11px] tabular-nums text-ink/50">%</span>
+                  </div>
+                </Row>
+                <p className="text-[9px] leading-relaxed text-ink/40">
+                  The photo sits inside the shape, cropped and scaled independently of the
+                  layer box. Keep Stroke width above zero to keep the frame visible.
+                </p>
+              </div>
+            )
           </div>
         </Section>
       )}
