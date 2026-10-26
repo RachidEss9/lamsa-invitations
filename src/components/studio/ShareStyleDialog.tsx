@@ -13,11 +13,12 @@ import {
   suiteOf,
   type ShareStyleOptions,
   type SharedStyleAspect,
+  type SuitePiece,
 } from "@/lib/suite";
 import type { DesignDocument } from "@/lib/design";
 import { cn } from "@/lib/utils";
 import { Check, Palette } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export interface ShareStyleDialogProps {
   open: boolean;
@@ -47,19 +48,49 @@ export function ShareStyleDialog({
 }: ShareStyleDialogProps) {
   const source = suiteOf(design).find((piece) => piece.id === sourcePieceId) ?? null;
   const others = suiteOf(design).filter((piece) => piece.id !== sourcePieceId);
-  const [targets, setTargets] = useState<string[]>([]);
-  const [aspects, setAspects] = useState<SharedStyleAspect[]>(["background", "palette"]);
-
-  // Re-open with a clean, honest slate: previous choices never leak into the
-  // next piece the host shares a style with.
-  useEffect(() => {
-    if (open) {
-      setTargets([]);
-      setAspects(["background", "palette"]);
-    }
-  }, [open]);
 
   if (!source) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[520px]">
+        <ShareStyleForm
+          design={design}
+          source={source}
+          others={others}
+          selectedElementIds={selectedElementIds}
+          onApply={onApply}
+          onClose={() => onOpenChange(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * The body of the dialog.
+ *
+ * It owns the tick boxes and mounts only while the dialog is open, so every
+ * reopen starts from a clean, honest slate — previous choices never leak into
+ * the next piece the host shares a style with.
+ */
+function ShareStyleForm({
+  design,
+  source,
+  others,
+  selectedElementIds,
+  onApply,
+  onClose,
+}: {
+  design: DesignDocument;
+  source: SuitePiece;
+  others: SuitePiece[];
+  selectedElementIds: string[];
+  onApply: (options: ShareStyleOptions) => void;
+  onClose: () => void;
+}) {
+  const [targets, setTargets] = useState<string[]>([]);
+  const [aspects, setAspects] = useState<SharedStyleAspect[]>(["background", "palette"]);
 
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
@@ -73,12 +104,11 @@ export function ShareStyleDialog({
       aspects,
       elementIds: selectedElementIds,
     });
-    onOpenChange(false);
+    onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
+    <>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-ui text-lg">
             <Palette className="size-4 text-[var(--red)]" />
@@ -224,7 +254,7 @@ export function ShareStyleDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={onClose}
             className="h-9 rounded-none text-[10px] uppercase tracking-[0.12em]"
           >
             Cancel
@@ -238,7 +268,6 @@ export function ShareStyleDialog({
             Apply to {targets.length} piece{targets.length === 1 ? "" : "s"}
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </>
   );
 }

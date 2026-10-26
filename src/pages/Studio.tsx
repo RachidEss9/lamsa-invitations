@@ -108,7 +108,6 @@ import {
   type PieceKind,
   type PiecePrint,
   type ShareStyleOptions,
-  type SuitePiece,
 } from "@/lib/suite";
 import {
   ENVELOPE_PRESETS,
@@ -2519,6 +2518,27 @@ export default function Studio() {
     </Dialog>
   );
 
+  // The hidden file input lives outside the panel tree, so the picker is
+  // opened from this event handler instead of touching the ref while rendering.
+  const pickImageFile = () => imageFileRef.current?.click();
+
+  // The opening cover is chosen from its own file input; the upload lives here
+  // so the panel only hands over a plain event handler.
+  const uploadOpeningCover = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const { storageId } = await uploadImage(file);
+      applyOpening({ ...design.opening, coverStorageId: storageId });
+    } catch (error) {
+      toast.error(messageOf(error));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const renderLeftPanel = () => {
     if (leftPanel === "add") {
       return (
@@ -2528,7 +2548,7 @@ export default function Studio() {
             <AddButton icon={Type} label="Heading" note="Large display names" onClick={() => addText("heading")} />
             <AddButton icon={Type} label="Body text" note="A line of invitation copy" onClick={() => addText("body")} />
             <AddButton icon={Type} label="Caption" note="Small tracked uppercase" onClick={() => addText("caption")} />
-            <AddButton icon={ImageIcon} label="Image" note="Upload a photograph or background" onClick={() => imageFileRef.current?.click()} />
+            <AddButton icon={ImageIcon} label="Image" note="Upload a photograph or background" onClick={pickImageFile} />
             <AddButton icon={Shapes} label="Shape" note="Rule, heart, arch, leaf, star" onClick={() => addShape("rect")} />
             <AddButton icon={Sparkles} label="Ornament" note="Hand-drawn botanical or celestial mark" onClick={addMotif} />
             <AddButton icon={Heart} label="Interactive reveal" note="A heart cover over a hidden message" onClick={addReveal} />
@@ -2627,13 +2647,6 @@ export default function Studio() {
               ))}
             </div>
           </div>
-          <input
-            ref={imageFileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            className="sr-only"
-            onChange={(event) => void handleAddImage(event)}
-          />
           {uploadingImage && (
             <p className="px-3 pb-3 text-[10px] text-ink/45">
               <Loader2 className="mr-1 inline size-3 animate-spin" /> Uploading…
@@ -2770,20 +2783,7 @@ export default function Studio() {
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   className="sr-only"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (!file) return;
-                    setUploadingImage(true);
-                    try {
-                      const { storageId } = await uploadImage(file);
-                      applyOpening({ ...design.opening, coverStorageId: storageId });
-                    } catch (error) {
-                      toast.error(messageOf(error));
-                    } finally {
-                      setUploadingImage(false);
-                    }
-                  }}
+                  onChange={(event) => void uploadOpeningCover(event)}
                 />
               </label>
             </div>
@@ -3064,19 +3064,26 @@ export default function Studio() {
           </div>
 
           <div className="mt-3 border-t border-ink/10 pt-2">
+            {/* Each row carries a plain patch builder rather than the patch call:
+                the panel is render code, and only the event handler below may
+                write to the design. */}
             {(
               [
-                ["Flap outline", geometry.showFlap, (value: boolean) => patchEnvelope({ showFlap: value })],
-                ["Recipient window", geometry.guides.recipient, (value: boolean) => patchEnvelope({ guides: { ...geometry.guides, recipient: value } })],
-                ["Stamp area", geometry.guides.stamp, (value: boolean) => patchEnvelope({ guides: { ...geometry.guides, stamp: value } })],
-                ["Return address", geometry.guides.returnAddress, (value: boolean) => patchEnvelope({ guides: { ...geometry.guides, returnAddress: value } })],
-                ["Postage-safe zone", geometry.guides.postageSafe, (value: boolean) => patchEnvelope({ guides: { ...geometry.guides, postageSafe: value } })],
-                ["Liner fit", geometry.showLiner, (value: boolean) => patchEnvelope({ showLiner: value })],
-              ] as [string, boolean, (value: boolean) => void][]
-            ).map(([label, checked, onChange]) => (
+                ["Flap outline", geometry.showFlap, (value: boolean) => ({ showFlap: value })],
+                ["Recipient window", geometry.guides.recipient, (value: boolean) => ({ guides: { ...geometry.guides, recipient: value } })],
+                ["Stamp area", geometry.guides.stamp, (value: boolean) => ({ guides: { ...geometry.guides, stamp: value } })],
+                ["Return address", geometry.guides.returnAddress, (value: boolean) => ({ guides: { ...geometry.guides, returnAddress: value } })],
+                ["Postage-safe zone", geometry.guides.postageSafe, (value: boolean) => ({ guides: { ...geometry.guides, postageSafe: value } })],
+                ["Liner fit", geometry.showLiner, (value: boolean) => ({ showLiner: value })],
+              ] as [string, boolean, (value: boolean) => Partial<EnvelopeGeometry>][]
+            ).map(([label, checked, buildPatch]) => (
               <label key={label} className="flex items-center justify-between gap-2 py-1">
                 <span className="text-[11px] text-ink/60">{label}</span>
-                <Switch checked={checked} onCheckedChange={onChange} className="scale-90" />
+                <Switch
+                  checked={checked}
+                  onCheckedChange={(value) => patchEnvelope(buildPatch(value))}
+                  className="scale-90"
+                />
               </label>
             ))}
           </div>
@@ -4241,6 +4248,16 @@ export default function Studio() {
       <span className="sr-only" aria-live="polite">
         {historyTick} edits
       </span>
+
+      {/* The picker itself lives at the root so the panel can open it without
+          holding the element while it renders. */}
+      <input
+        ref={imageFileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="sr-only"
+        onChange={(event) => void handleAddImage(event)}
+      />
     </div>
   );
 }

@@ -19,7 +19,6 @@ import {
   shareStyles,
   suiteOf,
   withSuite,
-  type DesignSuite,
   type PieceError,
   type PieceResult,
 } from "./suite";
@@ -571,7 +570,7 @@ describe("sheet layout", () => {
   it("draws crop marks outside the trim edge", () => {
     const segments = cropMarkSegments({ x: 10, y: 10, w: 100, h: 100 }, 3, 0.6);
     expect(segments).toHaveLength(8);
-    for (const [x1, y1, x2, y2] of segments) {
+    for (const [x1, y1, , y2] of segments) {
       const insideX = x1 > 10 && x1 < 110;
       const insideY = y1 > 10 && y1 < 110;
       // Each mark starts clear of the trim edge it belongs to.
