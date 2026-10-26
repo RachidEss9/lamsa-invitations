@@ -15,6 +15,11 @@ import {
   isHexColour,
   outlineWidth,
 } from "@/lib/effects";
+import {
+  imageAdjustFilter,
+  maskedImageFrame,
+  rotationCoverScale,
+} from "@/lib/image-frame";
 import { ensureDesignFonts, fontFamilyFor } from "@/lib/fonts";
 import { frameById } from "@/lib/frames";
 import {
@@ -29,6 +34,7 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useReducer,
   useRef,
   useState,
   type CSSProperties,
@@ -66,10 +72,13 @@ function ShapeArt({
   element,
   clipId,
   imageUrl,
+  aspect,
 }: {
   element: DesignElement;
   clipId?: string;
   imageUrl?: string;
+  /** The file's own width ÷ height, once the browser has measured it. */
+  aspect?: number;
 }) {
   const shape = element.shape ?? "rect";
   const fill = element.fill ?? element.color ?? "#161616";
@@ -110,7 +119,47 @@ function ShapeArt({
   }
 
   const path = SHAPE_PATHS[shape];
-  const imageScale = Math.max(0.1, element.imageZoom ?? 1);
+  const rotation = element.imageRotate ?? 0;
+
+  // The clip is drawn in the shape's own 0–100 space and never moves, so the
+  // photograph inside it can be zoomed, panned or turned without a single
+  // pixel escaping the form. Every maskable shape gets one: the rounded box
+  // for a rectangle, capsule or frame, the circle for an ellipse, and the
+  // vector itself for everything else.
+  const clipArt = (() => {
+    if (shape === "ellipse") return <ellipse cx={50} cy={50} rx={50} ry={50} />;
+    if (shape === "rect" || shape === "frame" || shape === "capsule") {
+      return (
+        <rect
+          x={0}
+          y={0}
+          width={100}
+          height={100}
+          rx={shape === "capsule" ? 50 : Math.max(0, radius)}
+        />
+      );
+    }
+    return path ? <path d={path} /> : null;
+  })();
+
+  // One shared masked-image node. The placement maths is identical in a
+  // circle, an arch and a rounded rectangle, so the Studio's controls behave
+  // the same in every mask.
+  const maskedArt = imageUrl ? (
+    <image
+      href={imageUrl}
+      {...maskedImageFrame({
+        aspect,
+        fit: element.fit,
+        zoom: element.imageZoom,
+        position: element.imagePosition,
+        rotation,
+      })}
+      clipPath={clipId ? `url(#${clipId})` : undefined}
+      transform={rotation ? `rotate(${rotation} 50 50)` : undefined}
+      style={{ filter: imageAdjustFilter(element.imageAdjust) }}
+    />
+  ) : null;
 
   return (
     <svg
@@ -120,11 +169,7 @@ function ShapeArt({
       className="h-full w-full overflow-visible"
     >
       <defs>
-        {path && clipId && (
-          <clipPath id={clipId}>
-            <path d={path} />
-          </clipPath>
-        )}
+        {clipId && clipArt && <clipPath id={clipId}>{clipArt}</clipPath>}
         {gradientActive && gradient && gradientId && (
           <linearGradient
             id={gradientId}
@@ -147,16 +192,7 @@ function ShapeArt({
       </defs>
       {shape === "rect" || shape === "frame" || shape === "capsule" ? (
         maskedImage ? (
-          <image
-            href={imageUrl}
-            preserveAspectRatio="xMidYMid slice"
-            x={((1 - imageScale) * 50).toFixed(3)}
-            y={((1 - imageScale) * 50).toFixed(3)}
-            width={100 * imageScale}
-            height={100 * imageScale}
-            clipPath={clipId ? `url(#${clipId})` : undefined}
-            style={{ clipPath: `inset(0 round ${radius}px)` }}
-          />
+          maskedArt
         ) : shape === "frame" ? (
           <rect
             x={0.5}
@@ -184,16 +220,7 @@ function ShapeArt({
         )
       ) : shape === "ellipse" ? (
         maskedImage ? (
-          <image
-            href={imageUrl}
-            preserveAspectRatio="xMidYMid slice"
-            x={((1 - imageScale) * 50).toFixed(3)}
-            y={((1 - imageScale) * 50).toFixed(3)}
-            width={100 * imageScale}
-            height={100 * imageScale}
-            clipPath={clipId ? `url(#${clipId})` : undefined}
-            style={{ clipPath: "ellipse(50% 50% at 50% 50%)" }}
-          />
+          maskedArt
         ) : (
           <ellipse
             cx={50}
@@ -209,15 +236,7 @@ function ShapeArt({
       ) : (
         <>
           {maskedImage && clipId ? (
-            <image
-              href={imageUrl}
-              preserveAspectRatio="xMidYMid slice"
-              x={((1 - imageScale) * 50).toFixed(3)}
-              y={((1 - imageScale) * 50).toFixed(3)}
-              width={100 * imageScale}
-              height={100 * imageScale}
-              clipPath={`url(#${clipId})`}
-            />
+            maskedArt
           ) : (
             <path d={path} fill={shade} />
           )}
@@ -367,6 +386,41 @@ export function CurvedText({
 /* Element art                                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The file's own proportions, measured once per URL for the whole session.
+ *
+ * Panning a photograph inside a mask needs to know how wide the file really
+ * is, and only the file knows that. The probe is a plain image load, cached
+ * module-wide so a card shown as a canvas, a thumbnail and a guest preview
+ * measure it once — and so an environment with no real image decoder (tests,
+ * export preflight) keeps the centred fallback instead of blocking.
+ */
+const imageAspectCache = new Map<string, number>();
+const imageAspectPending = new Set<string>();
+
+function useImageAspect(url: string | undefined): number | undefined {
+  const [, remeasure] = useReducer((tick: number) => tick + 1, 0);
+  useEffect(() => {
+    if (!url || imageAspectCache.has(url) || imageAspectPending.has(url)) return;
+    imageAspectPending.add(url);
+    const probe = new Image();
+    const settle = (aspect?: number) => {
+      imageAspectPending.delete(url);
+      if (aspect && Number.isFinite(aspect) && aspect > 0) {
+        imageAspectCache.set(url, aspect);
+      }
+      remeasure();
+    };
+    probe.onload = () =>
+      settle(
+        probe.naturalHeight > 0 ? probe.naturalWidth / probe.naturalHeight : undefined,
+      );
+    probe.onerror = () => settle(undefined);
+    probe.src = url;
+  }, [url]);
+  return url ? imageAspectCache.get(url) : undefined;
+}
+
 function ElementVisual({
   element,
   imageUrls,
@@ -380,6 +434,13 @@ function ElementVisual({
   rtl?: boolean;
   clipId: string;
 }) {
+  // Hooks run before any branch: an invitation without a photograph simply
+  // probes nothing.
+  const imageUrl = element.imageStorageId
+    ? imageUrls[element.imageStorageId]
+    : "";
+  const aspect = useImageAspect(imageUrl || undefined);
+
   if (element.kind === "text") {
     const direction =
       element.direction === "rtl"
@@ -468,7 +529,7 @@ function ElementVisual({
   }
 
   if (element.kind === "image") {
-    const url = element.imageStorageId ? imageUrls[element.imageStorageId] : "";
+    const url = imageUrl;
     if (!url) {
       return (
         <div
@@ -483,6 +544,22 @@ function ElementVisual({
         </div>
       );
     }
+    const fit = element.fit ?? "cover";
+    const zoom = Math.max(0.1, element.imageZoom ?? 1);
+    const rotation = element.imageRotate ?? 0;
+    const focalX = clamp(element.imagePosition?.x ?? 50, 0, 100);
+    const focalY = clamp(element.imagePosition?.y ?? 50, 0, 100);
+    // Turning a filled frame opens its corners, so the picture grows by the
+    // one factor that keeps the frame covered. "Fit inside" is left alone: a
+    // photograph showing all of itself must never be cropped behind the
+    // host's back.
+    const cover = rotationCoverScale(
+      rotation,
+      { width: element.w, height: element.h },
+      fit === "contain",
+    );
+    const scale = zoom * cover;
+    const radius = element.imageRadius ?? 0;
     const photo = (
       <img
         src={url}
@@ -490,31 +567,42 @@ function ElementVisual({
         draggable={false}
         className="h-full w-full select-none"
         style={{
-          objectFit: element.fit ?? "cover",
-          objectPosition: `${element.imagePosition?.x ?? 50}% ${element.imagePosition?.y ?? 50}%`,
-          borderRadius: element.imageRadius ?? 0,
-          border: element.imageBorder
-            ? `${element.imageBorder}px solid ${element.stroke ?? "#b38f6f"}`
-            : undefined,
-          boxShadow: element.imageShadow
-            ? "0 22px 50px rgba(22,22,22,0.22)"
-            : undefined,
+          objectFit: fit,
+          objectPosition: `${focalX}% ${focalY}%`,
+          // The photograph turns and zooms about its focal point, which stays
+          // pinned where the host put it. The layer box never moves.
+          transform:
+            rotation || scale !== 1
+              ? `rotate(${rotation}deg) scale(${scale})`
+              : undefined,
+          transformOrigin: `${focalX}% ${focalY}%`,
+          filter: imageAdjustFilter(element.imageAdjust),
         }}
       />
     );
+    // The border and the shadow belong to the frame, not to the picture, so
+    // they live on the clipping box: a turned photograph can no longer push
+    // its own edge out of shape, and nothing escapes the radius.
+    const frameStyle: CSSProperties = {
+      borderRadius: radius,
+      border: element.imageBorder
+        ? `${element.imageBorder}px solid ${element.stroke ?? "#b38f6f"}`
+        : undefined,
+      boxShadow: element.imageShadow
+        ? "0 22px 50px rgba(22,22,22,0.22)"
+        : undefined,
+    };
     const photoInner = insetShadow(element.effects);
-    if (!photoInner) return photo;
     return (
-      <div className="relative h-full w-full">
+      <div className="relative h-full w-full overflow-hidden" style={frameStyle}>
         {photo}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            boxShadow: photoInner,
-            borderRadius: element.imageRadius ?? 0,
-          }}
-        />
+        {photoInner ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{ boxShadow: photoInner }}
+          />
+        ) : null}
       </div>
     );
   }
@@ -555,7 +643,7 @@ function ElementVisual({
     ? imageUrls[element.imageStorageId]
     : undefined;
   const shapeArt = (
-    <ShapeArt element={element} clipId={clipId} imageUrl={coverImage} />
+    <ShapeArt element={element} clipId={clipId} imageUrl={coverImage} aspect={aspect} />
   );
 
   // An inner shadow only reads correctly on a closed, boxed form. The overlay

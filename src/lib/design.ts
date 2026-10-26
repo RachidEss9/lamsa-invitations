@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { normalizeEffects, type LayerEffects } from "@/lib/effects";
+import { normalizeImageAdjust, type ImageAdjust } from "@/lib/image-frame";
 import { normalizeCurve } from "@/lib/text-path";
 import { fontNameFor } from "@/lib/fonts";
 import {
@@ -250,6 +251,19 @@ export interface DesignElement {
    * a masked image, so a framed photograph still reads as a framed object.
    */
   frameStrokeOnImage?: boolean;
+  /**
+   * The photograph's own angle inside its frame or mask, in degrees. The
+   * element's `rotation` turns the whole layer; this turns only the picture,
+   * so a tilted shot can be straightened inside an arch without straightening
+   * the arch, or a portrait can sit at a deliberate slant.
+   */
+  imageRotate?: number;
+  /**
+   * Darkroom adjustments for the photograph only — brightness, contrast and
+   * saturation. They are settings, never pixels: the original file is left
+   * untouched, and every surface draws them from the same CSS filter.
+   */
+  imageAdjust?: ImageAdjust;
 
   /**
    * Editable layer effects. Optional, so every invitation saved before effects
@@ -1025,6 +1039,10 @@ export function cloneElement(element: DesignElement): DesignElement {
       element.imagePosition
         ? { x: element.imagePosition.x, y: element.imagePosition.y }
         : undefined,
+    // A copy owns its own darkroom settings; nudging one never reaches the other.
+    imageAdjust: element.imageAdjust
+      ? ({ ...element.imageAdjust } as ImageAdjust)
+      : undefined,
   };
 }
 
@@ -1477,6 +1495,13 @@ export function normalizeDesign(
           element.imagePosition && element.imageStorageId
             ? { x: Math.max(0, Math.min(100, Number(element.imagePosition.x) || 50)), y: Math.max(0, Math.min(100, Number(element.imagePosition.y) || 50)) }
             : undefined,
+        // A photograph's own angle is bounded to a single turn; a flat zero is
+        // dropped so untouched images stay on the plain rendering path.
+        imageRotate:
+          element.imageRotate != null && Math.abs(element.imageRotate) > 0.001
+            ? Math.max(-360, Math.min(360, Number(element.imageRotate) || 0))
+            : undefined,
+        imageAdjust: normalizeImageAdjust(element.imageAdjust),
         animation: {
           ...defaultAnimation(),
           ...(element.animation ?? {}),

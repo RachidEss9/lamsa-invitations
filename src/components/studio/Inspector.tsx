@@ -10,7 +10,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { FieldRow } from "@/components/ui/field";
+import {
+  ColorField,
+  NumberField,
+  Row,
+  ToggleRow,
+} from "@/components/studio/inspector-fields";
 import {
   ANIMATION_PRESETS,
   EASINGS,
@@ -28,6 +33,7 @@ import { frameById } from "@/lib/frames";
 import { MOTIFS } from "@/lib/invitation";
 import { TypographyStudio } from "@/components/studio/TypographyStudio";
 import { EffectsInspector } from "@/components/studio/EffectsInspector";
+import { ImageStudio } from "@/components/studio/ImageStudio";
 import { cn } from "@/lib/utils";
 import { useRef, type ReactNode } from "react";
 
@@ -99,118 +105,6 @@ function Section({ title, children, className, footer }: SectionProps) {
         <div className="mt-3 border-t border-ink/10 pt-2.5">{footer}</div>
       )}
     </section>
-  );
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <FieldRow label={label}>
-      {children}
-    </FieldRow>
-  );
-}
-
-const numberInput =
-  "h-8 rounded-none border-ink/20 bg-transparent px-2 text-right text-[11px] tabular-nums shadow-none focus-visible:border-ink focus-visible:ring-0";
-
-function NumberField({
-  value,
-  onChange,
-  step = 1,
-  min,
-  max,
-}: {
-  value: number;
-  onChange: (value: number) => void;
-  step?: number;
-  min?: number;
-  max?: number;
-}) {
-  return (
-    <Input
-      type="number"
-      value={Math.round(value * 100) / 100}
-      step={step}
-      min={min}
-      max={max}
-      onChange={(event) => {
-        const parsed = Number(event.target.value);
-        if (!Number.isFinite(parsed)) return;
-        let next = parsed;
-        if (typeof min === "number") next = Math.max(min, next);
-        if (typeof max === "number") next = Math.min(max, next);
-        onChange(next);
-      }}
-      className={cn(numberInput, "w-full")}
-    />
-  );
-}
-
-function ColorField({
-  value,
-  onChange,
-  allowTransparent,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  allowTransparent?: boolean;
-}) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const safe = /^#[0-9a-f]{6}$/i.test(value) ? value : "#161616";
-  return (
-    <div className="flex items-center gap-1.5">
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="size-8 shrink-0 border border-ink/20"
-        style={{
-          background:
-            value === "transparent"
-              ? "repeating-conic-gradient(#d8d5cb 0% 25%, #f2f1ed 0% 50%) 50% / 8px 8px"
-              : safe,
-        }}
-        aria-label="Choose colour"
-      />
-      <input
-        ref={inputRef}
-        type="color"
-        value={safe}
-        onChange={(event) => onChange(event.target.value)}
-        className="sr-only"
-        tabIndex={-1}
-      />
-      <Input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(numberInput, "text-left")}
-      />
-      {allowTransparent && (
-        <button
-          type="button"
-          onClick={() => onChange("transparent")}
-          className="shrink-0 border border-ink/20 px-1.5 py-1 text-[9px] uppercase tracking-[0.1em] text-ink/60"
-        >
-          None
-        </button>
-      )}
-    </div>
-  );
-}
-
-function ToggleRow({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-[11px] text-ink/60">{label}</span>
-      <Switch checked={checked} onCheckedChange={onChange} className="scale-90" />
-    </div>
   );
 }
 
@@ -630,75 +524,30 @@ export function Inspector({
       )}
 
       {element.kind === "image" && (
-        <Section title="Image">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 w-full rounded-none text-[10px] uppercase tracking-[0.12em]"
-            onClick={() => fileRef.current?.click()}
-          >
-            <ImagePlus className="size-3.5" />
-            {element.imageStorageId ? "Replace image" : "Upload image"}
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) void onUploadImage(file);
-            }}
+        <Section title="Image studio">
+          <ImageStudio
+            element={element}
+            onPatch={patch}
+            onUploadImage={onUploadImage}
+            photoLayer
           />
-          <Row label="Fit">
-            <Select value={element.fit ?? "cover"} onValueChange={(fit) => patch({ fit: fit as "cover" | "contain" })}>
-              <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cover">Fill the frame</SelectItem>
-                <SelectItem value="contain">Fit inside</SelectItem>
-              </SelectContent>
-            </Select>
-          </Row>
-          <div className="grid grid-cols-2 gap-2">
-            <Row label="Radius"><NumberField value={element.imageRadius ?? 0} onChange={(imageRadius) => patch({ imageRadius })} min={0} /></Row>
-            <Row label="Border"><NumberField value={element.imageBorder ?? 0} onChange={(imageBorder) => patch({ imageBorder })} min={0} /></Row>
-            <Row label="Crop X %"><NumberField value={element.imagePosition?.x ?? 50} onChange={(x) => patch({ imagePosition: { x, y: element.imagePosition?.y ?? 50 } })} min={0} max={100} /></Row>
-            <Row label="Crop Y %"><NumberField value={element.imagePosition?.y ?? 50} onChange={(y) => patch({ imagePosition: { x: element.imagePosition?.x ?? 50, y } })} min={0} max={100} /></Row>
-          </div>
-          <Row label="Border ink"><ColorField value={element.stroke ?? "#b38f6f"} onChange={(stroke) => patch({ stroke })} /></Row>
-          <ToggleRow label="Soft shadow" checked={Boolean(element.imageShadow)} onChange={(imageShadow) => patch({ imageShadow })} />
-          <div className="border-t border-ink/10 pt-2">
-            <Row label="Zoom %">
-              <div className="flex gap-1">
-                <NumberField
-                  value={Math.round((element.imageZoom ?? 1) * 100)}
-                  onChange={(zoom) => patch({ imageZoom: Math.max(10, Math.min(500, zoom)) / 100 })}
-                  min={10}
-                  max={500}
-                />
-                <span className="min-w-[3rem] text-[11px] tabular-nums text-ink/50">%</span>
-              </div>
-            </Row>
-            <p className="text-[9px] leading-relaxed text-ink/40">
-              Reposition the image by adjusting Crop X/Y. Zoom changes how close the
-              picture sits inside its frame without changing the layer size.
-            </p>
-          </div>
         </Section>
       )}
 
       {element.kind === "shape" && (
+        <>
         <Section title="Shape & mask">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 w-full rounded-none text-[10px] uppercase tracking-[0.12em]"
-            onClick={() => fileRef.current?.click()}
-          >
-            <ImagePlus className="size-3.5" />
-            {element.imageStorageId ? "Replace clipping image" : "Use image as mask"}
-          </Button>
+          {!element.imageStorageId ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 w-full rounded-none text-[10px] uppercase tracking-[0.12em]"
+              onClick={() => fileRef.current?.click()}
+            >
+              <ImagePlus className="size-3.5" />
+              Use image as mask
+            </Button>
+          ) : null}
           <input
             ref={fileRef}
             type="file"
@@ -758,34 +607,31 @@ export function Inspector({
               checked={Boolean(element.imageInShape)}
               onChange={(imageInShape) => patch({ imageInShape: imageInShape && element.imageStorageId ? true : undefined })}
             />
-            {element.imageInShape && (
-              <div className="mt-2 space-y-2">
-                <Row label="Frame stroke on photo">
-                  <Switch
-                    checked={Boolean(element.frameStrokeOnImage)}
-                    onCheckedChange={(frameStrokeOnImage) => patch({ frameStrokeOnImage: frameStrokeOnImage || undefined })}
-                    className="scale-90"
-                  />
-                </Row>
-                <Row label="Image zoom %">
-                  <div className="flex gap-1">
-                    <NumberField
-                      value={Math.round((element.imageZoom ?? 1) * 100)}
-                      onChange={(zoom) => patch({ imageZoom: Math.max(10, Math.min(500, zoom)) / 100 })}
-                      min={10}
-                      max={500}
-                    />
-                    <span className="min-w-[3rem] text-[11px] tabular-nums text-ink/50">%</span>
-                  </div>
-                </Row>
-                <p className="text-[9px] leading-relaxed text-ink/40">
-                  The photo sits inside the shape, cropped and scaled independently of the
-                  layer box. Keep Stroke width above zero to keep the frame visible.
-                </p>
-              </div>
-            )}
+            {element.imageInShape ? (
+              <Row label="Frame stroke on photo">
+                <Switch
+                  checked={Boolean(element.frameStrokeOnImage)}
+                  onCheckedChange={(frameStrokeOnImage) => patch({ frameStrokeOnImage: frameStrokeOnImage || undefined })}
+                  className="scale-90"
+                />
+              </Row>
+            ) : null}
           </div>
+          <p className="mt-2 text-[9px] leading-relaxed text-ink/40">
+            The photo sits inside the shape, cropped and scaled independently of the
+            layer box. Keep Stroke width above zero to keep the frame visible.
+          </p>
         </Section>
+        {element.imageInShape && element.imageStorageId ? (
+          <Section title="Image studio">
+            <ImageStudio
+              element={element}
+              onPatch={patch}
+              onUploadImage={onUploadImage}
+            />
+          </Section>
+        ) : null}
+        </>
       )}
 
       {element.kind === "motif" && (
