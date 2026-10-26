@@ -567,6 +567,168 @@ export async function buildPrintPdf(
   return new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
 }
 
+/* -------------------------------------------------------------------------- */
+/* Duplicate-per-sheet layout                                                 */
+/* -------------------------------------------------------------------------- */
+
+/** One side of a piece, captured and ready to be tiled onto a sheet. */
+export interface SheetCapture {
+  image: string;
+  label: string;
+}
+
+/**
+ * A sheet of identical copies: the imposition a stationer does before the
+ * guillotine. Everything is measured in millimetres and centred on the sheet,
+ * so a slightly larger stock never shifts the layout to a corner.
+ */
+export interface SheetLayout {
+  sheet: PageDimensions;
+  trim: PageDimensions;
+  bleedMm: number;
+  gapMm: number;
+  /** Turn each copy 90° to fit more on the sheet. */
+  rotate: boolean;
+  columns: number;
+  rows: number;
+  /** Copies that fit on one sheet. */
+  count: number;
+  /** Top-left of the first copy's media box, bleed included. */
+  origin: { x: number; y: number };
+}
+
+export const SHEET_GAP_MM = 3;
+
+export function sheetLayoutFor(options: {
+  trim: PageDimensions;
+  sheet: PageDimensions;
+  bleedMm?: number;
+  gapMm?: number;
+  rotate?: boolean;
+}): SheetLayout {
+  const bleed = Math.max(0, options.bleedMm ?? 0);
+  const gap = Math.max(0, options.gapMm ?? SHEET_GAP_MM);
+  const rotate = Boolean(options.rotate);
+  const mediaW = (rotate ? options.trim.heightMm : options.trim.widthMm) + bleed * 2;
+  const mediaH = (rotate ? options.trim.widthMm : options.trim.heightMm) + bleed * 2;
+  const cellW = mediaW + gap;
+  const cellH = mediaH + gap;
+  const columns = Math.max(1, Math.floor((options.sheet.widthMm + gap) / cellW));
+  const rows = Math.max(1, Math.floor((options.sheet.heightMm + gap) / cellH));
+  const usedW = Math.min(options.sheet.widthMm, columns * cellW - gap);
+  const usedH = Math.min(options.sheet.heightMm, rows * cellH - gap);
+  return {
+    sheet: options.sheet,
+    trim: options.trim,
+    bleedMm: bleed,
+    gapMm: gap,
+    rotate,
+    columns,
+    rows,
+    count: columns * rows,
+    origin: {
+      x: Math.max(0, (options.sheet.widthMm - usedW) / 2),
+      y: Math.max(0, (options.sheet.heightMm - usedH) / 2),
+    },
+  };
+}
+
+/** The media box of one copy: trim plus its bleed band, in millimetres. */
+export function sheetCellRect(
+  layout: SheetLayout,
+  index: number,
+): { x: number; y: number; w: number; h: number } {
+  const column = layout.columns > 0 ? index % layout.columns : 0;
+  const row = layout.columns > 0 ? Math.floor(index / layout.columns) : 0;
+  const w = (layout.rotate ? layout.trim.heightMm : layout.trim.widthMm) + layout.bleedMm * 2;
+  const h = (layout.rotate ? layout.trim.widthMm : layout.trim.heightMm) + layout.bleedMm * 2;
+  return {
+    x: layout.origin.x + column * (w + layout.gapMm),
+    y: layout.origin.y + row * (h + layout.gapMm),
+    w,
+    h,
+  };
+}
+
+/** Crop-mark segments for a trim rectangle, in millimetres from its top-left. */
+export function cropMarkSegments(
+  rect: { x: number; y: number; w: number; h: number },
+  markMm = 3,
+  gapMm = 0.6,
+): [number, number, number, number][] {
+  const left = rect.x;
+  const right = rect.x + rect.w;
+  const top = rect.y;
+  const bottom = rect.y + rect.h;
+  return [
+    [left - gapMm - markMm, top, left - gapMm, top],
+    [left, top - gapMm - markMm, left, top - gapMm],
+    [right + gapMm, top, right + gapMm + markMm, top],
+    [right, top - gapMm - markMm, right, top - gapMm],
+    [left - gapMm - markMm, bottom, left - gapMm, bottom],
+    [left, bottom + gapMm, left, bottom + gapMm + markMm],
+    [right + gapMm, bottom, right + gapMm + markMm, bottom],
+    [right, bottom + gapMm, right, bottom + gapMm + markMm],
+  ];
+}
+
+/**
+ * One sheet per capture, each tiled with the number of copies that fit. This
+ * is imposition only — the same RGB, rasterised output as the single-page PDF,
+ * with no colour management, no vector type, and no bleed beyond the rendered
+ * capture.
+ */
+export async function buildSheetPdf(
+  captures: SheetCapture[],
+  layout: SheetLayout,
+  title: string,
+  options: { cropMarks?: boolean } = {},
+): Promise<Blob> {
+  const { PDFDocument, rgb } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  pdf.setTitle(`${title} — print sheet`);
+  pdf.setProducer("LAMSA studio");
+
+  const pageW = mmToPt(layout.sheet.widthMm);
+  const pageH = mmToPt(layout.sheet.heightMm);
+  const images = await Promise.all(captures.map((capture) => pdf.embedPng(capture.image)));
+
+  for (let index = 0; index < captures.length; index += 1) {
+    const sheet = pdf.addPage([pageW, pageH]);
+    sheet.drawRectangle({ x: 0, y: 0, width: pageW, height: pageH, color: rgb(1, 1, 1) });
+    const image = images[index];
+    for (let copy = 0; copy < layout.count; copy += 1) {
+      const cell = sheetCellRect(layout, copy);
+      sheet.drawImage(image, {
+        x: mmToPt(cell.x),
+        y: pageH - mmToPt(cell.y + cell.h),
+        width: mmToPt(cell.w),
+        height: mmToPt(cell.h),
+      });
+      if (options.cropMarks && layout.bleedMm > 0) {
+        const trim = {
+          x: cell.x + layout.bleedMm,
+          y: cell.y + layout.bleedMm,
+          w: layout.trim.widthMm,
+          h: layout.trim.heightMm,
+        };
+        const markMm = Math.min(4, Math.max(1.5, layout.bleedMm * 0.7));
+        for (const [x1, y1, x2, y2] of cropMarkSegments(trim, markMm)) {
+          sheet.drawLine({
+            start: { x: mmToPt(x1), y: pageH - mmToPt(y1) },
+            end: { x: mmToPt(x2), y: pageH - mmToPt(y2) },
+            thickness: 0.5,
+            color: rgb(0, 0, 0),
+          });
+        }
+      }
+    }
+  }
+
+  const bytes = await pdf.save();
+  return new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+}
+
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

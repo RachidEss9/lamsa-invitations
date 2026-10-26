@@ -15,6 +15,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
+import { EnvelopeGuides } from "@/components/studio/EnvelopeGuides";
+import { geometryForPage, type EnvelopeGeometry } from "@/lib/envelope";
 import { equalSpacingGuides, type SpacingSegments } from "@/lib/smart-guides";
 import { effectFilter, gradientCss, outlineWidth } from "@/lib/effects";
 import { fontFamilyFor } from "@/lib/fonts";
@@ -58,6 +60,16 @@ interface StudioCanvasProps {
   showSafeArea?: boolean;
   /** Artwork / Print mode (false) hides every material finish on the canvas. */
   materialPreview?: boolean;
+  /**
+   * Envelope drafting guides for the piece being edited: flap, address
+   * windows, postage-safe zone and liner fit. Screen only — the overlay sits
+   * outside the page, so no export can pick it up by accident.
+   */
+  envelope?: {
+    geometry: EnvelopeGeometry;
+    view: "front" | "back";
+    liner?: { widthMm: number; heightMm: number } | null;
+  } | null;
   resetViewToken?: number;
   editRequest?: { id: string; token: number } | null;
   onZoom: (value: number) => void;
@@ -311,6 +323,7 @@ export function StudioCanvas({
   showRulers = false,
   showSafeArea = false,
   materialPreview = true,
+  envelope = null,
   resetViewToken = 0,
   editRequest,
   onZoom,
@@ -1115,6 +1128,18 @@ export function StudioCanvas({
                 width: Math.max(1, size.width - safeMargin * 2),
                 height: Math.max(1, size.height - safeMargin * 2),
               }}
+            />
+          )}
+
+          {/* Envelope drafting guides: measurement, never artwork. */}
+          {envelope && (
+            <EnvelopeGuides
+              geometry={geometryForPage(envelope.geometry, size.width, size.height)}
+              view={envelope.view}
+              width={size.width}
+              height={size.height}
+              scale={scale}
+              liner={envelope.liner}
             />
           )}
 

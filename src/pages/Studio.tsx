@@ -17,6 +17,8 @@ import {
 import { FrameThumb } from "@/components/invitation/FrameArt";
 import { OpeningDesigner } from "@/components/studio/OpeningDesigner";
 import { PrintExportDialog } from "@/components/studio/PrintExportDialog";
+import { ShareStyleDialog } from "@/components/studio/ShareStyleDialog";
+import { SuiteBar } from "@/components/studio/SuiteBar";
 import { StudioCanvas, type CanvasContextAction } from "@/components/studio/StudioCanvas";
 import { ShortcutReference } from "@/components/studio/ShortcutReference";
 import { Timeline } from "@/components/studio/Timeline";
@@ -39,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CLOSING_STYLES,
@@ -56,6 +59,7 @@ import {
   normalizeDesign,
   pageSizeOf,
   resizePage,
+  toDesignPx,
   PAGE_RESIZE_MODES,
   SHAPES,
   timelineDuration,
@@ -83,6 +87,38 @@ import {
   type ColourPalette,
 } from "@/lib/palettes";
 import { recolourSelection } from "@/lib/library-colour";
+import {
+  activePiece,
+  addPiece,
+  addPageToSuite,
+  deletePiece,
+  duplicatePiece,
+  movePiece,
+  pieceForPage,
+  piecePages,
+  pieceRange,
+  removePageFromSuite,
+  renamePiece,
+  selectPiece,
+  setGuestVisible,
+  shareStyles,
+  suiteOf,
+  updateEnvelopeGeometry,
+  updatePiecePrint,
+  type PieceKind,
+  type PiecePrint,
+  type ShareStyleOptions,
+  type SuitePiece,
+} from "@/lib/suite";
+import {
+  ENVELOPE_PRESETS,
+  FLAP_SHAPES,
+  defaultEnvelopeGeometry,
+  envelopePresetFor,
+  linerSizeFor,
+  type EnvelopeGeometry,
+  type FlapShape,
+} from "@/lib/envelope";
 import {
   MATERIAL_SCOPE_NOTE,
   supportsMaterial,
@@ -336,6 +372,7 @@ export default function Studio() {
     name: string;
   } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareStyleOpen, setShareStyleOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(0);
@@ -366,6 +403,8 @@ export default function Studio() {
   // then, so a careless Backspace can never destroy the layer being typed into.
   const [canvasEditing, setCanvasEditing] = useState(false);
   const [resizeMode, setResizeMode] = useState<PageResizeMode>("fit");
+  /** Units the envelope brief is typed in. Millimetres is how paper is sold. */
+  const [envelopeUnit, setEnvelopeUnit] = useState<"mm" | "in">("mm");
   const [sizeDraft, setSizeDraft] = useState({ width: DESIGN_WIDTH, height: DESIGN_HEIGHT });
 
   const pastRef = useRef<DesignDocument[]>([]);
@@ -833,6 +872,165 @@ export default function Studio() {
     },
     [applyCanvasSize, sizeDraftValue],
   );
+
+  /* ---------------------------------------------------------------------- */
+  /* Stationery suite: pieces, coordinated styles, envelope briefs          */
+  /* ---------------------------------------------------------------------- */
+
+  const currentPiece = design
+    ? (page ? pieceForPage(design, page.id) : null) ?? activePiece(design)
+    : null;
+
+  const pieceNameOf = (document: DesignDocument, pieceId: string) =>
+    suiteOf(document).find((piece) => piece.id === pieceId)?.name ?? "Piece";
+
+  const addSuitePiece = useCallback(
+    (kind: PieceKind) => {
+      const source = designRef.current;
+      if (!source) return;
+      const result = addPiece(source, kind, { afterPieceId: currentPiece?.id });
+      if (result.error || !result.design) {
+        toast.error(result.error ?? "That piece could not be added.");
+        return;
+      }
+      apply(() => result.design);
+      setPageIndex(result.pageIndex);
+      setSelectedIds([]);
+      toast.success(`“${pieceNameOf(result.design, result.pieceId)}” added to the suite.`);
+    },
+    [apply, currentPiece],
+  );
+
+  const duplicateSuitePiece = useCallback(() => {
+    const source = designRef.current;
+    const piece = source ? activePiece(source) : null;
+    if (!source || !piece) return;
+    const result = duplicatePiece(source, piece.id);
+    if (result.error || !result.design) {
+      toast.error(result.error ?? "That piece could not be duplicated.");
+      return;
+    }
+    apply(() => result.design);
+    setPageIndex(result.pageIndex);
+    setSelectedIds([]);
+    toast.success(`“${pieceNameOf(result.design, result.pieceId)}” created.`);
+  }, [apply]);
+
+  const removeSuitePiece = useCallback(() => {
+    const source = designRef.current;
+    const piece = source ? activePiece(source) : null;
+    if (!source || !piece) return;
+    const result = deletePiece(source, piece.id);
+    if (result.error || !result.design) {
+      toast.error(result.error ?? "That piece could not be removed.");
+      return;
+    }
+    apply(() => result.design);
+    setPageIndex(result.pageIndex);
+    setSelectedIds([]);
+    toast.success(`“${piece.name}” removed. Undo restores it.`);
+  }, [apply]);
+
+  const reorderSuitePiece = useCallback(
+    (direction: -1 | 1) => {
+      const source = designRef.current;
+      const piece = source ? activePiece(source) : null;
+      if (!source || !piece) return;
+      const next = movePiece(source, piece.id, direction);
+      if (next === source) return;
+      apply(() => next);
+      const range = pieceRange(next, piece.id);
+      if (range) setPageIndex(range.start);
+      setSelectedIds([]);
+    },
+    [apply],
+  );
+
+  const onPieceId = (mutate: (current: DesignDocument, pieceId: string) => DesignDocument) => {
+    const pieceId = currentPiece?.id;
+    if (!pieceId) return;
+    apply((current) => mutate(current, pieceId));
+  };
+
+  const renameSuitePiece = (name: string) =>
+    onPieceId((current, pieceId) => renamePiece(current, pieceId, name));
+
+  const changeSuiteGuestVisible = (visible: boolean) => {
+    onPieceId((current, pieceId) => setGuestVisible(current, pieceId, visible));
+    toast.success(
+      visible
+        ? "This piece is now part of the guest experience."
+        : "Production only — this piece stays off the public link.",
+    );
+  };
+
+  const changeSuitePrint = (print: Partial<PiecePrint>) =>
+    onPieceId((current, pieceId) => updatePiecePrint(current, pieceId, print));
+
+  const patchEnvelope = (patch: Partial<EnvelopeGeometry>) =>
+    onPieceId((current, pieceId) => updateEnvelopeGeometry(current, pieceId, patch));
+
+  /** Resizes every side of the envelope at once and keeps the flap in step. */
+  const setEnvelopeSize = (widthMm: number, heightMm: number) => {
+    const piece = currentPiece;
+    if (!piece || !piece.envelope) return;
+    const width = Math.max(40, Math.min(600, Math.round(widthMm * 10) / 10));
+    const height = Math.max(40, Math.min(600, Math.round(heightMm * 10) / 10));
+    const geometry = piece.envelope;
+    const ratio = geometry.heightMm > 0 ? geometry.flap.depthMm / geometry.heightMm : 0.42;
+    const target = {
+      width: Math.round(toDesignPx(width, "mm")),
+      height: Math.round(toDesignPx(height, "mm")),
+    };
+    apply((current) => {
+      const ids = new Set(piece.pageIds);
+      const pages = current.pages.map((candidate) =>
+        ids.has(candidate.id) ? resizePage(candidate, target, resizeMode) : candidate,
+      );
+      return updateEnvelopeGeometry({ ...current, pages }, piece.id, {
+        widthMm: width,
+        heightMm: height,
+        flap: {
+          ...geometry.flap,
+          depthMm: Math.round(height * ratio * 10) / 10,
+        },
+      });
+    });
+    setSizeDraft(target);
+    setSizeTouched(false);
+    toast.success(`Envelope set to ${width} × ${height} mm.`);
+  };
+
+  const applySharedStyle = (options: ShareStyleOptions) => {
+    let changed = false;
+    apply((current) => {
+      const next = shareStyles(current, options);
+      changed = next !== current;
+      return next;
+    });
+    toast.success(changed ? "Style applied. Undo restores it." : "Nothing to apply.");
+  };
+
+  /** Envelope drafting guides for the piece and side being edited. */
+  const envelopeGuide = useMemo(() => {
+    if (!design || !currentPiece || !page) return null;
+    if (currentPiece.kind !== "envelope" || !currentPiece.envelope) return null;
+    const side = currentPiece.pageIds.indexOf(page.id);
+    const linerPiece = suiteOf(design).find((piece) => piece.kind === "liner");
+    const linerPage = linerPiece ? piecePages(design, linerPiece)[0] : undefined;
+    const linerSize = linerPage ? pageSizeOf(linerPage) : null;
+    return {
+      geometry: currentPiece.envelope,
+      view: side === 1 ? ("back" as const) : ("front" as const),
+      liner:
+        currentPiece.envelope.showLiner && linerSize
+          ? {
+              widthMm: (linerSize.width * 25.4) / 96,
+              heightMm: (linerSize.height * 25.4) / 96,
+            }
+          : null,
+    };
+  }, [currentPiece, design, page]);
 
   /**
    * Adds a layer to the current page. `insertIndex` places it at a specific
@@ -1967,11 +2165,17 @@ export default function Studio() {
           : element,
       );
     }
-    apply((currentDesign) => ({
-      ...currentDesign,
-      pages: [...currentDesign.pages, nextPage],
-    }));
-    setPageIndex(design.pages.length);
+    // A new page belongs to the piece being worked on and lands inside its
+    // block, so pieces stay contiguous in the page list.
+    const piece = activePiece(design);
+    const range = piece ? pieceRange(design, piece.id) : null;
+    const insertAt = range ? range.end : design.pages.length;
+    apply((currentDesign) => {
+      const pages = [...currentDesign.pages];
+      pages.splice(insertAt, 0, nextPage);
+      return addPageToSuite({ ...currentDesign, pages }, nextPage.id);
+    });
+    setPageIndex(insertAt);
     setSelectedIds([]);
   };
 
@@ -1980,18 +2184,32 @@ export default function Studio() {
       toast.error("An invitation needs at least one page.");
       return;
     }
-    apply((current) => ({
-      ...current,
-      pages: current.pages.filter((_, position) => position !== index),
-    }));
+    const target = design.pages[index];
+    const owner = target ? pieceForPage(design, target.id) : null;
+    if (owner && owner.pageIds.length <= 1 && suiteOf(design).length > 0) {
+      toast.error(`“${owner.name}” only has this page — delete the piece instead.`);
+      return;
+    }
+    apply((current) =>
+      removePageFromSuite(
+        { ...current, pages: current.pages.filter((_, position) => position !== index) },
+        target.id,
+      ),
+    );
     setPageIndex((current) => Math.min(current, design.pages.length - 2));
     setSelectedIds([]);
   };
 
   const movePage = (index: number, direction: -1 | 1) => {
     if (!design) return;
+    // Pages are reordered inside their own piece: a card never slides into
+    // another piece's block.
+    const owner = pieceForPage(design, design.pages[index].id);
+    const range = owner ? pieceRange(design, owner.id) : null;
+    const first = range ? range.start : 0;
+    const last = range ? range.end - 1 : design.pages.length - 1;
     const target = index + direction;
-    if (target < 0 || target >= design.pages.length) return;
+    if (target < first || target > last) return;
     apply((current) => {
       const pages = [...current.pages];
       [pages[index], pages[target]] = [pages[target], pages[index]];
@@ -2679,11 +2897,225 @@ export default function Studio() {
       );
     }
 
+    const geometry =
+      currentPiece?.kind === "envelope" ? currentPiece.envelope ?? null : null;
+    const linerPiece = design.suite
+      ? suiteOf(design).find((candidate) => candidate.kind === "liner")
+      : null;
+    const linerPage = linerPiece ? piecePages(design, linerPiece)[0] : undefined;
+    const linerSizeMm = linerPage
+      ? { widthMm: (pageSizeOf(linerPage).width * 25.4) / 96, heightMm: (pageSizeOf(linerPage).height * 25.4) / 96 }
+      : linerSizeFor(geometry ?? defaultEnvelopeGeometry());
+    const envelopeWidthMm = (currentSize.width * 25.4) / 96;
+    const envelopeHeightMm = (currentSize.height * 25.4) / 96;
+    const showUnit = (mm: number) =>
+      envelopeUnit === "in"
+        ? Math.round((mm / 25.4) * 100) / 100
+        : Math.round(mm * 10) / 10;
+    const readUnit = (value: number) =>
+      envelopeUnit === "in" ? value * 25.4 : value;
+    const depthRatio =
+      geometry && geometry.heightMm > 0
+        ? geometry.flap.depthMm / geometry.heightMm
+        : 0.42;
+    const activeSide =
+      currentPiece && page && currentPiece.pageIds.indexOf(page.id) === 1
+        ? "back"
+        : "front";
+
     return (
       <>
-        <PanelHeading title="Pages" note="Reorder, duplicate, hide, or remove sections of the invitation." />
+        {geometry && (
+        <div className="border-b border-ink/12 p-3">
+          <p className="mb-1 font-meta text-[9px] uppercase tracking-[0.16em] text-ink/40">
+            Envelope
+          </p>
+          <p className="mb-2.5 text-[10px] leading-relaxed text-ink/45">
+            {activeSide === "back"
+              ? "Back: the flap, the liner’s fit and the return address."
+              : "Front: the recipient window, the stamp and the postage-safe zone."}{" "}
+            Every line here is a drafting guide: it never reaches a print
+            export unless you ask for it.
+          </p>
+
+          <div className="mb-2.5 grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[10px] text-ink/55">Width</span>
+              <Input
+                type="number"
+                step={envelopeUnit === "in" ? 0.1 : 1}
+                min={40}
+                max={600}
+                value={showUnit(envelopeWidthMm)}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  if (!Number.isFinite(value)) return;
+                  setEnvelopeSize(readUnit(value), envelopeHeightMm);
+                }}
+                className="h-8 rounded-none text-[11px]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] text-ink/55">Height</span>
+              <Input
+                type="number"
+                step={envelopeUnit === "in" ? 0.1 : 1}
+                min={40}
+                max={600}
+                value={showUnit(envelopeHeightMm)}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  if (!Number.isFinite(value)) return;
+                  setEnvelopeSize(envelopeWidthMm, readUnit(value));
+                }}
+                className="h-8 rounded-none text-[11px]"
+              />
+            </label>
+          </div>
+
+          <div className="mb-2.5 grid grid-cols-[1fr_auto] items-center gap-2">
+            <Select
+              value={
+                envelopePresetFor({ width: envelopeWidthMm, height: envelopeHeightMm })?.id ??
+                "custom"
+              }
+              onValueChange={(id) => {
+                const preset = ENVELOPE_PRESETS.find((item) => item.id === id);
+                if (preset) setEnvelopeSize(preset.width, preset.height);
+              }}
+            >
+              <SelectTrigger className="h-8 rounded-none text-[11px]">
+                <SelectValue placeholder="Size" />
+              </SelectTrigger>
+              <SelectContent>
+                {ENVELOPE_PRESETS.map((preset) => (
+                  <SelectItem key={preset.id} value={preset.id}>
+                    {preset.label} · {preset.width} × {preset.height} mm
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">Custom size</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={envelopeUnit}
+              onValueChange={(unit) => setEnvelopeUnit(unit as "mm" | "in")}
+            >
+              <SelectTrigger className="h-8 w-[74px] rounded-none text-[11px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mm">mm</SelectItem>
+                <SelectItem value="in">inches</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="mb-2 grid grid-cols-[1fr_auto] items-center gap-2">
+            <Select
+              value={geometry.flap.shape}
+              onValueChange={(shape) =>
+                patchEnvelope({
+                  flap: {
+                    ...geometry.flap,
+                    shape: shape as FlapShape,
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="h-8 rounded-none text-[11px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FLAP_SHAPES.map((flap) => (
+                  <SelectItem key={flap.id} value={flap.id}>
+                    {flap.label} flap
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="font-meta text-[9px] text-ink/40">
+              {Math.round(geometry.flap.depthMm * 10) / 10} mm deep
+            </span>
+          </div>
+
+          <div className="mb-1">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[10px] text-ink/55">Flap depth</span>
+              <span className="font-meta text-[9px] text-ink/40">
+                {Math.round(depthRatio * 100)}% of the height
+              </span>
+            </div>
+            <Slider
+              value={[Math.round(depthRatio * 100)]}
+              min={20}
+              max={75}
+              step={1}
+              onValueChange={([value]) => {
+                if (value == null) return;
+                patchEnvelope({
+                  flap: {
+                    ...geometry.flap,
+                    depthMm:
+                      Math.round(geometry.heightMm * (value / 100) * 10) / 10,
+                  },
+                });
+              }}
+            />
+          </div>
+
+          <div className="mt-3 border-t border-ink/10 pt-2">
+            {(
+              [
+                ["Flap outline", geometry.showFlap, (value: boolean) => patchEnvelope({ showFlap: value })],
+                ["Recipient window", geometry.guides.recipient, (value: boolean) => patchEnvelope({ guides: { ...geometry.guides, recipient: value } })],
+                ["Stamp area", geometry.guides.stamp, (value: boolean) => patchEnvelope({ guides: { ...geometry.guides, stamp: value } })],
+                ["Return address", geometry.guides.returnAddress, (value: boolean) => patchEnvelope({ guides: { ...geometry.guides, returnAddress: value } })],
+                ["Postage-safe zone", geometry.guides.postageSafe, (value: boolean) => patchEnvelope({ guides: { ...geometry.guides, postageSafe: value } })],
+                ["Liner fit", geometry.showLiner, (value: boolean) => patchEnvelope({ showLiner: value })],
+              ] as [string, boolean, (value: boolean) => void][]
+            ).map(([label, checked, onChange]) => (
+              <label key={label} className="flex items-center justify-between gap-2 py-1">
+                <span className="text-[11px] text-ink/60">{label}</span>
+                <Switch checked={checked} onCheckedChange={onChange} className="scale-90" />
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-ink/10 pt-2">
+            <span className="text-[9px] leading-relaxed text-ink/45">
+              Liner {showUnit(linerSizeMm.widthMm)} × {showUnit(linerSizeMm.heightMm)}{" "}
+              {envelopeUnit} · {linerPage ? "cut and ready to edit" : "not added yet"}
+            </span>
+            {!linerPage && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => addSuitePiece("liner")}
+                className="h-7 shrink-0 rounded-none text-[9px] uppercase tracking-[0.1em]"
+              >
+                <Plus className="size-3" /> Add
+              </Button>
+            )}
+          </div>
+        </div>
+        )}
+
+        <PanelHeading
+          title="Pages"
+          note={
+            design.suite && currentPiece
+              ? `Sides and pages of “${currentPiece.name}”.`
+              : "Reorder, duplicate, hide, or remove sections of the invitation."
+          }
+        />
         <div className="space-y-1 p-2">
-          {design.pages.map((candidate, index) => (
+          {(design.suite && currentPiece
+            ? piecePages(design, currentPiece).map((candidate) => ({
+                candidate,
+                index: design.pages.findIndex((item) => item.id === candidate.id),
+              }))
+            : design.pages.map((candidate, index) => ({ candidate, index }))
+          ).map(({ candidate, index }) => (
             <div
               key={candidate.id}
               className={cn(
@@ -2999,6 +3431,35 @@ export default function Studio() {
         </div>
       </header>
 
+      {/* The suite strip: one chip per piece of stationery, its brief, and the
+          actions that keep a set coordinated. */}
+      <SuiteBar
+        design={design}
+        activePieceId={currentPiece?.id ?? null}
+        onSelect={(pieceId) => {
+          const selection = selectPiece(design, pieceId);
+          if (!selection) return;
+          setPageIndex(selection.pageIndex);
+          setSelectedIds([]);
+        }}
+        onAdd={addSuitePiece}
+        onDuplicate={duplicateSuitePiece}
+        onDelete={removeSuitePiece}
+        onMove={reorderSuitePiece}
+        onRename={renameSuitePiece}
+        onGuestVisible={changeSuiteGuestVisible}
+        onPrint={changeSuitePrint}
+        onShareStyle={() => setShareStyleOpen(true)}
+      />
+
+      <ShareStyleDialog
+        open={shareStyleOpen}
+        onOpenChange={setShareStyleOpen}
+        design={design}
+        sourcePieceId={currentPiece?.id ?? null}
+        selectedElementIds={selectedIds}
+        onApply={applySharedStyle}
+      />
 
       <div className="flex min-h-0 flex-1">
         <aside className="relative z-20 hidden shrink-0 border-r border-[var(--edge)] bg-[var(--surface-card)] lg:flex">
@@ -3073,6 +3534,7 @@ export default function Studio() {
                 showRulers={overlays.rulers}
                 showSafeArea={overlays.safe}
                 materialPreview={materialPreview}
+                envelope={envelopeGuide}
                 resetViewToken={resetViewToken}
                 editRequest={editTextRequest}
                 onZoom={setZoom}

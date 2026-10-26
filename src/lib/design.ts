@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { normalizeEffects, type LayerEffects } from "@/lib/effects";
+import { guestVisiblePageIds, normalizeSuite, type DesignSuite } from "@/lib/suite";
 import { normalizeMaterial, type LayerMaterial } from "@/lib/materials";
 import { normalizeImageAdjust, type ImageAdjust } from "@/lib/image-frame";
 import { normalizeCurve } from "@/lib/text-path";
@@ -322,8 +323,16 @@ export const PAGE_TEXTURES: { id: PageTextureId; label: string; note: string }[]
 ];
 
 export function visiblePages(design: DesignDocument): DesignPage[] {
-  const shown = design.pages.filter((page) => !page.hidden);
-  return shown.length > 0 ? shown : design.pages.slice(0, 1);
+  // A stationery suite is a production aid: pieces the host has not opened to
+  // guests (the envelope, the liner, the RSVP) never reach a public link. An
+  // invitation with no suite keeps every page, exactly as it always has.
+  const guest = guestVisiblePageIds(design);
+  const pool = guest ? design.pages.filter((page) => guest.has(page.id)) : design.pages;
+  const shown = pool.filter((page) => !page.hidden);
+  if (shown.length > 0) return shown;
+  // Never hand a guest a blank run: fall back to the first page that exists.
+  const fallback = pool.length > 0 ? pool : design.pages;
+  return fallback.slice(0, 1);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -675,6 +684,13 @@ export interface PageTransition {
 export interface DesignDocument {
   version: 1;
   pages: DesignPage[];
+  /**
+   * The coordinated stationery suite: a named grouping of pages into pieces
+   * (card, RSVP, envelope, liner) with per-piece print settings. Absent on
+   * every invitation saved before suites existed, which then behave exactly as
+   * they always have — one document, every page public.
+   */
+  suite?: DesignSuite;
   opening: OpeningSettings;
   closing: ClosingSettings;
   transition: PageTransition;
@@ -1476,7 +1492,7 @@ export function normalizeDesign(
 ): DesignDocument {
   if (!isDesignDocument(value)) return createDefaultDesign(content);
   const fallback = createDefaultDesign(content);
-  return {
+  const normalized: DesignDocument = {
     version: 1,
     pages: value.pages.map((page, index) => {
       const elements = (page.elements ?? []).map((element) => ({
@@ -1590,6 +1606,10 @@ export function normalizeDesign(
     format: value.format,
     startedAt: value.startedAt,
   };
+  // The suite is reconciled against the repaired pages, so a piece pointing at
+  // a page that no longer exists — or a page with no piece — can never make
+  // artwork unreachable. Documents without a suite stay suite-less.
+  return { ...normalized, suite: normalizeSuite(value.suite, normalized.pages) };
 }
 
 /* -------------------------------------------------------------------------- */
