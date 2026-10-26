@@ -13,6 +13,7 @@ export type FavouriteKind =
   | "font"
   | "asset"
   | "frame"
+  | "material"
   | "opening"
   | "saved"
   | "palette";

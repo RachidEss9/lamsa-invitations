@@ -34,6 +34,14 @@ import { MOTIFS } from "@/lib/invitation";
 import { TypographyStudio } from "@/components/studio/TypographyStudio";
 import { EffectsInspector } from "@/components/studio/EffectsInspector";
 import { ImageStudio } from "@/components/studio/ImageStudio";
+import {
+  MaterialUnsupportedNote,
+  MaterialsStudio,
+} from "@/components/studio/MaterialsStudio";
+import {
+  supportsMaterial,
+  supportsMaterialRelief,
+} from "@/lib/materials";
 import { cn } from "@/lib/utils";
 import { useRef, type ReactNode } from "react";
 
@@ -85,6 +93,10 @@ interface InspectorProps {
   onTestReveal: (interactionId: string) => void;
   onPreviewAnimation: () => void;
   onEditText?: (id: string) => void;
+  /** Whether the canvas is currently drawing material finishes. */
+  materialPreview?: boolean;
+  /** Switches the canvas back to Material Preview from the panel. */
+  onShowMaterials?: () => void;
 }
 
 type SectionProps = {
@@ -128,6 +140,8 @@ export function Inspector({
   onTestReveal,
   onPreviewAnimation,
   onEditText,
+  materialPreview = true,
+  onShowMaterials,
 }: InspectorProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const element = selected.length === 1 ? selected[0] : null;
@@ -173,6 +187,15 @@ export function Inspector({
               onChange={(background) => onPagePatch({ background })}
             />
           </Row>
+        </Section>
+        <Section title="Material">
+          <MaterialsStudio
+            material={page.material}
+            scope="page"
+            previewMode={materialPreview}
+            onShowMaterials={onShowMaterials}
+            onChange={(material) => onPagePatch({ material })}
+          />
         </Section>
         <div className="px-4 py-5 text-[11px] leading-relaxed text-ink/50">
           Select a layer on the canvas or in the layer list to edit its content,
@@ -653,6 +676,21 @@ export function Inspector({
 
       <Section title="Effects">
         <EffectsInspector element={element} patch={patch} />
+      </Section>
+
+      <Section title="Material">
+        {supportsMaterial(element) ? (
+          <MaterialsStudio
+            material={element.material}
+            scope="layer"
+            reliefSupported={supportsMaterialRelief(element)}
+            previewMode={materialPreview}
+            onShowMaterials={onShowMaterials}
+            onChange={(material) => patch({ material })}
+          />
+        ) : (
+          <MaterialUnsupportedNote />
+        )}
       </Section>
 
       {animation && (

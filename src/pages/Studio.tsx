@@ -83,6 +83,12 @@ import {
   type ColourPalette,
 } from "@/lib/palettes";
 import { recolourSelection } from "@/lib/library-colour";
+import {
+  MATERIAL_SCOPE_NOTE,
+  supportsMaterial,
+  type LayerMaterial,
+  type MaterialId,
+} from "@/lib/materials";
 import type { BuiltinAsset } from "@/lib/assets";
 import type { RevealPreset } from "@/lib/reveals";
 import {
@@ -288,6 +294,31 @@ export default function Studio() {
       return next;
     });
   const [aspectLocked, setAspectLocked] = useState(false);
+  /**
+   * Material Preview draws the studio's paper, foil and relief simulations;
+   * Artwork mode is the clean, print-true card the export pipeline captures.
+   * It is a viewing preference like the grid or the rulers — never saved into
+   * the invitation, and never changing a single pixel of the design.
+   */
+  const [materialPreview, setMaterialPreview] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      return window.localStorage.getItem("lamsa.canvas.materials") !== "artwork";
+    } catch {
+      return true;
+    }
+  });
+  const setMaterialMode = useCallback((preview: boolean) => {
+    setMaterialPreview(preview);
+    try {
+      window.localStorage.setItem(
+        "lamsa.canvas.materials",
+        preview ? "materials" : "artwork",
+      );
+    } catch {
+      // Losing a viewing preference is harmless.
+    }
+  }, []);
   const [showHidden, setShowHidden] = useState(true);
   const [revealPreview, setRevealPreview] = useState<Set<string>>(new Set());
   const [leftPanel, setLeftPanel] = useState<LeftPanel>("add");
@@ -1826,6 +1857,56 @@ export default function Studio() {
     }));
   };
 
+  /**
+   * A finish from the library or the inspector: the selected layers when they
+   * have a surface the renderer can honestly draw on, otherwise the page
+   * itself. Nothing is baked into artwork — the material is one more setting on
+   * the element, so it can be edited or removed just like any other.
+   */
+  const applyMaterial = (material: LayerMaterial) => {
+    if (selectedIds.length === 0) {
+      patchPage({ material });
+      toast.success("Finish applied to this page.");
+      if (!materialPreview) setMaterialMode(true);
+      return;
+    }
+    const eligible = selected.filter((element) => supportsMaterial(element));
+    if (eligible.length === 0) {
+      toast.error(MATERIAL_SCOPE_NOTE);
+      return;
+    }
+    const ids = new Set(eligible.map((element) => element.id));
+    apply((current) => ({
+      ...current,
+      pages: current.pages.map((candidate, index) =>
+        index === pageIndex
+          ? {
+              ...candidate,
+              elements: candidate.elements.map((element) =>
+                ids.has(element.id) ? { ...element, material: { ...material } } : element,
+              ),
+            }
+          : candidate,
+      ),
+    }));
+    toast.success(
+      eligible.length === 1
+        ? `“${eligible[0].name}” is now finished with ${material.preset.replace("-", " ")}.`
+        : `Finish applied to ${eligible.length} layers.`,
+    );
+    // A finish applied while the canvas is showing clean artwork would look
+    // like nothing happened, so the preview turns itself back on.
+    if (!materialPreview) setMaterialMode(true);
+  };
+
+  /** The preset the current target already wears, so a tile can show itself. */
+  const activeMaterialId: MaterialId | undefined =
+    selectedIds.length === 0
+      ? page?.material?.preset
+      : selected.length === 1
+        ? selected[0].material?.preset
+        : undefined;
+
   const clipChange = (elementId: string, value: { start?: number; duration?: number }) => {
     setPageElements((elements) =>
       elements.map((element) =>
@@ -2991,6 +3072,7 @@ export default function Studio() {
                 showGrid={overlays.grid}
                 showRulers={overlays.rulers}
                 showSafeArea={overlays.safe}
+                materialPreview={materialPreview}
                 resetViewToken={resetViewToken}
                 editRequest={editTextRequest}
                 onZoom={setZoom}
@@ -3092,6 +3174,37 @@ export default function Studio() {
             <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col gap-1">
               <span className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-ink/55 backdrop-blur">
                 {page.name} · {page.elements.length} layers
+              </span>
+              {/* The two ways to look at this card, kept next to the card. */}
+              <span className="pointer-events-auto flex w-fit items-center gap-0.5 rounded-full border border-ink/15 bg-[var(--paper-light)]/90 p-0.5 backdrop-blur">
+                <button
+                  type="button"
+                  aria-pressed={!materialPreview}
+                  title="Artwork / Print mode — the clean card that exports"
+                  onClick={() => setMaterialMode(false)}
+                  className={cn(
+                    "rounded-full px-2 py-0.5 font-meta text-[8px] uppercase tracking-[0.1em] transition-colors",
+                    materialPreview
+                      ? "text-ink/50 hover:text-ink"
+                      : "bg-[var(--ink)] text-[var(--paper-light)]",
+                  )}
+                >
+                  Artwork
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={materialPreview}
+                  title="Material Preview — a screen simulation of paper, foil and relief"
+                  onClick={() => setMaterialMode(true)}
+                  className={cn(
+                    "rounded-full px-2 py-0.5 font-meta text-[8px] uppercase tracking-[0.1em] transition-colors",
+                    materialPreview
+                      ? "bg-[var(--ink)] text-[var(--paper-light)]"
+                      : "text-ink/50 hover:text-ink",
+                  )}
+                >
+                  Materials
+                </button>
               </span>
               {selected.length > 0 && (
                 <span className="pointer-events-auto rounded-md border border-[var(--red)]/30 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-[var(--red)] backdrop-blur">
@@ -3273,6 +3386,8 @@ export default function Studio() {
             onUploadImage={handleInspectorUpload}
             onTestReveal={testReveal}
             onPreviewAnimation={previewAnimation}
+            materialPreview={materialPreview}
+            onShowMaterials={() => setMaterialMode(true)}
             onEditText={(elementId) =>
               setEditTextRequest({ id: elementId, token: Date.now() })
             }
@@ -3357,6 +3472,8 @@ export default function Studio() {
                   onUploadImage={handleInspectorUpload}
                   onTestReveal={testReveal}
                   onPreviewAnimation={previewAnimation}
+            materialPreview={materialPreview}
+            onShowMaterials={() => setMaterialMode(true)}
                   onEditText={(elementId) => {
                     setEditTextRequest({ id: elementId, token: Date.now() });
                     setMobileSheet(null);
@@ -3425,6 +3542,8 @@ export default function Studio() {
         onApplyTypeStyle={applyTypeStyleToSelection}
         onApplyPalette={applyPalette}
         onApplyColour={applyLibraryColour}
+        onApplyMaterial={applyMaterial}
+        activeMaterialId={activeMaterialId}
         tab={libraryTab}
         onTabChange={setLibraryTab}
       />

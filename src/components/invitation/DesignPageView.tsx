@@ -16,6 +16,11 @@ import {
   outlineWidth,
 } from "@/lib/effects";
 import {
+  materialOverlayStyle,
+  materialShapeRadius,
+  materialTargetOf,
+} from "@/lib/materials";
+import {
   imageAdjustFilter,
   maskedImageFrame,
   rotationCoverScale,
@@ -31,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { FrameArt } from "./FrameArt";
 import { Motif } from "./Motif";
 import {
+  cloneElement,
   useEffect,
   useId,
   useLayoutEffect,
@@ -73,12 +79,19 @@ function ShapeArt({
   clipId,
   imageUrl,
   aspect,
+  boxClip,
 }: {
   element: DesignElement;
   clipId?: string;
   imageUrl?: string;
   /** The file's own width ÷ height, once the browser has measured it. */
   aspect?: number;
+  /**
+   * Also publish the silhouette in the element's own pixel space, so an HTML
+   * overlay (a material finish) can clip itself to this vector with
+   * `clip-path: url(#…)` instead of spilling past its edges.
+   */
+  boxClip?: boolean;
 }) {
   const shape = element.shape ?? "rect";
   const fill = element.fill ?? element.color ?? "#161616";
@@ -170,6 +183,13 @@ function ShapeArt({
     >
       <defs>
         {clipId && clipArt && <clipPath id={clipId}>{clipArt}</clipPath>}
+        {boxClip && clipId && clipArt && (
+          <clipPath id={`${clipId}-box`} clipPathUnits="userSpaceOnUse">
+            {cloneElement(clipArt, {
+              transform: `scale(${Math.max(1, element.w) / 100} ${Math.max(1, element.h) / 100})`,
+            })}
+          </clipPath>
+        )}
         {gradientActive && gradient && gradientId && (
           <linearGradient
             id={gradientId}
@@ -427,12 +447,18 @@ function ElementVisual({
   guestName,
   rtl,
   clipId,
+  material,
+  boxClip,
 }: {
   element: DesignElement;
   imageUrls: Record<string, string>;
   guestName?: string | null;
   rtl?: boolean;
   clipId: string;
+  /** The material finish, already reduced to one overlay style. */
+  material?: CSSProperties;
+  /** True when the silhouette has to be referenced through a clip path. */
+  boxClip?: boolean;
 }) {
   // Hooks run before any branch: an invitation without a photograph simply
   // probes nothing.
@@ -603,6 +629,13 @@ function ElementVisual({
             style={{ boxShadow: photoInner }}
           />
         ) : null}
+        {material ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={material}
+          />
+        ) : null}
       </div>
     );
   }
@@ -620,9 +653,7 @@ function ElementVisual({
         />
       </div>
     );
-  }
-
-  // A decorative frame is drawn as vector artwork instead of a plain keyline.
+  }  // A decorative frame is drawn as vector artwork instead of a plain keyline.
   // It is still a shape layer, so nothing else about editing changes.
   const frame = frameById(element.frameArt);
   if (frame) {
@@ -643,7 +674,13 @@ function ElementVisual({
     ? imageUrls[element.imageStorageId]
     : undefined;
   const shapeArt = (
-    <ShapeArt element={element} clipId={clipId} imageUrl={coverImage} aspect={aspect} />
+    <ShapeArt
+      element={element}
+      clipId={clipId}
+      imageUrl={coverImage}
+      aspect={aspect}
+      boxClip={boxClip}
+    />
   );
 
   // An inner shadow only reads correctly on a closed, boxed form. The overlay
@@ -652,17 +689,31 @@ function ElementVisual({
   const shape = element.shape ?? "rect";
   const boxed = shape === "rect" || shape === "capsule" || shape === "ellipse";
   const shapeInner = boxed ? insetShadow(element.effects) : undefined;
-  if (!shapeInner) return shapeArt;
+  const materialOverlay = material ? (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-0"
+      style={material}
+    />
+  ) : null;
+  if (!shapeInner && !materialOverlay) return shapeArt;
   const boxRadius =
-    shape === "capsule" ? "999px" : shape === "ellipse" ? "50%" : `${element.radius ?? 0}px`;
+    shape === "capsule"
+      ? "999px"
+      : shape === "ellipse"
+        ? "50%"
+        : `${element.radius ?? 0}px`;
   return (
     <div className="relative h-full w-full">
       {shapeArt}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ boxShadow: shapeInner, borderRadius: boxRadius }}
-      />
+      {shapeInner ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ boxShadow: shapeInner, borderRadius: boxRadius }}
+        />
+      ) : null}
+      {materialOverlay}
     </div>
   );
 }
@@ -798,6 +849,14 @@ export interface DesignPageViewProps {
    * triggered elements wait for this moment (null) and then animate locally.
    */
   scrollActivationTime?: number | null;
+  /**
+   * Material Preview mode draws paper, foil and relief simulations on top of
+   * the artwork. Artwork / Print mode (false) is the clean, flat card that the
+   * export pipeline captures, so a screen finish is never mistaken for print.
+   * Defaults to the preview, because a finish a host just applied should be
+   * visible immediately and a design without materials looks identical either way.
+   */
+  materialPreview?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -818,6 +877,7 @@ export function DesignPageView({
   ignoreExit,
   hideElementId,
   scrollActivationTime = 0,
+  materialPreview = true,
   className,
   style,
 }: DesignPageViewProps) {
@@ -849,6 +909,7 @@ export function DesignPageView({
   };
 
   const size = pageSizeOf(page);
+  const pageOverlay = materialPreview ? materialOverlayStyle(page.material) : undefined;
 
   return (
     <div
@@ -870,6 +931,15 @@ export function DesignPageView({
             "pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-multiply",
             `texture-${page.texture}`,
           )}
+        />
+      )}
+      {/* The sheet's own material finish: under every layer of artwork, exactly
+          as paper sits under ink, and only in Material Preview mode. */}
+      {materialPreview && pageOverlay && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={pageOverlay}
         />
       )}
       <div
@@ -903,6 +973,23 @@ export function DesignPageView({
         const selected = selectedIds?.includes(element.id);
         const dimmed = isCovered && !isRevealed && editor;
 
+        // A material is one overlay layer above the artwork — in Material
+        // Preview mode only. Nothing is ever written into the artwork itself,
+        // so switching back to Artwork / Print restores the untouched card.
+        const finishTarget = materialPreview ? materialTargetOf(element) : null;
+        const finish = finishTarget ? materialOverlayStyle(element.material) : undefined;
+        const finishRadius = finish ? materialShapeRadius(element) : undefined;
+        const finishFor = (clipId: string): CSSProperties | undefined => {
+          if (!finish) return undefined;
+          if (finishRadius) return { ...finish, borderRadius: finishRadius };
+          // A vector silhouette has no border radius to clip against, so the
+          // overlay borrows the shape's own clip path in the layer's pixels.
+          return finishTarget === "shape"
+            ? { ...finish, clipPath: `url(#${clipId}-box)` }
+            : finish;
+        };
+        const boxClip = Boolean(finish && !finishRadius && finishTarget === "shape");
+
         const content = (
           <div
             data-element-id={element.id}
@@ -928,6 +1015,9 @@ export function DesignPageView({
               opacity: dimmed ? 0.25 : animated.style.opacity,
               pointerEvents: interactive ? "auto" : "none",
               outline: dimmed ? "1px dashed rgba(113,0,20,0.55)" : undefined,
+              // Keeps a finish's blend inside this layer, so a foil panel never
+              // blends with the sheet behind it.
+              isolation: finish ? "isolate" : undefined,
               zIndex: undefined,
             }}
           >
@@ -937,6 +1027,8 @@ export function DesignPageView({
               guestName={guestName}
               rtl={rtl}
               clipId={`clip-${element.id}`}
+              material={finishFor(`clip-${element.id}`)}
+              boxClip={boxClip}
             />
             {dimmed && (
               <span className="absolute -top-4 left-0 bg-[#710014] px-1.5 py-0.5 text-[11px] uppercase tracking-[0.16em] text-white">
@@ -981,6 +1073,8 @@ export function DesignPageView({
                   guestName={guestName}
                   rtl={rtl}
                   clipId={`clip-cover-${element.id}`}
+                  material={finishFor(`clip-cover-${element.id}`)}
+                  boxClip={boxClip}
                 />
               </RevealCover>
             </div>

@@ -29,6 +29,15 @@ import { OPENING_EXPERIENCES } from "@/lib/design";
 import type { ShapeKind } from "@/lib/design";
 import { PALETTES, PALETTE_GROUPS, type ColourPalette } from "@/lib/palettes";
 import { paletteSwatches as deriveSwatches } from "@/lib/library-colour";
+import {
+  MATERIAL_CATEGORIES,
+  MATERIAL_PRESETS,
+  materialForPreset,
+  type LayerMaterial,
+  type MaterialCategory,
+  type MaterialId,
+} from "@/lib/materials";
+import { MaterialSwatch } from "@/components/studio/MaterialsStudio";
 import { cn } from "@/lib/utils";
 import {
   Bookmark,
@@ -43,6 +52,7 @@ import {
   Search,
   Shapes,
   Sparkle,
+  Stamp,
   Star,
   Trash2,
   Type,
@@ -172,6 +182,7 @@ export type LibraryTab =
   | "styles"
   | "assets"
   | "frames"
+  | "materials"
   | "layouts"
   | "reveals"
   | "opening";
@@ -235,6 +246,13 @@ const CATEGORIES: CategorySpec[] = [
     placeholder: "Search botanical, deco…",
   },
   {
+    id: "materials",
+    label: "Materials",
+    icon: Stamp,
+    blurb: "Paper, foil, relief and lace — finishes for a layer or the page.",
+    placeholder: "Search cotton, foil, wax…",
+  },
+  {
     id: "layouts",
     label: "Pages",
     icon: Film,
@@ -282,6 +300,13 @@ interface LibraryPanelProps {
   onApplyPalette?: (palette: ColourPalette) => void;
   /** Recolours the selection, or the page background when nothing is selected. */
   onApplyColour?: (hex: string) => void;
+  /**
+   * Applies a finish. The studio decides the target: the selected layers when
+   * there is a selection, the page when there is not.
+   */
+  onApplyMaterial?: (material: LayerMaterial) => void;
+  /** The preset the current target is already wearing, for a selected tile. */
+  activeMaterialId?: MaterialId;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -887,6 +912,8 @@ export function LibraryPanel({
   onApplyTypeStyle,
   onApplyPalette,
   onApplyColour,
+  onApplyMaterial,
+  activeMaterialId,
   tab: tabProp,
   onTabChange,
 }: LibraryPanelProps) {
@@ -895,6 +922,7 @@ export function LibraryPanel({
   const setTab = onTabChange ?? setInnerTab;
   const [query, setQuery] = useState("");
   const [assetCategory, setAssetCategory] = useState<string>("Backgrounds");
+  const [materialGroup, setMaterialGroup] = useState<MaterialCategory | "All">("All");
   const [frameGroup, setFrameGroup] = useState<FrameGroup | "All">("All");
   const [paletteGroup, setPaletteGroup] = useState<string | "All">("All");
   const [fontScript, setFontScript] = useState<"all" | "latin" | "arabic">("all");
@@ -1237,6 +1265,22 @@ export function LibraryPanel({
     });
   }, [query, paletteGroup]);
 
+  const filteredMaterials = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return MATERIAL_PRESETS.filter((preset) => {
+      if (materialGroup !== "All" && preset.category !== materialGroup) return false;
+      if (onlyFavourites && !favourites.includes(favouriteKey("material", preset.id))) {
+        return false;
+      }
+      if (!needle) return true;
+      return (
+        preset.label.toLowerCase().includes(needle) ||
+        preset.category.toLowerCase().includes(needle) ||
+        preset.note.toLowerCase().includes(needle)
+      );
+    });
+  }, [query, materialGroup, onlyFavourites, favourites]);
+
   /** The distinct colours of the curated palettes, as single swatches. */
   const paletteSwatches = useMemo(
     () => deriveSwatches(filteredPalettes),
@@ -1268,6 +1312,8 @@ export function LibraryPanel({
         return BUILTIN_ASSETS.length;
       case "frames":
         return FRAMES.length;
+      case "materials":
+        return MATERIAL_PRESETS.length;
       case "layouts":
         return PAGE_LAYOUTS.length;
       case "reveals":
@@ -1293,6 +1339,8 @@ export function LibraryPanel({
         return `${filteredAssets.length} in ${assetCategory}`;
       case "frames":
         return `${filteredFrames.length} frames`;
+      case "materials":
+        return `${filteredMaterials.length} of ${MATERIAL_PRESETS.length} finishes`;
       case "layouts":
         return `${PAGE_LAYOUTS.length} page layouts`;
       case "reveals":
@@ -1420,6 +1468,7 @@ export function LibraryPanel({
                   tab === "styles" ||
                   tab === "type" ||
                   tab === "assets" ||
+                  tab === "materials" ||
                   tab === "frames") && (
                   <p className="mb-3 flex items-center gap-1.5 rounded-full border border-[var(--gold)]/45 bg-[var(--gold)]/10 px-3 py-1.5 font-ui text-[0.66rem] leading-relaxed text-[#6d5324]">
                     <Star className="size-3 shrink-0" fill="currentColor" />
@@ -1976,6 +2025,82 @@ export function LibraryPanel({
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {tab === "materials" && (
+                <div className="space-y-3">
+                  <p className="rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-sunk)]/60 px-3 py-2 font-ui text-[0.66rem] leading-relaxed text-ink/55">
+                    A finish lies over the artwork: the words, colours and layout
+                    underneath stay editable. With layers selected it dresses them;
+                    with nothing selected it finishes the page.
+                  </p>
+
+                  <GroupChips
+                    label="Material groups"
+                    options={MATERIAL_CATEGORIES}
+                    value={materialGroup}
+                    onChange={setMaterialGroup}
+                  />
+
+                  {filteredMaterials.length === 0 ? (
+                    <EmptyNote>
+                      {onlyFavourites
+                        ? "No favourite finishes yet. Star one to keep it here."
+                        : "No finishes match that search."}
+                    </EmptyNote>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                      {filteredMaterials.map((preset) => {
+                        const sample = materialForPreset(preset.id);
+                        const applied = activeMaterialId === preset.id;
+                        return (
+                          <div key={preset.id} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => onApplyMaterial?.(sample)}
+                              aria-label={`Apply the ${preset.label} finish`}
+                              className="ui-tile group"
+                            >
+                              <span className="ui-tile-art relative aspect-[4/3] w-full">
+                                <MaterialSwatch
+                                  material={sample}
+                                  className="h-full w-full"
+                                />
+                                {applied && (
+                                  <span className="absolute top-1.5 left-1.5 grid size-4 place-items-center rounded-full bg-white/90 text-[var(--red)]">
+                                    <Check className="size-2.5" strokeWidth={3} />
+                                  </span>
+                                )}
+                                <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-ink/85 py-1 text-center font-ui text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Apply finish
+                                </span>
+                              </span>
+                              <span className="block px-1 pb-0.5">
+                                <span className="block truncate font-ui text-[0.72rem] font-medium text-ink">
+                                  {preset.label}
+                                </span>
+                                <span className="mt-0.5 block truncate font-ui text-[0.58rem] uppercase tracking-[0.09em] text-ink/40">
+                                  {preset.category}
+                                </span>
+                              </span>
+                            </button>
+                            <FavouriteToggle
+                              className="absolute top-2 right-2"
+                              active={favourites.includes(favouriteKey("material", preset.id))}
+                              label={preset.label}
+                              onToggle={() => togglePin(favouriteKey("material", preset.id))}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <p className="font-ui text-[0.62rem] leading-relaxed text-ink/40">
+                    Foil, relief and lace are screen previews of real finishes. PNG and
+                    PDF exports print the clean artwork, never the simulation.
+                  </p>
                 </div>
               )}
 

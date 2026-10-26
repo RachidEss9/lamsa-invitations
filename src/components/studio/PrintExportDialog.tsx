@@ -807,6 +807,7 @@ export function PrintExportDialog({
                           guestName={null}
                           rtl={rtl}
                           ignoreExit
+                          materialPreview={false}
                         />
                       )}
                     </DesignStage>
@@ -878,6 +879,7 @@ export function PrintExportDialog({
                   guestName={null}
                   rtl={rtl}
                   ignoreExit
+                  materialPreview={false}
                 />
               </div>
             ))}

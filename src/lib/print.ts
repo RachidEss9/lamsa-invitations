@@ -396,6 +396,24 @@ export function preflightDesign(
     }
   }
 
+  // Finishes are a screen preview. Saying so before the host pays for paper is
+  // the honest thing to do, and it is only ever a note — never a block.
+  if (
+    design.pages.some(
+      (page) =>
+        page.material?.enabled ||
+        page.elements.some((element) => element.material?.enabled),
+    )
+  ) {
+    issues.push({
+      id: "materials-preview",
+      severity: "info",
+      title: "Material finishes are not printed",
+      detail:
+        "Paper grain, foil, embossing and lace are visual previews of real finishes. This export uses the clean artwork, so order a foil or emboss treatment separately if you want it on paper.",
+    });
+  }
+
   // Fill always loses the edges that do not match the sheet's proportions.
   if (settings.fit === "fill") {
     const area = printableArea(settings);
@@ -428,7 +446,16 @@ export function printablePage(page: DesignPage): DesignPage {
   );
   return {
     ...page,
-    elements: page.elements.filter((element) => !covers.has(element.id)),
+    // A material finish is a screen simulation of paper, foil or relief — it
+    // is not ink and it cannot be reproduced by a printer. Stripping it here
+    // makes "exports print the clean artwork" a structural guarantee of the
+    // print path rather than a promise the UI has to keep on its own.
+    material: undefined,
+    elements: page.elements
+      .filter((element) => !covers.has(element.id))
+      .map((element) =>
+        element.material ? { ...element, material: undefined } : element,
+      ),
   };
 }
 

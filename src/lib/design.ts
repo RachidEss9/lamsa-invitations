@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { normalizeEffects, type LayerEffects } from "@/lib/effects";
+import { normalizeMaterial, type LayerMaterial } from "@/lib/materials";
 import { normalizeImageAdjust, type ImageAdjust } from "@/lib/image-frame";
 import { normalizeCurve } from "@/lib/text-path";
 import { fontNameFor } from "@/lib/fonts";
@@ -271,6 +272,14 @@ export interface DesignElement {
    */
   effects?: LayerEffects;
 
+  /**
+   * A material / print finish (paper grain, foil, relief, wax). Optional and
+   * sanitised on load, so an invitation saved before materials existed opens
+   * exactly as it was, and a malformed value is dropped rather than drawn.
+   * Finishes are screen previews only: they never enter the print pipeline.
+   */
+  material?: LayerMaterial;
+
   reveal?: RevealConfig;
   animation: ElementAnimation;
   exit?: ExitAnimation;
@@ -296,6 +305,11 @@ export interface DesignPage {
   bleed?: number;
   /** Paper surface printed under the artwork. */
   texture?: PageTextureId;
+  /**
+   * An optional material finish for the sheet itself (vellum, linen, foil).
+   * Absent on every page saved before materials existed.
+   */
+  material?: LayerMaterial;
 }
 
 export type PageTextureId = "none" | "cotton" | "linen" | "fibre";
@@ -1031,6 +1045,8 @@ export function cloneElement(element: DesignElement): DesignElement {
     effects: element.effects
       ? (JSON.parse(JSON.stringify(element.effects)) as LayerEffects)
       : undefined,
+    // …and its own material, so a duplicated layer can be re-finished freely.
+    material: element.material ? { ...element.material } : undefined,
     animation: { ...element.animation },
     exit: element.exit ? { ...element.exit } : undefined,
     // Image-mask state is cloned so a duplicated masked photo keeps its zoom and
@@ -1478,6 +1494,9 @@ export function normalizeDesign(
         // Effects are sanitised on load: a corrupt colour or an out-of-range
         // blur becomes a safe default instead of breaking the whole page.
         effects: normalizeEffects(element.effects),
+        // A material is dropped when it is unknown or malformed, so a damaged
+        // document never renders the wrong finish over someone's artwork.
+        material: normalizeMaterial(element.material),
         // A curve outside −1…1 would throw the arc far outside the card, so it
         // is clamped, and a curve that rounds to nothing is dropped outright so
         // straight text stays on the exact old rendering path.
@@ -1551,6 +1570,7 @@ export function normalizeDesign(
         texture: PAGE_TEXTURES.some((texture) => texture.id === page.texture)
           ? page.texture
           : undefined,
+        material: normalizeMaterial(page.material),
         elements,
       };
     }),

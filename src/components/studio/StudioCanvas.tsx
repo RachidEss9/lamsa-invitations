@@ -56,6 +56,8 @@ interface StudioCanvasProps {
   showGrid?: boolean;
   showRulers?: boolean;
   showSafeArea?: boolean;
+  /** Artwork / Print mode (false) hides every material finish on the canvas. */
+  materialPreview?: boolean;
   resetViewToken?: number;
   editRequest?: { id: string; token: number } | null;
   onZoom: (value: number) => void;
@@ -308,6 +310,7 @@ export function StudioCanvas({
   showGrid = false,
   showRulers = false,
   showSafeArea = false,
+  materialPreview = true,
   resetViewToken = 0,
   editRequest,
   onZoom,
@@ -1083,6 +1086,7 @@ export function StudioCanvas({
             onReveal={onReveal}
             ignoreExit={ignoreExit}
             hideElementId={editing?.id}
+            materialPreview={materialPreview}
             className="shadow-none"
           />
 
