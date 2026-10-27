@@ -11,9 +11,10 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 /**
  * Walks a stored design document and collects every storage id it references:
- * page element images, reveal cover images, and opening cover images. The
- * studio and the public invitation both render from these resolved URLs, so
- * guests never need storage access beyond what the design already exposes.
+ * page element images, reveal cover images, opening cover images, and the
+ * per-layer artwork of a guest-driven opening (images or clips). The studio
+ * and the public invitation both render from these resolved URLs, so guests
+ * never need storage access beyond what the design already exposes.
  */
 export function collectDesignStorageIds(design: unknown): Id<"_storage">[] {
   const ids = new Set<Id<"_storage">>();
@@ -27,7 +28,10 @@ export function collectDesignStorageIds(design: unknown): Id<"_storage">[] {
     if (!isRecord(value)) return;
     for (const [key, entry] of Object.entries(value)) {
       if (
-        (key === "imageStorageId" || key === "coverStorageId") &&
+        (key === "imageStorageId" ||
+          key === "coverStorageId" ||
+          // Opening layers store their artwork under a plain storageId.
+          key === "storageId") &&
         typeof entry === "string"
       ) {
         ids.add(entry as Id<"_storage">);

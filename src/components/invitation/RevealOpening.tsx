@@ -1,11 +1,22 @@
 import { useState } from "react";
 import { REVEAL_HINTS, type RevealLayoutId } from "@/lib/invitation";
+import {
+  type EnvelopeSettings,
+  type InteractiveOpeningSettings,
+} from "@/lib/design";
+import { InteractiveOpening } from "@/components/invitation/InteractiveOpening";
 
 interface RevealOpeningProps {
   layout: RevealLayoutId;
   accent: string;
   /** Stage background for the envelope/ribbon openers. */
   background: string;
+  /** Ink colour of the invitation, used by the envelope artwork. */
+  ink?: string;
+  /** The saved guest-driven opening, so the cover wears the same artwork. */
+  interactive?: InteractiveOpeningSettings;
+  stationery?: EnvelopeSettings;
+  imageUrls?: Record<string, string>;
   go: boolean;
   reducedMotion: boolean;
   onOpen: () => void;
@@ -33,6 +44,10 @@ export function RevealOpening({
   layout,
   accent,
   background,
+  ink = "#161616",
+  interactive,
+  stationery,
+  imageUrls = {},
   go,
   reducedMotion,
   onOpen,
@@ -125,65 +140,19 @@ export function RevealOpening({
       {layout === "arch" && hint}
 
       {layout === "envelope" && (
-        <button
-          type="button"
-          onClick={onOpen}
-          className="relative z-10 grid place-items-center py-10 outline-none"
-          aria-label={REVEAL_HINTS[layout]}
-        >
-          <span
-            className="lamsa-env relative"
-            style={{
-              width: "min(76vw, 320px)",
-              height: "min(46vw, 210px)",
-              background: "#5a0010",
-              borderRadius: 6,
-              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.5)",
-              zIndex: 6,
-            }}
-          >
-            <span
-              aria-hidden
-              className="absolute inset-0"
-              style={{
-                background: "linear-gradient(135deg, #7d0a1e, #5a0010)",
-                clipPath: "polygon(0 100%, 50% 40%, 100% 100%)",
-              }}
-            />
-            <span
-              aria-hidden
-              className="lamsa-flap absolute left-0 right-0 top-0 z-[2]"
-              style={{
-                height: "60%",
-                background: "linear-gradient(#8a0a22, #6a0a1c)",
-                clipPath: "polygon(0 0, 100% 0, 50% 100%)",
-              }}
-            />
-            <span
-              aria-hidden
-              className="lamsa-seal z-[3] grid place-items-center text-2xl"
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: "calc(60% - 6px)",
-                width: 54,
-                height: 54,
-                marginLeft: -27,
-                marginTop: -27,
-                borderRadius: "50%",
-                background:
-                  "radial-gradient(circle at 35% 30%, #d9bb98, #b38f6f 55%, #7d5f43)",
-                boxShadow: "0 4px 10px rgba(0,0,0,0.45)",
-                color: "#5a0010",
-              }}
-            >
-              ✦
-            </span>
-          </span>
-        </button>
+        <InteractiveOpening
+          variant="cover"
+          settings={interactive}
+          accent={accent}
+          background={background}
+          ink={ink}
+          stationery={stationery}
+          imageUrls={imageUrls}
+          reducedMotion={reducedMotion}
+          onDone={onOpen}
+          className="absolute inset-0"
+        />
       )}
-
-      {layout === "envelope" && hint}
 
       {layout === "ribbon" && (
         <>

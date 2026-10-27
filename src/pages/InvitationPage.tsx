@@ -877,6 +877,10 @@ export default function InvitationPage() {
                 layout={reveal}
                 accent={data.palette.accent}
                 background={data.palette.background}
+                ink={data.palette.ink}
+                interactive={designDoc?.opening.interactive}
+                stationery={designDoc?.opening.stationery}
+                imageUrls={designImageUrls}
                 go={revealGo}
                 reducedMotion={reducedMotion}
                 onOpen={handleOpen}

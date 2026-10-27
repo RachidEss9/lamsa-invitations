@@ -16,6 +16,8 @@ import { envelopeStageBox, usableLining } from "@/lib/envelope";
 import { pageEntranceEnd } from "@/lib/journey";
 import { openingPresetOf, type OpeningFrame } from "@/lib/opening";
 import { frameForOpening, openingDurationOf } from "@/lib/opening-sequence";
+import { InteractiveOpening } from "@/components/invitation/InteractiveOpening";
+import { interactiveHint, stageFromProgress } from "@/lib/opening-interactive";
 import { openingPaletteOf, openingToneOf } from "@/lib/openings";
 import { cn } from "@/lib/utils";
 import {
@@ -1267,6 +1269,9 @@ export function OpeningStage({
   className,
 }: OpeningStageProps) {
   const preset = openingPresetOf(opening.experience) ?? "fade";
+  // A guest-driven opening replaces the automatic scene entirely: it owns its
+  // own interaction and never autoplays before the visitor takes part.
+  const interactive = opening.interactive?.enabled === true;
   // A sequence decides its own running length; an invitation without one keeps
   // the saved duration it has always played to.
   const duration = openingDurationOf(opening);
@@ -1328,7 +1333,7 @@ export function OpeningStage({
   };
 
   useEffect(() => {
-    if (!autoOpen || still) return;
+    if (!autoOpen || still || interactive) return;
     const timer = window.setTimeout(begin, 550);
     return () => window.clearTimeout(timer);
     // The auto-open timer is intentionally armed once per mount.
@@ -1443,6 +1448,56 @@ export function OpeningStage({
       {cardContent}
     </InvitationCard>
   );
+
+  // The interactive engine renders the whole stage itself — its own fitting,
+  // its own hints — so it branches in after every hook has run and before the
+  // automatic scene is built.
+  if (interactive) {
+    return (
+      <div
+        ref={stageRef}
+        className={cn("absolute inset-0 z-40 overflow-hidden", className)}
+        style={{ background: stageBackground, color: ink }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={interactiveHint("sealed") ?? hint}
+      >
+        <InteractiveOpening
+          settings={opening.interactive}
+          page={page}
+          imageUrls={imageUrls}
+          guestName={guestName}
+          rtl={rtl}
+          accent={palette.accent}
+          background={palette.background}
+          stageBackground={stageBackground}
+          ink={palette.ink}
+          stationery={opening.stationery}
+          previewStage={
+            still && typeof stillAt === "number" ? stageFromProgress(stillAt) : null
+          }
+          reducedMotion={reducedMotion}
+          onDone={finish}
+        />
+        {!still && !reducedMotion ? (
+          <button
+            type="button"
+            onClick={finish}
+            className="absolute right-4 top-4 z-30 rounded-sm border px-3 py-1.5 font-ui text-[0.55rem] uppercase tracking-[0.22em] transition-opacity hover:opacity-100 focus-visible:opacity-100"
+            aria-label="Skip the opening animation"
+            style={{
+              borderColor: rgba(ink, 0.28),
+              color: ink,
+              background: rgba(pageTint, 0.78),
+              opacity: 0.8,
+            }}
+          >
+            Skip
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   let scene: ReactNode;
   switch (preset) {

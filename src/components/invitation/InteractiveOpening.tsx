@@ -4,6 +4,7 @@ import {
   DESIGN_WIDTH,
   pageSizeOf,
   type DesignPage,
+  type EasingId,
   type EnvelopeSettings,
 } from "@/lib/design";
 import { pageEntranceEnd } from "@/lib/journey";
@@ -16,11 +17,9 @@ import {
   interactiveMotionOf,
   initialInteractiveState,
   reduceInteractive,
-  stageFromProgress,
   type InteractiveEvent,
   type InteractiveOpeningSettings,
   type InteractiveStage,
-  type OpeningLayerId,
 } from "@/lib/opening-interactive";
 import { cn } from "@/lib/utils";
 import {
@@ -78,7 +77,10 @@ interface InteractiveOpeningProps {
   guestName?: string | null;
   rtl?: boolean;
   accent: string;
+  /** The suite's paper: the colour the built-in envelope stock is drawn in. */
   background: string;
+  /** What sits behind everything when no backdrop asset is assigned. */
+  stageBackground?: string;
   ink: string;
   stationery?: EnvelopeSettings;
   /**
@@ -102,7 +104,7 @@ interface InteractiveOpeningProps {
  * It is built once and clipped twice along a jagged fracture, so breaking it
  * separates two real halves of the same seal instead of swapping a shape.
  */
-function sealArt(monogram: string, wax: string, ink: string) {
+function sealArt(monogram: string, wax: string, ink: string, prefix: string) {
   const blob =
     "M0,-76 C16,-80 30,-70 44,-63 C58,-56 73,-46 75,-30 C77,-13 68,-2 66,14 " +
     "C64,30 71,47 58,59 C46,70 29,66 14,72 C-2,78 -19,75 -33,67 C-47,59 -65,61 -73,47 " +
@@ -114,7 +116,7 @@ function sealArt(monogram: string, wax: string, ink: string) {
 
   const art = (
     <>
-      <path d={blob} fill="url(#wax-g)" />
+      <path d={blob} fill={`url(#${prefix}-wax-g)`} />
       {/* Pressed ring: a dark groove with a light lip below it. */}
       <circle r="53" fill="none" stroke={ink} strokeOpacity="0.35" strokeWidth="3.5" />
       <circle r="50" fill="none" stroke="#ffffff" strokeOpacity="0.22" strokeWidth="2" />
@@ -130,7 +132,14 @@ function sealArt(monogram: string, wax: string, ink: string) {
       >
         {monogram}
       </text>
-      <ellipse cx="-24" cy="-34" rx="30" ry="18" fill="url(#wax-hi)" transform="rotate(-24)" />
+      <ellipse
+        cx="-24"
+        cy="-34"
+        rx="30"
+        ry="18"
+        fill={`url(#${prefix}-wax-hi)`}
+        transform="rotate(-24)"
+      />
     </>
   );
 
@@ -149,6 +158,7 @@ export function InteractiveOpening({
   rtl,
   accent,
   background,
+  stageBackground,
   ink,
   stationery,
   variant = "full",
@@ -164,6 +174,7 @@ export function InteractiveOpening({
   const [state, setState] = useState(initialInteractiveState);
   const [channels, setChannels] = useState({ seal: 0, flap: 0, card: 0 });
   const [scale, setScale] = useState(0);
+  const [fit, setFit] = useState({ w: 0, h: 0 });
 
   const boxRef = useRef<HTMLDivElement | null>(null);
   const stateRef = useRef(state);
@@ -208,6 +219,7 @@ export function InteractiveOpening({
       const width = node.clientWidth;
       const height = node.clientHeight;
       if (!width || !height) return;
+      setFit({ w: width, h: height });
       setScale(Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT));
     };
     measure();
@@ -231,7 +243,7 @@ export function InteractiveOpening({
       channel: "seal" | "flap" | "card",
       to: number,
       duration: number,
-      easing: ReturnType<typeof easingValue> extends never ? never : Parameters<typeof easingValue>[0],
+      easing: EasingId,
       onSettled?: () => void,
     ) => {
       stopTween();
@@ -289,18 +301,23 @@ export function InteractiveOpening({
     if (reducedMotion && previewStage == null) finish();
   }, [reducedMotion, previewStage, finish]);
 
+  // The cover variant ends the moment the flap has opened — that open state is
+  // the hand-off to the page underneath.
+  useEffect(() => {
+    if (variant === "cover" && state.stage === "open" && previewStage == null) finish();
+  }, [variant, state.stage, previewStage, finish]);
+
   /* --- gestures -------------------------------------------------------- */
 
   const pinned = previewStage != null;
   const stage = previewStage ?? state.stage;
   const hint = previewStage != null ? null : interactiveHint(state.stage, variant);
 
-  const canGesture = (channel: "flap" | "card") => {
+  // Pure over an explicit stage, so it is safe to call while rendering.
+  const canGesture = (channel: "flap" | "card", currentStage: InteractiveStage) => {
     if (pinned || reducedMotion) return false;
-    if (interactiveBusy(stateRef.current.stage)) return false;
-    return channel === "flap"
-      ? stateRef.current.stage === "unsealed"
-      : stateRef.current.stage === "open";
+    if (interactiveBusy(currentStage)) return false;
+    return channel === "flap" ? currentStage === "unsealed" : currentStage === "open";
   };
 
   const activate = () => {
@@ -315,19 +332,20 @@ export function InteractiveOpening({
     dispatch({ type: "activate" });
   };
 
-  const onGesturePointerDown =
-    (channel: "flap" | "card") => (event: ReactPointerEvent<HTMLElement>) => {
-      if (!canGesture(channel)) return;
-      event.preventDefault();
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-      gestureRef.current = {
-        channel,
-        startY: event.clientY,
-        moved: false,
-        origin: channelsRef.current[channel],
-        pointerId: event.pointerId,
-      };
+  const onGesturePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    const channel =
+      (event.currentTarget.dataset.gesture as "flap" | "card" | undefined) ?? "flap";
+    if (!canGesture(channel, stateRef.current.stage)) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    gestureRef.current = {
+      channel,
+      startY: event.clientY,
+      moved: false,
+      origin: channelsRef.current[channel],
+      pointerId: event.pointerId,
     };
+  };
 
   const onGesturePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     const gesture = gestureRef.current;
@@ -369,7 +387,7 @@ export function InteractiveOpening({
   const env = SCENE.envelope;
   const sealWax = stationery?.sealColor?.trim() || palette.accent;
   const monogram = (stationery?.sealInitials ?? "").trim().slice(0, 3) || "✦";
-  const seal = sealArt(monogram, sealWax, palette.ink);
+  const seal = sealArt(monogram, sealWax, palette.ink, uid);
   const paper = palette.background;
   const liningColour = stationery?.lining?.trim() || undefined;
 
@@ -378,6 +396,7 @@ export function InteractiveOpening({
   const flapLayer = settings?.layers?.flap;
   const linerLayer = settings?.layers?.liner;
   const sealLayer = settings?.layers?.seal;
+  const sealUrl = sealLayer?.storageId ? imageUrls[sealLayer.storageId] : undefined;
 
   const pageSize = page ? pageSizeOf(page) : null;
   const contentScale = pageSize
@@ -406,6 +425,8 @@ export function InteractiveOpening({
     position: "absolute",
     width: DESIGN_WIDTH,
     height: DESIGN_HEIGHT,
+    left: fit.w ? (fit.w - DESIGN_WIDTH * scale) / 2 : 0,
+    top: fit.h ? (fit.h - DESIGN_HEIGHT * scale) / 2 : 0,
     transform: `scale(${scale || 0.0001})`,
     transformOrigin: "top left",
     visibility: scale ? "visible" : "hidden",
@@ -418,25 +439,12 @@ export function InteractiveOpening({
       data-interactive-opening={settings?.scene ?? "envelope-seal"}
       data-stage={stage}
     >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: DESIGN_WIDTH,
-          height: DESIGN_HEIGHT,
-          transform: scale
-            ? `translate(${`calc(50% - ${DESIGN_WIDTH * scale * 0.5}px)`}, ${`calc(50% - ${DESIGN_HEIGHT * scale * 0.5}px)`}) scale(${scale})`
-            : "scale(0.0001)",
-          transformOrigin: "top left",
-          visibility: scale ? "visible" : "hidden",
-        }}
-      >
+      <div style={artboardStyle}>
         {/* ---------------- backdrop ---------------- */}
         <BackdropLayer
           asset={backdropLayer}
           url={backdropLayer ? imageUrls[backdropLayer.storageId] : undefined}
-          fallback={background}
+          fallback={stageBackground ?? background}
         />
         {/* Stage lighting: one light source, consistent for every layer. */}
         <div
@@ -586,8 +594,14 @@ export function InteractiveOpening({
                 aria-label={
                   stage === "presented" ? "Open the invitation" : "Pull the invitation out"
                 }
-                onClick={activate}
-                onPointerDown={onGesturePointerDown("card")}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    activate();
+                  }
+                }}
+                data-gesture="card"
+                onPointerDown={onGesturePointerDown}
                 onPointerMove={onGesturePointerMove}
                 onPointerUp={onGesturePointerUp}
                 onPointerCancel={onGesturePointerUp}
@@ -677,18 +691,24 @@ export function InteractiveOpening({
             type="button"
             aria-label="Lift the flap"
             disabled={pinned}
-            onPointerDown={onGesturePointerDown("flap")}
+            data-gesture="flap"
+            onPointerDown={onGesturePointerDown}
             onPointerMove={onGesturePointerMove}
             onPointerUp={onGesturePointerUp}
             onPointerCancel={onGesturePointerUp}
-            onClick={undefined}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                activate();
+              }
+            }}
             className="absolute inset-0 border-0 bg-transparent p-0"
             style={{
               transformOrigin: "50% 0%",
               transform: `rotateX(${-flapP * 158}deg)`,
               transformStyle: "preserve-3d",
               touchAction: "none",
-              cursor: canGesture("flap") ? "grab" : "default",
+              cursor: canGesture("flap", stage) ? "grab" : "default",
             }}
           >
             {/* Front of the flap: paper */}
@@ -761,6 +781,14 @@ export function InteractiveOpening({
                   strokeWidth="2"
                 />
               </svg>
+              {/* The host's own liner artwork, when one is assigned. */}
+              {linerLayer && (
+                <LayerImage
+                  className="absolute inset-0 h-full w-full object-cover"
+                  url={linerLayer.storageId ? imageUrls[linerLayer.storageId] : undefined}
+                  alt=""
+                />
+              )}
             </span>
 
             {flapLayer && (
@@ -777,7 +805,7 @@ export function InteractiveOpening({
         </div>
 
         {/* ---------------- wax seal ---------------- */}
-        {!pinned && stage === "sealed" && (
+        {!pinned && (stage === "sealed" || stage === "breaking") && (
           <button
             type="button"
             aria-label="Tap the seal to begin"
@@ -820,9 +848,17 @@ export function InteractiveOpening({
                   opacity: 1 - clamp01((sealP - 0.62) / 0.38),
                 }}
               >
-                <g fill={`url(#${uid}-wax-g)`} />
                 {seal.art}
-                <g style={{ fill: sealWax }}>{null}</g>
+                {sealUrl && (
+                  <image
+                    href={sealUrl}
+                    x={-96}
+                    y={-96}
+                    width={192}
+                    height={192}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                )}
               </g>
               <g
                 clipPath={`url(#${uid}-right)`}
@@ -833,6 +869,16 @@ export function InteractiveOpening({
                 }}
               >
                 {seal.art}
+                {sealUrl && (
+                  <image
+                    href={sealUrl}
+                    x={-96}
+                    y={-96}
+                    width={192}
+                    height={192}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                )}
               </g>
               {/* Wax crumbs thrown clear of the fracture */}
               {[
@@ -853,64 +899,6 @@ export function InteractiveOpening({
               ))}
             </svg>
           </button>
-        )}
-
-        {/* The host's own seal artwork, when supplied, splits the same way. */}
-        {sealLayer && !pinned && stage !== "presented" && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute"
-            style={{
-              left: SCENE.seal.cx - 96,
-              top: SCENE.seal.cy - 96,
-              width: 192,
-              height: 192,
-            }}
-          >
-            <LayerImage
-              className="h-full w-full object-contain"
-              style={{
-                opacity: 1 - clamp01((sealP - 0.62) / 0.38),
-                transform: `translateX(${-sealP * 40}px) rotate(${-sealP * 24}deg)`,
-                clipPath: "polygon(0 0, 52% 0, 48% 100%, 0 100%)",
-              }}
-              url={sealLayer.storageId ? imageUrls[sealLayer.storageId] : undefined}
-              alt=""
-            />
-            <LayerImage
-              className="h-full w-full object-contain"
-              style={{
-                opacity: 1 - clamp01((sealP - 0.62) / 0.38),
-                transform: `translateX(${sealP * 40}px) rotate(${sealP * 24}deg)`,
-                clipPath: "polygon(52% 0, 100% 0, 100% 100%, 48% 100%)",
-              }}
-              url={sealLayer.storageId ? imageUrls[sealLayer.storageId] : undefined}
-              alt=""
-            />
-          </div>
-        )}
-
-        {/* The liner artwork, when supplied, covers the flap's inner face. */}
-        {linerLayer && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute"
-            style={{
-              left: env.x,
-              top: env.y,
-              width: env.w,
-              height: SCENE.flapH,
-              transform: `translateY(${cardP * 60}px) rotateX(${-flapP * 158}deg)`,
-              transformOrigin: "50% 0%",
-              opacity: (1 - cardP) * flapP,
-            }}
-          >
-            <LayerImage
-              className="h-full w-full object-cover"
-              url={linerLayer.storageId ? imageUrls[linerLayer.storageId] : undefined}
-              alt=""
-            />
-          </div>
         )}
       </div>
 
@@ -962,12 +950,13 @@ function LayerImage({
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   if (!url || failed) return null;
+  const baseOpacity = typeof style?.opacity === "number" ? style.opacity : 1;
   return (
     <img
       src={url}
       alt={alt}
       className={className}
-      style={{ ...style, opacity: (style?.opacity ?? 1) * (ready ? 1 : 0), transition: "opacity 240ms ease" }}
+      style={{ ...style, opacity: baseOpacity * (ready ? 1 : 0), transition: "opacity 240ms ease" }}
       onLoad={() => setReady(true)}
       onError={() => setFailed(true)}
       data-layer-image
@@ -1024,9 +1013,6 @@ function BackdropLayer({
       data-backdrop="image"
       style={{ opacity: ready ? 1 : 0, transition: "opacity 300ms ease" }}
       onLoad={() => setReady(true)}
-      onError={() => setFailed(true)}
-    />
+      onError={() => setFailed(true)}    />
   );
 }
-
-export { stageFromProgress };

@@ -12,10 +12,13 @@ import { OpeningStage } from "@/components/invitation/OpeningStage";
 import {
   OPENING_EXPERIENCES,
   OPENING_TONES,
+  OPENING_LAYERS,
   EASINGS,
   type DesignPage,
   type EasingId,
   type EnvelopeSettings,
+  type InteractiveOpeningSettings,
+  type OpeningLayerId,
   type OpeningSettings,
 } from "@/lib/design";
 import {
@@ -47,6 +50,7 @@ import {
   type OpeningStepRole,
 } from "@/lib/opening-sequence";
 import { openingPresetOf } from "@/lib/opening";
+import { interactiveMotionOf } from "@/lib/opening-interactive";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -84,6 +88,9 @@ interface OpeningDesignerProps {
    */
   onCoverUpload?: (file: File) => Promise<void>;
   uploadingCover?: boolean;
+  /** Assigns reference artwork (image or clip) to one layer of the scene. */
+  onLayerUpload?: (layer: OpeningLayerId, file: File) => Promise<void>;
+  uploadingLayer?: OpeningLayerId | null;
 }
 
 function readLibrary(): SavedOpening[] {
@@ -109,6 +116,19 @@ const DEFAULT_MOTION = {
   cardStart: 0.34,
 };
 
+/** The four steps of the guest-driven opening, pinned as stills for preview. */
+const INTERACTIVE_STILLS: {
+  id: string;
+  label: string;
+  note: string;
+  progress: number;
+}[] = [
+  { id: "is-sealed", label: "Sealed", note: "The suite, untouched", progress: 0.05 },
+  { id: "is-unsealed", label: "Seal gone", note: "Wax broken away", progress: 0.3 },
+  { id: "is-open", label: "Flap open", note: "Liner shown, card seated", progress: 0.55 },
+  { id: "is-presented", label: "Card out", note: "Invitation presented", progress: 0.92 },
+];
+
 /**
  * The Opening Designer: one place to choose a suite, dress it in materials and
  * colours, shape how the invitation leaves it, and watch the real opening play.
@@ -132,6 +152,8 @@ export function OpeningDesigner({
   coverUrl,
   onCoverUpload,
   uploadingCover = false,
+  onLayerUpload,
+  uploadingLayer = null,
 }: OpeningDesignerProps) {
   const [runToken, setRunToken] = useState(0);
   const [stillStage, setStillStage] = useState<string | null>(null);
@@ -160,6 +182,30 @@ export function OpeningDesigner({
 
   const patchPalette = (next: { accent?: string; hull?: string; paper?: string }) =>
     onChange({ ...opening, palette: { ...opening.palette, ...next } });
+
+  /* --------------------- Guest-driven (interactive) opening ---------------- */
+
+  const interactiveMotion = interactiveMotionOf(opening.interactive);
+
+  const patchInteractive = (next: Partial<InteractiveOpeningSettings>) =>
+    patch({
+      interactive: {
+        enabled: true,
+        scene: "envelope-seal",
+        ...opening.interactive,
+        ...next,
+      },
+    });
+
+  const patchInteractiveLive = (next: Partial<InteractiveOpeningSettings>) =>
+    patchLive({
+      interactive: {
+        enabled: true,
+        scene: "envelope-seal",
+        ...opening.interactive,
+        ...next,
+      },
+    });
 
   // Stationery starts from the effective size the suite is already showing, so
   // nudging one dimension never jumps the envelope to an unrelated preset.
@@ -226,10 +272,14 @@ export function OpeningDesigner({
     setRunToken((value) => value + 1);
   };
 
+  const interactiveEnabled = opening.interactive?.enabled === true;
+  // The guest-driven opening has its own four steps to preview; the automatic
+  // scene keeps the classic stage strip.
+  const stageStills = interactiveEnabled ? INTERACTIVE_STILLS : OPENING_STAGES;
   const stillProgress =
     stillStage === null
       ? null
-      : OPENING_STAGES.find((stage) => stage.id === stillStage)?.progress ?? null;
+      : stageStills.find((stage) => stage.id === stillStage)?.progress ?? null;
 
   const motion = {
     startScale: opening.motion?.startScale ?? DEFAULT_MOTION.startScale,
@@ -241,7 +291,7 @@ export function OpeningDesigner({
   // Materials and colours restart the preview so the change is visible at once;
   // the emergence sliders do not, because dragging them would restart the run
   // dozens of times a second. The replay control shows the new choreography.
-  const previewKey = `${runToken}-${stillStage ?? "play"}-${previewReduced ? "rm" : "full"}-${opening.experience}-${opening.tone ?? ""}-${opening.palette?.accent ?? ""}-${opening.palette?.hull ?? ""}-${opening.palette?.paper ?? ""}-${opening.background ?? ""}-${stationery?.width ?? ""}x${stationery?.height ?? ""}-${stationery?.flapDepth ?? ""}-${stationery?.lining ?? ""}-${stationery?.sealColor ?? ""}-${stationery?.sealInitials ?? ""}-${stationery?.showFlap ?? ""}-${stationery?.showLiner ?? ""}-${stationery?.showSeal ?? ""}`;
+  const previewKey = `${runToken}-${stillStage ?? "play"}-${previewReduced ? "rm" : "full"}-${interactiveEnabled ? "interactive" : "auto"}-${Object.values(opening.interactive?.layers ?? {}).map((asset) => asset?.storageId ?? "").join(".")}-${opening.experience}-${opening.tone ?? ""}-${opening.palette?.accent ?? ""}-${opening.palette?.hull ?? ""}-${opening.palette?.paper ?? ""}-${opening.background ?? ""}-${stationery?.width ?? ""}x${stationery?.height ?? ""}-${stationery?.flapDepth ?? ""}-${stationery?.lining ?? ""}-${stationery?.sealColor ?? ""}-${stationery?.sealInitials ?? ""}-${stationery?.showFlap ?? ""}-${stationery?.showLiner ?? ""}-${stationery?.showSeal ?? ""}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -260,7 +310,7 @@ export function OpeningDesigner({
               type="button"
               variant="outline"
               className="h-8 rounded-md px-3 text-[10px] uppercase tracking-[0.14em]"
-              onClick={() => setStillStage("sealed")}
+              onClick={() => setStillStage(stageStills[0].id)}
             >
               Hold frame
             </Button>
@@ -298,8 +348,10 @@ export function OpeningDesigner({
 
               <p className="mt-2 section-label">
                 {stillProgress === null
-                  ? "Playing the full sequence"
-                  : `Held at ${OPENING_STAGES.find((stage) => stage.id === stillStage)?.label ?? ""}`}
+                  ? interactiveEnabled
+                    ? "Waiting for the guest"
+                    : "Playing the full sequence"
+                  : `Held at ${stageStills.find((stage) => stage.id === stillStage)?.label ?? ""}`}
               </p>
 
               {/* Sequence stages: pick one to hold that exact frame. */}
@@ -308,7 +360,7 @@ export function OpeningDesigner({
                 aria-label="Opening stages"
                 className="mt-2 grid grid-cols-4 gap-1"
               >
-                {OPENING_STAGES.map((stage) => (
+                {stageStills.map((stage) => (
                   <button
                     key={stage.id}
                     type="button"
@@ -371,6 +423,208 @@ export function OpeningDesigner({
                   </button>
                 ))}
               </div>
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="section-label">Guest-driven opening</p>
+                <Switch
+                  checked={interactiveEnabled}
+                  onCheckedChange={(enabled) =>
+                    patch({
+                      interactive: enabled
+                        ? {
+                            scene: "envelope-seal" as const,
+                            ...opening.interactive,
+                            enabled: true,
+                          }
+                        : undefined,
+                    })
+                  }
+                  aria-label="Guest-driven opening"
+                  className="scale-90"
+                />
+              </div>
+
+              {interactiveEnabled ? (
+                <>
+                  <p className="text-[9px] leading-relaxed text-ink/40">
+                    The guest breaks the wax seal, lifts the flap and pulls the
+                    invitation out — the very engine the published invitation
+                    runs. Nothing autoplays before they take part.
+                  </p>
+
+                  <div>
+                    <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                      Artwork per layer
+                    </span>
+                    <ul className="divide-y divide-ink/10 border border-ink/10">
+                      {OPENING_LAYERS.map((layer) => {
+                        const asset = opening.interactive?.layers?.[layer.id];
+                        const url = asset ? imageUrls[asset.storageId] : undefined;
+                        return (
+                          <li key={layer.id} className="flex items-center gap-2 px-2 py-2">
+                            <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md border border-[var(--edge)] bg-[var(--paper-light)]">
+                              {url && asset?.kind === "video" ? (
+                                <video
+                                  src={url}
+                                  muted
+                                  playsInline
+                                  className="size-full object-cover"
+                                  aria-hidden
+                                />
+                              ) : url ? (
+                                <img src={url} alt="" className="size-full object-cover" />
+                              ) : (
+                                <span className="text-[7.5px] uppercase tracking-[0.08em] text-ink/30">
+                                  Built-in
+                                </span>
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[10.5px] text-ink/80">
+                                {layer.label}
+                              </span>
+                              <span className="block truncate text-[8.5px] text-ink/35">
+                                {layer.note}
+                              </span>
+                            </span>
+                            <label className="shrink-0 cursor-pointer rounded-md border border-[var(--edge)] px-2 py-1.5 text-[8.5px] uppercase tracking-[0.1em] text-ink/55 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink">
+                              <span className="flex min-h-5 items-center gap-1">
+                                {uploadingLayer === layer.id ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : null}
+                                {asset ? "Replace" : layer.acceptsVideo ? "Image / clip" : "Assign"}
+                              </span>
+                              <input
+                                type="file"
+                                accept={
+                                  layer.acceptsVideo
+                                    ? "image/png,image/jpeg,image/webp,video/mp4,video/webm"
+                                    : "image/png,image/jpeg,image/webp"
+                                }
+                                className="sr-only"
+                                disabled={uploadingLayer != null || !onLayerUpload}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+                                  event.target.value = "";
+                                  if (file) void onLayerUpload?.(layer.id, file);
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              aria-label={`Remove the ${layer.label} artwork`}
+                              disabled={!asset}
+                              onClick={() => {
+                                const layers = { ...opening.interactive?.layers };
+                                delete layers[layer.id];
+                                patchInteractive({
+                                  layers: Object.keys(layers).length ? layers : undefined,
+                                });
+                              }}
+                              className="grid size-8 shrink-0 place-items-center rounded-md text-ink/40 transition-colors duration-150 hover:bg-[var(--red)]/[0.06] hover:text-[var(--red)] disabled:pointer-events-none disabled:opacity-25"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="mt-1.5 text-[9px] leading-relaxed text-ink/35">
+                      Assigned artwork replaces the built-in vector art on that
+                      layer; if an upload fails to load, the built-in art stays.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="section-label">Movement</p>
+                      <button
+                        type="button"
+                        onClick={() => patchInteractive({ motion: undefined })}
+                        className="rounded px-2 text-[9px] uppercase tracking-[0.1em] text-ink/45 transition-[background-color,color] duration-150 hover:bg-ink/[0.03] hover:text-[var(--red)]"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <RangeRow
+                      label="Seal reaction"
+                      value={`${interactiveMotion.sealMs} ms`}
+                      min={150}
+                      max={1600}
+                      step={30}
+                      current={interactiveMotion.sealMs}
+                      onInput={(value) =>
+                        patchInteractiveLive({
+                          motion: { ...opening.interactive?.motion, sealMs: value },
+                        })
+                      }
+                    />
+                    <RangeRow
+                      label="Flap swing"
+                      value={`${interactiveMotion.flapMs} ms`}
+                      min={300}
+                      max={4000}
+                      step={60}
+                      current={interactiveMotion.flapMs}
+                      onInput={(value) =>
+                        patchInteractiveLive({
+                          motion: { ...opening.interactive?.motion, flapMs: value },
+                        })
+                      }
+                    />
+                    <div className="flex flex-wrap gap-1.5">
+                      {EASINGS.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          aria-pressed={interactiveMotion.flapEasing === entry.id}
+                          onClick={() =>
+                            patchInteractive({
+                              motion: {
+                                ...opening.interactive?.motion,
+                                flapEasing: entry.id as EasingId,
+                              },
+                            })
+                          }
+                          className={cn(
+                            "min-h-8 rounded-md border px-2 text-[9px] uppercase tracking-[0.08em] transition-[background-color,border-color,color] duration-150",
+                            interactiveMotion.flapEasing === entry.id
+                              ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
+                              : "border-[var(--edge)] text-ink/55 hover:border-ink/45 hover:text-ink",
+                          )}
+                        >
+                          {entry.label}
+                        </button>
+                      ))}
+                    </div>
+                    <RangeRow
+                      label="Card pull"
+                      value={`${interactiveMotion.pullMs} ms`}
+                      min={300}
+                      max={4000}
+                      step={60}
+                      current={interactiveMotion.pullMs}
+                      onInput={(value) =>
+                        patchInteractiveLive({
+                          motion: { ...opening.interactive?.motion, pullMs: value },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <p className="text-[9px] leading-relaxed text-ink/35">
+                    Use the four step buttons by the preview to hold any stage,
+                    and Replay to restart from the sealed state.
+                  </p>
+                </>
+              ) : (
+                <p className="text-[9px] leading-relaxed text-ink/40">
+                  Turn this on to let guests unseal and open the invitation by
+                  hand. Off, the saved automatic opening plays instead.
+                </p>
+              )}
             </section>
 
             {hasMaterial && (

@@ -68,6 +68,7 @@ import {
   type DesignElement,
   type DesignPage,
   type ElementAnimation,
+  type OpeningLayerId,
   type OpeningSettings,
   type PageResizeMode,
   type StylePreset,
@@ -381,6 +382,7 @@ export default function Studio() {
   const [closingPreviewKey, setClosingPreviewKey] = useState(0);
   const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingLayer, setUploadingLayer] = useState<OpeningLayerId | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const [historyTick, setHistoryTick] = useState(0);
   const [historyFlags, setHistoryFlags] = useState({ undo: false, redo: false });
@@ -1193,6 +1195,39 @@ export default function Studio() {
     }
     if (file.size > 10 * 1024 * 1024) {
       throw new Error("Choose an image under 10 MB.");
+    }
+    const uploadUrl = await generateUploadUrl({});
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!response.ok) throw new Error(`The upload failed (${response.status}).`);
+    const result = (await response.json()) as { storageId: string };
+    const url = URL.createObjectURL(file);
+    setLocalImageUrls((previous) => ({ ...previous, [result.storageId]: url }));
+    return { storageId: result.storageId, url };
+  };
+
+  /**
+   * Reference artwork for an opening layer: photographs for the printed
+   * pieces, clips for the backdrop. Same storage, same URL resolution guests
+   * already use for every other image in the design.
+   */
+  const uploadMedia = async (file: File): Promise<{ storageId: string; url: string }> => {
+    const allowed = [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/gif",
+      "video/mp4",
+      "video/webm",
+    ];
+    if (!allowed.includes(file.type)) {
+      throw new Error("Choose a PNG, JPG, WebP or GIF image, or an MP4 / WebM clip.");
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      throw new Error("Choose a file under 20 MB.");
     }
     const uploadUrl = await generateUploadUrl({});
     const response = await fetch(uploadUrl, {
@@ -2471,6 +2506,30 @@ export default function Studio() {
           applyOpening({ ...design.opening, coverStorageId: storageId });
         } catch (error) {
           toast.error(messageOf(error));
+        }
+      }}
+      uploadingLayer={uploadingLayer}
+      onLayerUpload={async (layer, file) => {
+        setUploadingLayer(layer);
+        try {
+          const { storageId } = await uploadMedia(file);
+          const kind = file.type.startsWith("video/") ? ("video" as const) : ("image" as const);
+          applyOpening({
+            ...design.opening,
+            interactive: {
+              enabled: true,
+              scene: "envelope-seal",
+              ...design.opening.interactive,
+              layers: {
+                ...design.opening.interactive?.layers,
+                [layer]: { storageId, kind },
+              },
+            },
+          });
+        } catch (error) {
+          toast.error(messageOf(error));
+        } finally {
+          setUploadingLayer(null);
         }
       }}
     />
