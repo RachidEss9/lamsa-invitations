@@ -111,6 +111,17 @@ export const OPENING_TIMELINES: Record<OpeningPresetId, OpeningTimeline> = {
     fromY: 40,
     fromRotate: 0,
   },
+  box: {
+    preset: "box",
+    // The lid has cleared the tray before the card starts to rise.
+    cardStart: 0.3,
+    cardEnd: 0.9,
+    frameStart: 0.06,
+    frameEnd: 0.6,
+    fromScale: 0.66,
+    fromY: 420,
+    fromRotate: 0,
+  },
   paper: {
     preset: "paper",
     cardStart: 0.02,

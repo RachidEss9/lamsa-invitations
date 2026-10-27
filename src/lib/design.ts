@@ -12,6 +12,12 @@ import {
   type InvitationContent,
   type MotifId,
 } from "@/lib/invitation";
+import { normalizeSequence, type OpeningStep } from "@/lib/opening-sequence";
+
+// The sequence model lives with its timing maths so the editor, the stage and
+// the tests share one definition.
+export { OPENING_STEP_ROLES } from "@/lib/opening-sequence";
+export type { OpeningStep, OpeningStepRole } from "@/lib/opening-sequence";
 
 /**
  * The canvas studio document.
@@ -654,6 +660,7 @@ export type OpeningExperienceId =
   | "cards"
   | "folding"
   | "paper"
+  | "box"
   | "typography"
   | "floral"
   | "cinematic"
@@ -674,6 +681,7 @@ export const OPENING_EXPERIENCES: {
   { id: "cards", label: "Layered cards", note: "Stacked paper lifts away one by one" },
   { id: "folding", label: "Folding card", note: "A gate-fold card opens in three panels" },
   { id: "paper", label: "Paper unfold", note: "A creased sheet flattens across the screen" },
+  { id: "box", label: "Gift box", note: "A keepsake box lifts its lid and presents the card" },
   { id: "typography", label: "Typography reveal", note: "The names are set, then the card appears" },
   { id: "floral", label: "Floral reveal", note: "An ornamental wreath opens around the card" },
   { id: "cinematic", label: "Cinematic layers", note: "Letterbox bars and a slow zoom part" },
@@ -734,6 +742,13 @@ export interface EnvelopeSettings {
   sealInitials?: string;
   /** Flat wax colour; omitted uses the suite accent. */
   sealColor?: string;
+  /**
+   * Part visibility, so one envelope can be a plain flap, a lined sleeve or a
+   * sealed suite. Absent means the part is drawn, exactly as it always was.
+   */
+  showFlap?: boolean;
+  showLiner?: boolean;
+  showSeal?: boolean;
 }
 
 export interface OpeningSettings {
@@ -748,6 +763,14 @@ export interface OpeningSettings {
   motion?: OpeningMotion;
   /** Optional physical envelope; omitted keeps the classic suite. */
   stationery?: EnvelopeSettings;
+  /**
+   * The ordered choreography the Opening Designer edits. Absent on every
+   * invitation saved before sequences existed, which keep the preset's own
+   * timing untouched — a missing sequence is never a behaviour change.
+   */
+  sequence?: OpeningStep[];
+  /** Stage background behind the suite; absent keeps the page or suite gradient. */
+  background?: string;
 }
 
 export type ClosingStyleId = "message" | "seal" | "curtain" | "fade";
@@ -1731,6 +1754,14 @@ export function normalizeDesign(
       ...fallback.opening,
       ...(value.opening ?? {}),
       experience: value.opening?.experience ?? "none",
+      // A sequence is repaired rather than trusted: junk roles and timings are
+      // dropped, and an invitation saved before sequences existed keeps none.
+      sequence: normalizeSequence(value.opening?.sequence),
+      background:
+        typeof value.opening?.background === "string" &&
+        value.opening.background.trim()
+          ? value.opening.background
+          : undefined,
     },
     closing: {
       ...fallback.closing,
@@ -1972,6 +2003,8 @@ export function openingHint(experience: OpeningExperienceId): string {
       return "Open the fold";
     case "paper":
       return "Unfold the paper";
+    case "box":
+      return "Lift the lid";
     case "typography":
       return "Reveal the names";
     case "floral":
