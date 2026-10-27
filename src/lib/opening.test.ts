@@ -9,12 +9,19 @@ import {
   openingTimeline,
   type OpeningPresetId,
 } from "./opening";
+import { OPENING_EXPERIENCES } from "./design";
 
 const presets = Object.keys(OPENING_TIMELINES) as OpeningPresetId[];
 
 describe("opening choreography", () => {
   it("covers every configured opening preset", () => {
-    expect(presets).toHaveLength(14);
+    // Every experience a host can pick must have choreography behind it — and
+    // nothing more, so a timeline can never drift away from the picker.
+    expect(presets.sort()).toEqual(
+      OPENING_EXPERIENCES.filter((item) => item.id !== "none")
+        .map((item) => item.id)
+        .sort(),
+    );
     expect(openingPresetOf("none")).toBeNull();
     expect(openingPresetOf("envelope")).toBe("envelope");
   });

@@ -115,6 +115,37 @@ describe("saved opening configurations", () => {
     expect(applied.autoOpen).toBe(false);
   });
 
+  it("carries the saved choreography to the next invitation", () => {
+    const sequenced = upsertSavedOpening(
+      [],
+      {
+        ...base,
+        background: "#101010",
+        sequence: [
+          { id: "a", role: "cover", delay: 0, duration: 1200, easing: "easeInOut" },
+          { id: "b", role: "card", delay: -600, duration: 1500, easing: "easeOut" },
+        ],
+      },
+      "Sequenced suite",
+      7,
+    )[0];
+    const applied = applySavedOpening(
+      { experience: "fade", duration: 2600, autoOpen: false, welcome: "With love" },
+      sequenced,
+    );
+    expect(applied.sequence?.map((step) => step.role)).toEqual(["cover", "card"]);
+    expect(applied.sequence?.[1].duration).toBe(1500);
+    expect(applied.background).toBe("#101010");
+
+    // A configuration saved before sequences existed clears rather than keeps
+    // the host's old timing: applying a look replaces the choreography.
+    const plain = applySavedOpening(
+      { experience: "fade", duration: 2600, autoOpen: false, welcome: "x", sequence: sequenced.opening.sequence },
+      upsertSavedOpening([], base, "Plain suite", 8)[0],
+    );
+    expect(plain.sequence).toBeUndefined();
+  });
+
   it("summarises a configuration for the library list", () => {
     expect(openingSummary(base)).toContain("2.8s");
     expect(openingSummary(base)).toContain("Ivory");

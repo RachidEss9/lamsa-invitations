@@ -12,7 +12,9 @@ import { OpeningStage } from "@/components/invitation/OpeningStage";
 import {
   OPENING_EXPERIENCES,
   OPENING_TONES,
+  EASINGS,
   type DesignPage,
+  type EasingId,
   type EnvelopeSettings,
   type OpeningSettings,
 } from "@/lib/design";
@@ -34,8 +36,28 @@ import {
   upsertSavedOpening,
   type SavedOpening,
 } from "@/lib/openings";
+import {
+  OPENING_TEMPLATES,
+  OPENING_STEP_ROLES,
+  applyOpeningTemplate,
+  defaultSequence,
+  makeStep,
+  sequenceTotalMs,
+  type OpeningStep,
+  type OpeningStepRole,
+} from "@/lib/opening-sequence";
+import { openingPresetOf } from "@/lib/opening";
 import { cn } from "@/lib/utils";
-import { Play, RotateCcw, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ImagePlus,
+  Loader2,
+  Play,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 interface OpeningDesignerProps {
@@ -56,6 +78,12 @@ interface OpeningDesignerProps {
   guestName?: string | null;
   names?: string;
   coverUrl?: string;
+  /**
+   * Cover upload lives with the host's storage code; the designer only hands
+   * over the picked file and shows the busy state.
+   */
+  onCoverUpload?: (file: File) => Promise<void>;
+  uploadingCover?: boolean;
 }
 
 function readLibrary(): SavedOpening[] {
@@ -102,11 +130,15 @@ export function OpeningDesigner({
   guestName,
   names,
   coverUrl,
+  onCoverUpload,
+  uploadingCover = false,
 }: OpeningDesignerProps) {
   const [runToken, setRunToken] = useState(0);
   const [stillStage, setStillStage] = useState<string | null>(null);
   const [presetName, setPresetName] = useState("");
   const [libraryVersion, setLibraryVersion] = useState(0);
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [previewReduced, setPreviewReduced] = useState(false);
   const stationery = opening.stationery;
   const envelopeMm = envelopeMillimetres(stationery);
   const envelopePreset = envelopePresetFor(stationery);
@@ -142,6 +174,53 @@ export function OpeningDesigner({
   const patchStationeryLive = (next: Partial<EnvelopeSettings>) =>
     patchLive({ stationery: { ...stationeryBase(), ...next } });
 
+  /* ------------------------- Choreography sequence ------------------------ */
+
+  const sequence = opening.sequence;
+  const presetId = openingPresetOf(opening.experience) ?? "fade";
+  const selectedStep =
+    sequence?.find((step) => step.id === selectedStepId) ?? null;
+
+  const setSequence = (steps: OpeningStep[] | undefined) =>
+    patch({ sequence: steps });
+
+  const updateStep = (id: string, next: Partial<OpeningStep>) =>
+    setSequence((sequence ?? []).map((step) => (step.id === id ? { ...step, ...next } : step)));
+
+  const updateStepLive = (id: string, next: Partial<OpeningStep>) =>
+    patchLive({
+      sequence: (sequence ?? []).map((step) =>
+        step.id === id ? { ...step, ...next } : step,
+      ),
+    });
+
+  const moveStep = (index: number, delta: number) => {
+    const steps = [...(sequence ?? [])];
+    const target = index + delta;
+    if (target < 0 || target >= steps.length) return;
+    const [moved] = steps.splice(index, 1);
+    steps.splice(target, 0, moved);
+    setSequence(steps);
+    replay();
+  };
+
+  const deleteStep = (id: string) => {
+    const steps = (sequence ?? []).filter((step) => step.id !== id);
+    if (selectedStepId === id) setSelectedStepId(null);
+    setSequence(steps.length > 0 ? steps : undefined);
+    replay();
+  };
+
+  const addStep = () => {
+    const present = new Set((sequence ?? []).map((step) => step.role));
+    const role =
+      (OPENING_STEP_ROLES.find((entry) => !present.has(entry.id))?.id ??
+        "card") as OpeningStepRole;
+    const step = makeStep(role);
+    setSequence([...(sequence ?? []), step]);
+    setSelectedStepId(step.id);
+  };
+
   const replay = () => {
     setStillStage(null);
     setRunToken((value) => value + 1);
@@ -162,7 +241,7 @@ export function OpeningDesigner({
   // Materials and colours restart the preview so the change is visible at once;
   // the emergence sliders do not, because dragging them would restart the run
   // dozens of times a second. The replay control shows the new choreography.
-  const previewKey = `${runToken}-${stillStage ?? "play"}-${opening.experience}-${opening.tone ?? ""}-${opening.palette?.accent ?? ""}-${opening.palette?.hull ?? ""}-${opening.palette?.paper ?? ""}-${stationery?.width ?? ""}x${stationery?.height ?? ""}-${stationery?.flapDepth ?? ""}-${stationery?.lining ?? ""}-${stationery?.sealColor ?? ""}-${stationery?.sealInitials ?? ""}`;
+  const previewKey = `${runToken}-${stillStage ?? "play"}-${previewReduced ? "rm" : "full"}-${opening.experience}-${opening.tone ?? ""}-${opening.palette?.accent ?? ""}-${opening.palette?.hull ?? ""}-${opening.palette?.paper ?? ""}-${opening.background ?? ""}-${stationery?.width ?? ""}x${stationery?.height ?? ""}-${stationery?.flapDepth ?? ""}-${stationery?.lining ?? ""}-${stationery?.sealColor ?? ""}-${stationery?.sealInitials ?? ""}-${stationery?.showFlap ?? ""}-${stationery?.showLiner ?? ""}-${stationery?.showSeal ?? ""}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,6 +290,7 @@ export function OpeningDesigner({
                   guestName={guestName ?? null}
                   names={names}
                   coverUrl={coverUrl}
+                  reducedMotion={previewReduced}
                   stillAt={stillProgress ?? undefined}
                   onDone={() => undefined}
                 />
@@ -253,6 +333,17 @@ export function OpeningDesigner({
               >
                 <RotateCcw className="size-3" /> Play the full opening
               </button>
+              <div className="mt-1.5 flex min-h-9 items-center justify-between rounded-md border border-[var(--edge)] px-2">
+                <span className="text-[10px] text-ink/55">
+                  Preview reduced motion
+                </span>
+                <Switch
+                  checked={previewReduced}
+                  onCheckedChange={setPreviewReduced}
+                  aria-label="Preview reduced motion"
+                  className="scale-90"
+                />
+              </div>
             </div>
           </div>
 
@@ -398,6 +489,43 @@ export function OpeningDesigner({
                   current={Math.round((stationery?.flapDepth ?? 0.523) * 100)}
                   onInput={(value) => patchStationeryLive({ flapDepth: value / 100 })}
                 />
+                <div>
+                  <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                    Parts
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(
+                      [
+                        { key: "showFlap", label: "Flap", on: true },
+                        // A liner is an addition: nothing printed inside until
+                        // the host asks for one, exactly as the stage renders it.
+                        { key: "showLiner", label: "Liner", on: false },
+                        { key: "showSeal", label: "Seal", on: true },
+                      ] as const
+                    ).map((part) => {
+                      // Absent means the part follows its own historic default.
+                      const shown = stationery?.[part.key] ?? part.on;
+                      return (
+                        <button
+                          key={part.key}
+                          type="button"
+                          aria-pressed={shown}
+                          onClick={() =>
+                            patchStationery({ [part.key]: !shown })
+                          }
+                          className={cn(
+                            "rounded-md border px-2 py-1.5 text-[9px] uppercase tracking-[0.08em] transition-[background-color,border-color,color] duration-150",
+                            shown
+                              ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
+                              : "border-[var(--edge)] text-ink/40 hover:border-ink/45 hover:text-ink",
+                          )}
+                        >
+                          {part.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
                     <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
@@ -539,6 +667,122 @@ export function OpeningDesigner({
 
             <section className="space-y-3">
               <p className="section-label">
+                Stage
+              </p>
+              <div>
+                <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                  Background
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    aria-pressed={!opening.background}
+                    onClick={() => patch({ background: undefined })}
+                    className={cn(
+                      "min-h-8 rounded-md border px-2.5 text-[9px] uppercase tracking-[0.08em] transition-[background-color,border-color,color] duration-150",
+                      !opening.background
+                        ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
+                        : "border-[var(--edge)] text-ink/55 hover:border-ink/45 hover:text-ink",
+                    )}
+                  >
+                    Auto
+                  </button>
+                  {[
+                    { label: "Accent", value: accent },
+                    { label: "Ink", value: ink },
+                    { label: "Paper", value: background },
+                  ].map((swatch) => (
+                    <button
+                      key={swatch.label}
+                      type="button"
+                      title={swatch.label}
+                      aria-pressed={opening.background === swatch.value}
+                      onClick={() => patch({ background: swatch.value })}
+                      className={cn(
+                        "min-h-8 rounded-md border px-2 text-[9px] uppercase tracking-[0.08em] transition-[border-color] duration-150",
+                        opening.background === swatch.value
+                          ? "border-[var(--red)]/70"
+                          : "border-[var(--edge)] hover:border-ink/45",
+                      )}
+                    >
+                      <span
+                        aria-hidden
+                        className="mr-1.5 inline-block size-3 rounded-full border border-ink/15 align-[-2px]"
+                        style={{ background: swatch.value }}
+                      />
+                      {swatch.label}
+                    </button>
+                  ))}
+                  <span className="flex min-h-8 items-center gap-1 rounded-md border border-[var(--edge)] px-1.5">
+                    <input
+                      type="color"
+                      aria-label="Custom stage background colour"
+                      value={
+                        /^#[0-9a-f]{3,8}$/i.test(opening.background ?? "")
+                          ? opening.background!
+                          : "#161616"
+                      }
+                      onChange={(event) =>
+                        patch({ background: event.target.value })
+                      }
+                      className="h-5 w-5 shrink-0 cursor-pointer border-0 bg-transparent p-0 rounded-full"
+                    />
+                    <span className="text-[9px] uppercase tracking-[0.08em] text-ink/45">
+                      Custom
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <div>
+                <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                  Cover
+                </span>
+                {coverUrl ? (
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <img
+                      src={coverUrl}
+                      alt="Opening cover"
+                      className="h-12 w-12 rounded-md border border-[var(--edge)] object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => patch({ coverStorageId: undefined })}
+                      className="min-h-8 rounded px-2 text-[9px] uppercase tracking-[0.1em] text-ink/45 transition-colors duration-150 hover:text-[var(--red)]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
+                {onCoverUpload ? (
+                  <label className="flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--edge)] text-[9px] uppercase tracking-[0.14em] text-ink/55 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink">
+                    {uploadingCover ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <ImagePlus className="size-3.5" />
+                    )}
+                    <span>{coverUrl ? "Replace cover" : "Upload cover"}</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      disabled={uploadingCover}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        if (file) void onCoverUpload(file);
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <p className="text-[9px] leading-relaxed text-ink/35">
+                    The cover image is chosen in the Opening panel.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <p className="section-label">
                 The card's emergence
               </p>
               <RangeRow
@@ -590,6 +834,13 @@ export function OpeningDesigner({
                 current={opening.duration}
                 onInput={(value) => patchLive({ duration: value })}
               />
+              {sequence && sequence.length > 0 ? (
+                <p className="-mt-2 text-[9px] leading-relaxed text-ink/35">
+                  The choreography below sets the run at{" "}
+                  {(sequenceTotalMs(sequence) / 1000).toFixed(1)} s; this length
+                  is the fallback used when no sequence is set.
+                </p>
+              ) : null}
               <label className="block">
                 <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
                   Welcome line
@@ -611,6 +862,257 @@ export function OpeningDesigner({
                   className="scale-90"
                 />
               </div>
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="section-label">
+                  Choreography
+                </p>
+                {sequence ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSequence(undefined);
+                      setSelectedStepId(null);
+                      replay();
+                    }}
+                    className="rounded px-2 text-[9px] uppercase tracking-[0.1em] text-ink/45 transition-[background-color,color] duration-150 hover:bg-ink/[0.03] hover:text-[var(--red)]"
+                  >
+                    Use the suite's timing
+                  </button>
+                ) : null}
+              </div>
+
+              <div>
+                <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                  Templates
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {OPENING_TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      title={template.note}
+                      onClick={() => {
+                        onChange(applyOpeningTemplate(template, opening));
+                        setSelectedStepId(null);
+                        replay();
+                      }}
+                      className="rounded-md border border-[var(--edge)] px-2 py-1.5 text-left text-[10px] leading-tight text-ink/60 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
+                    >
+                      {template.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {sequence && sequence.length > 0 ? (
+                <>
+                  <div>
+                    <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                      Steps — {(sequenceTotalMs(sequence) / 1000).toFixed(1)} s
+                    </span>
+                    <ol className="divide-y divide-ink/10 border border-ink/10">
+                      {sequence.map((step, index) => {
+                        const role = OPENING_STEP_ROLES.find(
+                          (entry) => entry.id === step.role,
+                        );
+                        const selected = step.id === selectedStepId;
+                        const easing = EASINGS.find(
+                          (entry) => entry.id === step.easing,
+                        );
+                        return (
+                          <li
+                            key={step.id}
+                            className={cn(
+                              "flex items-center gap-1 px-2 py-1.5",
+                              selected && "bg-[var(--red)]/[0.06]",
+                            )}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStepId(step.id)}
+                              aria-pressed={selected}
+                              className="min-h-9 min-w-0 flex-1 rounded-md text-left"
+                            >
+                              <span className="block truncate text-[10.5px] text-ink/80">
+                                {index + 1}. {role?.label ?? step.role}
+                              </span>
+                              <span className="block truncate font-meta text-[8.5px] tabular-nums text-ink/40">
+                                {step.delay > 0 ? "+" : ""}
+                                {step.delay} ms gap · {step.duration} ms ·{" "}
+                                {easing?.label ?? step.easing}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Move ${role?.label ?? step.role} earlier`}
+                              disabled={index === 0}
+                              onClick={() => moveStep(index, -1)}
+                              className="grid size-8 shrink-0 place-items-center rounded-md text-ink/45 transition-colors duration-150 hover:bg-ink/[0.04] hover:text-ink disabled:pointer-events-none disabled:opacity-25"
+                            >
+                              <ChevronUp className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Move ${role?.label ?? step.role} later`}
+                              disabled={index === sequence.length - 1}
+                              onClick={() => moveStep(index, 1)}
+                              className="grid size-8 shrink-0 place-items-center rounded-md text-ink/45 transition-colors duration-150 hover:bg-ink/[0.04] hover:text-ink disabled:pointer-events-none disabled:opacity-25"
+                            >
+                              <ChevronDown className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${role?.label ?? step.role}`}
+                              onClick={() => deleteStep(step.id)}
+                              className="grid size-8 shrink-0 place-items-center rounded-md text-ink/40 transition-colors duration-150 hover:bg-[var(--red)]/[0.06] hover:text-[var(--red)]"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                    <button
+                      type="button"
+                      onClick={addStep}
+                      className="mt-1.5 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md border border-[var(--edge)] text-[9px] uppercase tracking-[0.14em] text-ink/55 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
+                    >
+                      <Plus className="size-3" /> Add step
+                    </button>
+                  </div>
+
+                  {selectedStep ? (
+                    <div className="space-y-3 rounded-md border border-[var(--edge)] p-2">
+                      <div>
+                        <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                          Movement
+                        </span>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {OPENING_STEP_ROLES.map((role) => (
+                            <button
+                              key={role.id}
+                              type="button"
+                              title={role.note}
+                              aria-pressed={selectedStep.role === role.id}
+                              onClick={() =>
+                                updateStep(selectedStep.id, { role: role.id })
+                              }
+                              className={cn(
+                                "rounded-md border px-2 py-1.5 text-left text-[9.5px] leading-tight transition-[background-color,border-color,color] duration-150",
+                                selectedStep.role === role.id
+                                  ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
+                                  : "border-[var(--edge)] text-ink/55 hover:border-ink/45 hover:text-ink",
+                              )}
+                            >
+                              {role.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <RangeRow
+                        label="Gap before"
+                        value={`${selectedStep.delay > 0 ? "+" : ""}${selectedStep.delay} ms`}
+                        min={-3000}
+                        max={5000}
+                        step={50}
+                        current={selectedStep.delay}
+                        onInput={(value) =>
+                          updateStepLive(selectedStep.id, { delay: value })
+                        }
+                      />
+                      <RangeRow
+                        label="Duration"
+                        value={`${selectedStep.duration} ms`}
+                        min={120}
+                        max={6000}
+                        step={60}
+                        current={selectedStep.duration}
+                        onInput={(value) =>
+                          updateStepLive(selectedStep.id, { duration: value })
+                        }
+                      />
+                      <div>
+                        <span className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-ink/45">
+                          Easing
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {EASINGS.map((entry) => (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              aria-pressed={selectedStep.easing === entry.id}
+                              onClick={() =>
+                                updateStep(selectedStep.id, {
+                                  easing: entry.id as EasingId,
+                                })
+                              }
+                              className={cn(
+                                "min-h-8 rounded-md border px-2 text-[9px] uppercase tracking-[0.08em] transition-[background-color,border-color,color] duration-150",
+                                selectedStep.easing === entry.id
+                                  ? "border-[var(--red)]/70 bg-[var(--red)]/10 text-ink"
+                                  : "border-[var(--edge)] text-ink/55 hover:border-ink/45 hover:text-ink",
+                              )}
+                            >
+                              {entry.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[9px] leading-relaxed text-ink/40">
+                      Select a step to retime it. A negative gap overlaps the
+                      movement before it, the way a flap is still swinging while
+                      the card starts to rise.
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      className="h-8 flex-1 rounded-md px-3 text-[10px] uppercase tracking-[0.1em]"
+                      onClick={replay}
+                    >
+                      <Play className="size-3" /> Preview
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 flex-1 rounded-md px-3 text-[10px] uppercase tracking-[0.1em]"
+                      onClick={() => {
+                        const steps = defaultSequence(presetId, sequenceTotalMs(sequence));
+                        setSequence(steps);
+                        setSelectedStepId(steps[0]?.id ?? null);
+                        replay();
+                      }}
+                    >
+                      <RotateCcw className="size-3" /> Reset
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <p className="text-[9px] leading-relaxed text-ink/40">
+                    The suite plays its own timing. Turn it into steps to retime
+                    every movement — each one stays editable afterwards.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const steps = defaultSequence(presetId);
+                      setSequence(steps);
+                      setSelectedStepId(steps[0]?.id ?? null);
+                      replay();
+                    }}
+                    className="mt-2 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md border border-[var(--edge)] text-[9px] uppercase tracking-[0.14em] text-ink/60 transition-[background-color,border-color,color] duration-150 hover:border-ink/45 hover:text-ink"
+                  >
+                    <Plus className="size-3" /> Edit as steps
+                  </button>
+                </div>
+              )}
             </section>
 
             <section>

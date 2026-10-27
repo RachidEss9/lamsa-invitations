@@ -4,6 +4,7 @@ import {
   type OpeningSettings,
   type OpeningToneId,
 } from "./design";
+import { normalizeSequence } from "./opening-sequence";
 import type { OpeningPresetId } from "./opening";
 
 /**
@@ -180,6 +181,10 @@ function payloadOf(settings: OpeningSettings): OpeningSettings {
     // The physical suite travels with a saved opening: an envelope size is part
     // of the look, not a per-invitation afterthought.
     stationery: settings.stationery,
+    // So is the choreography: a saved sequence is the timing the host designed,
+    // repaired on the way in so junk never reaches another invitation.
+    sequence: normalizeSequence(settings.sequence),
+    background: settings.background,
   };
 }
 
@@ -254,6 +259,10 @@ export function applySavedOpening(
     palette: saved.opening.palette,
     motion: saved.opening.motion,
     stationery: saved.opening.stationery,
+    // The saved choreography replaces this invitation's own; one saved before
+    // sequences existed falls back to the preset's timing, as it always did.
+    sequence: normalizeSequence(saved.opening.sequence),
+    background: saved.opening.background,
   };
 }
 

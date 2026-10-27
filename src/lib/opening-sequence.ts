@@ -162,6 +162,25 @@ function makeStepId(): string {
 }
 
 /**
+ * A freshly minted step for the sequence editor. Ids are unique within the
+ * session so reordering and selecting never collide, and the timings start
+ * inside the clamped model range.
+ */
+export function makeStep(
+  role: OpeningStepRole,
+  overrides: Partial<Omit<OpeningStep, "role">> = {},
+): OpeningStep {
+  return {
+    id: makeStepId(),
+    role,
+    delay: 0,
+    duration: 900,
+    easing: "easeOut",
+    ...overrides,
+  };
+}
+
+/**
  * Repairs a loaded sequence: junk roles, timings and easings are dropped or
  * clamped, and the host's order is preserved. An unusable sequence comes back
  * as `undefined`, which means "use the preset's own timeline".
@@ -457,10 +476,15 @@ export function applyOpeningTemplate(
   template: OpeningTemplate,
   current: OpeningSettings,
 ): OpeningSettings {
-  const steps: OpeningStep[] = template.steps.map((step, index) => ({
-    ...step,
-    id: `${template.id}_${index}`,
-  }));
+  // Ids are minted fresh on every application, so re-applying a template can
+  // never leave two steps claiming the same identity in the editor.
+  const steps: OpeningStep[] = template.steps.map((step) =>
+    makeStep(step.role, {
+      delay: step.delay,
+      duration: step.duration,
+      easing: step.easing,
+    }),
+  );
   return {
     ...current,
     experience: template.experience,

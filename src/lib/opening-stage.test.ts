@@ -215,4 +215,51 @@ describe("opening stage", () => {
     });
     expect(onDone).toHaveBeenCalledTimes(1);
   });
+
+  it("plays a saved sequence and reveals the real invitation through it", () => {
+    const { container, onDone } = mount(false, {
+      sequence: [
+        { id: "seal", role: "seal", delay: 0, duration: 400, easing: "easeOut" },
+        { id: "cover", role: "cover", delay: -200, duration: 1200, easing: "easeInOut" },
+        { id: "card", role: "card", delay: -700, duration: 1500, easing: "easeOut" },
+        { id: "exit", role: "exit", delay: -400, duration: 800, easing: "easeIn" },
+      ],
+    });
+    click(container, "Break the seal");
+
+    frame(0);
+    // The saved artwork waits inside the envelope — the real page, not a stand-in.
+    expect(cardTransform(container)).toContain("scale(0.6)");
+    expect(cardTransform(container)).toContain("translate3d(0, 560px, 0)");
+    expect(container.textContent).toContain("Amelia & Søren");
+
+    // Half-way through the 2600 ms run the card is genuinely emerging.
+    frame(1430);
+    const midway = cardTransform(container);
+    const scale = Number(midway.match(/scale\(([\d.]+)\)/)?.[1]);
+    expect(scale).toBeGreaterThan(0.6);
+    expect(scale).toBeLessThan(1);
+
+    frame(2600);
+    frame(2600);
+    expect(cardTransform(container)).toContain("scale(1)");
+    expect(cardTransform(container)).toContain("translate3d(0, 0px, 0)");
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Amelia & Søren");
+  });
+
+  it("hands over at once for reduced-motion guests, sequence or not", () => {
+    const { container, onDone } = mount(true, {
+      sequence: [
+        { id: "cover", role: "cover", delay: 0, duration: 1600, easing: "linear" },
+        { id: "card", role: "card", delay: -600, duration: 1800, easing: "linear" },
+      ],
+    });
+    frame(0);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    // The invitation is simply present and settled — no waiting out the run.
+    expect(cardTransform(container)).toContain("scale(1)");
+    expect(container.textContent).toContain("Amelia & Søren");
+    expect(container.textContent).not.toContain("Break the seal");
+  });
 });

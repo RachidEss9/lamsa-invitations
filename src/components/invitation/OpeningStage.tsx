@@ -14,12 +14,8 @@ import {
 import { fontFamilyFor } from "@/lib/fonts";
 import { envelopeStageBox, usableLining } from "@/lib/envelope";
 import { pageEntranceEnd } from "@/lib/journey";
-import {
-  openingFrame,
-  openingPresetOf,
-  openingRunDuration,
-  type OpeningFrame,
-} from "@/lib/opening";
+import { openingPresetOf, type OpeningFrame } from "@/lib/opening";
+import { frameForOpening, openingDurationOf } from "@/lib/opening-sequence";
 import { openingPaletteOf, openingToneOf } from "@/lib/openings";
 import { cn } from "@/lib/utils";
 import {
@@ -159,6 +155,11 @@ function EnvelopeScene({
   const liningOverride = usableLining(stationery?.lining);
   const sealColour = usableLining(stationery?.sealColor) ?? palette.accent;
   const sealInitials = (stationery?.sealInitials ?? "").trim().slice(0, 3);
+  // Part visibility: absent means the part has always been drawn, so an
+  // invitation saved before these flags existed opens exactly as it did.
+  const showFlap = stationery?.showFlap !== false;
+  const showSeal = stationery?.showSeal !== false;
+  const showLiner = stationery?.showLiner === true;
   const body =
     tone === "ink"
       ? `linear-gradient(155deg, ${palette.ink} 0%, #0d0c0b 100%)`
@@ -206,6 +207,16 @@ function EnvelopeScene({
           border: `1px solid ${edge}`,
         }}
       >
+        {showLiner && (
+          <div
+            className="absolute inset-[6%]"
+            style={{
+              background: lining,
+              borderRadius: 6,
+              boxShadow: `inset 0 0 60px ${rgba("#000000", 0.35)}`,
+            }}
+          />
+        )}
         <div
           className="absolute inset-x-0 top-0"
           style={{
@@ -278,6 +289,7 @@ function EnvelopeScene({
       </div>
 
       {/* Flap, hinged at the envelope's top edge */}
+      {showFlap && (
       <div
         className="absolute"
         style={{
@@ -316,8 +328,10 @@ function EnvelopeScene({
           />
         </div>
       </div>
+      )}
 
       {/* Wax seal: it cracks and the two halves fall away */}
+      {showSeal && (
       <div
         aria-hidden
         className="absolute"
@@ -366,6 +380,164 @@ function EnvelopeScene({
           </div>
         ))}
       </div>
+      )}
+      </div>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Keepsake box                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A rigid box: the lid hinges back off the top edge, the tray holds the card
+ * behind its front wall until the card has risen clear, then the whole suite
+ * lets go of the stage. The lid is the only element painted over the card, so
+ * it swings away first and fades out before the invitation reaches full size —
+ * it can never sit on top of the finished page.
+ */
+function BoxScene({
+  frame,
+  palette,
+  card,
+}: {
+  frame: OpeningFrame;
+  palette: Palette;
+  card: ReactNode;
+}) {
+  const open = frame.frame;
+  const box = { left: 90, top: 70, width: 820, height: 1263 };
+  const wallTop = 640;
+  // The lid is released only once it has swung behind the hinge plane.
+  const lidRelease = Math.min(1, Math.max(0, (open - 0.6) / 0.4));
+  // The front wall steps aside as the card clears it, so the invitation is
+  // never trapped behind the packaging it came out of.
+  const clear = Math.min(1, Math.max(0, (frame.card - 0.45) / 0.55));
+  const drift = `translateY(${Math.round(frame.retreat * 1400)}px)`;
+  const shell = `linear-gradient(162deg, ${rgba(palette.ink, 1)} 0%, ${rgba(
+    "#0b0a09",
+    1,
+  )} 58%, ${rgba(palette.accent, 0.85)} 100%)`;
+  const edge = rgba(palette.accent, 0.5);
+
+  return (
+    <>
+      {/* Tray behind the card */}
+      <div aria-hidden className="absolute inset-0" style={{ transform: drift }}>
+        <div
+          className="absolute overflow-hidden"
+          style={{
+            left: box.left,
+            top: box.top,
+            width: box.width,
+            height: box.height,
+            background: shell,
+            borderRadius: 12,
+            border: `1px solid ${edge}`,
+            boxShadow: `0 46px 100px ${rgba("#000000", 0.45)}`,
+          }}
+        >
+          <div
+            className="absolute inset-[26px] rounded-lg"
+            style={{
+              background: `linear-gradient(180deg, ${rgba(
+                palette.accent,
+                0.34,
+              )}, ${rgba(palette.accent, 0.08)})`,
+              boxShadow: `inset 0 26px 64px ${rgba("#000000", 0.55)}`,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* The real invitation, resting inside the tray */}
+      {card}
+
+      {/* Front wall of the tray, standing in front of the card */}
+      <div aria-hidden className="absolute inset-0" style={{ transform: drift }}>
+        <div
+          className="absolute"
+          style={{
+            left: box.left,
+            top: box.top + wallTop,
+            width: box.width,
+            height: box.height - wallTop,
+            background: shell,
+            borderRadius: "10px 10px 12px 12px",
+            borderTop: `2px solid ${rgba(palette.accent, 0.55)}`,
+            boxShadow: `inset 0 26px 50px ${rgba(
+              "#000000",
+              0.5,
+            )}, 0 -18px 44px ${rgba("#000000", 0.32)}`,
+            opacity: 1 - clear,
+          }}
+        >
+          <div
+            className="absolute inset-x-0 top-[26%] h-[3px]"
+            style={{ background: rgba(palette.accent, 0.7) }}
+          />
+          <div
+            className="absolute left-1/2 top-[20%] size-10 -translate-x-1/2 rounded-full border"
+            style={{
+              borderColor: rgba(palette.accent, 0.8),
+              background: rgba(palette.background, 0.06),
+            }}
+          />
+        </div>
+      </div>
+
+      {/* The lid, hinged along the tray's top edge */}
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{ ...sceneChrome(frame), perspective: 1900 }}
+      >
+        <div
+          className="absolute"
+          style={{
+            left: box.left,
+            top: box.top,
+            width: box.width,
+            height: box.height - 40,
+            transformOrigin: "center top",
+            transform: `rotateX(${-open * 116}deg) translateY(${-lidRelease * 160}px)`,
+            background: `linear-gradient(168deg, ${rgba(
+              palette.background,
+              1,
+            )} 0%, ${rgba(palette.background, 0.9)} 52%, ${rgba(
+              palette.accent,
+              0.28,
+            )} 100%)`,
+            borderRadius: 12,
+            border: `1px solid ${edge}`,
+            boxShadow: `0 34px 74px ${rgba(
+              "#000000",
+              0.5,
+            )}, inset 0 2px 0 ${rgba(palette.background, 0.5)}`,
+            opacity: 1 - lidRelease,
+            willChange: "transform",
+          }}
+        >
+          <div
+            className="absolute inset-[7%] border"
+            style={{ borderColor: rgba(palette.accent, 0.45) }}
+          />
+          <div
+            className="absolute inset-x-0 top-1/2 h-[5px] -translate-y-1/2"
+            style={{ background: rgba(palette.accent, 0.75) }}
+          />
+          <div
+            className="absolute left-1/2 top-1/2 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2"
+            style={{
+              borderColor: rgba(palette.accent, 0.85),
+              background: rgba(palette.background, 0.92),
+              color: rgba(palette.ink, 0.8),
+            }}
+          >
+            <span className="font-display text-[18px] leading-none">L</span>
+          </div>
+        </div>
       </div>
     </>
   );
@@ -1095,7 +1267,9 @@ export function OpeningStage({
   className,
 }: OpeningStageProps) {
   const preset = openingPresetOf(opening.experience) ?? "fade";
-  const duration = openingRunDuration(opening.duration);
+  // A sequence decides its own running length; an invitation without one keeps
+  // the saved duration it has always played to.
+  const duration = openingDurationOf(opening);
   // A still is a design tool, not a guest state: it never plays and never
   // reports completion, so the designer can freeze any stage of the sequence.
   const still = typeof stillAt === "number";
@@ -1117,6 +1291,10 @@ export function OpeningStage({
   const stageRef = useRef<HTMLDivElement | null>(null);
   const doneRef = useRef(onDone);
   const finishedRef = useRef(false);
+  // The run's start moment lives in a ref so editing the sequence mid-play
+  // (a longer step, a reordered movement) continues from where the guest is
+  // instead of snapping back to the beginning.
+  const startRef = useRef<number | null>(null);
 
   useEffect(() => {
     doneRef.current = onDone;
@@ -1170,10 +1348,9 @@ export function OpeningStage({
   useEffect(() => {
     if (phase !== "playing" || reducedMotion || still) return;
     let frame = 0;
-    let start: number | null = null;
     const tick = (now: number) => {
-      if (start === null) start = now;
-      const next = Math.min(1, (now - start) / duration);
+      if (startRef.current === null) startRef.current = now;
+      const next = Math.min(1, (now - startRef.current) / duration);
       setProgress(next);
       if (next < 1) frame = requestAnimationFrame(tick);
       else finish();
@@ -1190,11 +1367,7 @@ export function OpeningStage({
     return () => window.clearTimeout(timer);
   }, [duration, phase, still]);
 
-  const frame = openingFrame(
-    preset,
-    still ? stillAt : progress,
-    opening.motion,
-  );
+  const frame = frameForOpening(opening, still ? stillAt : progress);
   const tone = openingToneOf(opening);
   const hint = openingHint(opening.experience) || "Open the invitation";
   const welcome = personalize(opening.welcome, guestName);
@@ -1214,6 +1387,17 @@ export function OpeningStage({
     ink: colours.hull,
   };
   const pageBackground = page?.background ?? background;
+  // The host can paint the stage itself: a chosen background sits behind the
+  // suite, otherwise the envelope keeps its gradient and every other suite
+  // keeps the page it is opening.
+  const stageBackground =
+    opening.background ??
+    (preset === "envelope" || preset === "wax-seal"
+      ? `radial-gradient(120% 90% at 50% 100%, ${rgba(accent, 0.28)}, ${rgba(
+          ink,
+          0.94,
+        )} 72%)`
+      : pageBackground);
   // Tints and translucent plates need one flat colour; a saved wash cannot be
   // tinted, so those surfaces fall back to the studio ivory.
   const pageTint = flatBackgroundOf(pageBackground);
@@ -1301,6 +1485,9 @@ export function OpeningStage({
     case "folding":
       scene = <FoldingScene frame={frame} palette={palette} card={card} />;
       break;
+    case "box":
+      scene = <BoxScene frame={frame} palette={palette} card={card} />;
+      break;
     case "paper":
       scene = <PaperScene frame={frame} palette={palette} card={card} />;
       break;
@@ -1359,13 +1546,7 @@ export function OpeningStage({
       ref={stageRef}
       className={cn("absolute inset-0 z-40 overflow-hidden", className)}
       style={{
-        background:
-          preset === "envelope" || preset === "wax-seal"
-            ? `radial-gradient(120% 90% at 50% 100%, ${rgba(accent, 0.28)}, ${rgba(
-                ink,
-                0.94,
-              )} 72%)`
-            : pageBackground,
+        background: stageBackground,
         color: ink,
       }}
       role="dialog"

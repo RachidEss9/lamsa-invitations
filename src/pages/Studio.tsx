@@ -2464,6 +2464,15 @@ export default function Studio() {
           ? imageUrls[design.opening.coverStorageId]
           : undefined
       }
+      uploadingCover={uploadingImage}
+      onCoverUpload={async (file) => {
+        try {
+          const { storageId } = await uploadImage(file);
+          applyOpening({ ...design.opening, coverStorageId: storageId });
+        } catch (error) {
+          toast.error(messageOf(error));
+        }
+      }}
     />
   );
 
