@@ -13,11 +13,27 @@ import {
   type MotifId,
 } from "@/lib/invitation";
 import { normalizeSequence, type OpeningStep } from "@/lib/opening-sequence";
+import {
+  normalizeInteractiveOpening,
+  type InteractiveOpeningSettings,
+} from "@/lib/opening-interactive";
 
 // The sequence model lives with its timing maths so the editor, the stage and
 // the tests share one definition.
 export { OPENING_STEP_ROLES } from "@/lib/opening-sequence";
 export type { OpeningStep, OpeningStepRole } from "@/lib/opening-sequence";
+// The guest-driven opening engine: its scenes, layers and settings.
+export {
+  INTERACTIVE_OPENING_SCENES,
+  OPENING_LAYERS,
+} from "@/lib/opening-interactive";
+export type {
+  InteractiveOpeningMotion,
+  InteractiveOpeningSceneId,
+  InteractiveOpeningSettings,
+  OpeningLayerAsset,
+  OpeningLayerId,
+} from "@/lib/opening-interactive";
 
 /**
  * The canvas studio document.
@@ -771,6 +787,12 @@ export interface OpeningSettings {
   sequence?: OpeningStep[];
   /** Stage background behind the suite; absent keeps the page or suite gradient. */
   background?: string;
+  /**
+   * The guest-driven opening: an envelope the visitor unseals and opens by
+   * hand. Absent means the invitation keeps its automatic opening exactly as
+   * saved, so nothing changes for designs created before the engine existed.
+   */
+  interactive?: InteractiveOpeningSettings;
 }
 
 export type ClosingStyleId = "message" | "seal" | "curtain" | "fade";
@@ -1762,6 +1784,9 @@ export function normalizeDesign(
         value.opening.background.trim()
           ? value.opening.background
           : undefined,
+      // The interactive opening is repaired on load: a disabled or damaged
+      // configuration simply falls back to the saved automatic opening.
+      interactive: normalizeInteractiveOpening(value.opening?.interactive),
     },
     closing: {
       ...fallback.closing,
