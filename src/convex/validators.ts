@@ -51,6 +51,13 @@ export const motifValidator = v.union(
   v.literal("trellis"),
   v.literal("moon"),
   v.literal("frame"),
+  // Reference-set additions: paisley, zellige, flourishes and celebration marks.
+  v.literal("paisley"),
+  v.literal("zellige"),
+  v.literal("flourish"),
+  v.literal("blossom"),
+  v.literal("confetti"),
+  v.literal("bow"),
   v.literal("none"),
 );
 

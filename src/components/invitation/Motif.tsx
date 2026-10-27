@@ -268,6 +268,75 @@ export function Motif({
           <path d="M44 84c2-3 10-3 12 0-2 2-10 2-12 0Z" />
         </g>
       )}
+
+      {id === "paisley" && (
+        <g {...shared}>
+          <path d="M52 10 C72 20 84 42 79 64 C74 86 55 96 39 89 C25 83 17 68 22 54 C27 41 41 35 51 41 C45 47 43 55 47 61 C53 69 65 65 67 54 C70 37 63 20 52 10 Z" />
+          <path d="M53 30 C63 37 69 49 66 61" opacity="0.6" />
+          <path d="M46 44 C40 52 40 62 45 68" opacity="0.5" />
+          <circle cx="60" cy="70" r="1.4" fill="currentColor" stroke="none" opacity="0.7" />
+        </g>
+      )}
+
+      {id === "zellige" && (
+        <g {...shared}>
+          <path d="M22 22h56v56H22Z" />
+          <path d="M50 6 94 50 50 94 6 50Z" />
+          <circle cx="50" cy="50" r="9" opacity="0.7" />
+          <circle cx="50" cy="50" r="1.6" fill="currentColor" stroke="none" />
+        </g>
+      )}
+
+      {id === "flourish" && (
+        <g {...shared}>
+          <path d="M10 56 C26 42 36 66 50 54 C64 42 74 66 90 52" />
+          <path d="M10 56 C5 60 7 67 14 65" opacity="0.7" />
+          <path d="M90 52 C95 48 93 41 86 43" opacity="0.7" />
+          <circle cx="50" cy="54" r="2" fill="currentColor" stroke="none" />
+          <path d="M28 40 C33 35 40 35 44 39" opacity="0.45" />
+          <path d="M56 68 C61 73 68 73 72 69" opacity="0.45" />
+        </g>
+      )}
+
+      {id === "blossom" && (
+        <g {...shared}>
+          {[0, 72, 144, 216, 288].map((angle) => (
+            <path
+              key={angle}
+              d="M50 50 C43 41 43 27 50 18 C57 27 57 41 50 50 Z"
+              transform={`rotate(${angle} 50 50)`}
+              opacity={angle === 0 ? 0.9 : 0.75}
+            />
+          ))}
+          <circle cx="50" cy="50" r="4.5" opacity="0.8" />
+          <circle cx="50" cy="50" r="1.4" fill="currentColor" stroke="none" />
+        </g>
+      )}
+
+      {id === "confetti" && (
+        <g {...shared}>
+          <path d="M22 72 C30 62 24 52 32 42" />
+          <path d="M78 68 C70 60 76 50 68 40" opacity="0.7" />
+          <circle cx="36" cy="26" r="2.4" fill="currentColor" stroke="none" />
+          <circle cx="62" cy="20" r="1.8" fill="currentColor" stroke="none" opacity="0.8" />
+          <circle cx="74" cy="34" r="2" fill="currentColor" stroke="none" opacity="0.7" />
+          <circle cx="24" cy="48" r="1.6" fill="currentColor" stroke="none" opacity="0.6" />
+          <circle cx="50" cy="86" r="2.2" fill="currentColor" stroke="none" opacity="0.8" />
+          <circle cx="68" cy="80" r="1.5" fill="currentColor" stroke="none" opacity="0.6" />
+          <path d="M44 30 48 22" opacity="0.7" />
+          <path d="M56 74 60 66" opacity="0.6" />
+        </g>
+      )}
+
+      {id === "bow" && (
+        <g {...shared}>
+          <path d="M50 46 C36 33 15 37 15 52 C15 65 34 64 50 51" />
+          <path d="M50 46 C64 33 85 37 85 52 C85 65 66 64 50 51" />
+          <ellipse cx="50" cy="48.5" rx="6.5" ry="5.5" />
+          <path d="M46 53 C43 66 40 76 33 87" opacity="0.85" />
+          <path d="M54 53 C57 66 60 76 67 87" opacity="0.85" />
+        </g>
+      )}
     </svg>
   );
 }

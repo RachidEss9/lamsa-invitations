@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  PAGE_EDGES,
   elementStyleAt,
   isDesignDocument,
   normalizeDesign,
+  pageEdgeClipPath,
   type DesignDocument,
 } from "./design";
 import type { InvitationContent } from "./invitation";
@@ -250,5 +252,51 @@ describe("normalizeDesign save/reload consistency", () => {
     expect(stored.opening).toEqual(saved.opening);
     expect(stored.closing).toEqual(saved.closing);
     expect(stored.transition).toEqual(saved.transition);
+  });
+});
+
+describe("page cut edges", () => {
+  const width = 1000;
+  const height = 1333;
+
+  it("leaves a plain rectangle unclipped", () => {
+    expect(pageEdgeClipPath("straight", width, height)).toBeUndefined();
+    expect(pageEdgeClipPath(undefined, width, height)).toBeUndefined();
+  });
+
+  it("draws every cut edge inside the page box, the same every time", () => {
+    for (const edge of PAGE_EDGES) {
+      if (edge.id === "straight") continue;
+      const path = pageEdgeClipPath(edge.id, width, height);
+      expect(path, edge.id).toBeTruthy();
+      expect(path, edge.id).toMatch(/^M/);
+      expect(path, edge.id).toMatch(/Z$/);
+      // Deterministic: a saved invitation keeps the exact edge it was given.
+      expect(pageEdgeClipPath(edge.id, width, height)).toBe(path);
+      // Every coordinate sits in the sheet's own box — a cut never draws
+      // outside the page it belongs to.
+      const numbers = (path ?? "").match(/-?\d+(\.\d+)?/g) ?? [];
+      const values = numbers.map(Number);
+      const xs = values.filter((_, index) => index % 2 === 0);
+      const ys = values.filter((_, index) => index % 2 === 1);
+      expect(Math.min(...xs), edge.id).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...xs), edge.id).toBeLessThanOrEqual(width);
+      expect(Math.min(...ys), edge.id).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...ys), edge.id).toBeLessThanOrEqual(height);
+    }
+  });
+
+  it("keeps a saved edge and drops an unknown one", () => {
+    const kept = normalizeDesign(
+      { pages: [{ elements: [], edge: "deckle" }] },
+      content,
+    );
+    expect(kept.pages[0].edge).toBe("deckle");
+
+    const dropped = normalizeDesign(
+      { pages: [{ elements: [], edge: "zigzag-of-doom" }] },
+      content,
+    );
+    expect(dropped.pages[0].edge).toBeUndefined();
   });
 });

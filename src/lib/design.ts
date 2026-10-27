@@ -128,7 +128,10 @@ export type ShapeKind =
   | "diamond"
   | "hexagon"
   | "shield"
-  | "scallop";
+  | "scallop"
+  | "burst"
+  | "clover"
+  | "blob";
 
 export const SHAPES: { id: ShapeKind; label: string }[] = [
   { id: "rect", label: "Rectangle" },
@@ -144,6 +147,9 @@ export const SHAPES: { id: ShapeKind; label: string }[] = [
   { id: "star", label: "Star" },
   { id: "shield", label: "Shield" },
   { id: "scallop", label: "Scallop" },
+  { id: "burst", label: "Seal burst" },
+  { id: "clover", label: "Quatrefoil" },
+  { id: "blob", label: "Organic blob" },
   { id: "frame", label: "Frame" },
 ];
 
@@ -307,6 +313,11 @@ export interface DesignPage {
   /** Paper surface printed under the artwork. */
   texture?: PageTextureId;
   /**
+   * The shape the sheet is trimmed in. Absent on every page saved before cut
+   * edges existed, which means a plain straight trim — never a hidden change.
+   */
+  edge?: PageEdgeId;
+  /**
    * An optional material finish for the sheet itself (vellum, linen, foil).
    * Absent on every page saved before materials existed.
    */
@@ -321,6 +332,115 @@ export const PAGE_TEXTURES: { id: PageTextureId; label: string; note: string }[]
   { id: "linen", label: "Linen", note: "A fine woven weave" },
   { id: "fibre", label: "Raw fibre", note: "Handmade paper with visible flecks" },
 ];
+
+/* -------------------------------------------------------------------------- */
+/* Cut edges                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The shape the sheet is trimmed in. Every edge except `straight` cuts into
+ * the rectangle — paper is never drawn outside its own page box — so artwork
+ * sitting close to the trim is what the cut visibly passes through, exactly
+ * like a real die-cut or torn sheet.
+ */
+export type PageEdgeId =
+  | "straight"
+  | "deckle"
+  | "scallop"
+  | "wave"
+  | "arch"
+  | "petal"
+  | "notch";
+
+export const PAGE_EDGES: { id: PageEdgeId; label: string; note: string }[] = [
+  { id: "straight", label: "Straight", note: "A clean machine-cut trim" },
+  { id: "deckle", label: "Deckle", note: "Torn edges of a handmade sheet" },
+  { id: "scallop", label: "Scallop", note: "Round die-cut bites along the trim" },
+  { id: "wave", label: "Wave", note: "A soft rolling edge" },
+  { id: "arch", label: "Arched top", note: "A domed top, like a card window" },
+  { id: "petal", label: "Petal", note: "Sides that bow gently inward" },
+  { id: "notch", label: "Pinked", note: "Fine teeth, like pinking shears" },
+];
+
+export function isPageEdgeId(value: unknown): value is PageEdgeId {
+  return PAGE_EDGES.some((edge) => edge.id === value);
+}
+
+/** Deterministic noise in [0, 1), so a saved edge never re-rolls on reopen. */
+function noise(seed: number): number {
+  const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+/**
+ * The clip path for a cut edge, in the page's own pixel box, or undefined for
+ * a plain rectangle. Pure geometry: the editor, the guest page, the template
+ * thumbnails and the PNG/PDF capture all read this one function.
+ */
+export function pageEdgeClipPath(
+  edge: PageEdgeId | undefined,
+  width: number,
+  height: number,
+): string | undefined {
+  const id = edge && isPageEdgeId(edge) ? edge : "straight";
+  const w = Math.max(1, Math.round(width));
+  const h = Math.max(1, Math.round(height));
+  if (id === "straight" || w < 24 || h < 24) return undefined;
+
+  const short = Math.min(w, h);
+  const fmt = (value: number) => Math.round(value * 100) / 100;
+
+  if (id === "arch") {
+    const drop = Math.round(h * 0.3);
+    return `M0 ${h} L0 ${drop} C ${fmt(w * 0.2)} 0 ${fmt(w * 0.8)} 0 ${w} ${drop} L${w} ${h} Z`;
+  }
+
+  // Walk the trim clockwise; `bite` is how far the cut travels into the sheet.
+  type Side = { length: number; point: (at: number, bite: number) => [number, number] };
+  const sides: Side[] = [
+    { length: w, point: (x, d) => [x, d] },
+    { length: h, point: (y, d) => [w - d, y] },
+    { length: w, point: (x, d) => [w - x, h - d] },
+    { length: h, point: (y, d) => [d, h - y] },
+  ];
+
+  const points: [number, number][] = [];
+  sides.forEach((side, sideIndex) => {
+    const steps = Math.max(10, Math.round(side.length / (id === "notch" ? 34 : 26)));
+    for (let step = 0; step <= steps; step += 1) {
+      // Corners are contributed by the next side's first point, so the trim
+      // runs continuously around all four sides.
+      if (step === steps) continue;
+      const t = step / steps;
+      const at = t * side.length;
+      let bite = 0;
+      const seed = sideIndex * 97 + step * 13;
+      if (id === "deckle") {
+        bite = short * 0.011 * (0.15 + 0.85 * noise(seed));
+      } else if (id === "wave") {
+        const cycles = Math.max(2, Math.round(side.length / (short * 0.28)));
+        bite = short * 0.016 * (0.5 + 0.5 * Math.sin(t * Math.PI * 2 * cycles));
+      } else if (id === "scallop") {
+        const bites = Math.max(4, Math.round(side.length / (short * 0.16)));
+        const phase = (t * bites) % 1;
+        const radius = (side.length / bites) * 0.5;
+        bite = radius * Math.sin(phase * Math.PI);
+      } else if (id === "petal") {
+        bite = short * 0.055 * Math.sin(t * Math.PI);
+      } else if (id === "notch") {
+        const teeth = Math.max(6, Math.round(side.length / (short * 0.06)));
+        const phase = (t * teeth) % 1;
+        bite = phase < 0.5 ? short * 0.014 * (phase / 0.5) : short * 0.014 * ((1 - phase) / 0.5);
+      }
+      points.push(side.point(at, bite));
+    }
+  });
+
+  const d = points
+    .map(([x, y], index) => `${index === 0 ? "M" : "L"}${fmt(x)} ${fmt(y)}`)
+    .join(" ");
+  return `${d} Z`;
+}
 
 export function visiblePages(design: DesignDocument): DesignPage[] {
   // A stationery suite is a production aid: pieces the host has not opened to
@@ -1144,6 +1264,22 @@ export const TEMPLATE_DESIGN_FONTS: Record<string, string> = {
   "studio-birthday": "space-grotesk",
   "eid-jade": "reem-kufi",
   "anniversary-wine": "cormorant-garamond",
+  // The reference set — every id resolves to the very family its font pair
+  // already picks, so both template paths set identical type.
+  "oxblood-ivory": "bodoni-moda",
+  "garden-deckle": "cormorant-garamond",
+  "champagne-scallop": "marcellus",
+  "midnight-arch": "cinzel",
+  "rose-ask": "great-vibes",
+  "terracotta-wave": "playfair-display",
+  "confetti-noir": "dm-serif-display",
+  "pearl-bloom": "pinyon-script",
+  "convocation-navy": "cinzel",
+  "scholar-deckle": "libre-baskerville",
+  "eid-emerald-night": "amiri",
+  "eid-sand-khatim": "reem-kufi",
+  "first-bloom": "cormorant-garamond",
+  "cocoa-soiree": "dm-serif-display",
 };
 
 function textElement(
@@ -1586,6 +1722,7 @@ export function normalizeDesign(
         texture: PAGE_TEXTURES.some((texture) => texture.id === page.texture)
           ? page.texture
           : undefined,
+        edge: isPageEdgeId(page.edge) ? page.edge : undefined,
         material: normalizeMaterial(page.material),
         elements,
       };

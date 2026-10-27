@@ -3,6 +3,7 @@ import {
   elementStyleAt,
   pageBackgroundStyle,
   pageSizeOf,
+  pageEdgeClipPath,
   personalize,
   type DesignElement,
   type DesignPage,
@@ -59,7 +60,30 @@ function easeOut(t: number) {
 /* Shape art                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * A regular burst: `points` outer spikes alternating with a shallower inner
+ * radius, drawn from the middle of the 0–100 box so it stays editable like any
+ * other vector.
+ */
+function burstPath(points: number, outer = 48, inner = 34): string {
+  const total = points * 2;
+  const coords = Array.from({ length: total }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
+    const radius = index % 2 === 0 ? outer : inner;
+    return `${(50 + Math.cos(angle) * radius).toFixed(2)} ${(
+      50 +
+      Math.sin(angle) * radius
+    ).toFixed(2)}`;
+  });
+  return `M${coords.join(" L")} Z`;
+}
+
 const SHAPE_PATHS: Record<string, string> = {
+  burst: burstPath(12),
+  clover:
+    "M25 25 A25 25 0 0 1 75 25 A25 25 0 0 1 75 75 A25 25 0 0 1 25 75 A25 25 0 0 1 25 25 Z",
+  blob:
+    "M54 3 C78 2 98 22 95 47 C92 72 78 98 50 98 C24 98 3 79 5 52 C7 26 29 4 54 3 Z",
   heart:
     "M50 89 C22 69 4 52 4 34 C4 18 16 8 30 8 C40 8 47 14 50 22 C53 14 60 8 70 8 C84 8 96 18 96 34 C96 52 78 69 50 89Z",
   arch: "M6 97 L6 47 C6 23 26 4 50 4 C74 4 94 23 94 47 L94 97 Z",
@@ -910,15 +934,20 @@ export function DesignPageView({
 
   const size = pageSizeOf(page);
   const pageOverlay = materialPreview ? materialOverlayStyle(page.material) : undefined;
+  // The cut edge of the sheet: a die-cut, torn or domed trim is part of the
+  // artwork and travels with it into previews, the public page and export.
+  const edgeClip = pageEdgeClipPath(page.edge, size.width, size.height);
 
   return (
     <div
       className={cn("relative overflow-hidden", className)}
       dir={rtl ? "rtl" : "ltr"}
+      data-page-edge={page.edge ?? "straight"}
       style={{
         width: size.width,
         height: size.height,
         containerType: "inline-size",
+        ...(edgeClip ? { clipPath: `path("${edgeClip}")` } : null),
         ...pageBackgroundStyle(page.background),
         ...style,
       }}

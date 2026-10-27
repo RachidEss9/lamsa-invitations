@@ -19,6 +19,7 @@ import {
 import {
   ANIMATION_PRESETS,
   EASINGS,
+  PAGE_EDGES,
   REVEAL_EFFECTS,
   SHAPES,
   elementTypeLabel,
@@ -26,6 +27,7 @@ import {
   type DesignElement,
   type DesignPage,
   type ElementAnimation,
+  type PageEdgeId,
   type RevealEffect,
 } from "@/lib/design";
 import { fontById } from "@/lib/fonts";
@@ -186,6 +188,23 @@ export function Inspector({
               value={page.background}
               onChange={(background) => onPagePatch({ background })}
             />
+          </Row>
+          <Row label="Edge">
+            <Select
+              value={page.edge ?? "straight"}
+              onValueChange={(edge) => onPagePatch({ edge: edge as PageEdgeId })}
+            >
+              <SelectTrigger className="h-8 rounded-none text-[11px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_EDGES.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Row>
         </Section>
         <Section title="Material">

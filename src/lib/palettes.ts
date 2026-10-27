@@ -28,6 +28,7 @@ export const PALETTE_GROUPS = [
   "Neutral",
   "Dark & metallic",
   "Festive",
+  "Reference",
 ] as const;
 
 export const PALETTES: ColourPalette[] = [
@@ -252,6 +253,77 @@ export const PALETTES: ColourPalette[] = [
     paper: "#eef5ef",
     ink: "#1c3a2c",
     accent: "#a8862d",
+  },
+
+  /* ------------------------------------------- lifted from the studio set */
+  {
+    id: "ref-oxblood",
+    name: "Oxblood & cream",
+    group: "Reference",
+    paper: "#5c1214",
+    ink: "#f4e7d4",
+    accent: "#d8bd97",
+    background: "radial-gradient(120% 85% at 50% 12%, #6d171a 0%, #5c1214 55%, #3c0a0c 100%)",
+  },
+  {
+    id: "ref-eucalyptus",
+    name: "Eucalyptus",
+    group: "Reference",
+    paper: "#eef1ea",
+    ink: "#2e3a31",
+    accent: "#8fa088",
+  },
+  {
+    id: "ref-champagne",
+    name: "Champagne silk",
+    group: "Reference",
+    paper: "#f1e8d8",
+    ink: "#3a2e22",
+    accent: "#b38f6f",
+    background: "linear-gradient(160deg, #f4ecdd 0%, #ece1cd 55%, #ddccb1 100%)",
+  },
+  {
+    id: "ref-dusty-rose",
+    name: "Dusty rose",
+    group: "Reference",
+    paper: "#faeee9",
+    ink: "#4a2b2c",
+    accent: "#c0857f",
+    background: "radial-gradient(95% 75% at 50% 0%, #fdf6f2 0%, #f7e7e1 60%, #eed7cf 100%)",
+  },
+  {
+    id: "ref-midnight",
+    name: "Midnight & gold",
+    group: "Reference",
+    paper: "#0f1a33",
+    ink: "#efe7d6",
+    accent: "#c9a76a",
+    background: "linear-gradient(180deg, #101d38 0%, #0f1a33 60%, #1a2340 100%)",
+  },
+  {
+    id: "ref-terracotta",
+    name: "Terracotta",
+    group: "Reference",
+    paper: "#efd9c6",
+    ink: "#54291d",
+    accent: "#b4674a",
+  },
+  {
+    id: "ref-cocoa",
+    name: "Cocoa & champagne",
+    group: "Reference",
+    paper: "#3a2018",
+    ink: "#f2e6d6",
+    accent: "#c98f63",
+    background: "radial-gradient(110% 75% at 25% 8%, #4a2a1f 0%, #3a2018 55%, #26120c 100%)",
+  },
+  {
+    id: "ref-blush-pearl",
+    name: "Blush pearl",
+    group: "Reference",
+    paper: "#fdf8f4",
+    ink: "#5b3a3c",
+    accent: "#e0a9ad",
   },
 ];
 

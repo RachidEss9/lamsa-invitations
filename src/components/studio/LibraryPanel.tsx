@@ -26,6 +26,7 @@ import { BUILTIN_STYLES, type BuiltinStyle } from "@/lib/styles";
 import { FONT_LIBRARY, fontById, fontSamples } from "@/lib/fonts";
 import { TEMPLATES, type InvitationTemplate } from "@/lib/invitation";
 import { OPENING_EXPERIENCES } from "@/lib/design";
+import { OPENING_LOOKS, openingLookSettings } from "@/lib/openings";
 import type { ShapeKind } from "@/lib/design";
 import { PALETTES, PALETTE_GROUPS, type ColourPalette } from "@/lib/palettes";
 import { paletteSwatches as deriveSwatches } from "@/lib/library-colour";
@@ -158,7 +159,13 @@ export function ShapePreview({
                             ? "M50 3 C68 12 84 14 96 14 L96 48 C96 76 76 92 50 98 C24 92 4 76 4 48 L4 14 C16 14 32 12 50 3 Z"
                             : shape === "scallop"
                               ? "M50 3 C60 3 68 8 73 14 C81 11 91 15 95 24 C99 32 96 41 92 47 C97 54 97 65 91 72 C93 81 86 90 77 92 C72 98 62 100 55 96 C50 100 42 100 37 96 C30 100 20 98 15 92 C6 90 -1 81 1 72 C-5 65 -5 54 0 47 C-4 41 -7 32 -3 24 C1 15 11 11 19 14 C24 8 32 3 42 3 Z"
-                              : "M50 8 L94 92 L6 92 Z"
+                              : shape === "clover"
+                                ? "M25 25 A25 25 0 0 1 75 25 A25 25 0 0 1 75 75 A25 25 0 0 1 25 75 A25 25 0 0 1 25 25 Z"
+                                : shape === "blob"
+                                  ? "M54 3 C78 2 98 22 95 47 C92 72 78 98 50 98 C24 98 3 79 5 52 C7 26 29 4 54 3 Z"
+                                  : shape === "burst"
+                                    ? "M50.00 2.00 L58.80 17.16 L74.00 8.43 L74.04 25.96 L91.57 26.00 L82.84 41.20 L98.00 50.00 L82.84 58.80 L91.57 74.00 L74.04 74.04 L74.00 91.57 L58.80 82.84 L50.00 98.00 L41.20 82.84 L26.00 91.57 L25.96 74.04 L8.43 74.00 L17.16 58.80 L2.00 50.00 L17.16 41.20 L8.43 26.00 L25.96 25.96 L26.00 8.43 L41.20 17.16 Z"
+                                    : "M50 8 L94 92 L6 92 Z"
           }
           fill={fill ?? "var(--red)"}
           stroke={stroke}
@@ -1127,6 +1134,13 @@ export function LibraryPanel({
 
   /* ------------------------------------------------------------ filtering */
 
+  /** True when the search box is empty or any field of the item matches it. */
+  const matchesQuery = (...fields: string[]) => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return true;
+    return fields.some((field) => field.toLowerCase().includes(needle));
+  };
+
   const filteredSaved = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return savedTemplates.filter((item) => {
@@ -1346,7 +1360,7 @@ export function LibraryPanel({
       case "reveals":
         return `${filteredReveals.length} reveal presets`;
       case "opening":
-        return `${countFor("opening")} opening experiences`;
+        return `${countFor("opening")} experiences · ${OPENING_LOOKS.length} looks`;
     }
   })();
 
@@ -2166,13 +2180,82 @@ export function LibraryPanel({
 
               {tab === "opening" && (
                 <>
-                  {OPENING_EXPERIENCES.filter((experience) => experience.id !== "none")
-                    .length === 0 ? (
+                  <p className="section-label">Looks</p>
+                  <p className="mb-2.5 -mt-2 font-ui text-[0.63rem] leading-relaxed text-ink/45">
+                    A finished mood — experience, tone and palette in one tap.
+                    Your wording and cover photograph stay as they are.
+                  </p>
+                  <div className="mb-4 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
+                    {OPENING_LOOKS.filter((look) =>
+                      matchesQuery(look.name, look.note),
+                    ).map((look) => {
+                      const active =
+                        design.opening.experience === look.experience &&
+                        design.opening.tone === look.tone;
+                      return (
+                        <button
+                          key={look.id}
+                          type="button"
+                          onClick={() => {
+                            onApplyOpening(openingLookSettings(look, design.opening));
+                            onClose();
+                          }}
+                          className={cn(
+                            "ui-tile group gap-1.5 text-left",
+                            active && "border-[var(--edge-strong)]",
+                          )}
+                        >
+                          <span
+                            className="ui-tile-art grid aspect-[4/3] w-full place-items-center"
+                            style={{
+                              background: `linear-gradient(150deg, ${look.palette.paper} 0%, ${look.palette.hull} 78%)`,
+                            }}
+                          >
+                            <span className="flex gap-1.5">
+                              {[look.palette.accent, look.palette.hull, look.palette.paper].map(
+                                (swatch) => (
+                                  <span
+                                    key={swatch}
+                                    className="size-4 rounded-full border border-black/15 shadow-[0_1px_2px_rgba(0,0,0,0.18)]"
+                                    style={{ background: swatch }}
+                                  />
+                                ),
+                              )}
+                            </span>
+                            <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-ink/85 py-1 text-center font-ui text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Use look
+                            </span>
+                          </span>
+                          <span className="block px-1 pb-0.5">
+                            <span className="block truncate font-ui text-[0.72rem] font-medium text-ink">
+                              {look.name}
+                            </span>
+                            <span className="mt-0.5 line-clamp-2 font-ui text-[0.6rem] leading-snug text-ink/45">
+                              {look.note}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <p className="section-label">Experiences</p>
+                  <p className="mb-2.5 -mt-2 font-ui text-[0.63rem] leading-relaxed text-ink/45">
+                    Only the experience changes here — the suite's materials,
+                    envelope size and palette stay.
+                  </p>
+                  {OPENING_EXPERIENCES.filter(
+                    (experience) =>
+                      experience.id !== "none" &&
+                      matchesQuery(experience.label, experience.note),
+                  ).length === 0 ? (
                     <EmptyNote>No opening experiences available.</EmptyNote>
                   ) : (
                     <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
                       {OPENING_EXPERIENCES.filter(
-                        (experience) => experience.id !== "none",
+                        (experience) =>
+                          experience.id !== "none" &&
+                          matchesQuery(experience.label, experience.note),
                       ).map((experience) => (
                         <button
                           key={experience.id}
@@ -2360,6 +2443,8 @@ function buildFullDesign(
     name: template.name,
     background: paper,
     elements,
+    // The template's own cut edge travels with the sheet it designs.
+    edge: template.edge,
   };
 
   return {
@@ -2370,6 +2455,7 @@ function buildFullDesign(
       duration: 1200,
       autoOpen: false,
       welcome: "",
+      ...template.opening,
     },
     closing: {
       enabled: false,

@@ -18,6 +18,121 @@ import type { OpeningPresetId } from "./opening";
 export const OPENING_STORE_KEY = "lamsa.openings.v1";
 const MAX_SAVED_OPENINGS = 18;
 
+/* -------------------------------------------------------------------------- */
+/* Curated looks                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A finished opening: experience, tone and palette drawn as one look, so a
+ * host picks a mood instead of assembling three controls. Every value is a
+ * screen colour for the opening only — the invitation's own artwork is never
+ * recoloured by choosing one.
+ */
+export interface OpeningLook {
+  id: string;
+  name: string;
+  note: string;
+  experience: OpeningSettings["experience"];
+  tone: OpeningToneId;
+  palette: { accent: string; hull: string; paper: string };
+  duration: number;
+}
+
+export const OPENING_LOOKS: OpeningLook[] = [
+  {
+    id: "look-oxblood",
+    name: "Oxblood wax",
+    note: "A wine envelope with ivory tissue and a gold seal",
+    experience: "envelope",
+    tone: "crimson",
+    palette: { accent: "#d8bd97", hull: "#5c1214", paper: "#f4e7d4" },
+    duration: 3200,
+  },
+  {
+    id: "look-garden",
+    name: "Ivory garden",
+    note: "Eucalyptus green wreath opening on white stock",
+    experience: "floral",
+    tone: "ivory",
+    palette: { accent: "#8fa088", hull: "#eef1ea", paper: "#ffffff" },
+    duration: 3000,
+  },
+  {
+    id: "look-champagne",
+    name: "Champagne stack",
+    note: "Layered greige cards lifting one by one",
+    experience: "cards",
+    tone: "ivory",
+    palette: { accent: "#b38f6f", hull: "#e7dcc7", paper: "#fbf6ec" },
+    duration: 3000,
+  },
+  {
+    id: "look-midnight",
+    name: "Midnight cinema",
+    note: "Ink-blue letterbox bars with a gold horizon",
+    experience: "cinematic",
+    tone: "ink",
+    palette: { accent: "#c9a76a", hull: "#0f1a33", paper: "#efe7d6" },
+    duration: 3400,
+  },
+  {
+    id: "look-rose",
+    name: "Rose gate-fold",
+    note: "Blush panels folding open onto pearl paper",
+    experience: "folding",
+    tone: "ivory",
+    palette: { accent: "#c0857f", hull: "#eedad3", paper: "#fffaf7" },
+    duration: 3000,
+  },
+  {
+    id: "look-cocoa",
+    name: "Cocoa curtain",
+    note: "Heavy brown panels parting onto champagne script",
+    experience: "curtain",
+    tone: "ink",
+    palette: { accent: "#c98f63", hull: "#3a2018", paper: "#f2e6d6" },
+    duration: 3200,
+  },
+  {
+    id: "look-emerald",
+    name: "Emerald doors",
+    note: "Panelled doors in deep green with gilded light",
+    experience: "door",
+    tone: "ink",
+    palette: { accent: "#cda96c", hull: "#123026", paper: "#f3eddc" },
+    duration: 3200,
+  },
+  {
+    id: "look-blush",
+    name: "Blush welcome",
+    note: "A named greeting before a soft pearl card",
+    experience: "personal",
+    tone: "ivory",
+    palette: { accent: "#e0a9ad", hull: "#f6e8e4", paper: "#fffdfb" },
+    duration: 2800,
+  },
+];
+
+/**
+ * Applies a look to this invitation's own opening: the guest-facing wording
+ * and the uploaded cover photograph stay exactly where they were, and the
+ * motion returns to the experience's own timeline so the look plays the way it
+ * was composed.
+ */
+export function openingLookSettings(
+  look: OpeningLook,
+  current: OpeningSettings,
+): OpeningSettings {
+  return {
+    ...current,
+    experience: look.experience,
+    tone: look.tone,
+    palette: { ...look.palette },
+    duration: look.duration,
+    motion: undefined,
+  };
+}
+
 export interface SavedOpening {
   id: string;
   label: string;

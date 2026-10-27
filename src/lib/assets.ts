@@ -536,6 +536,269 @@ export const BUILTIN_ASSETS: BuiltinAsset[] = [
     elements: [motif("Travel compass", "compass", { x: 420, y: 520, w: 160, h: 160 })],
     preview: { type: "motif", motif: "compass" },
   },
+
+  /* ------------------------------------------ backgrounds from the references */
+  {
+    id: "paper-oxblood",
+    name: "Oxblood card",
+    note: "Deep wine stock with a warm centre light — the reference set's darkest red.",
+    category: "Backgrounds",
+    background:
+      "radial-gradient(120% 85% at 50% 12%, #7a1d1f 0%, #5e1416 45%, #3a0b0d 100%)",
+    preview: { type: "background" },
+  },
+  {
+    id: "paper-champagne",
+    name: "Champagne silk",
+    note: "Warm greige with a soft satin sheen.",
+    category: "Backgrounds",
+    background:
+      "linear-gradient(160deg, #f3ead9 0%, #e9dcc6 48%, #dccbb0 100%)",
+    preview: { type: "background" },
+  },
+  {
+    id: "paper-dusty-rose",
+    name: "Dusty rose",
+    note: "A muted rose ground for romantic wording.",
+    category: "Backgrounds",
+    background:
+      "radial-gradient(105% 80% at 50% 0%, #f7ece7 0%, #eed9d2 55%, #e2c2ba 100%)",
+    preview: { type: "background" },
+  },
+  {
+    id: "paper-sage-deep",
+    name: "Sage & stone",
+    note: "The reference set's eucalyptus green, deepened.",
+    category: "Backgrounds",
+    background:
+      "linear-gradient(150deg, #e8ebe1 0%, #d5dbcd 55%, #bcc6b4 100%)",
+    preview: { type: "background" },
+  },
+  {
+    id: "paper-cocoa",
+    name: "Cocoa lacquer",
+    note: "Polished brown with a lit upper corner.",
+    category: "Backgrounds",
+    background:
+      "radial-gradient(110% 75% at 22% 8%, #6a4630 0%, #47291b 52%, #2c170f 100%)",
+    preview: { type: "background" },
+  },
+  {
+    id: "paper-navy-gold",
+    name: "Midnight navy",
+    note: "Ink-blue evening card with gold undertone.",
+    category: "Backgrounds",
+    background:
+      "linear-gradient(180deg, #0d1a3a 0%, #101f45 55%, #2a2f4e 100%)",
+    preview: { type: "background" },
+  },
+  {
+    id: "paper-terracotta",
+    name: "Terracotta clay",
+    note: "Sun-baked clay for warm, earthy suites.",
+    category: "Backgrounds",
+    background:
+      "linear-gradient(145deg, #efd9c6 0%, #e2bda3 55%, #cf9e82 100%)",
+    preview: { type: "background" },
+  },
+  {
+    id: "paper-pearl-blush",
+    name: "Pearl blush",
+    note: "Near-white with the faintest rose bloom.",
+    category: "Backgrounds",
+    background:
+      "linear-gradient(170deg, #fdfaf7 0%, #f9f2ee 60%, #f2e6e0 100%)",
+    preview: { type: "background" },
+  },
+
+  /* ---------------------------------------------- new shapes from the set */
+  {
+    id: "shape-burst",
+    name: "Seal burst",
+    category: "Shapes",
+    note: "A twelve-point burst for stamps and seals.",
+    elements: [{ kind: "shape", shape: "burst", name: "Seal burst", x: 390, y: 510, w: 220, h: 220, fillToken: "accent" }],
+    preview: { type: "shape", shape: "burst" },
+  },
+  {
+    id: "shape-clover",
+    name: "Quatrefoil",
+    category: "Shapes",
+    note: "Four-lobed form from Moroccan and Gothic ornament.",
+    elements: [{ kind: "shape", shape: "clover", name: "Quatrefoil", x: 380, y: 500, w: 240, h: 240, fillToken: "accent", opacity: 0.85 }],
+    preview: { type: "shape", shape: "clover" },
+  },
+  {
+    id: "shape-blob",
+    name: "Organic form",
+    category: "Shapes",
+    note: "A hand-cut silhouette for non-straight layouts.",
+    elements: [{ kind: "shape", shape: "blob", name: "Organic form", x: 340, y: 440, w: 320, h: 360, fillToken: "paper", strokeToken: "accent", strokeWidth: 2 }],
+    preview: { type: "shape", shape: "blob" },
+  },
+
+  /* ------------------------------------------- ornaments from the references */
+  {
+    id: "ornament-paisley",
+    name: "Paisley",
+    category: "Ornaments",
+    note: "A boteh drop for traditional and Moroccan cards.",
+    elements: [motif("Paisley", "paisley", { x: 400, y: 500, w: 200, h: 200, fillToken: "accent", opacity: 0.85 })],
+    preview: { type: "motif", motif: "paisley" },
+  },
+  {
+    id: "ornament-zellige",
+    name: "Zellige star",
+    category: "Ornaments",
+    note: "The eight-point khatim star of Moroccan tilework.",
+    elements: [motif("Zellige star", "zellige", { x: 390, y: 490, w: 220, h: 220, fillToken: "accent", opacity: 0.8 })],
+    preview: { type: "motif", motif: "zellige" },
+  },
+  {
+    id: "ornament-blossom",
+    name: "Blossom",
+    category: "Ornaments",
+    note: "A five-petal bloom for spring and birthday cards.",
+    elements: [motif("Blossom", "blossom", { x: 405, y: 505, w: 190, h: 190, fillToken: "accent", opacity: 0.85 })],
+    preview: { type: "motif", motif: "blossom" },
+  },
+  {
+    id: "ornament-bow",
+    name: "Ribbon bow",
+    category: "Ornaments",
+    note: "A tied bow for gifts, birthdays and favours.",
+    elements: [motif("Ribbon bow", "bow", { x: 390, y: 510, w: 220, h: 200, fillToken: "accent", opacity: 0.9 })],
+    preview: { type: "motif", motif: "bow" },
+  },
+
+  /* ----------------------------------------------------- more keylines */
+  {
+    id: "frame-paisley-corners",
+    name: "Paisley corners",
+    category: "Keylines",
+    note: "A hairline keyline finished with a paisley at each corner.",
+    elements: [
+      { kind: "shape", shape: "frame", name: "Keyline", x: 44, y: 44, w: 912, h: 1245, strokeToken: "accent", strokeWidth: 1.2, opacity: 0.6 },
+      motif("Corner paisley", "paisley", { x: 52, y: 52, w: 110, h: 110, opacity: 0.75 }),
+      motif("Corner paisley", "paisley", { x: 838, y: 1171, w: 110, h: 110, rotation: 180, opacity: 0.75 }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "frame-zellige-band",
+    name: "Zellige band",
+    category: "Keylines",
+    note: "A top and bottom band of repeating star geometry.",
+    elements: [
+      { kind: "shape", shape: "line", name: "Upper rule", x: 120, y: 150, w: 760, h: 1.5, fillToken: "accent", opacity: 0.55 },
+      motif("Zellige star", "zellige", { x: 470, y: 96, w: 64, h: 64, fillToken: "accent", opacity: 0.8 }),
+      { kind: "shape", shape: "line", name: "Lower rule", x: 120, y: 1183, w: 760, h: 1.5, fillToken: "accent", opacity: 0.55 },
+      motif("Zellige star", "zellige", { x: 470, y: 1175, w: 64, h: 64, fillToken: "accent", opacity: 0.8 }),
+    ],
+    preview: { type: "layers" },
+  },
+
+  /* -------------------------------------------------- more dividers */
+  {
+    id: "divider-flourish",
+    name: "Calligraphic flourish",
+    category: "Dividers",
+    note: "A drawn swash between two sections.",
+    elements: [motif("Flourish", "flourish", { x: 300, y: 610, w: 400, h: 90, fillToken: "accent", opacity: 0.8 })],
+    preview: { type: "motif", motif: "flourish" },
+  },
+  {
+    id: "divider-dot-rule",
+    name: "Dotted rule",
+    category: "Dividers",
+    note: "A fine rule interrupted by three dots.",
+    elements: [
+      rule("Left rule", 300, { x: 160, y: 654, h: 1.5 }),
+      rule("Right rule", 300, { x: 540, y: 654, h: 1.5 }),
+      { kind: "shape", shape: "ellipse", name: "Centre dot", x: 492, y: 649, w: 12, h: 12, fillToken: "accent" },
+    ],
+    preview: { type: "layers" },
+  },
+
+  /* ---------------------------------------------------- more seals */
+  {
+    id: "seal-burst",
+    name: "Burst seal",
+    category: "Seals",
+    note: "A twelve-point wax burst with a zellige centre.",
+    elements: [
+      { kind: "shape", shape: "burst", name: "Burst seal", x: 390, y: 530, w: 220, h: 220, fillToken: "accent" },
+      motif("Seal zellige", "zellige", { x: 452, y: 592, w: 96, h: 96, fill: "#f6f1e6", opacity: 0.92 }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "seal-clover",
+    name: "Quatrefoil seal",
+    category: "Seals",
+    note: "A four-lobed seal for a modern suite.",
+    elements: [
+      { kind: "shape", shape: "clover", name: "Clover seal", x: 395, y: 535, w: 210, h: 210, fill: "#1d2024" },
+      motif("Seal star", "star", { x: 462, y: 602, w: 76, h: 76, fill: "#c9b189" }),
+    ],
+    preview: { type: "layers" },
+  },
+
+  /* -------------------------------------------------- more masks */
+  {
+    id: "mask-burst",
+    name: "Burst cover",
+    category: "Masks",
+    note: "A starburst that bursts apart on tap.",
+    elements: [{ kind: "shape", shape: "burst", name: "Burst reveal cover", x: 300, y: 420, w: 400, h: 400, fillToken: "accent" }],
+    preview: { type: "shape", shape: "burst" },
+  },
+  {
+    id: "mask-blob",
+    name: "Organic cover",
+    category: "Masks",
+    note: "A hand-cut shape that lifts to reveal a note.",
+    elements: [{ kind: "shape", shape: "blob", name: "Organic reveal cover", x: 300, y: 400, w: 400, h: 460, fillToken: "accent" }],
+    preview: { type: "shape", shape: "blob" },
+  },
+
+  /* ------------------------------------------- celebration additions */
+  {
+    id: "icon-confetti",
+    name: "Confetti",
+    category: "Celebration icons",
+    note: "Streamers and dots for birthdays and graduations.",
+    elements: [motif("Confetti", "confetti", { x: 380, y: 500, w: 240, h: 240, fillToken: "accent", opacity: 0.85 })],
+    preview: { type: "motif", motif: "confetti" },
+  },
+  {
+    id: "icon-blossom",
+    name: "Spring blossom",
+    category: "Celebration icons",
+    note: "A single bloom for engagements and showers.",
+    elements: [motif("Blossom", "blossom", { x: 700, y: 150, w: 180, h: 180, fillToken: "accent", opacity: 0.7 })],
+    preview: { type: "motif", motif: "blossom" },
+  },
+  {
+    id: "icon-zellige",
+    name: "Zellige star",
+    category: "Celebration icons",
+    note: "An eight-point star for Moroccan celebrations.",
+    elements: [motif("Zellige star", "zellige", { x: 410, y: 510, w: 180, h: 180, fillToken: "accent" })],
+    preview: { type: "motif", motif: "zellige" },
+  },
+  {
+    id: "botanical-blossom-branch",
+    name: "Blossom branch",
+    category: "Botanical",
+    note: "A flowering branch for the corner of a card.",
+    elements: [
+      motif("Blossom branch", "branch", { x: 680, y: 90, w: 250, h: 270, rotation: -8, opacity: 0.55 }),
+      motif("Blossom", "blossom", { x: 760, y: 210, w: 90, h: 90, fillToken: "accent", opacity: 0.7 }),
+      motif("Blossom", "blossom", { x: 700, y: 140, w: 64, h: 64, fillToken: "accent", opacity: 0.55 }),
+    ],
+    preview: { type: "layers" },
+  },
 ];
 
 export const BUILTIN_ASSET_CATEGORIES = [

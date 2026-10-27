@@ -133,6 +133,26 @@ export const FONT_LIBRARY: FontDef[] = [
   arabic("baloo-bhaijaan-2", "Baloo Bhaijaan 2", ["display"], {
     note: "Soft, festive Arabic display",
   }),
+  arabic("rakkas", "Rakkas", ["display"], {
+    weights: [400],
+    note: "Bold Arabic display for headlines",
+  }),
+  arabic("lemonada", "Lemonada", ["display", "sans"], {
+    weights: [400, 700],
+    note: "Rounded Arabic display",
+  }),
+  arabic("aref-ruqaa-ink", "Aref Ruqaa Ink", ["calligraphy", "display"], {
+    weights: [400, 700],
+    note: "Ruqaa calligraphy with ink texture",
+  }),
+  arabic("vibes", "Vibes", ["calligraphy", "display"], {
+    weights: [400],
+    note: "Elegant Arabic calligraphy for names",
+  }),
+  arabic("katibeh", "Katibeh", ["serif", "display"], {
+    weights: [400, 700],
+    note: "Slanted Arabic with a calligraphic hand",
+  }),
   {
     ...latin("rubik", "Rubik", ["sans"], { note: "Latin + Arabic, rounded" }),
     script: "both",
@@ -348,6 +368,51 @@ export const FONT_LIBRARY: FontDef[] = [
   latin("shrikhand", "Shrikhand", ["display"], {
     weights: [400],
     note: "Festive display",
+  }),
+  latin("prata", "Prata", ["serif", "display"], {
+    weights: [400],
+    note: "Didone for names and titles",
+  }),
+  latin("cinzel-decorative", "Cinzel Decorative", ["serif", "display"], {
+    weights: [400, 700],
+    note: "Ornamented engraved capitals",
+  }),
+  latin("antic-didone", "Antic Didone", ["serif", "display"], {
+    weights: [400],
+    note: "Light didone with fine hairlines",
+  }),
+  latin("italianno", "Italianno", ["calligraphy"], {
+    weights: [400],
+    fallback: SCRIPT_FALLBACK,
+    note: "Airy formal script",
+  }),
+  latin("mrs-saint-delafield", "Mrs Saint Delafield", ["calligraphy"], {
+    weights: [400],
+    fallback: SCRIPT_FALLBACK,
+    note: "Delicate handwritten script",
+  }),
+  latin("rouge-script", "Rouge Script", ["calligraphy"], {
+    weights: [400],
+    fallback: SCRIPT_FALLBACK,
+    note: "Romantic copperplate",
+  }),
+  latin("ballet", "Ballet", ["calligraphy"], {
+    weights: [400],
+    fallback: SCRIPT_FALLBACK,
+    note: "Tall, modern calligraphy",
+  }),
+  latin("marck-script", "Marck Script", ["handwritten"], {
+    weights: [400],
+    fallback: SCRIPT_FALLBACK,
+    note: "Casual marker script",
+  }),
+  latin("urbanist", "Urbanist", ["sans"], {
+    italic: true,
+    note: "Geometric sans with warmth",
+  }),
+  latin("figtree", "Figtree", ["sans"], {
+    italic: true,
+    note: "Friendly, modern sans",
   }),
 ];
 
