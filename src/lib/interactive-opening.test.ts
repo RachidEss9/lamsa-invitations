@@ -429,9 +429,11 @@ describe("interactive opening — the guest journey", () => {
     expect(backdrop?.getAttribute("data-backdrop")).toBe("video");
     expect(backdrop?.getAttribute("src")).toContain("backdrop.mp4");
     // The seal artwork rides inside the same control the guest taps.
-    expect(buttonByLabel(container, "Tap the seal to begin")).toBeTruthy();  expect(
-      container.querySelector('button[aria-label="Tap the seal to begin"] image')
-        ?.getAttribute("src"),
+    expect(buttonByLabel(container, "Tap the seal to begin")).toBeTruthy();
+    expect(
+      container
+        .querySelector('button[aria-label="Tap the seal to begin"] image')
+        ?.getAttribute("href"),
     ).toContain("seal.png");
   });
 
@@ -468,7 +470,6 @@ describe("interactive opening — the cover reveal", () => {
     settle();
     expect(stageOf(container)).toBe("unsealed");
     expect(onOpen).not.toHaveBeenCalled();
-    tapHint(container);
     tapHint(container);
     settle();
     expect(stageOf(container)).toBe("open");

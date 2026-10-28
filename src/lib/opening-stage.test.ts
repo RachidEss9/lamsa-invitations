@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
-import { createRequire } from "node:module";
+import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
@@ -33,35 +32,10 @@ beforeAll(() => {
   cac.mockImplementation(() => undefined);
 });
 
-beforeEach(async () => {
-  if (!(globalThis as unknown as { document: unknown }).document) {
-    // jsdom exposes its document factory through a module loaded lazily; if that is
-    // not attached to this test global yet, import it once and reuse it.
-    let factory: ((globalObject: unknown, args: unknown) => HTMLDocument) | undefined;
-    if ((globalThis as unknown as { documents: unknown }).documents) {
-      factory = (globalThis as unknown as { documents: { createImpl: (globalObject: unknown, args: unknown) => HTMLDocument } }).documents.createImpl;
-    } else {
-      const docs = createRequire(import.meta.url)(
-        "jsdom/lib/jsdom/living/nodes/Document-impl.js",
-      );
-      const impl = docs.default ?? docs;
-      factory = (impl as unknown as { createImpl: (globalObject: unknown, args: unknown) => HTMLDocument }).createImpl;
-    }
-    const doc = factory!(globalThis, { parsingMode: "html" }) as HTMLDocument;
-    (globalThis as unknown as { document: HTMLDocument }).document = doc;
-    (globalThis as unknown as { body: unknown }).body = doc.body;
-  }
-});
-
 afterEach(() => {
   if (globalThis.cancelAnimationFrame) {
     (globalThis.cancelAnimationFrame as unknown as { _spied: boolean })._spied = false;
   }
-  // Reset the jsdom document the opening-stage tests install, so nested test
-  // frames that import real jsdom classes do not inherit a factory reference
-  // pointing at another document object.
-  delete (globalThis as unknown as { document?: HTMLDocument }).document;
-  delete (globalThis as unknown as { body?: HTMLBodyElement }).body;
   vi.useRealTimers();
 });
 
