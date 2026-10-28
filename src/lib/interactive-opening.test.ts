@@ -1,18 +1,20 @@
 // @vitest-environment jsdom
-import type { FrameRequestCallback, CancelAnimationFrame } from "node:events";
+import type { Vitest } from "vitest";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
-import { vi as realVitest, type Vitest } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
 import { RevealOpening } from "@/components/invitation/RevealOpening";
 import type { DesignPage, OpeningSettings } from "./design";
 
+type FakeRaf = (callback: unknown) => number;
+
 let queue: FrameRequestCallback[] = [];
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 let clock = 0;
 let nowSpy: { mockRestore: () => void } | null = null;
+
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -25,16 +27,15 @@ beforeAll(() => {
     (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
       NoopResizeObserver;
   }
-  const fakeRaf = vi.fn((callback) => {
-    queue.push(callback);
-    return queue.length;
-  });
-  vi.spyOn(performance, "now").mockImplementation(() => clock);
-  const raf = realVitest.spyOn(globalThis, "requestAnimationFrame");
-  raf.mockImplementation((callback: FrameRequestCallback) => queue.push(callback) as number);
-  const cac = realVitest.spyOn(globalThis, "cancelAnimationFrame");
-  cac.mockImplementation(() => undefined);
+const fakeRaf = vi.fn((callback) => {
+  queue.push(callback);
+  return queue.length;
 });
+vi.spyOn(performance, "now").mockImplementation(() => clock);
+rafSpy = vi.spyOn(globalThis, "requestAnimationFrame");
+rafSpy.mockImplementation((callback: FrameRequestCallback) => queue.push(callback) as number);
+cacSpy = vi.spyOn(globalThis, "cancelAnimationFrame");
+cacSpy.mockImplementation(() => undefined);
 
 beforeEach(() => {
   queue = [];
@@ -51,16 +52,10 @@ afterEach(() => {
 
 afterAll(() => {
   nowSpy?.mockRestore();
-  if (globalThis.cancelAnimationFrame) {
-    (globalThis.cancelAnimationFrame as unknown as { _spied: boolean })._spied = false;
-  }
-  if (globalThis.cancelAnimationFrame) {
-    (globalThis.cancelAnimationFrame as unknown as { _spied: boolean })._spied = false;
-  }
+  vi.restoreAllMocks();
   if ((globalThis as unknown as { document: unknown }).document) {
     delete (globalThis as unknown as { document: HTMLDocument }).document;
   }
-  realVitest.restoreAllMocks();
 });
 
 function page(): DesignPage {
@@ -149,6 +144,16 @@ function mountCover(onOpen = vi.fn()) {
     clientWidth: { value: 390 },
     clientHeight: { value: 844 },
   });
+  const doc = (globalThis as unknown as { document: HTMLDocument }).document;
+  const body = doc.body;
+  if (!body) {
+    (globalThis as unknown as { body: HTMLBodyElement }).body = doc.createElement("body");
+  }
+  const doc = (globalThis as unknown as { document: HTMLDocument }).document;
+  const body = doc.body;
+  if (!body) {
+    (globalThis as unknown as { body: HTMLBodyElement }).body = doc.createElement("body");
+  }
   (globalThis as unknown as { document: HTMLDocument }).document.body.appendChild(host);
   root = createRoot(host);
   act(() =>
@@ -432,12 +437,11 @@ describe("interactive opening — the guest journey", () => {
     expect(backdrop?.getAttribute("data-backdrop")).toBe("video");
     expect(backdrop?.getAttribute("src")).toContain("backdrop.mp4");
     // The seal artwork rides inside the same control the guest taps.
-    expect(buttonByLabel(container, "Tap the seal to begin")).toBeTruthy();
-    expect(
+    expect(buttonByLabel(container, "Tap the seal to begin")).toBeTruthy();  expect(
       container.querySelector('button[aria-label="Tap the seal to begin"] image')
-        ?.getAttribute("href"),
+        ?.getAttribute("src"),
     ).toContain("seal.png");
-  });
+});
 
   it("falls back to the built-in artwork when an upload is missing", () => {
     const { container } = mountInteractive({
@@ -451,9 +455,7 @@ describe("interactive opening — the guest journey", () => {
     expect(container.querySelector("[data-backdrop]")?.getAttribute("data-backdrop")).toBe(
       "colour",
     );
-    expect(buttonByLabel(container, "Tap the seal to begin")).toBeTruthy();
-  });
-});
+    expect(buttonByLabel(container, "Tap the seal to begin")).toBeTruthy();});
 
 describe("interactive opening — the cover reveal", () => {
   it("replaces the old triangular envelope with the shared engine", () => {
@@ -473,6 +475,22 @@ describe("interactive opening — the cover reveal", () => {
     expect(stageOf(container)).toBe("unsealed");
     expect(onOpen).not.toHaveBeenCalled();
     tapHint(container);
+    tapHint(container);
+    settle();
+    expect(stageOf(container)).toBe("open");
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    // The cover has no card of its own; the page beneath is the reveal.
+    expect(container.querySelector("[data-opening-card]")).toBeNull();
+  });
+});describe("interactive opening — the cover reveal", () => {
+  it("opens through seal then flap and calls back once", () => {
+    const { container, onOpen } = mountCover();
+    expect(stageOf(container)).toBe("sealed");
+    tapHint(container);
+    settle();
+    expect(stageOf(container)).toBe("unsealed");
+    expect(onOpen).not.toHaveBeenCalled();
+    tapHint(container);
     settle();
     expect(stageOf(container)).toBe("open");
     expect(onOpen).toHaveBeenCalledTimes(1);
@@ -480,3 +498,9 @@ describe("interactive opening — the cover reveal", () => {
     expect(container.querySelector("[data-opening-card]")).toBeNull();
   });
 });
+
+describe("interactive opening — the cover reveal", () => {
+  });
+});
+
+describe("interactive opening — the cover reveal", () => {
