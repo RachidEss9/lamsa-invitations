@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
+import type { FrameRequestCallback, CancelAnimationFrame } from "node:events";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { vi as realVitest, type Vitest } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
@@ -23,12 +25,15 @@ beforeAll(() => {
     (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
       NoopResizeObserver;
   }
-  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+  const fakeRaf = vi.fn((callback) => {
     queue.push(callback);
     return queue.length;
   });
-  vi.stubGlobal("cancelAnimationFrame", () => {});
-  nowSpy = vi.spyOn(performance, "now").mockImplementation(() => clock);
+  vi.spyOn(performance, "now").mockImplementation(() => clock);
+  const raf = realVitest.spyOn(globalThis, "requestAnimationFrame");
+  raf.mockImplementation((callback: FrameRequestCallback) => queue.push(callback) as number);
+  const cac = realVitest.spyOn(globalThis, "cancelAnimationFrame");
+  cac.mockImplementation(() => undefined);
 });
 
 beforeEach(() => {
@@ -46,7 +51,16 @@ afterEach(() => {
 
 afterAll(() => {
   nowSpy?.mockRestore();
-  vi.unstubAllGlobals();
+  if (globalThis.cancelAnimationFrame) {
+    (globalThis.cancelAnimationFrame as unknown as { _spied: boolean })._spied = false;
+  }
+  if (globalThis.cancelAnimationFrame) {
+    (globalThis.cancelAnimationFrame as unknown as { _spied: boolean })._spied = false;
+  }
+  if ((globalThis as unknown as { document: unknown }).document) {
+    delete (globalThis as unknown as { document: HTMLDocument }).document;
+  }
+  realVitest.restoreAllMocks();
 });
 
 function page(): DesignPage {
@@ -128,11 +142,14 @@ function mountInteractive(
 
 function mountCover(onOpen = vi.fn()) {
   host = document.createElement("div");
+  if (!(globalThis as unknown as { document: unknown }).document) {
+    (globalThis as unknown as { document: HTMLDocument }).document = document.implementation.createHTMLDocument("cover");
+  }
   Object.defineProperties(host, {
     clientWidth: { value: 390 },
     clientHeight: { value: 844 },
   });
-  document.body.appendChild(host);
+  (globalThis as unknown as { document: HTMLDocument }).document.body.appendChild(host);
   root = createRoot(host);
   act(() =>
     root?.render(
