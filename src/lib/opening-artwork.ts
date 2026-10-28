@@ -55,6 +55,8 @@ export const OPENING_REFERENCE = {
     revealFrame: revealFrameArt,
     revealCard: revealCardArt,
   },
+  /** The stage colour the ground photograph ends in, continued to the board's foot. */
+  floor: "#3e0e11",
   /** Where each band sits, in reference rows. */
   rows: {
     /** Top of the pocket interior band. */

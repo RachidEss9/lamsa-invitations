@@ -501,8 +501,6 @@ export function InteractiveOpening({
           />
         </div>
 
-        </div>
-
         {/* The envelope outside the flap — its shoulders and its pocket —
             so opening the flap shows the real paper underneath. */}
         {["left", "right"].map((side) => (
@@ -822,10 +820,22 @@ export function InteractiveOpening({
                   <rect x={0} y={-SCENE.seal.r} width={SCENE.seal.r} height={SCENE.seal.r * 2} />
                 </clipPath>
               </defs>
+              {/* The intact seal, straight from the reference, until it cracks. */}
+              {sealP === 0 && (
+                <image
+                  href={sealUrl || OPENING_REFERENCE.images.seal}
+                  x={-SCENE.seal.r}
+                  y={-SCENE.seal.r}
+                  width={SCENE.seal.r * 2}
+                  height={SCENE.seal.r * 2}
+                  preserveAspectRatio="xMidYMid meet"
+                />
+              )}
               <g
                 style={{
                   transform: `translate(${-sealP * SCENE.seal.r}px, ${sealP * 47}px) rotate(${-sealP * 42}deg)`,
                   transformOrigin: "0px 0px",
+                  visibility: sealP === 0 ? "hidden" : "visible",
                   opacity: 1 - clamp01((sealP - 0.62) / 0.38),
                 }}
               >
@@ -853,6 +863,7 @@ export function InteractiveOpening({
                 style={{
                   transform: `translate(${sealP * SCENE.seal.r}px, ${sealP * 43}px) rotate(${sealP * 38}deg)`,
                   transformOrigin: "0px 0px",
+                  visibility: sealP === 0 ? "hidden" : "visible",
                   opacity: 1 - clamp01((sealP - 0.62) / 0.38),
                 }}
               >
