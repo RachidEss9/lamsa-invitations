@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { createRequire } from "node:module";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
@@ -40,7 +41,9 @@ beforeEach(async () => {
     if ((globalThis as unknown as { documents: unknown }).documents) {
       factory = (globalThis as unknown as { documents: { createImpl: (globalObject: unknown, args: unknown) => HTMLDocument } }).documents.createImpl;
     } else {
-      const docs = await import("jsdom/lib/jsdom/living/nodes/Document-impl.js");
+      const docs = createRequire(import.meta.url)(
+        "jsdom/lib/jsdom/living/nodes/Document-impl.js",
+      );
       const impl = docs.default ?? docs;
       factory = (impl as unknown as { createImpl: (globalObject: unknown, args: unknown) => HTMLDocument }).createImpl;
     }
@@ -57,9 +60,8 @@ afterEach(() => {
   // Reset the jsdom document the opening-stage tests install, so nested test
   // frames that import real jsdom classes do not inherit a factory reference
   // pointing at another document object.
-  delete (globalThis as unknown as { document: HTMLDocument }).document;
-  delete (globalThis as unknown as { body: HTMLBodyElement }).body;
-  delete (globalThis as unknown as { document: HTMLDocument }).document;
+  delete (globalThis as unknown as { document?: HTMLDocument }).document;
+  delete (globalThis as unknown as { body?: HTMLBodyElement }).body;
   vi.useRealTimers();
 });
 
