@@ -26,8 +26,7 @@ beforeAll(() => {
     }
     (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
       NoopResizeObserver;
-  }
-const fakeRaf = vi.fn((callback) => {
+  }  const fakeRaf = vi.fn((callback) => {
   queue.push(callback);
   return queue.length;
 });
@@ -482,7 +481,9 @@ describe("interactive opening — the cover reveal", () => {
     // The cover has no card of its own; the page beneath is the reveal.
     expect(container.querySelector("[data-opening-card]")).toBeNull();
   });
-});describe("interactive opening — the cover reveal", () => {
+});
+
+describe("interactive opening — the cover reveal", () => {
   it("opens through seal then flap and calls back once", () => {
     const { container, onOpen } = mountCover();
     expect(stageOf(container)).toBe("sealed");
@@ -496,10 +497,6 @@ describe("interactive opening — the cover reveal", () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
     // The cover has no card of its own; the page beneath is the reveal.
     expect(container.querySelector("[data-opening-card]")).toBeNull();
-  });
-});
-
-describe("interactive opening — the cover reveal", () => {
   });
 });
 
