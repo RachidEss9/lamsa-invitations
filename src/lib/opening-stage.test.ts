@@ -1,5 +1,14 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+  vi,
+} from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
@@ -21,10 +30,6 @@ beforeAll(() => {
     (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
       NoopResizeObserver;
   }
-  const fakeRaf = vi.fn((callback) => {
-    queue.push(callback);
-    return queue.length;
-  });
   vi.spyOn(performance, "now").mockImplementation(() => clock);
   const raf = vi.spyOn(globalThis, "requestAnimationFrame");
   raf.mockImplementation((callback) => queue.push(callback) as number);
@@ -32,18 +37,22 @@ beforeAll(() => {
   cac.mockImplementation(() => undefined);
 });
 
+beforeEach(() => {
+  queue = [];
+  clock = 0;
+});
+
 afterEach(() => {
-  if (globalThis.cancelAnimationFrame) {
-    (globalThis.cancelAnimationFrame as unknown as { _spied: boolean })._spied = false;
-  }
+  if (root) act(() => root?.unmount());
+  root = null;
+  host?.remove();
+  host = null;
+  queue = [];
   vi.useRealTimers();
 });
 
 afterAll(() => {
   vi.restoreAllMocks();
-  if (globalThis.cancelAnimationFrame) {
-    (globalThis.cancelAnimationFrame as unknown as { _spied: boolean })._spied = false;
-  }
 });
 
 function page(): DesignPage {
@@ -81,6 +90,11 @@ function page(): DesignPage {
   };
 }
 
+/**
+ * The envelope experience mounts with no saved guest-driven settings — the
+ * exact configuration behind the screenshot this suite guards against: the
+ * reference engine must render anyway.
+ */
 function mount(
   reducedMotion = false,
   overrides: Partial<OpeningSettings> = {},
@@ -88,6 +102,10 @@ function mount(
 ) {
   const onDone = vi.fn();
   host = document.createElement("div");
+  Object.defineProperties(host, {
+    clientWidth: { value: 390 },
+    clientHeight: { value: 844 },
+  });
   document.body.appendChild(host);
   root = createRoot(host);
   act(() =>
@@ -116,10 +134,16 @@ function mount(
   return { container: host, onDone };
 }
 
-function click(container: HTMLElement, label: string) {
-  const button = Array.from(container.querySelectorAll("button")).find(
-    (candidate) => candidate.getAttribute("aria-label") === label,
+function buttonByLabel(container: HTMLElement, label: string) {
+  return (
+    Array.from(container.querySelectorAll("button")).find(
+      (candidate) => candidate.getAttribute("aria-label") === label,
+    ) ?? null
   );
+}
+
+function click(container: HTMLElement, label: string) {
+  const button = buttonByLabel(container, label);
   expect(button, `button ${label}`).toBeTruthy();
   act(() => button?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 }
@@ -133,97 +157,143 @@ function frame(now: number) {
   });
 }
 
+/** Flush queued frames while advancing the tween clock until nothing is left. */
+function settle(budgetMs = 8000, step = 60) {
+  let elapsed = 0;
+  act(() => {
+    for (let guard = 0; guard < 400 && elapsed < budgetMs; guard += 1) {
+      const pending = queue;
+      queue = [];
+      if (pending.length === 0) return;
+      clock += step;
+      elapsed += step;
+      for (const callback of pending) callback(clock);
+    }
+  });
+}
+
+function stageOf(container: HTMLElement): string | null | undefined {
+  return container
+    .querySelector("[data-interactive-opening]")
+    ?.getAttribute("data-stage");
+}
+
+function hint(container: HTMLElement): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>("[data-hint]");
+}
+
+function tapHint(container: HTMLElement) {
+  const button = hint(container);
+  expect(button, "hint button").toBeTruthy();
+  act(() => button?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+}
+
 function cardTransform(container: HTMLElement): string {
   const card = container.querySelector<HTMLElement>("[data-opening-card]");
   return card?.style.transform ?? "";
 }
 
 describe("opening stage", () => {
-  it("shows the real invitation inside the envelope before it opens", () => {
+  it("renders the photographed reference envelope, not the procedural one", () => {
     const { container } = mount();
-    // The card is the saved first section, not an unrelated placeholder.
+
+    // The closed state is the supplied reference artwork…
+    expect(stageOf(container)).toBe("sealed");
+    const sealed = container.querySelector<HTMLImageElement>('[data-ref-layer="sealed"]');
+    expect(sealed?.getAttribute("src") ?? "").toMatch(/env-scene/);
+    expect(container.querySelector('[data-ref-layer="ground"]')).toBeTruthy();
+    expect(container.querySelector('[data-ref-layer="lid"]')).toBeTruthy();
+    expect(container.querySelector('[data-ref-layer="pocket"]')).toBeTruthy();
+
+    // …and the guest reaches the real wax seal.
+    expect(buttonByLabel(container, "Tap the seal to begin")).toBeTruthy();
+    expect(hint(container)?.textContent).toContain("Tap the seal to begin");
+
+    // The invitation waits inside the envelope, as the saved first section.
+    expect(container.querySelector("[data-opening-card]")).toBeTruthy();
     expect(container.textContent).toContain("Amelia & Søren");
-    expect(cardTransform(container)).toContain("scale(0.6)");
-    expect(cardTransform(container)).toContain("translate3d(0, 560px, 0)");
-    click(container, "Break the seal");
+
+    // The old procedural envelope (its folded pocket clip) never draws.
+    expect(container.innerHTML).not.toContain("polygon(0 100%, 0 23%, 50% 10%");
+
+    // Nothing autoplays before the guest takes part.
+    settle(300);
+    expect(stageOf(container)).toBe("sealed");
   });
 
-  it("emerges the card and completes exactly once", () => {
+  it("breaks the seal, opens the flap and hands over exactly once", () => {
     const { container, onDone } = mount();
-    click(container, "Break the seal");
 
-    frame(0);
-    // Still sealed at the very start of the run.
-    expect(cardTransform(container)).toContain("scale(0.6)");
+    // 1 — the wax seal cracks and falls away.
+    tapHint(container);
+    expect(stageOf(container)).toBe("breaking");
+    settle();
+    expect(stageOf(container)).toBe("unsealed");
+    expect(buttonByLabel(container, "Tap the seal to begin")).toBeNull();
 
-    frame(1200);
-    const midway = cardTransform(container);
-    const scale = Number(midway.match(/scale\(([\d.]+)\)/)?.[1]);
-    const offset = Number(midway.match(/translate3d\(0, (-?[\d.]+)px/)?.[1]);
-    expect(scale).toBeGreaterThan(0.6);
-    expect(scale).toBeLessThan(1);
-    expect(offset).toBeLessThan(560);
-    expect(offset).toBeGreaterThan(0);
+    // 2 — the flap swings open around its hinge.
+    tapHint(container);
+    expect(stageOf(container)).toBe("lifting");
+    settle();
+    expect(stageOf(container)).toBe("open");
 
-    frame(2400);
-    frame(2400);
-    expect(cardTransform(container)).toContain("scale(1)");
-    expect(cardTransform(container)).toContain("translate3d(0, 0px, 0)");
+    // 3 — the invitation card is drawn out of the pocket.
+    tapHint(container);
+    expect(stageOf(container)).toBe("drawing");
+    settle();
+    expect(stageOf(container)).toBe("presented");
+
+    // 4 — the last tap hands over to the journey, once and only once.
+    tapHint(container);
+    settle();
     expect(onDone).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Amelia & Søren");
   });
 
   it("hands over at once for guests who prefer reduced motion", () => {
     const { container, onDone } = mount(true);
     frame(0);
+    settle();
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Amelia & Søren");
-    expect(container.textContent).not.toContain("Break the seal");
   });
 
-  it("wears the saved material and emergence", () => {
+  it("wears the saved opening palette on the reference stage", () => {
     const { container } = mount(false, {
       tone: "ivory",
       palette: { accent: "#7b1027", paper: "#f4ecdd", hull: "#1b1a18" },
-      motion: { startScale: 0.7, rise: 420, cardStart: 0.3 },
     });
-    // The card waits where the host designed it, not at the preset's default.
-    expect(cardTransform(container)).toContain("scale(0.7)");
-    expect(cardTransform(container)).toContain("translate3d(0, 420px, 0)");
-    // The suite's own colour comes from the saved opening palette.
-    expect(container.innerHTML.toLowerCase()).toContain("244, 236, 221");
-    click(container, "Break the seal");
+    // The saved accent drives the stage behind the photographed envelope.
+    expect(container.innerHTML.toLowerCase()).toContain("123, 16, 39");
+    expect(stageOf(container)).toBe("sealed");
   });
 
-  it("holds one stage of the sequence still for the designer", () => {
-    const { container, onDone } = mount(
-      false,
-      { motion: { startScale: 0.7, rise: 420, cardStart: 0.3 } },
-      0.68,
-    );
-    const still = cardTransform(container);
-    const scale = Number(still.match(/scale\(([\d.]+)\)/)?.[1]);
-    const offset = Number(still.match(/translate3d\(0, (-?[\d.]+)px/)?.[1]);
-    expect(scale).toBeGreaterThan(0.7);
-    expect(scale).toBeLessThan(1);
-    expect(offset).toBeGreaterThan(0);
-    expect(offset).toBeLessThan(420);
+  it("holds one stage of the reference engine still for the designer", () => {
+    const { container, onDone } = mount(false, {}, 0.68);
+    // Pinned to the open state: flap open, card seated, no guest controls.
+    expect(stageOf(container)).toBe("open");
+    expect(hint(container)).toBeNull();
     // A still is never a guest state: it does not play or hand over.
     expect(onDone).not.toHaveBeenCalled();
-    expect(container.textContent).not.toContain("Break the seal");
+    settle(300);
+    expect(onDone).not.toHaveBeenCalled();
   });
 
-  it("completes even if animation frames stall", () => {
-    vi.useFakeTimers();
+  it("always offers the guest a way to the invitation", () => {
     const { container, onDone } = mount();
-    click(container, "Break the seal");
-    act(() => {
-      vi.advanceTimersByTime(6000);
-    });
+    click(container, "Skip the opening animation");
+    expect(onDone).toHaveBeenCalledTimes(1);
+    // A second press cannot complete the opening twice.
+    click(container, "Skip the opening animation");
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("plays a saved sequence and reveals the real invitation through it", () => {
+  it("plays a saved sequence on the automatic scenes and reveals the real invitation", () => {
     const { container, onDone } = mount(false, {
+      // Envelope suites run the reference engine; the automatic choreography
+      // is proven on another preset of the same stage.
+      experience: "arch",
+      motion: { startScale: 0.7, rise: 420, cardStart: 0.3 },
       sequence: [
         { id: "seal", role: "seal", delay: 0, duration: 400, easing: "easeOut" },
         { id: "cover", role: "cover", delay: -200, duration: 1200, easing: "easeInOut" },
@@ -231,19 +301,19 @@ describe("opening stage", () => {
         { id: "exit", role: "exit", delay: -400, duration: 800, easing: "easeIn" },
       ],
     });
-    click(container, "Break the seal");
+    click(container, "Step through the arch");
 
     frame(0);
-    // The saved artwork waits inside the envelope — the real page, not a stand-in.
-    expect(cardTransform(container)).toContain("scale(0.6)");
-    expect(cardTransform(container)).toContain("translate3d(0, 560px, 0)");
+    // The saved artwork waits inside the suite — the real page, not a stand-in.
+    expect(cardTransform(container)).toContain("scale(0.7)");
+    expect(cardTransform(container)).toContain("translate3d(0, 420px, 0)");
     expect(container.textContent).toContain("Amelia & Søren");
 
     // Half-way through the 2600 ms run the card is genuinely emerging.
     frame(1430);
     const midway = cardTransform(container);
     const scale = Number(midway.match(/scale\(([\d.]+)\)/)?.[1]);
-    expect(scale).toBeGreaterThan(0.6);
+    expect(scale).toBeGreaterThan(0.7);
     expect(scale).toBeLessThan(1);
 
     frame(2600);
@@ -252,20 +322,5 @@ describe("opening stage", () => {
     expect(cardTransform(container)).toContain("translate3d(0, 0px, 0)");
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Amelia & Søren");
-  });
-
-  it("hands over at once for reduced-motion guests, sequence or not", () => {
-    const { container, onDone } = mount(true, {
-      sequence: [
-        { id: "cover", role: "cover", delay: 0, duration: 1600, easing: "linear" },
-        { id: "card", role: "card", delay: -600, duration: 1800, easing: "linear" },
-      ],
-    });
-    frame(0);
-    expect(onDone).toHaveBeenCalledTimes(1);
-    // The invitation is simply present and settled — no waiting out the run.
-    expect(cardTransform(container)).toContain("scale(1)");
-    expect(container.textContent).toContain("Amelia & Søren");
-    expect(container.textContent).not.toContain("Break the seal");
   });
 });

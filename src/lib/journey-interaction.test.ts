@@ -124,7 +124,7 @@ describe("guest journey interaction", () => {
     expect(buttonByText(container, "Continue")).toBeUndefined();
   });
 
-  it("plays the opening, settles the first section, then offers the way on", () => {
+  it("hands the guest the reference opening, then settles the first section", () => {
     vi.useFakeTimers();
     const queue: FrameRequestCallback[] = [];
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -150,19 +150,24 @@ describe("guest journey interaction", () => {
       }),
     );
 
-    const open = buttonByLabel(container, "Break the seal");
+    // The envelope suite runs the reference engine even though this saved
+    // design carries no guest-driven settings: the guest taps the real seal.
+    const open = buttonByLabel(container, "Tap the seal to begin");
     expect(open).toBeTruthy();
     act(() => open?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(
+      container
+        .querySelector("[data-interactive-opening]")
+        ?.getAttribute("data-stage"),
+    ).toBe("breaking");
 
     // The invitation is inside the envelope before the guest opens it.
     expect(container.querySelector("[data-opening-card]")).toBeTruthy();
 
-    act(() => {
-      for (const callback of queue.splice(0)) callback(0);
-    });
-    act(() => {
-      for (const callback of queue.splice(0)) callback(2400);
-    });
+    // The guest can always reach the invitation: the stage offers the hand-off.
+    const skip = buttonByLabel(container, "Skip the opening animation");
+    expect(skip).toBeTruthy();
+    act(() => skip?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
     // The opening has handed over to the same section, now a live page.
     expect(container.querySelector("[data-opening-card]")).toBeNull();

@@ -1271,7 +1271,13 @@ export function OpeningStage({
   const preset = openingPresetOf(opening.experience) ?? "fade";
   // A guest-driven opening replaces the automatic scene entirely: it owns its
   // own interaction and never autoplays before the visitor takes part.
-  const interactive = opening.interactive?.enabled === true;
+  const guestDriven = opening.interactive?.enabled === true;
+  // The envelope and wax-seal openings are drawn from the supplied reference
+  // photograph by that same engine — the procedural envelope it replaced is
+  // never what the guest sees, whether or not the saved design still carries
+  // the guest-driven toggle.
+  const interactive =
+    guestDriven || preset === "envelope" || preset === "wax-seal";
   // A sequence decides its own running length; an invitation without one keeps
   // the saved duration it has always played to.
   const duration = openingDurationOf(opening);
@@ -1501,30 +1507,8 @@ export function OpeningStage({
 
   let scene: ReactNode;
   switch (preset) {
-    case "envelope":
-      scene = (
-        <EnvelopeScene
-          frame={frame}
-          palette={palette}
-          card={card}
-          guestName={guestName}
-          tone={tone}
-          stationery={opening.stationery}
-        />
-      );
-      break;
-    case "wax-seal":
-      scene = (
-        <EnvelopeScene
-          frame={frame}
-          palette={palette}
-          card={card}
-          guestName={guestName}
-          tone={tone}
-          stationery={opening.stationery}
-        />
-      );
-      break;
+    // `envelope` and `wax-seal` never reach this switch: they are handled by
+    // the reference engine above, before the automatic scene is built.
     case "arch":
       scene = <ArchScene frame={frame} palette={palette} card={card} />;
       break;

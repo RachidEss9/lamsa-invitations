@@ -275,7 +275,14 @@ export function OpeningDesigner({
   const interactiveEnabled = opening.interactive?.enabled === true;
   // The guest-driven opening has its own four steps to preview; the automatic
   // scene keeps the classic stage strip.
-  const stageStills = interactiveEnabled ? INTERACTIVE_STILLS : OPENING_STAGES;
+  // The envelope suites always render through the reference engine, so their
+  // preview strip offers that engine's four steps even when the saved design
+  // predates the guest-driven toggle.
+  const referenceEngine =
+    interactiveEnabled ||
+    opening.experience === "envelope" ||
+    opening.experience === "wax-seal";
+  const stageStills = referenceEngine ? INTERACTIVE_STILLS : OPENING_STAGES;
   const stillProgress =
     stillStage === null
       ? null
@@ -348,7 +355,7 @@ export function OpeningDesigner({
 
               <p className="mt-2 section-label">
                 {stillProgress === null
-                  ? interactiveEnabled
+                  ? referenceEngine
                     ? "Waiting for the guest"
                     : "Playing the full sequence"
                   : `Held at ${stageStills.find((stage) => stage.id === stillStage)?.label ?? ""}`}

@@ -82,7 +82,7 @@ describe("invitation journey rendering", () => {
     );
     // The opening stage renders its own tap affordance before any page, and
     // the invitation card inside it is the saved first section itself.
-    expect(html).toContain("Break the seal");
+    expect(html).toContain("Tap the seal to begin");
     expect(html).toContain("Amelia &amp; Søren");
     expect(html).toContain("data-opening-card");
     expect(html).not.toContain("Close the invitation");
