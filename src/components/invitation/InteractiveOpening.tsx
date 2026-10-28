@@ -21,6 +21,7 @@ import {
   type InteractiveOpeningSettings,
   type InteractiveStage,
 } from "@/lib/opening-interactive";
+import { OPENING_REFERENCE } from "@/lib/opening-artwork";
 import { cn } from "@/lib/utils";
 import {
   useCallback,
@@ -42,20 +43,33 @@ import {
  * then scaled to fit whatever stage hosts it, so the editor preview and the
  * published invitation share exact proportions on any phone.
  *
- * The sealed envelope hides the card completely: the flap covers the upper
- * band, the pocket wall covers the lower band, and they overlap, so there is
- * never a gap the invitation could leak through.
+ * Every box below is the reference artwork's own geometry, measured from the
+ * supplied layers and scaled by `OPENING_REFERENCE.scale` — the envelope keeps
+ * the landscape proportions of the reference instead of being stretched into
+ * a portrait box. The flap hinges on the envelope's top edge and points at
+ * `flapTip`, where the wax sits.
  */
+const S = OPENING_REFERENCE.scale;
+/** Reference rows → artboard pixels. */
+const refY = (rows: number) => rows * S;
+
 const SCENE = {
-  envelope: { x: 130, y: 520, w: 740, h: 800 },
-  flapH: 470,
-  /** Top of the pocket wall, in artboard units. */
-  wallTop: 940,
-  card: { x: 210, y: 540, w: 580, h: 772 },
+  /** The reference board: one scene wide, laid at the top of the artboard. */
+  board: { w: 1000, h: refY(513) },
+  /** Opaque pocket band (reference rows 116…513). */
+  interior: { top: refY(116), h: refY(397) },
+  /** Contact detail at the flap's tip (reference rows 307…513). */
+  wall: { top: refY(307), h: refY(206) },
+  /** The lid: the flap triangle, hinged on the envelope's top edge. */
+  lid: { top: refY(89), h: refY(360 - 89) },
+  /** The pocket front: everything below the flap's point. */
+  pocket: { top: refY(360) },
+  card: { x: 342, y: 350, w: 315, h: 560 },
   /** How far the card rises and how much it grows when presented. */
   cardRise: -260,
   cardGrow: 0.25,
-  seal: { cx: 500, cy: 990, r: 82 },
+  /** The pressed wax, at its place on the flap. */
+  seal: { cx: refY(367), cy: refY(316), r: Math.round(refY(104) / 2) },
   /** Screen pixels of drag that complete the flap lift / card pull. */
   flapDragPx: 130,
   cardDragPx: 170,
@@ -99,52 +113,11 @@ interface InteractiveOpeningProps {
 /* Artwork                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/**
- * The wax seal, drawn as an irregular pressed-wax blob rather than a circle.
- * It is built once and clipped twice along a jagged fracture, so breaking it
- * separates two real halves of the same seal instead of swapping a shape.
+/*
+ * The envelope, its flap, its tissue and its wax are the supplied reference
+ * layers (see `@/lib/opening-artwork`) rather than drawn shapes: the seal is
+ * the pressed wax itself, broken into its two real halves.
  */
-function sealArt(monogram: string, wax: string, ink: string, prefix: string) {
-  const blob =
-    "M0,-76 C16,-80 30,-70 44,-63 C58,-56 73,-46 75,-30 C77,-13 68,-2 66,14 " +
-    "C64,30 71,47 58,59 C46,70 29,66 14,72 C-2,78 -19,75 -33,67 C-47,59 -65,61 -73,47 " +
-    "C-81,33 -72,16 -74,0 C-76,-17 -85,-33 -75,-47 C-65,-61 -47,-58 -33,-66 " +
-    "C-19,-74 -14,-74 0,-76 Z";
-  const leftClip =
-    "M-92,-92 H-4 L1,-64 L-6,-34 L3,-4 L-5,28 L4,60 L-3,92 H-92 Z";
-  const rightClip = "M4,-92 H92 V92 H-3 L4,60 L-5,28 L3,-4 L-6,-34 L1,-64 Z";
-
-  const art = (
-    <>
-      <path d={blob} fill={`url(#${prefix}-wax-g)`} />
-      {/* Pressed ring: a dark groove with a light lip below it. */}
-      <circle r="53" fill="none" stroke={ink} strokeOpacity="0.35" strokeWidth="3.5" />
-      <circle r="50" fill="none" stroke="#ffffff" strokeOpacity="0.22" strokeWidth="2" />
-      <text
-        y="10"
-        textAnchor="middle"
-        fontFamily='"Cormorant Garamond", Georgia, serif'
-        fontWeight={600}
-        fontSize={monogram.length > 2 ? 34 : 44}
-        letterSpacing={monogram.length > 1 ? "0.04em" : undefined}
-        fill={ink}
-        fillOpacity="0.5"
-      >
-        {monogram}
-      </text>
-      <ellipse
-        cx="-24"
-        cy="-34"
-        rx="30"
-        ry="18"
-        fill={`url(#${prefix}-wax-hi)`}
-        transform="rotate(-24)"
-      />
-    </>
-  );
-
-  return { blob, leftClip, rightClip, art };
-}
 
 /* -------------------------------------------------------------------------- */
 /* Component                                                                  */
@@ -384,10 +357,7 @@ export function InteractiveOpening({
   const flapP = shown.flap;
   const cardP = shown.card;
 
-  const env = SCENE.envelope;
   const sealWax = stationery?.sealColor?.trim() || palette.accent;
-  const monogram = (stationery?.sealInitials ?? "").trim().slice(0, 3) || "✦";
-  const seal = sealArt(monogram, sealWax, palette.ink, uid);
   const paper = palette.background;
   const liningColour = stationery?.lining?.trim() || undefined;
 
@@ -446,6 +416,31 @@ export function InteractiveOpening({
           url={backdropLayer ? imageUrls[backdropLayer.storageId] : undefined}
           fallback={stageBackground ?? background}
         />
+        {/* The reference stage: the same photograph with the envelope removed,
+            continued below the board by the floor colour it ends in. */}
+        {!backdropLayer && (
+          <>
+            <img
+              src={OPENING_REFERENCE.images.ground}
+              alt=""
+              aria-hidden
+              className="pointer-events-none absolute left-0 top-0"
+              data-ref-layer="ground"
+              style={{ width: SCENE.board.w, height: SCENE.board.h }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-0"
+              data-ref-layer="floor"
+              style={{
+                top: SCENE.board.h,
+                width: SCENE.board.w,
+                height: DESIGN_HEIGHT - SCENE.board.h,
+                background: OPENING_REFERENCE.floor,
+              }}
+            />
+          </>
+        )}
         {/* Stage lighting: one light source, consistent for every layer. */}
         <div
           aria-hidden
@@ -461,104 +456,94 @@ export function InteractiveOpening({
           className="paper-grain pointer-events-none absolute inset-0 opacity-[0.07] mix-blend-multiply"
         />
 
-        {/* ---------------- the envelope itself ---------------- */}
+        {/* ------------- the reference envelope's pocket ------------------- */}
+        {/* Its contact shadow, cut from the shell mask. */}
         <div
-          className="absolute"
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-0"
+          data-ref-layer="shell-shadow"
           style={{
-            left: env.x,
-            top: env.y,
-            width: env.w,
-            height: env.h,
-            perspective: 1700,
+            left: 0,
+            top: 0,
+            width: SCENE.board.w,
+            height: SCENE.board.h,
+            background: "rgba(0,0,0,0.5)",
+            opacity: 0.2,
             transform: `translateY(${cardP * 60}px)`,
-            filter: "drop-shadow(0 46px 70px rgba(0,0,0,0.42))",
+            maskImage: `url(${OPENING_REFERENCE.images.mask})`,
+            WebkitMaskImage: `url(${OPENING_REFERENCE.images.mask})`,
+            maskSize: "100% 100%",
+            WebkitMaskSize: "100% 100%",
+          }}
+        />
+        {/* The opaque pocket band, with the flap lifted out of it. */}
+        <div
+          aria-hidden
+          className="absolute overflow-hidden"
+          data-ref-layer="interior"
+          style={{
+            left: 0,
+            top: SCENE.interior.top,
+            width: SCENE.board.w,
+            height: SCENE.interior.h,
+            transform: `translateY(${cardP * 60}px)`,
           }}
         >
-          {/* Interior and pocket back */}
-          <svg
-            viewBox={`0 0 ${env.w} ${env.h}`}
-            className="absolute inset-0 h-full w-full"
-            aria-hidden
-          >
-            <defs>
-              <linearGradient id={`${uid}-paper`} x1="0" y1="0" x2="0.3" y2="1">
-                <stop offset="0" stopColor={paper} />
-                <stop offset="0.55" stopColor={paper} />
-                <stop offset="1" stopColor={paper} stopOpacity="0.86" />
-              </linearGradient>
-              <linearGradient id={`${uid}-well`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="rgba(0,0,0,0.5)" />
-                <stop offset="0.34" stopColor="rgba(0,0,0,0.12)" />
-                <stop offset="1" stopColor="rgba(0,0,0,0.26)" />
-              </linearGradient>
-              <pattern
-                id={`${uid}-liner`}
-                width="46"
-                height="46"
-                patternUnits="userSpaceOnUse"
-                patternTransform="rotate(45)"
-              >
-                <rect width="46" height="46" fill={liningColour ?? paper} />
-                <circle cx="23" cy="23" r="7" fill="rgba(255,255,255,0.35)" />
-                <circle cx="0" cy="0" r="3" fill="rgba(0,0,0,0.12)" />
-                <circle cx="46" cy="46" r="3" fill="rgba(0,0,0,0.12)" />
-              </pattern>
-              <filter id={`${uid}-grain`}>
-                <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch" />
-                <feColorMatrix type="saturate" values="0" />
-              </filter>
-            </defs>
-            {/* Outer shell */}
-            <rect width={env.w} height={env.h} rx="10" fill={`url(#${uid}-paper)`} />
-            {/* Printed liner inside the pocket */}
-            <rect
-              x="14"
-              y="14"
-              width={env.w - 28}
-              height={env.h - 28}
-              rx="7"
-              fill={`url(#${uid}-liner)`}
-              opacity={liningColour ? 0.9 : 0.5}
-            />
-            {/* The pocket sits in shadow beneath the flap */}
-            <rect
-              x="14"
-              y="14"
-              width={env.w - 28}
-              height={env.h - 28}
-              rx="7"
-              fill={`url(#${uid}-well)`}
-            />
-            <rect
-              width={env.w}
-              height={env.h}
-              rx="10"
-              filter={`url(#${uid}-grain)`}
-              opacity="0.1"
-              style={{ mixBlendMode: "multiply" }}
-            />
-            <rect
-              x="0.5"
-              y="0.5"
-              width={env.w - 1}
-              height={env.h - 1}
-              rx="10"
-              fill="none"
-              stroke="rgba(0,0,0,0.22)"
-            />
-          </svg>
-
-          {bodyLayer && (
-            <LayerImage
-              className="absolute inset-0 h-full w-full rounded-[10px] object-cover"
-              url={bodyLayer.storageId ? imageUrls[bodyLayer.storageId] : undefined}
-              alt=""
-            />
-          )}
+          <img
+            src={OPENING_REFERENCE.images.interior}
+            alt=""
+            className="absolute left-0"
+            style={{
+              top: -SCENE.interior.top,
+              width: SCENE.board.w,
+              height: SCENE.board.h,
+            }}
+          />
         </div>
+
+        </div>
+
+        {/* The envelope outside the flap — its shoulders and its pocket —
+            so opening the flap shows the real paper underneath. */}
+        {["left", "right"].map((side) => (
+          <div
+            key={side}
+            aria-hidden
+            className="absolute left-0 top-0"
+            data-ref-layer={`shell-${side}`}
+            style={{
+              width: SCENE.board.w,
+              height: SCENE.board.h,
+              transform: `translateY(${cardP * 60}px)`,
+              clipPath:
+                side === "left"
+                  ? `polygon(0 ${SCENE.lid.top}px, 50% ${SCENE.pocket.top}px, 50% ${SCENE.board.h}px, 0 ${SCENE.board.h}px)`
+                  : `polygon(100% ${SCENE.lid.top}px, 100% ${SCENE.board.h}px, 50% ${SCENE.board.h}px, 50% ${SCENE.pocket.top}px)`,
+            }}
+          >
+            <img
+              src={OPENING_REFERENCE.images.body}
+              alt=""
+              className="absolute left-0"
+              style={{ top: 0, width: SCENE.board.w, height: SCENE.board.h }}
+            />
+            {bodyLayer && (
+              <LayerImage
+                className="absolute left-0"
+                style={{ top: 0, width: SCENE.board.w, height: SCENE.board.h }}
+                url={bodyLayer.storageId ? imageUrls[bodyLayer.storageId] : undefined}
+                alt=""
+              />
+            )}
+          </div>
+        ))}
 
         {/* ---------------- the real invitation ---------------- */}
         {variant === "full" && page && (
+          <div
+            className="absolute overflow-hidden"
+            style={{ left: 0, top: 0, width: SCENE.board.w, height: SCENE.board.h }}
+          >
           <div
             data-opening-card
             className="absolute overflow-hidden"
@@ -588,6 +573,39 @@ export function InteractiveOpening({
             >
               {cardContent}
             </div>
+            {/*
+              The reference card the invitation is printed on. It faces the
+              guest while the card is being pulled, then gives way to the real
+              invitation underneath the moment the pull is complete.
+            */}
+            <div
+              aria-hidden
+              data-card-cover
+              className="absolute inset-0"
+              style={{
+                opacity: cardP >= 0.999 ? 0 : 1,
+                transition: "opacity 420ms ease",
+                pointerEvents: "none",
+              }}
+            >
+              <img
+                src={OPENING_REFERENCE.images.revealFrame}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <img
+                src={OPENING_REFERENCE.images.revealCard}
+                alt=""
+                className="absolute"
+                style={{
+                  left: `${OPENING_REFERENCE.reveal.card.x * 100}%`,
+                  top: `${OPENING_REFERENCE.reveal.card.y * 100}%`,
+                  width: `${OPENING_REFERENCE.reveal.card.w * 100}%`,
+                  height: `${OPENING_REFERENCE.reveal.card.h * 100}%`,
+                  objectFit: "cover",
+                }}
+              />
+            </div>
             {!pinned && (
               <button
                 type="button"
@@ -609,78 +627,53 @@ export function InteractiveOpening({
                 style={{ touchAction: "none" }}
               />
             )}
+            </div>
           </div>
         )}
 
-        {/* ---------------- pocket wall (in front of the card) ------------- */}
+        {/* ------------- the pocket front, standing before the card -------- */}
         <div
           aria-hidden
-          className="absolute"
+          className="absolute overflow-hidden"
+          data-ref-layer="pocket"
           style={{
-            left: env.x,
-            top: SCENE.wallTop,
-            width: env.w,
-            height: env.y + env.h - SCENE.wallTop,
+            left: 0,
+            top: SCENE.pocket.top,
+            width: SCENE.board.w,
+            height: SCENE.board.h - SCENE.pocket.top,
             transform: `translateY(${cardP * 60}px)`,
             pointerEvents: "none",
+            filter: "drop-shadow(0 46px 70px rgba(0,0,0,0.42))",
           }}
         >
-          <svg
-            viewBox={`0 0 ${env.w} ${env.h + env.y - SCENE.wallTop}`}
-            className="h-full w-full"
-          >
-            <defs>
-              <linearGradient id={`${uid}-wall`} x1="0" y1="0" x2="0.2" y2="1">
-                <stop offset="0" stopColor={paper} />
-                <stop offset="1" stopColor="rgba(0,0,0,0.06)" stopOpacity="0.5" />
-              </linearGradient>
-              <linearGradient id={`${uid}-wallshade`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="rgba(0,0,0,0.3)" />
-                <stop offset="0.18" stopColor="rgba(0,0,0,0)" />
-              </linearGradient>
-              <filter id={`${uid}-grain2`}>
-                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch" />
-                <feColorMatrix type="saturate" values="0" />
-              </filter>
-            </defs>
-            <rect width={env.w} height={env.h + env.y - SCENE.wallTop} rx="10" fill={paper} />
-            <rect width={env.w} height={env.h + env.y - SCENE.wallTop} rx="10" fill={`url(#${uid}-wall)`} />
-            <rect
-              width={env.w}
-              height="120"
-              fill={`url(#${uid}-wallshade)`}
+          <img
+            src={OPENING_REFERENCE.images.body}
+            alt=""
+            className="absolute left-0"
+            style={{ top: -SCENE.pocket.top, width: SCENE.board.w, height: SCENE.board.h }}
+          />
+          {/* The host's own envelope artwork, when one is assigned. */}
+          {bodyLayer && (
+            <LayerImage
+              className="absolute left-0"
+              style={{ top: -SCENE.pocket.top, width: SCENE.board.w, height: SCENE.board.h }}
+              url={bodyLayer.storageId ? imageUrls[bodyLayer.storageId] : undefined}
+              alt=""
             />
-            <rect
-              width={env.w}
-              height={env.h + env.y - SCENE.wallTop}
-              rx="10"
-              filter={`url(#${uid}-grain2)`}
-              opacity="0.1"
-              style={{ mixBlendMode: "multiply" }}
-            />
-            {/* Fold seams converging on the centre, as on a real pocket. */}
-            <path
-              d={`M0,${env.h + env.y - SCENE.wallTop} L${env.w / 2},96`}
-              stroke="rgba(0,0,0,0.14)"
-              fill="none"
-            />
-            <path
-              d={`M${env.w},${env.h + env.y - SCENE.wallTop} L${env.w / 2},96`}
-              stroke="rgba(0,0,0,0.14)"
-              fill="none"
-            />
-            <path d={`M0,2 L${env.w},2`} stroke="rgba(255,255,255,0.5)" fill="none" />
-          </svg>
+          )}
         </div>
 
-        {/* ---------------- flap, hinged along the envelope's top edge ------ */}
+        {/* ------------- the flap, hinged on the envelope's top edge ------- */}
         <div
-          className="absolute"
+          data-ref-layer="lid"
+          className="absolute overflow-hidden"
           style={{
-            left: env.x,
-            top: env.y,
-            width: env.w,
-            height: SCENE.flapH,
+            left: 0,
+            top: SCENE.lid.top,
+            width: SCENE.board.w,
+            height: SCENE.lid.h,
+            /* The flap triangle, straight from the reference silhouette. */
+            clipPath: "polygon(0 0, 100% 0, 50% 100%)",
             perspective: 1700,
             transform: `translateY(${cardP * 60}px)`,
             pointerEvents: !pinned && stage === "unsealed" && !interactiveBusy(state.stage) ? "auto" : "none",
@@ -711,98 +704,87 @@ export function InteractiveOpening({
               cursor: canGesture("flap", stage) ? "grab" : "default",
             }}
           >
-            {/* Front of the flap: paper */}
+            {/* Front of the flap: the reference envelope, cut to the flap. */}
             <span
               aria-hidden
-              className="absolute inset-0"
+              className="absolute inset-0 overflow-hidden"
               style={{ backfaceVisibility: "hidden" }}
             >
-              <svg viewBox={`0 0 ${env.w} ${SCENE.flapH}`} className="h-full w-full">
-                <defs>
-                  <linearGradient id={`${uid}-flap`} x1="0" y1="0" x2="0.25" y2="1">
-                    <stop offset="0" stopColor={paper} />
-                    <stop offset="1" stopColor="rgba(0,0,0,0.1)" stopOpacity="0.75" />
-                  </linearGradient>
-                  <filter id={`${uid}-grain3`}>
-                    <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch" />
-                    <feColorMatrix type="saturate" values="0" />
-                  </filter>
-                </defs>
-                <path
-                  d={`M0,0 H${env.w} L${env.w / 2 + 4},${SCENE.flapH - 14} Q${env.w / 2},${SCENE.flapH} ${env.w / 2 - 4},${SCENE.flapH - 14} Z`}
-                  fill={paper}
-                />
-                <path
-                  d={`M0,0 H${env.w} L${env.w / 2 + 4},${SCENE.flapH - 14} Q${env.w / 2},${SCENE.flapH} ${env.w / 2 - 4},${SCENE.flapH - 14} Z`}
-                  fill={`url(#${uid}-flap)`}
-                />
-                <path
-                  d={`M0,0 H${env.w} L${env.w / 2 + 4},${SCENE.flapH - 14} Q${env.w / 2},${SCENE.flapH} ${env.w / 2 - 4},${SCENE.flapH - 14} Z`}
-                  filter={`url(#${uid}-grain3)`}
-                  opacity="0.1"
-                  style={{ mixBlendMode: "multiply" }}
-                />
-                {/* The crease the flap folds on */}
-                <path d="M0,6 H1000" transform="scale(0.74,1)" stroke="rgba(0,0,0,0.18)" fill="none" />
-              </svg>
-            </span>
-
-            {/* Back of the flap: the liner the guest uncovers */}
-            <span
-              aria-hidden
-              className="absolute inset-0"
-              style={{ transform: "rotateX(180deg)", backfaceVisibility: "hidden" }}
-            >
-              <svg viewBox={`0 0 ${env.w} ${SCENE.flapH}`} className="h-full w-full">
-                <defs>
-                  <pattern
-                    id={`${uid}-liner2`}
-                    width="46"
-                    height="46"
-                    patternUnits="userSpaceOnUse"
-                    patternTransform="rotate(45)"
-                  >
-                    <rect width="46" height="46" fill={liningColour ?? paper} />
-                    <circle cx="23" cy="23" r="7" fill="rgba(255,255,255,0.35)" />
-                    <circle cx="0" cy="0" r="3" fill="rgba(0,0,0,0.12)" />
-                    <circle cx="46" cy="46" r="3" fill="rgba(0,0,0,0.12)" />
-                  </pattern>
-                </defs>
-                <path
-                  d={`M0,0 H${env.w} L${env.w / 2 + 4},${SCENE.flapH - 14} Q${env.w / 2},${SCENE.flapH} ${env.w / 2 - 4},${SCENE.flapH - 14} Z`}
-                  fill={`url(#${uid}-liner2)`}
-                  opacity={liningColour ? 0.95 : 0.7}
-                />
-                <path
-                  d={`M14,14 H${env.w - 14} L${env.w / 2 + 4},${SCENE.flapH - 24} Q${env.w / 2},${SCENE.flapH - 12} ${env.w / 2 - 4},${SCENE.flapH - 24} Z`}
-                  fill="none"
-                  stroke={palette.accent}
-                  strokeOpacity="0.5"
-                  strokeWidth="2"
-                />
-              </svg>
-              {/* The host's own liner artwork, when one is assigned. */}
-              {linerLayer && (
+              <img
+                src={OPENING_REFERENCE.images.body}
+                alt=""
+                className="absolute left-0"
+                style={{ top: -SCENE.lid.top, width: SCENE.board.w, height: SCENE.board.h }}
+              />
+              <img
+                src={OPENING_REFERENCE.images.flap}
+                alt=""
+                className="absolute left-0"
+                style={{ top: -SCENE.lid.top, width: SCENE.board.w, height: refY(124) }}
+              />
+              <img
+                src={OPENING_REFERENCE.images.wall}
+                alt=""
+                className="absolute left-0"
+                style={{
+                  top: SCENE.wall.top - SCENE.lid.top,
+                  width: SCENE.board.w,
+                  height: SCENE.wall.h,
+                }}
+              />
+              {flapLayer && (
                 <LayerImage
-                  className="absolute inset-0 h-full w-full object-cover"
-                  url={linerLayer.storageId ? imageUrls[linerLayer.storageId] : undefined}
+                  className="absolute left-0"
+                  style={{ top: -SCENE.lid.top, width: SCENE.board.w, height: SCENE.board.h }}
+                  url={flapLayer.storageId ? imageUrls[flapLayer.storageId] : undefined}
                   alt=""
                 />
               )}
             </span>
 
-            {flapLayer && (
-              <LayerImage
-                className="absolute inset-0 h-full w-full object-cover"
-                style={{
-                  clipPath: `polygon(0 0, 100% 0, ${env.w / 2 + 4}px ${SCENE.flapH - 14}px, 50% 100%, ${env.w / 2 - 4}px ${SCENE.flapH - 14}px)`,
-                }}
-                url={flapLayer.storageId ? imageUrls[flapLayer.storageId] : undefined}
+            {/* Back of the flap: the tissue the guest uncovers. */}
+            <span
+              aria-hidden
+              className="absolute inset-0 overflow-hidden"
+              style={{
+                transform: "rotateX(180deg)",
+                backfaceVisibility: "hidden",
+                background: liningColour ?? paper,
+              }}
+            >
+              <img
+                src={OPENING_REFERENCE.images.liner}
                 alt=""
+                className="absolute left-0"
+                style={{ top: -SCENE.lid.top, width: SCENE.board.w, height: refY(122) }}
               />
-            )}
+              {/* The host's own liner artwork, when one is assigned. */}
+              {linerLayer && (
+                <LayerImage
+                  className="absolute left-0"
+                  style={{ top: -SCENE.lid.top, width: SCENE.board.w, height: SCENE.board.h }}
+                  url={linerLayer.storageId ? imageUrls[linerLayer.storageId] : undefined}
+                  alt=""
+                />
+              )}
+            </span>
           </button>
         </div>
+
+        {/* ------------- the sealed envelope: the whole reference ---------- */}
+        <img
+          src={OPENING_REFERENCE.images.scene}
+          alt=""
+          aria-hidden
+          data-ref-layer="sealed"
+          className="pointer-events-none absolute left-0 top-0"
+          style={{
+            width: SCENE.board.w,
+            height: SCENE.board.h,
+            /* It lifts away with the flap, leaving the real layers beneath. */
+            opacity: 1 - flapP,
+          }}
+        />
 
         {/* ---------------- wax seal ---------------- */}
         {!pinned && (stage === "sealed" || stage === "breaking") && (
@@ -813,70 +795,84 @@ export function InteractiveOpening({
             disabled={interactiveBusy(state.stage)}
             className="absolute grid place-items-center rounded-full border-0 bg-transparent p-0"
             style={{
-              left: SCENE.seal.cx - 96,
-              top: SCENE.seal.cy - 96,
-              width: 192,
-              height: 192,
+              left: SCENE.seal.cx - SCENE.seal.r,
+              top: SCENE.seal.cy - SCENE.seal.r,
+              width: SCENE.seal.r * 2,
+              height: SCENE.seal.r * 2,
               cursor: "pointer",
               touchAction: "manipulation",
               filter: `drop-shadow(0 10px 16px rgba(0,0,0,${0.4 - sealP * 0.3}))`,
             }}
           >
-            <svg viewBox="-96 -96 192 192" className="h-full w-full overflow-visible">
+            <svg
+              viewBox={`${-SCENE.seal.r} ${-SCENE.seal.r} ${SCENE.seal.r * 2} ${SCENE.seal.r * 2}`}
+              className="h-full w-full overflow-visible"
+            >
               <defs>
-                <radialGradient id={`${uid}-wax-g`} cx="0.36" cy="0.3" r="0.85">
-                  <stop offset="0" stopColor="rgba(255,255,255,0.5)" />
-                  <stop offset="0.35" stopColor={sealWax} />
-                  <stop offset="1" stopColor="rgba(0,0,0,0.55)" />
-                </radialGradient>
-                <radialGradient id={`${uid}-wax-hi`}>
-                  <stop offset="0" stopColor="rgba(255,255,255,0.55)" />
-                  <stop offset="1" stopColor="rgba(255,255,255,0)" />
-                </radialGradient>
+                {/* An uploaded seal is broken down the middle. */}
                 <clipPath id={`${uid}-left`}>
-                  <path d={seal.leftClip} />
+                  <rect
+                    x={-SCENE.seal.r}
+                    y={-SCENE.seal.r}
+                    width={SCENE.seal.r}
+                    height={SCENE.seal.r * 2}
+                  />
                 </clipPath>
                 <clipPath id={`${uid}-right`}>
-                  <path d={seal.rightClip} />
+                  <rect x={0} y={-SCENE.seal.r} width={SCENE.seal.r} height={SCENE.seal.r * 2} />
                 </clipPath>
               </defs>
               <g
-                clipPath={`url(#${uid}-left)`}
                 style={{
-                  transform: `translate(${-sealP * 104}px, ${sealP * 64}px) rotate(${-sealP * 42}deg)`,
+                  transform: `translate(${-sealP * SCENE.seal.r}px, ${sealP * 47}px) rotate(${-sealP * 42}deg)`,
                   transformOrigin: "0px 0px",
                   opacity: 1 - clamp01((sealP - 0.62) / 0.38),
                 }}
               >
-                {seal.art}
-                {sealUrl && (
+                {sealUrl ? (
                   <image
                     href={sealUrl}
-                    x={-96}
-                    y={-96}
-                    width={192}
-                    height={192}
+                    x={-SCENE.seal.r}
+                    y={-SCENE.seal.r}
+                    width={SCENE.seal.r * 2}
+                    height={SCENE.seal.r * 2}
                     preserveAspectRatio="xMidYMid meet"
+                    clipPath={`url(#${uid}-left)`}
+                  />
+                ) : (
+                  <image
+                    href={OPENING_REFERENCE.images.sealLeft}
+                    x={-SCENE.seal.r}
+                    y={-SCENE.seal.r}
+                    width={SCENE.seal.r * 2}
+                    height={SCENE.seal.r * 2}
                   />
                 )}
               </g>
               <g
-                clipPath={`url(#${uid}-right)`}
                 style={{
-                  transform: `translate(${sealP * 104}px, ${sealP * 58}px) rotate(${sealP * 38}deg)`,
+                  transform: `translate(${sealP * SCENE.seal.r}px, ${sealP * 43}px) rotate(${sealP * 38}deg)`,
                   transformOrigin: "0px 0px",
                   opacity: 1 - clamp01((sealP - 0.62) / 0.38),
                 }}
               >
-                {seal.art}
-                {sealUrl && (
+                {sealUrl ? (
                   <image
                     href={sealUrl}
-                    x={-96}
-                    y={-96}
-                    width={192}
-                    height={192}
+                    x={-SCENE.seal.r}
+                    y={-SCENE.seal.r}
+                    width={SCENE.seal.r * 2}
+                    height={SCENE.seal.r * 2}
                     preserveAspectRatio="xMidYMid meet"
+                    clipPath={`url(#${uid}-right)`}
+                  />
+                ) : (
+                  <image
+                    href={OPENING_REFERENCE.images.sealRight}
+                    x={-SCENE.seal.r}
+                    y={-SCENE.seal.r}
+                    width={SCENE.seal.r * 2}
+                    height={SCENE.seal.r * 2}
                   />
                 )}
               </g>
