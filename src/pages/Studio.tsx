@@ -17,6 +17,7 @@ import {
 import { FrameThumb } from "@/components/invitation/FrameArt";
 import { OpeningDesigner } from "@/components/studio/OpeningDesigner";
 import { PrintExportDialog } from "@/components/studio/PrintExportDialog";
+import { MockupStudio } from "@/components/studio/MockupStudio";
 import { ShareStyleDialog } from "@/components/studio/ShareStyleDialog";
 import { SuiteBar } from "@/components/studio/SuiteBar";
 import { StudioCanvas, type CanvasContextAction } from "@/components/studio/StudioCanvas";
@@ -177,6 +178,7 @@ import {
   PanelLeft,
   PanelRight,
   Play,
+  Presentation,
   Plus,
   Redo2,
   Ruler,
@@ -464,6 +466,9 @@ export default function Studio() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareStyleOpen, setShareStyleOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  const [mockupOpen, setMockupOpen] = useState(false);
+  // Mockup arrangements live in this device's storage, keyed per invitation.
+  const mockupDesignKey = invitation?._id ?? `draft:${invitationId || "new"}`;
   const [publishing, setPublishing] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(0);
   const [showOpeningPreview, setShowOpeningPreview] = useState(false);
@@ -3525,6 +3530,17 @@ export default function Studio() {
           <Button
             type="button"
             variant="outline"
+            onClick={() => setMockupOpen(true)}
+            className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
+            aria-label="Open the mockup studio"
+            title="Mockup studio — present your pieces as product photography"
+          >
+            <Presentation className="size-3.5" />
+            <span className="hidden sm:inline">Mockup</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => setPrintOpen(true)}
             className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
             aria-label="Export a print-ready PDF"
@@ -4263,6 +4279,16 @@ export default function Studio() {
         onOpenChange={setPrintOpen}
         design={design}
         pageIndex={pageIndex}
+        imageUrls={imageUrls}
+        title={content.title}
+        rtl={Boolean(content.rtl)}
+      />
+
+      <MockupStudio
+        open={mockupOpen}
+        onOpenChange={setMockupOpen}
+        design={design}
+        designKey={mockupDesignKey}
         imageUrls={imageUrls}
         title={content.title}
         rtl={Boolean(content.rtl)}
