@@ -510,6 +510,9 @@ function ElementVisual({
     const curved = curveIsActive(element.curve);
     return (
       <div
+        // The studio measures this node to detect text clipping; the attribute
+        // is inert everywhere else (previews, exports, guest pages).
+        data-lamsa-text={curved ? undefined : element.id}
         className={cn(
           "flex h-full w-full",
           // A curve rises past its box, so it escapes the edge the way a

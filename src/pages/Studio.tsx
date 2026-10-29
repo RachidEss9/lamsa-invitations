@@ -83,7 +83,7 @@ import {
 } from "@/lib/invitation";
 import { FRAMES, frameBounds, frameLayerIndex, type FrameSpec } from "@/lib/frames";
 import { pageLayoutById } from "@/lib/layouts";
-import { ensureFont, fontById } from "@/lib/fonts";
+import { containsArabic, ensureFontForText, fontById } from "@/lib/fonts";
 import {
   PALETTES,
   readSavedPalettes,
@@ -144,6 +144,7 @@ import {
   distributePositions,
   type AlignKind,
 } from "@/lib/arrange";
+import type { TextOverflow } from "@/lib/text-fit";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -409,6 +410,15 @@ export default function Studio() {
       return map;
     });
   }, []);
+  /* Text layers whose words have outgrown their box, measured on the canvas.
+     The warning and its fixes are editor-only: nothing here reaches the card. */
+  const [textOverflow, setTextOverflow] = useState<Record<string, TextOverflow>>(
+    {},
+  );
+  const handleTextOverflow = useCallback(
+    (issues: Record<string, TextOverflow>) => setTextOverflow(issues),
+    [],
+  );
   const [aspectLocked, setAspectLocked] = useState(false);
   /**
    * Material Preview draws the studio's paper, foil and relief simulations;
@@ -2145,7 +2155,12 @@ export default function Studio() {
     }
     patchElement(element.id, { font: fontId });
     const font = fontById(fontId);
-    const loaded = await ensureFont(fontId, element.fontWeight ?? 400, Boolean(element.italic));
+    const loaded = await ensureFontForText(
+      element.text,
+      fontId,
+      element.fontWeight ?? 400,
+      Boolean(element.italic),
+    );
     if (loaded) {
       toast.success(`${font.name} applied to "${element.name}".`);
     } else {
@@ -3637,6 +3652,7 @@ export default function Studio() {
                 showGuides={overlays.guides}
                 userGuides={guidesByPage[page.id] ?? NO_GUIDES}
                 onUserGuidesChange={(next) => updatePageGuides(page.id, next)}
+                onTextOverflow={handleTextOverflow}
                 materialPreview={materialPreview}
                 envelope={envelopeGuide}
                 resetViewToken={resetViewToken}
@@ -3673,6 +3689,20 @@ export default function Studio() {
                 onAltDuplicate={duplicateForDrag}
                 onTextCommit={(elementId, text) => {
                   patchElement(elementId, { text });
+                  const edited = page?.elements.find(
+                    (candidate) => candidate.id === elementId,
+                  );
+                  // Arabic typed into a Latin face needs the Naskh fallback
+                  // actually loaded — otherwise the browser draws it from its
+                  // last-resort font instead of the promised shape.
+                  if (edited && containsArabic(text)) {
+                    void ensureFontForText(
+                      text,
+                      edited.font,
+                      edited.fontWeight ?? 400,
+                      Boolean(edited.italic),
+                    );
+                  }
                   toast.success("Text updated.");
                 }}
                 onContextAction={handleCanvasContextAction}
@@ -4005,6 +4035,7 @@ export default function Studio() {
             onPatch={patchElement}
             onPagePatch={patchPage}
             unit={unit}
+            textOverflow={textOverflow}
             onAlign={alignSelection}
             onDistribute={distributeSelection}
             onLayer={orderSelection}
@@ -4106,6 +4137,7 @@ export default function Studio() {
                   onPatch={patchElement}
                   onPagePatch={patchPage}
                   unit={unit}
+                  textOverflow={textOverflow}
                   onAlign={alignSelection}
                   onDistribute={distributeSelection}
                   onLayer={orderSelection}

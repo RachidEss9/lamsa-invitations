@@ -20,6 +20,7 @@ import { DesignPageView } from "@/components/invitation/DesignPageView";
 import { EnvelopeGuides } from "@/components/studio/EnvelopeGuides";
 import { geometryForPage, type EnvelopeGeometry } from "@/lib/envelope";
 import { equalSpacingGuides, type SpacingSegments } from "@/lib/smart-guides";
+import { textOverflows, type TextOverflow } from "@/lib/text-fit";
 import { effectFilter, gradientCss, outlineWidth } from "@/lib/effects";
 import { fontFamilyFor } from "@/lib/fonts";
 import { cleanEditedText, shouldCommitText } from "@/lib/studio-edit";
@@ -97,6 +98,11 @@ interface StudioCanvasProps {
   onContextAction?: (action: CanvasContextAction) => void;
   /** Reports inline text editing so the studio can protect the layer. */
   onEditingChange?: (editing: boolean) => void;
+  /**
+   * Reports text layers whose words have outgrown their box, with the measured
+   * shortfall. Editor only — nothing here is drawn on the card.
+   */
+  onTextOverflow?: (issues: Record<string, TextOverflow>) => void;
 }
 
 const SNAP_THRESHOLD = 7;
@@ -355,6 +361,7 @@ export function StudioCanvas({
   onContextAction,
   onTextCommit,
   onEditingChange,
+  onTextOverflow,
 }: StudioCanvasProps) {
   const schedule = useFrameBatch();
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -462,9 +469,37 @@ export function StudioCanvas({
       setMenu(null);
       editFinished.current = false;
       setEditing({ id: element.id, original: element.text ?? "", caret: null });
+
+      /* Bring the layer into view before the caret lands. On a phone the
+         keyboard takes the lower half of the screen, and a layer that was
+         panned or zoomed out of sight would be edited blind. Fitting the page
+         guarantees the whole card — and the layer on it — is visible. The
+         geometry is read from the live DOM, so it cannot be stale. */
+      const host = hostRef.current;
+      const design = designRef.current;
+      if (host && design) {
+        const hostRect = host.getBoundingClientRect();
+        const designRect = design.getBoundingClientRect();
+        const designWidth = parseFloat(design.style.width) || 1;
+        const scale = designRect.width / designWidth;
+        const pad = 48;
+        const left = designRect.left - hostRect.left + element.x * scale;
+        const top = designRect.top - hostRect.top + element.y * scale;
+        const right = left + element.w * scale;
+        const bottom = top + element.h * scale;
+        const visible =
+          left >= pad &&
+          top >= pad &&
+          right <= hostRect.width - pad &&
+          bottom <= hostRect.height - pad;
+        if (!visible) {
+          setPan({ x: 0, y: 0 });
+          onZoom(1);
+        }
+      }
     });
     return () => cancelAnimationFrame(frame);
-  }, [editRequest, page.elements]);
+  }, [editRequest, page.elements, onZoom]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setPan({ x: 0, y: 0 }));
@@ -904,6 +939,76 @@ export function StudioCanvas({
       window.removeEventListener("pointercancel", end);
     };
   }, [panning]);
+
+  /* ------------------------------------------------------- text overflow */
+
+  const [textOverflow, setTextOverflow] = useState<Record<string, TextOverflow>>({});
+  const reportedOverflow = useRef("");
+
+  /**
+   * Measures every straight text layer against its own box, using the real
+   * rendering: same family, size, leading, tracking, case and padding. A layer
+   * that outgrows its box is clipped on the card with nothing on screen to say
+   * so, so the canvas reports the shortfall and the panel offers the fixes.
+   * Curved text is skipped — an arc deliberately rises past its box.
+   */
+  useEffect(() => {
+    const root = designRef.current;
+    if (!root) return;
+    let cancelled = false;
+
+    const measure = () => {
+      if (cancelled) return;
+      const issues: Record<string, TextOverflow> = {};
+      root
+        .querySelectorAll<HTMLElement>("[data-lamsa-text]")
+        .forEach((node) => {
+          const id = node.dataset.lamsaText;
+          if (!id || id === editing?.id) return;
+          const inner = node.firstElementChild as HTMLElement | null;
+          // Curved text renders an SVG that deliberately escapes its box.
+          if (!inner || inner instanceof SVGElement) return;
+          const style = getComputedStyle(node);
+          const padX =
+            (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+          const padY =
+            (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+          const chromeW =
+            padX +
+            (parseFloat(style.borderLeftWidth) || 0) +
+            (parseFloat(style.borderRightWidth) || 0);
+          const chromeH =
+            padY +
+            (parseFloat(style.borderTopWidth) || 0) +
+            (parseFloat(style.borderBottomWidth) || 0);
+          const overflow: TextOverflow = {
+            contentW: inner.scrollWidth,
+            contentH: inner.offsetHeight,
+            availableW: node.clientWidth - padX,
+            availableH: node.clientHeight - padY,
+            chromeW,
+            chromeH,
+          };
+          if (textOverflows(overflow)) issues[id] = overflow;
+        });
+
+      const key = JSON.stringify(issues);
+      if (key === reportedOverflow.current) return;
+      reportedOverflow.current = key;
+      setTextOverflow(issues);
+      onTextOverflow?.(issues);
+    };
+
+    measure();
+    // A webface arriving late reflows the words, so measure once more when the
+    // document's fonts have settled.
+    void document.fonts?.ready.then(() => {
+      if (!cancelled) measure();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [editing, onTextOverflow, page.elements, showHidden]);
 
   /* ---------------------------------------------------------- draft guides */
 
@@ -1384,6 +1489,18 @@ export function StudioCanvas({
                       style={{ transform: `translateY(-100%) rotate(${-element.rotation}deg)` }}
                     >
                       {element.name}
+                    </span>
+                  )}
+                  {/* Editor-only clip flag: the words are being cut off by this
+                      box. The fixes live in Typography; the flag never prints. */}
+                  {textOverflow[element.id] && !editing && (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute right-0 top-0 whitespace-nowrap rounded-bl-[3px] bg-[#b45309] px-1.5 py-0.5 font-ui text-[9px] font-semibold uppercase tracking-[0.1em] text-[#fff7ed]"
+                      style={{ transform: `translate(100%, -100%) rotate(${-element.rotation}deg)` }}
+                      title="This text is clipped by its box — open Typography for fixes"
+                    >
+                      Clipped
                     </span>
                   )}
                 </div>

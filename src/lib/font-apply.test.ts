@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  containsArabic,
   fontById,
+  fontIdsForText,
   fontFamilyFor,
   isLegacyFontId,
   supportsArabic,
@@ -44,6 +46,44 @@ describe("font resolution", () => {
       expect(font).toBeDefined();
       expect(font.id).toBe(id);
     }
+  });
+});
+
+describe("text-aware font loading", () => {
+  it("detects Arabic, including mixed lines, and leaves Latin alone", () => {
+    expect(containsArabic("مرحباً بالعالم")).toBe(true);
+    expect(containsArabic("LAMSA — مساء الخير! 2026")).toBe(true);
+    expect(containsArabic("Alexandra & Omar — at last")).toBe(false);
+    expect(containsArabic("14 June 2026, 16:00")).toBe(false);
+    expect(containsArabic("")).toBe(false);
+    expect(containsArabic(null)).toBe(false);
+    expect(containsArabic(undefined)).toBe(false);
+  });
+
+  it("adds the Naskh fallback only when Arabic meets a Latin-only face", () => {
+    // Latin face + Arabic words: both faces are needed and loaded.
+    expect(fontIdsForText("مرحبا", "cormorant-garamond")).toEqual([
+      "cormorant-garamond",
+      "noto-naskh-arabic",
+    ]);
+    // Latin words need only the chosen family.
+    expect(fontIdsForText("Alexandra & Omar", "cormorant-garamond")).toEqual([
+      "cormorant-garamond",
+    ]);
+    // A family that already covers Arabic never gets a second face.
+    expect(fontIdsForText("مرحبا", "amiri")).toEqual(["amiri"]);
+    expect(fontIdsForText("مرحبا", "rubik")).toEqual(["rubik"]);
+    // Unknown ids fall back to the house face, safely.
+    expect(fontIdsForText("مرحبا", undefined)).toEqual([
+      "cormorant-garamond",
+      "noto-naskh-arabic",
+    ]);
+  });
+
+  it("the fallback itself is a real Arabic family in the kit", () => {
+    const fallback = fontById("noto-naskh-arabic");
+    expect(fallback.script).toBe("arabic");
+    expect(fallback.family).toContain("Noto Naskh Arabic");
   });
 });
 

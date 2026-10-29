@@ -29,6 +29,12 @@ import {
   extractTypeStyle,
   type TypeStyle,
 } from "@/lib/type-styles";
+import {
+  growBoxPatch,
+  shrinkFontSize,
+  tightenLineHeight,
+  type TextOverflow,
+} from "@/lib/text-fit";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -36,6 +42,7 @@ import {
   AlignLeft,
   AlignRight,
   CaseUpper,
+  Copy,
   Save,
   Strikethrough,
   Underline,
@@ -124,11 +131,14 @@ export function TypographyStudio({
   activeFont,
   onPatch,
   onEditText,
+  overflow,
 }: {
   element: DesignElement;
   activeFont: FontDef;
   onPatch: (patch: Partial<DesignElement>) => void;
   onEditText?: (id: string) => void;
+  /** Measured clipping for this layer, reported by the canvas. */
+  overflow?: TextOverflow;
 }) {
   const saved = useQuery(api.library.listMine, { kind: "style" });
   const createStyle = useMutation(api.library.create);
@@ -250,8 +260,90 @@ export function TypographyStudio({
     }
   };
 
+  /** Copies a saved style under its own name. The original is never written. */
+  const duplicateStyle = async (item: {
+    name: string;
+    payload: unknown;
+    description?: string | null;
+  }) => {
+    const style = savedStyleFrom(item.payload);
+    if (!style) return;
+    setSaving(true);
+    try {
+      await createStyle({
+        kind: "style",
+        name: `${item.name} copy`,
+        category: "typography",
+        description: item.description || describeTypeStyle(style, activeFont.name),
+        payload: { style },
+      });
+      toast.success(`Duplicated as “${item.name} copy”.`);
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "The style could not be duplicated.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
+      {/* Editor-only clip warning. Every fix here is an explicit choice — the
+          studio never shrinks or grows type on its own. */}
+      {overflow && (
+        <div className="rounded-[var(--radius-tile)] border border-[#b45309]/45 bg-[#b45309]/[0.07] p-2.5">
+          <p className="text-[10px] font-medium leading-relaxed text-[#8a4b08]">
+            Clipped on the card: the words need about {Math.ceil(overflow.contentH)} px
+            of height, this box offers {Math.floor(overflow.availableH)} px.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7"
+              onClick={() => onPatch(growBoxPatch(element, overflow))}
+            >
+              Grow box to fit
+            </Button>
+            {shrinkFontSize(element, overflow) !== null && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() => {
+                  const size = shrinkFontSize(element, overflow);
+                  if (size !== null) onPatch({ fontSize: size });
+                }}
+              >
+                Reduce type to {shrinkFontSize(element, overflow)}
+              </Button>
+            )}
+            {tightenLineHeight(element, overflow) !== null && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() => {
+                  const next = tightenLineHeight(element, overflow);
+                  if (next !== null) onPatch({ lineHeight: next });
+                }}
+              >
+                Tighten leading
+              </Button>
+            )}
+          </div>
+          <p className="mt-1.5 text-[9px] leading-relaxed text-ink/45">
+            Manual line breaks and your wording stay exactly as typed — pick a
+            fix, or resize the layer on the canvas.
+          </p>
+        </div>
+      )}
       {/* Live specimen: the real text, the real family, the real effects. */}
       <div className="relative overflow-hidden rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-sunk)]/70 px-3 py-4">
         <p className="mb-2 text-center font-ui text-[8px] uppercase tracking-[0.18em] text-ink/35">
@@ -681,6 +773,16 @@ export function TypographyStudio({
                       className="shrink-0 rounded-full px-2 py-0.5 font-ui text-[9px] font-medium uppercase tracking-[0.08em] text-ink/60 hover:bg-ink/[0.06] hover:text-ink disabled:opacity-40"
                     >
                       Apply
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!style || saving}
+                      onClick={() => void duplicateStyle(item)}
+                      title={`Duplicate “${item.name}”`}
+                      className="shrink-0 rounded-full p-1 text-ink/50 hover:bg-ink/[0.06] hover:text-ink disabled:opacity-40"
+                    >
+                      <Copy className="size-3" />
+                      <span className="sr-only">Duplicate style</span>
                     </button>
                     <button
                       type="button"

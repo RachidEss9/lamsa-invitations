@@ -474,6 +474,59 @@ export function supportsArabic(id: string | undefined | null): boolean {
   return script === "arabic" || script === "both";
 }
 
+/**
+ * Arabic and the neighbouring Arabic-extend, presentation-form and Kufi ranges
+ * — the characters a Latin-only family cannot draw.
+ */
+const ARABIC_RANGE =
+  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+export function containsArabic(text: string | null | undefined): boolean {
+  return ARABIC_RANGE.test(text ?? "");
+}
+
+/** The Naskh face every Latin family in the kit falls back to for Arabic. */
+export const ARABIC_FALLBACK_FONT_ID = "noto-naskh-arabic";
+
+/**
+ * The font faces a piece of text actually needs, in load order: its own family
+ * first, plus a real Arabic face when the words are Arabic and the chosen
+ * family covers Latin only. Without the second face the browser would still
+ * draw the Arabic from its last-resort font — readable, but silently losing the
+ * Naskh shaping the interface promises.
+ */
+export function fontIdsForText(
+  text: string | null | undefined,
+  fontId?: string | null,
+): string[] {
+  const primary = fontById(fontId).id;
+  const ids = [primary];
+  if (
+    containsArabic(text) &&
+    fontById(primary).script === "latin" &&
+    primary !== ARABIC_FALLBACK_FONT_ID
+  ) {
+    ids.push(ARABIC_FALLBACK_FONT_ID);
+  }
+  return ids;
+}
+
+/** Loads every face the text needs. Resolves false only for the own family. */
+export async function ensureFontForText(
+  text: string | null | undefined,
+  fontId?: string | null,
+  weight = 400,
+  italic = false,
+): Promise<boolean> {
+  const ids = fontIdsForText(text, fontId);
+  const results = await Promise.all(
+    ids.map((id, index) =>
+      ensureFont(id, index === 0 ? weight : 400, index === 0 && italic),
+    ),
+  );
+  return results[0] ?? false;
+}
+
 const ARABIC_SAMPLE = "أهلاً وسهلاً بكم في ليلة العمر";
 const LATIN_SAMPLE = "Alexandra & Omar — at last";
 

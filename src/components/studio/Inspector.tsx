@@ -35,6 +35,7 @@ import {
   type RevealEffect,
 } from "@/lib/design";
 import { fontById } from "@/lib/fonts";
+import type { TextOverflow } from "@/lib/text-fit";
 import { frameById } from "@/lib/frames";
 import { MOTIFS } from "@/lib/invitation";
 import { TypographyStudio } from "@/components/studio/TypographyStudio";
@@ -90,6 +91,8 @@ interface InspectorProps {
   aspectLocked: boolean;
   /** Display unit for every measurement in the panel. */
   unit: DesignUnit;
+  /** Measured text clipping, keyed by layer id — editor only. */
+  textOverflow?: Record<string, TextOverflow>;
   onAspectLocked: (value: boolean) => void;
   onPatch: (id: string, patch: Partial<DesignElement>) => void;
   onPagePatch: (patch: Partial<DesignPage>) => void;
@@ -195,6 +198,7 @@ function InspectorBody({
   selected,
   aspectLocked,
   unit,
+  textOverflow,
   onAspectLocked,
   onPatch,
   onPagePatch,
@@ -558,6 +562,7 @@ function InspectorBody({
               activeFont={activeFont}
               onPatch={patch}
               onEditText={onEditText}
+              overflow={textOverflow?.[element.id]}
             />
           </Section>
           <Section title="Text box">
