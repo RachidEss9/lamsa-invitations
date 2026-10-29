@@ -64,17 +64,32 @@ const page: DesignPage = {
 
 const STYLES: OpeningExperienceId[] = ["cinematic", "monogram", "silk"];
 
+/*
+ * `?style=silk` picks the style and `?still=0.4` freezes one exact frame, so
+ * the harness can be screenshotted at a precise moment without clicking
+ * through the run (headless capture has no pointer).
+ */
+const params = new URLSearchParams(window.location.search);
+const START_STYLE = (params.get("style") as OpeningExperienceId | null) ??
+  "cinematic";
+const START_STILL = (() => {
+  const raw = Number(params.get("still"));
+  return params.has("still") && Number.isFinite(raw) ? raw : undefined;
+})();
+/** `?hold=1` keeps the engine idle, so the guest's start prompt is visible. */
+const HOLD = params.get("hold") === "1";
+
 function openingFor(style: OpeningExperienceId): OpeningSettings {
   return {
     experience: style,
     duration: 3200,
-    autoOpen: true,
+    autoOpen: !HOLD,
     welcome: "For {{guest}}",
   };
 }
 
 function Harness() {
-  const [style, setStyle] = useState<OpeningExperienceId>("cinematic");
+  const [style, setStyle] = useState<OpeningExperienceId>(START_STYLE);
   const [runs, setRuns] = useState(0);
   const [done, setDone] = useState(false);
 
@@ -90,6 +105,7 @@ function Harness() {
         ink="#4a000d"
         guestName="Amira"
         names="Amira & Yusuf"
+        stillAt={START_STILL}
         onDone={() => setDone(true)}
         className="absolute inset-0"
       />
