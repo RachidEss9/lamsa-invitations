@@ -108,7 +108,7 @@ export const MOCKUP_SCENES: MockupScene[] = [
     label: "Single invitation",
     note: "One card, softly tilted on the surface.",
     stage: { w: 1.55, h: 1.45 },
-    slots: [slot("card", { x: 0.5, y: 0.5, w: 0.64, rotation: -2, z: 3 })],
+    slots: [slot("card", { prefer: "invitation", x: 0.5, y: 0.5, w: 0.64, rotation: -2, z: 3 })],
   },
   {
     id: "card-envelope",
@@ -117,7 +117,7 @@ export const MOCKUP_SCENES: MockupScene[] = [
     stage: { w: 2, h: 1.6 },
     slots: [
       slot("envelope", { prefer: "envelope", x: 0.6, y: 0.4, w: 0.6, rotation: -7, z: 1 }),
-      slot("card", { x: 0.42, y: 0.6, w: 0.52, rotation: 5, z: 3 }),
+      slot("card", { prefer: "invitation", x: 0.42, y: 0.6, w: 0.52, rotation: 5, z: 3 }),
       slot("extra", { x: 0.8, y: 0.76, w: 0.3, rotation: 11, z: 2 }),
     ],
   },
@@ -137,7 +137,7 @@ export const MOCKUP_SCENES: MockupScene[] = [
         z: 1,
         style: "flap",
       }),
-      slot("card", { x: 0.52, y: 0.36, w: 0.5, rotation: 3, z: 3 }),
+      slot("card", { prefer: "invitation", x: 0.52, y: 0.36, w: 0.5, rotation: 3, z: 3 }),
       slot("extra", { x: 0.78, y: 0.8, w: 0.26, rotation: 9, z: 2 }),
     ],
   },
@@ -147,9 +147,9 @@ export const MOCKUP_SCENES: MockupScene[] = [
     note: "Three cards fanned as a set.",
     stage: { w: 2.2, h: 1.5 },
     slots: [
-      slot("rsvp", { x: 0.2, y: 0.66, w: 0.3, rotation: -9, z: 1 }),
-      slot("details", { x: 0.8, y: 0.64, w: 0.3, rotation: 8, z: 1 }),
-      slot("card", { x: 0.5, y: 0.44, w: 0.44, rotation: -1, z: 3 }),
+      slot("rsvp", { prefer: "rsvp", x: 0.2, y: 0.66, w: 0.3, rotation: -9, z: 1 }),
+      slot("details", { prefer: "details", x: 0.8, y: 0.64, w: 0.3, rotation: 8, z: 1 }),
+      slot("card", { prefer: "invitation", x: 0.5, y: 0.44, w: 0.44, rotation: -1, z: 3 }),
     ],
   },
   {
@@ -162,7 +162,7 @@ export const MOCKUP_SCENES: MockupScene[] = [
       slot("b", { x: 0.73, y: 0.3, w: 0.3, rotation: 5, z: 1 }),
       slot("c", { x: 0.28, y: 0.74, w: 0.3, rotation: 3, z: 1 }),
       slot("d", { x: 0.72, y: 0.72, w: 0.3, rotation: -6, z: 1 }),
-      slot("card", { x: 0.5, y: 0.51, w: 0.36, rotation: 0, z: 3 }),
+      slot("card", { prefer: "invitation", x: 0.5, y: 0.51, w: 0.36, rotation: 0, z: 3 }),
     ],
   },
   {
@@ -172,8 +172,8 @@ export const MOCKUP_SCENES: MockupScene[] = [
       "The piece's face and inside spread side by side; falls back to a single card when there is no second page.",
     stage: { w: 2.4, h: 1.5 },
     slots: [
-      slot("panel-left", { pageIndex: 0, x: 0.27, y: 0.5, w: 0.44, z: 1 }),
-      slot("panel-right", { pageIndex: 1, x: 0.73, y: 0.5, w: 0.44, z: 1 }),
+      slot("panel-left", { prefer: "invitation", pageIndex: 0, x: 0.27, y: 0.5, w: 0.44, z: 1 }),
+      slot("panel-right", { prefer: "invitation", pageIndex: 1, x: 0.73, y: 0.5, w: 0.44, z: 1 }),
     ],
   },
   {
@@ -183,7 +183,7 @@ export const MOCKUP_SCENES: MockupScene[] = [
     stage: { w: 1.9, h: 1.7 },
     slots: [
       slot("envelope", { prefer: "liner", x: 0.5, y: 0.48, w: 0.66, rotation: 0, z: 1 }),
-      slot("card", { x: 0.5, y: 0.52, w: 0.5, rotation: -1, z: 3 }),
+      slot("card", { prefer: "invitation", x: 0.5, y: 0.52, w: 0.5, rotation: -1, z: 3 }),
     ],
   },
 ];
@@ -220,13 +220,28 @@ export interface PlacementOverride {
   z?: number;
 }
 
+interface RawPlacement {
+  slotDef: MockupSlot;
+  piece: MockupPiece;
+  pageIndex: number;
+}
+
 /**
  * Fills a scene's slots from the chosen pieces.
  *
- * Slots that prefer a kind take those pieces first (so an envelope lands on
- * the envelope slot even if it was selected last), the rest fill in selection
- * order, and slots left without a piece are dropped — a two-piece project
- * simply renders a two-piece scene instead of a placeholder.
+ * Four passes keep the headline slots honest instead of greedy:
+ *
+ *  1. Slots that ask for a kind receive exactly that kind — a box tray never
+ *     swallows the invitation just because it was declared first.
+ *  2. Open slots take whatever is left.
+ *  3. A slot whose preferred kind does not exist in this project falls back,
+ *     so a suite without a liner or RSVP still renders every chosen piece.
+ *  4. Only if the scene would be empty does any slot accept anything.
+ *
+ * A pass-1 slot showing a later page may reuse an already-placed piece of its
+ * kind, which is what lets a folded invitation show its face and inside spread
+ * side by side from a single piece. Slots left without a piece are dropped —
+ * never rendered as an empty placeholder.
  */
 export function resolvePlacements(
   scene: MockupScene,
@@ -238,62 +253,160 @@ export function resolvePlacements(
     .map((id) => pieces.find((piece) => piece.id === id))
     .filter((piece): piece is MockupPiece => Boolean(piece));
   const remaining = [...chosen];
+  const chosenKinds = new Set(chosen.map((piece) => piece.kind));
 
-  const take = (slotDef: MockupSlot): MockupPiece | null => {
-    if (remaining.length === 0) return null;
-    const needed = slotDef.pageIndex ?? 0;
-    // A slot that shows a specific page only accepts pieces that have it, so
-    // an unfinished fold never consumes a piece and then renders nothing.
-    const fits = (piece: MockupPiece) => piece.pages.length > needed;
-    let index = -1;
-    if (slotDef.prefer) {
-      index = remaining.findIndex(
-        (piece) => piece.kind === slotDef.prefer && fits(piece),
-      );
-    }
-    if (index < 0) index = remaining.findIndex(fits);
-    if (index < 0) return null;
-    return remaining.splice(index, 1)[0] ?? null;
+  const hasPage = (piece: MockupPiece, slotDef: MockupSlot) =>
+    piece.pages.length > (slotDef.pageIndex ?? 0);
+  const takeWhere = (slotDef: MockupSlot, ok: (piece: MockupPiece) => boolean) => {
+    const index = remaining.findIndex(
+      (piece) => hasPage(piece, slotDef) && ok(piece),
+    );
+    return index < 0 ? null : (remaining.splice(index, 1)[0] ?? null);
   };
 
-  const ordered = [
-    ...scene.slots.filter((item) => item.prefer),
-    ...scene.slots.filter((item) => !item.prefer),
-  ];
-
-  const placements: MockupPlacement[] = [];
-  for (const slotDef of ordered) {
-    const piece = take(slotDef);
-    if (!piece) continue;
-    const pageIndex = Math.min(slotDef.pageIndex ?? 0, piece.pages.length - 1);
-    const override = overrides[slotDef.id] ?? {};
-    placements.push({
-      slotId: slotDef.id,
-      pieceId: piece.id,
-      pageIndex,
-      x: override.x ?? slotDef.x,
-      y: override.y ?? slotDef.y,
-      rotation: override.rotation ?? slotDef.rotation,
-      w: slotDef.w,
-      scale: override.scale ?? 1,
-      z: override.z ?? slotDef.z,
-      style: slotDef.style ?? "flat",
+  const filled: RawPlacement[] = [];
+  const fill = (slotDef: MockupSlot, piece: MockupPiece) => {
+    filled.push({
+      slotDef,
+      piece,
+      pageIndex: Math.min(slotDef.pageIndex ?? 0, piece.pages.length - 1),
     });
+  };
+
+  const preferSlots = scene.slots.filter((item) => item.prefer);
+  const plainSlots = scene.slots.filter((item) => !item.prefer);
+
+  // 1. Preferred kinds only (with face/inside reuse for folds).
+  for (const slotDef of preferSlots) {
+    const needed = slotDef.pageIndex ?? 0;
+    if (needed > 0) {
+      const reused = filled.find(
+        (item) =>
+          item.piece.kind === slotDef.prefer && item.piece.pages.length > needed,
+      );
+      if (reused) {
+        fill(slotDef, reused.piece);
+        continue;
+      }
+    }
+    const piece = takeWhere(slotDef, (item) => item.kind === slotDef.prefer);
+    if (piece) fill(slotDef, piece);
   }
+
+  // 2. Open slots take what remains.
+  for (const slotDef of plainSlots) {
+    const piece = takeWhere(slotDef, () => true);
+    if (piece) fill(slotDef, piece);
+  }
+
+  // 3. Preferred kind absent from the project entirely → fall back.
+  for (const slotDef of preferSlots) {
+    if (filled.some((item) => item.slotDef.id === slotDef.id)) continue;
+    if (chosenKinds.has(slotDef.prefer!)) continue;
+    const piece = takeWhere(slotDef, () => true);
+    if (piece) fill(slotDef, piece);
+  }
+
+  // 4. Nothing rendered at all → let every slot try.
+  if (filled.length === 0) {
+    for (const slotDef of [...preferSlots, ...plainSlots]) {
+      const piece = takeWhere(slotDef, () => true);
+      if (piece) fill(slotDef, piece);
+    }
+  }
+
+  let result: MockupPlacement[] = filled.map((item) => ({
+    slotId: item.slotDef.id,
+    pieceId: item.piece.id,
+    pageIndex: item.pageIndex,
+    x: item.slotDef.x,
+    y: item.slotDef.y,
+    rotation: item.slotDef.rotation,
+    w: item.slotDef.w,
+    scale: 1,
+    z: item.slotDef.z,
+    style: item.slotDef.style ?? "flat",
+  }));
 
   // A scene that ends up with a single piece (a one-piece project, or a fold
   // with no second page) reads better centred than parked in one slot.
-  if (placements.length === 1 && scene.slots.length > 1) {
-    placements[0] = {
-      ...placements[0],
+  if (result.length === 1 && scene.slots.length > 1) {
+    result[0] = {
+      ...result[0],
       x: 0.5,
       y: 0.5,
-      w: Math.max(placements[0].w, 0.5),
+      w: Math.max(result[0].w, 0.5),
       z: 3,
     };
   }
 
-  return placements.sort((a, b) => a.z - b.z || a.slotId.localeCompare(b.slotId));
+  // The authored defaults must never clip: fit each piece's rotated bounding
+  // box onto the stage before the owner's own overrides are applied.
+  result = fitPlacementsToStage(result, scene, chosen);
+
+  // Overrides win — the owner's arrangement, including off-centre drags, is
+  // exactly what was saved.
+  result = result.map((placement) => {
+    const override = overrides[placement.slotId];
+    if (!override) return placement;
+    return {
+      ...placement,
+      x: override.x ?? placement.x,
+      y: override.y ?? placement.y,
+      rotation: override.rotation ?? placement.rotation,
+      scale: override.scale ?? placement.scale,
+      z: override.z ?? placement.z,
+    };
+  });
+
+  return result.sort((a, b) => a.z - b.z || a.slotId.localeCompare(b.slotId));
+}
+
+/**
+ * Shrinks and centres authored slot positions until every piece's rotated
+ * bounding box sits fully inside the stage.
+ *
+ * A portrait invitation beside a landscape envelope overflows a fixed slot
+ * box — the arithmetic is simple: the rotated bounds grow linearly with the
+ * piece width, so the largest width that fits is a one-line solve. Slot
+ * positions are adjusted only when they actually overflow; the owner's saved
+ * overrides are applied afterwards and are never rewritten.
+ */
+function fitPlacementsToStage(
+  placements: MockupPlacement[],
+  scene: MockupScene,
+  chosen: MockupPiece[],
+): MockupPlacement[] {
+  if (placements.length === 0 || chosen.length === 0) return placements;
+  const maxW = Math.max(1, ...chosen.map((piece) => piece.widthMm));
+  const maxH = Math.max(1, ...chosen.map((piece) => piece.heightMm));
+  const stageW = maxW * scene.stage.w;
+  const stageH = maxH * scene.stage.h;
+  const byId = new Map(chosen.map((piece) => [piece.id, piece]));
+
+  return placements.map((placement) => {
+    const piece = byId.get(placement.pieceId);
+    const page = piece?.pages[placement.pageIndex] ?? piece?.pages[0];
+    if (!piece || !page) return placement;
+    const { width, height } = pageSizeOf(page);
+    const aspect = width > 0 && height > 0 ? height / width : 1;
+    const rad = (placement.rotation * Math.PI) / 180;
+    const sin = Math.abs(Math.sin(rad));
+    const cos = Math.abs(Math.cos(rad));
+    // Rotated bounds per unit of card width (millimetres).
+    const perW = cos + aspect * sin;
+    const perH = sin + aspect * cos;
+    const wMm = Math.min(placement.w * stageW, stageW / perW, stageH / perH);
+    const w = wMm / stageW;
+    const halfX = (wMm * perW) / (2 * stageW);
+    const halfY = (wMm * perH) / (2 * stageH);
+    return {
+      ...placement,
+      w,
+      x: Math.min(1 - halfX, Math.max(halfX, placement.x)),
+      y: Math.min(1 - halfY, Math.max(halfY, placement.y)),
+    };
+  });
 }
 
 /** Keeps a dragged piece on the stage instead of letting it escape. */

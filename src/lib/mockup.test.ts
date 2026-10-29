@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { blankInvitationContent } from "@/lib/dashboard";
 import {
   createDefaultDesign,
+  pageSizeOf,
   type DesignDocument,
   type DesignPage,
 } from "@/lib/design";
@@ -362,5 +363,203 @@ describe("surfaces", () => {
     expect(ids).toContain("ivory");
     expect(surfaceById("does-not-exist").id).toBe("ivory");
     expect(surfaceById("linen").label).toBe("Warm linen");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Visual QA: slot honesty and stage clipping                                 */
+/* -------------------------------------------------------------------------- */
+
+/** A folded invitation: one piece, two pages (face and inside spread). */
+function foldDesign(): DesignDocument {
+  const base = createDefaultDesign(blankInvitationContent());
+  const pages: DesignPage[] = [
+    page("fold-face", 1000, 1400),
+    page("fold-inside", 1000, 1400),
+  ];
+  return {
+    ...base,
+    pages,
+    suite: {
+      version: 1,
+      activePieceId: "piece-fold",
+      pieces: [
+        {
+          id: "piece-fold",
+          name: "Folded invitation",
+          kind: "invitation",
+          pageIds: ["fold-face", "fold-inside"],
+          print: { unit: "mm", bleedMm: 3, safeMm: 5, cropMarks: false },
+          guestVisible: true,
+        },
+      ],
+    },
+  };
+}
+
+/** Every placement's rotated bounding box must sit fully on the stage. */
+function clippedScenes(
+  sceneIds: string[],
+  pieces: ReturnType<typeof mockupPieces>,
+): string[] {
+  const ids = pieces.map((piece) => piece.id);
+  const failures: string[] = [];
+  const epsilon = 1e-6;
+  for (const sceneId of sceneIds) {
+    const scene = sceneById(sceneId);
+    const stage = stageSizeFor(scene, pieces);
+    const byId = new Map(pieces.map((piece) => [piece.id, piece]));
+    for (const placement of resolvePlacements(scene, pieces, ids, {})) {
+      const piece = byId.get(placement.pieceId);
+      const page = piece?.pages[placement.pageIndex] ?? piece?.pages[0];
+      if (!piece || !page) continue;
+      const { width, height } = pageSizeOf(page);
+      const aspect = width > 0 ? height / width : 1;
+      const rad = (placement.rotation * Math.PI) / 180;
+      const sin = Math.abs(Math.sin(rad));
+      const cos = Math.abs(Math.cos(rad));
+      const wMm = placement.w * placement.scale * stage.widthMm;
+      const boundW = wMm * (cos + aspect * sin);
+      const boundH = wMm * (sin + aspect * cos);
+      const cx = placement.x * stage.widthMm;
+      const cy = placement.y * stage.heightMm;
+      const outside =
+        cx - boundW / 2 < -epsilon ||
+        cx + boundW / 2 > stage.widthMm + epsilon ||
+        cy - boundH / 2 < -epsilon ||
+        cy + boundH / 2 > stage.heightMm + epsilon;
+      if (outside) {
+        failures.push(`${sceneId} · slot ${placement.slotId} overflows the stage`);
+      }
+    }
+  }
+  return failures;
+}
+
+describe("scene slot honesty (visual QA)", () => {
+  const pieces = mockupPieces(suiteDesign());
+  const allIds = pieces.map((piece) => piece.id);
+
+  it("keeps the invitation in the headline card slot of every scene", () => {
+    const scenes = [
+      "card",
+      "card-envelope",
+      "open-envelope",
+      "suite-spread",
+      "collection",
+      "box",
+    ];
+    for (const sceneId of scenes) {
+      const placements = resolvePlacements(sceneById(sceneId), pieces, allIds, {});
+      const card = placements.find((placement) => placement.slotId === "card");
+      expect(card?.pieceId, sceneId).toBe("piece-inv");
+    }
+  });
+
+  it("never lets the envelope slot steal the invitation when no envelope exists", () => {
+    const withoutEnvelope = pieces.filter((piece) => piece.id !== "piece-env");
+    const placements = resolvePlacements(
+      sceneById("card-envelope"),
+      withoutEnvelope,
+      withoutEnvelope.map((piece) => piece.id),
+      {},
+    );
+    const bySlot = new Map(
+      placements.map((placement) => [placement.slotId, placement.pieceId]),
+    );
+    expect(bySlot.get("envelope")).toBeUndefined();
+    expect(bySlot.get("card")).toBe("piece-inv");
+    expect(bySlot.get("extra")).toBe("piece-rsvp");
+  });
+
+  it("still renders a chosen piece when its preferred kind does not exist", () => {
+    // A project with no invitation at all must not produce an empty stage.
+    const onlyRsvp = pieces.filter((piece) => piece.id === "piece-rsvp");
+    const single = resolvePlacements(
+      sceneById("card"),
+      onlyRsvp,
+      ["piece-rsvp"],
+      {},
+    );
+    expect(single).toHaveLength(1);
+    expect(single[0].pieceId).toBe("piece-rsvp");
+    // The box tray falls back to the envelope when the suite has no liner.
+    const boxed = resolvePlacements(sceneById("box"), pieces, allIds, {});
+    expect(
+      boxed.find((placement) => placement.slotId === "card")?.pieceId,
+    ).toBe("piece-inv");
+    expect(
+      boxed.find((placement) => placement.slotId === "envelope")?.pieceId,
+    ).toBe("piece-env");
+  });
+
+  it("shows the RSVP and details pieces in their own slots", () => {
+    const spread = resolvePlacements(sceneById("suite-spread"), pieces, allIds, {});
+    expect(
+      spread.find((placement) => placement.slotId === "rsvp")?.pieceId,
+    ).toBe("piece-rsvp");
+    expect(
+      spread.find((placement) => placement.slotId === "card")?.pieceId,
+    ).toBe("piece-inv");
+    expect(spread).toHaveLength(3);
+  });
+
+  it("shows a folded invitation's face and inside spread from one piece", () => {
+    const fold = mockupPieces(foldDesign());
+    const panels = resolvePlacements(
+      sceneById("folded"),
+      fold,
+      ["piece-fold"],
+      {},
+    );
+    expect(panels).toHaveLength(2);
+    const left = panels.find((placement) => placement.slotId === "panel-left");
+    const right = panels.find((placement) => placement.slotId === "panel-right");
+    expect(left).toMatchObject({ pieceId: "piece-fold", pageIndex: 0 });
+    expect(right).toMatchObject({ pieceId: "piece-fold", pageIndex: 1 });
+    // A single-page invitation on this scene falls back to one centred card.
+    const flat = mockupPieces(suiteDesign());
+    const single = resolvePlacements(
+      sceneById("folded"),
+      flat.filter((piece) => piece.id === "piece-inv"),
+      ["piece-inv"],
+      {},
+    );
+    expect(single).toHaveLength(1);
+    expect(single[0].x).toBe(0.5);
+    expect(single[0].y).toBe(0.5);
+  });
+});
+
+describe("stage fitting (visual QA)", () => {
+  const pieces = mockupPieces(suiteDesign());
+  const sceneIds = MOCKUP_SCENES.map((scene) => scene.id);
+
+  it("keeps every default placement on-stage for a full suite", () => {
+    expect(clippedScenes(sceneIds, pieces)).toEqual([]);
+  });
+
+  it("keeps every default placement on-stage for the invitation alone", () => {
+    const invitation = pieces.filter((piece) => piece.id === "piece-inv");
+    expect(clippedScenes(sceneIds, invitation)).toEqual([]);
+  });
+
+  it("keeps every default placement on-stage for a folded two-page piece", () => {
+    const fold = mockupPieces(foldDesign());
+    expect(clippedScenes(sceneIds, fold)).toEqual([]);
+  });
+
+  it("applies the fit before overrides, never rewriting the owner's own layout", () => {
+    const scene = sceneById("card-envelope");
+    const base = resolvePlacements(scene, pieces, ["piece-inv"], {})[0];
+    // The authored default is inside the stage …
+    expect(base.y).toBeGreaterThan(0);
+    expect(base.y).toBeLessThan(1);
+    // … but a saved off-stage drag survives exactly as arranged.
+    const dragged = resolvePlacements(scene, pieces, ["piece-inv"], {
+      card: { x: 1.1, y: -0.1 },
+    })[0];
+    expect(dragged.x).toBe(1.1);
+    expect(dragged.y).toBe(-0.1);
   });
 });

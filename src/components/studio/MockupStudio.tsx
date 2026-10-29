@@ -304,7 +304,9 @@ export function MockupStudio({
                     />
                   )}
                 </DesignStage>
-                {selectedSlot === placement.slotId && !presenting && (
+                {/* Editor chrome only: never while presenting, never captured
+                    in an export — the downloaded image contains just the art. */}
+                {selectedSlot === placement.slotId && !presenting && !busy && (
                   <span
                     aria-hidden
                     className="pointer-events-none absolute -inset-[3px] border border-[#710014]/70"
