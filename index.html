@@ -9,7 +9,13 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/lamsa-icon-180.png" />
   <link rel="apple-touch-icon" sizes="1024x1024" href="/lamsa-icon-1024.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- `interactive-widget=resizes-content` lets the virtual keyboard resize the
+       layout viewport, so bottom sheets and the mobile tool bar stay visible
+       (and reachable) while a field inside them is focused. -->
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"
+  />
   <meta
     name="description"
     content="LAMSA is an invitation atelier. Compose a considered invitation, address it to each guest by name, and send one link worth opening."

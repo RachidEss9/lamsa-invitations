@@ -3251,8 +3251,8 @@ export default function Studio() {
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
-          className="pressable grid size-8 shrink-0 place-items-center rounded-full border border-[var(--edge)] bg-[var(--surface-card)] text-ink/60 shadow-[var(--shadow-xs)] transition-[background-color,border-color,color] duration-150 hover:border-[var(--edge-strong)] hover:text-ink"
-          aria-label="Back to the studio"
+          className="pressable grid size-9 shrink-0 place-items-center rounded-full border border-[var(--edge)] bg-[var(--surface-card)] text-ink/60 shadow-[var(--shadow-xs)] transition-[background-color,border-color,color] duration-150 hover:border-[var(--edge-strong)] hover:text-ink sm:size-8"
+          aria-label="Back to your projects"
         >
           <ArrowLeft className="size-3.5" />
         </button>
@@ -3286,8 +3286,8 @@ export default function Studio() {
         </div>
 
         <div className="flex items-center gap-0.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-0.5 shadow-[var(--shadow-xs)]">
-          <IconButton label="Undo" onClick={undo} disabled={!historyFlags.undo} className="border-transparent"><Undo2 className="size-3.5" /></IconButton>
-          <IconButton label="Redo" onClick={redo} disabled={!historyFlags.redo} className="border-transparent"><Redo2 className="size-3.5" /></IconButton>
+          <IconButton label="Undo" onClick={undo} disabled={!historyFlags.undo} className="size-9 border-transparent sm:size-8"><Undo2 className="size-3.5" /></IconButton>
+          <IconButton label="Redo" onClick={redo} disabled={!historyFlags.redo} className="size-9 border-transparent sm:size-8"><Redo2 className="size-3.5" /></IconButton>
         </div>
 
         {/* Medium headers keep only the drawing aids: showing every workspace
@@ -3353,7 +3353,7 @@ export default function Studio() {
             onClick={() => setGuestOpen(true)}
             aria-label="Guest preview"
             title="Guest preview"
-            className="h-8 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em]"
+            className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
           >
             <Eye className="size-3.5" />
             <span className="hidden sm:inline">Guest preview</span>
@@ -3362,7 +3362,7 @@ export default function Studio() {
             type="button"
             variant="outline"
             onClick={() => setPrintOpen(true)}
-            className="h-8 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em]"
+            className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
             aria-label="Export a print-ready PDF"
             title="Export a print-ready PDF"
           >
@@ -3836,8 +3836,9 @@ export default function Studio() {
                 setLeftPanel(sheet);
               }
             }}
+            aria-expanded={mobileSheet === sheet}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 py-2 font-meta text-[8px] uppercase tracking-[0.1em]",
+              "flex min-h-[46px] flex-1 flex-col items-center justify-center gap-0.5 py-2 font-meta text-[8px] uppercase tracking-[0.1em] transition-colors duration-150",
               mobileSheet === sheet ? "text-[var(--red)]" : "text-ink/50",
             )}
           >
@@ -3847,12 +3848,25 @@ export default function Studio() {
         ))}
       </nav>
 
+      {/*
+        The sheet is a true bottom sheet, not a modal: it sits above the tool
+        bar and dims nothing, so the canvas behind it stays visible *and*
+        interactive — a host can nudge a layer while its properties are open,
+        switch straight to another tool, or close the sheet, all without a
+        second layer of UI in the way.
+      */}
       {mobileSheet && (
-        <div className="fixed inset-0 z-[70] flex flex-col justify-end bg-black/25 lg:hidden" onClick={() => setMobileSheet(null)}>
-          <div
-            className="flex max-h-[min(78dvh,calc(100dvh-3rem))] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-t border-[var(--edge)] bg-[var(--surface-overlay)] pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-sheet)]"
-            onClick={(event) => event.stopPropagation()}
-          >
+        <div className="pointer-events-none fixed inset-0 z-[70] flex flex-col justify-end pb-[calc(46px+env(safe-area-inset-bottom))] lg:hidden">
+          <div className="pointer-events-auto flex max-h-[min(64dvh,calc(100dvh-7rem))] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-t border-[var(--edge)] bg-[var(--surface-overlay)] shadow-[var(--shadow-sheet)]">
+            {/* The grab handle doubles as an always-reachable dismiss. */}
+            <button
+              type="button"
+              onClick={() => setMobileSheet(null)}
+              aria-label={`Close the ${mobileSheet} panel`}
+              className="flex h-7 w-full items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--gold)]"
+            >
+              <span className="h-1 w-9 rounded-full bg-ink/25" />
+            </button>
             <div className="flex items-center justify-between border-b border-[var(--edge)] px-4 py-2.5">
               <span className="section-label capitalize">{mobileSheet}</span>
               <button type="button" onClick={() => setMobileSheet(null)} className="pressable rounded-full border border-[var(--edge)] px-3 py-1 font-ui text-[0.62rem] font-medium uppercase tracking-[0.1em] text-ink/55 hover:border-[var(--edge-strong)] hover:text-ink">

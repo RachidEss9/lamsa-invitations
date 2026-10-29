@@ -45,7 +45,13 @@ import {
   supportsMaterialRelief,
 } from "@/lib/materials";
 import { cn } from "@/lib/utils";
-import { useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import {
   AlignCenterHorizontal,
@@ -106,23 +112,79 @@ type SectionProps = {
   children: ReactNode;
   className?: string;
   footer?: ReactNode;
+  /** Advanced groups start folded so the everyday controls lead the panel. */
+  defaultOpen?: boolean;
 };
 
-function Section({ title, children, className, footer }: SectionProps) {
+/**
+ * Which groups are folded, held above every selection view so a choice made
+ * while editing one layer still applies to the next one selected — the panel
+ * never re-flips under the user's hands.
+ */
+const SectionCollapseContext = createContext<{
+  open: Record<string, boolean>;
+  toggle: (title: string, open: boolean) => void;
+} | null>(null);
+
+function Section({
+  title,
+  children,
+  className,
+  footer,
+  defaultOpen = true,
+}: SectionProps) {
+  const collapse = useContext(SectionCollapseContext);
+  const open = collapse ? (collapse.open[title] ?? defaultOpen) : defaultOpen;
   return (
     <section className={cn("border-b border-[var(--edge)] bg-transparent px-4 py-3.5", className)}>
-      <p className="section-label mb-2.5">
-        {title}
-      </p>
-      <div className="min-h-[2px]">{children}</div>
-      {footer && (
-        <div className="mt-3 border-t border-ink/10 pt-2.5">{footer}</div>
+      <button
+        type="button"
+        onClick={() => collapse?.toggle(title, !open)}
+        aria-expanded={open}
+        className="group flex w-full items-center gap-2 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
+      >
+        <span className="section-label flex-1">{title}</span>
+        <ChevronDown
+          aria-hidden
+          className={cn(
+            "size-3 shrink-0 text-ink/35 transition-transform duration-200 group-hover:text-ink/70",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && (
+        <>
+          <div className="mt-2.5 min-h-[2px]">{children}</div>
+          {footer && (
+            <div className="mt-3 border-t border-ink/10 pt-2.5">{footer}</div>
+          )}
+        </>
       )}
     </section>
   );
 }
 
-export function Inspector({
+/**
+ * The contextual inspector. Fold state lives in this wrapper rather than in
+ * any one selection view, so it survives switching between layers, between
+ * single and multi-selection, and between the canvas and the mobile sheet.
+ */
+export function Inspector(props: InspectorProps) {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  return (
+    <SectionCollapseContext.Provider
+      value={{
+        open,
+        toggle: (title, next) =>
+          setOpen((previous) => ({ ...previous, [title]: next })),
+      }}
+    >
+      <InspectorBody {...props} />
+    </SectionCollapseContext.Provider>
+  );
+}
+
+function InspectorBody({
   page,
   selected,
   aspectLocked,
@@ -207,7 +269,7 @@ export function Inspector({
             </Select>
           </Row>
         </Section>
-        <Section title="Material">
+        <Section title="Material" defaultOpen={false}>
           <MaterialsStudio
             material={page.material}
             scope="page"
@@ -693,11 +755,11 @@ export function Inspector({
         </Section>
       )}
 
-      <Section title="Effects">
+      <Section title="Effects" defaultOpen={false}>
         <EffectsInspector element={element} patch={patch} />
       </Section>
 
-      <Section title="Material">
+      <Section title="Material" defaultOpen={false}>
         {supportsMaterial(element) ? (
           <MaterialsStudio
             material={element.material}
@@ -713,7 +775,7 @@ export function Inspector({
       </Section>
 
       {animation && (
-        <Section title="Animation">
+        <Section title="Animation" defaultOpen={false}>
           <ToggleRow
             label="Animate this layer"
             checked={animation.enabled}
@@ -807,7 +869,7 @@ export function Inspector({
         </Section>
       )}
 
-      <Section title="Interactive reveal" className="border-b-0">
+      <Section title="Interactive reveal" defaultOpen={false} className="border-b-0">
         <ToggleRow
           label="Use as a cover"
           checked={Boolean(reveal)}

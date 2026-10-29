@@ -1170,7 +1170,9 @@ export function StudioCanvas({
                     // hairline instead of dissolving when the card is fitted.
                     outline: isSelected
                       ? `${Math.max(1.2 / scale, 0.6)}px solid #710014`
-                      : "none",
+                      : element.locked
+                        ? `${Math.max(1 / scale, 0.6)}px dashed rgba(113,0,20,0.32)`
+                        : "none",
                   }}
                   onPointerDown={(event) =>
                     beginMove(event as ReactPointerEvent, element)
