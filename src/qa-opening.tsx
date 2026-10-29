@@ -4,8 +4,7 @@ import { InteractiveOpening } from "@/components/invitation/InteractiveOpening";
 import { defaultAnimation, type DesignPage } from "@/lib/design";
 import "./index.css";
 
-/**
- * Standalone harness for the reference-driven opening: open `qa-opening.html`
+/** Standalone harness for the reference-driven opening: open qa-opening.html
  * through the dev server, tap the wax seal and step through the real scene —
  * the same renderer the Studio preview and the published invitation use.
  */

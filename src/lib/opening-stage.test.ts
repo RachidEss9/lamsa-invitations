@@ -12,7 +12,11 @@ import {
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { OpeningStage } from "@/components/invitation/OpeningStage";
+
+export {};
 import type { DesignPage, OpeningSettings } from "./design";
+
+type FakeRaf = (callback: unknown) => number;
 
 let queue: FrameRequestCallback[] = [];
 let root: Root | null = null;
@@ -38,6 +42,10 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  if ((globalThis as unknown as { document?: Document }).document) {
+    delete (globalThis as unknown as { document?: Document }).document;
+  }
   queue = [];
   clock = 0;
 });
@@ -49,10 +57,9 @@ afterEach(() => {
   host = null;
   queue = [];
   vi.useRealTimers();
-});
-
-afterAll(() => {
-  vi.restoreAllMocks();
+  if ((globalThis as unknown as { document?: Document }).document) {
+    delete (globalThis as unknown as { document?: Document }).document;
+  }
 });
 
 function page(): DesignPage {
