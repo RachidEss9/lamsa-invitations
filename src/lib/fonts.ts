@@ -469,6 +469,11 @@ export function isLegacyFontId(id: string | undefined | null): boolean {
   return Boolean(id && !FONT_MAP.has(id) && LEGACY_MAP.has(id));
 }
 
+/** True when the id resolves to a real family, current or legacy. */
+export function isKnownFontId(id: string | undefined | null): boolean {
+  return Boolean(id && (FONT_MAP.has(id) || LEGACY_MAP.has(id)));
+}
+
 export function supportsArabic(id: string | undefined | null): boolean {
   const script = fontById(id).script;
   return script === "arabic" || script === "both";

@@ -7,6 +7,7 @@ import {
   type DesignFormat,
   type DesignPage,
 } from "@/lib/design";
+import { fontById, isKnownFontId } from "@/lib/fonts";
 
 /**
  * Print preparation for the invitation canvas.
@@ -81,8 +82,21 @@ export interface PrintSettings {
   fit: FitMode;
   includeBackground: boolean;
   dpi: 150 | 200 | 300;
-  scope: "all" | "current";
+  scope: "all" | "current" | "piece";
   guides: boolean;
+  /** PNG only: keep the export's background transparent. JPEG has no alpha. */
+  transparent?: boolean;
+  /** Sheet imposition: the stock copies are tiled onto. */
+  sheetPaper?: PaperId;
+  /** Custom sheet size, in `unit`, used when `sheetPaper` is "custom". */
+  sheetWidth?: number;
+  sheetHeight?: number;
+  /** Gap between copies, in millimetres. */
+  sheetGapMm?: number;
+  /** Turn each copy 90° to fit more on the sheet. */
+  sheetRotate?: boolean;
+  /** Copies to impose; 0 means as many as fit. */
+  sheetCopies?: number;
 }
 
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
@@ -99,6 +113,13 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   dpi: 300,
   scope: "all",
   guides: true,
+  transparent: false,
+  sheetPaper: "a4",
+  sheetWidth: 297,
+  sheetHeight: 420,
+  sheetGapMm: 3,
+  sheetRotate: false,
+  sheetCopies: 0,
 };
 
 export interface PageDimensions {
@@ -238,9 +259,53 @@ export interface PreflightMeasurements {
   imageWidths?: Record<string, number>;
   /** Wanted content height vs. the height the text box gave it, canvas units. */
   textHeights?: Record<string, { content: number; box: number }>;
+  /** Font ids that are still not available after trying to load them. */
+  unloadedFontIds?: string[];
 }
 
 export const MIN_PRINT_DPI = 150;
+
+/**
+ * The scale the capture must render at to land on the chosen DPI, clamped to
+ * what the browser accepts — and the DPI that actually reaches the paper once
+ * the clamp has had its say. Shown to the host so "300 DPI" is never a promise
+ * the capture cannot keep.
+ */
+export function captureScaleFor(
+  settings: PrintSettings,
+  pageWidthPx: number,
+  artWidthMm: number,
+): number {
+  const needed = ((artWidthMm / 25.4) * settings.dpi) / Math.max(1, pageWidthPx);
+  if (!(needed > 0)) return 1;
+  return Math.min(6, Math.max(0.5, needed));
+}
+
+export function actualDpiFor(
+  settings: PrintSettings,
+  pageWidthPx: number,
+  artWidthMm: number,
+): number {
+  const needed = ((artWidthMm / 25.4) * settings.dpi) / Math.max(1, pageWidthPx);
+  if (!(needed > 0)) return settings.dpi;
+  return Math.round(
+    (settings.dpi * captureScaleFor(settings, pageWidthPx, artWidthMm)) / needed,
+  );
+}
+
+/** The sheet copies are imposed onto, in millimetres. */
+export function sheetSizeFor(settings: PrintSettings): PageDimensions {
+  if (settings.sheetPaper === "custom") {
+    return {
+      widthMm: Math.max(50, Math.min(2000, toMm(settings.sheetWidth ?? 297, settings.unit))),
+      heightMm: Math.max(50, Math.min(2000, toMm(settings.sheetHeight ?? 420, settings.unit))),
+    };
+  }
+  const base =
+    PAPER_SIZES.find((paper) => paper.id === (settings.sheetPaper ?? "a4")) ??
+    PAPER_SIZES[1];
+  return { widthMm: base.widthMm, heightMm: base.heightMm };
+}
 
 function overlapBand(
   element: DesignElement,
@@ -342,7 +407,43 @@ export function preflightPage(
           elementId: element.id,
         });
       }
+      // The font id no longer resolves to a family in the kit: the renderer
+      // silently substitutes the house face, which is worth saying out loud.
+      if (element.font && !isKnownFontId(element.font)) {
+        const substitute = fontById(element.font);
+        issues.push({
+          id: `font-missing:${element.id}`,
+          severity: "warning",
+          title: `“${element.name}” uses a font that is no longer available`,
+          detail: `The saved family “${element.font}” is not in the library any more, so this layer renders in ${substitute.name}. Re-pick the family to be sure of the result.`,
+          elementId: element.id,
+        });
+      }
+      // The face could not be fetched in this browser (offline, blocked), so
+      // the capture would show a substitute instead of the chosen family.
+      if (element.font && measurements.unloadedFontIds?.includes(element.font)) {
+        const font = fontById(element.font);
+        issues.push({
+          id: `font-unloaded:${element.id}`,
+          severity: "warning",
+          title: `“${font.name}” is not loaded in this browser`,
+          detail: `“${element.name}” would export in a substitute face. Reopen the file with a connection so the family can load, then export again.`,
+          elementId: element.id,
+        });
+      }
     }
+  }
+
+  // A page with nothing visible on it prints as blank paper — usually a
+  // half-finished side, never something the host wants to pay to discover.
+  if (!page.elements.some((element) => !element.hidden)) {
+    issues.push({
+      id: "empty-page",
+      severity: "warning",
+      title: `“${page.name}” has no visible content`,
+      detail:
+        "Every layer on this page is hidden or removed for print, so it will export as blank paper.",
+    });
   }
 
   // The paper and the saved document brief can drift apart: the host may have
@@ -370,9 +471,22 @@ export function preflightDesign(
   measurements: PreflightMeasurements = {},
 ): PreflightIssue[] {
   const pages = pagesForPrint(design, settings, currentIndex);
-  const issues = pages.flatMap(({ page }) =>
-    preflightPage(page, settings, measurements),
-  );
+  const issues = pages.flatMap(({ page }) => {
+    const found = preflightPage(page, settings, measurements);
+    // The capture's clamp can leave the output below the resolution the host
+    // picked; say so with the real number rather than the requested one.
+    const art = pageArtworkRect(settings, page);
+    const actual = actualDpiFor(settings, pageSizeOf(page).width, art.w);
+    if (actual < settings.dpi * 0.95) {
+      found.push({
+        id: `dpi-cap:${page.id}`,
+        severity: "warning",
+        title: `“${page.name}” renders at about ${actual} DPI`,
+        detail: `The selected ${settings.dpi} DPI needs more scale than this browser will capture in one step, so the real output is about ${actual} DPI at this size.`,
+      });
+    }
+    return found;
+  });
 
   const paper = paperDimensions(settings);
   const paperEdges = [paper.widthMm, paper.heightMm].sort((a, b) => a - b);
@@ -470,6 +584,17 @@ export function pagesForPrint(
   const list = all.length > 0 ? all : [{ page: printablePage(design.pages[0]), index: 0 }];
   if (settings.scope === "current") {
     return [list.find((item) => item.index === currentIndex) ?? list[0]];
+  }
+  if (settings.scope === "piece") {
+    const suite = design.suite;
+    const piece = suite?.pieces.find(
+      (candidate) => candidate.id === suite.activePieceId,
+    );
+    // A design without a suite is a single piece: every page belongs to it.
+    if (!piece) return list;
+    const ids = new Set(piece.pageIds);
+    const inPiece = list.filter((item) => ids.has(item.page.id));
+    return inPiece.length > 0 ? inPiece : list;
   }
   return list;
 }
@@ -575,6 +700,12 @@ export async function buildPrintPdf(
 export interface SheetCapture {
   image: string;
   label: string;
+  /**
+   * Where the artwork sits inside the copy's trim, in millimetres from the
+   * trim's top-left — the same rectangle the single-page PDF uses, so a sheet
+   * copy keeps its margins instead of being stretched to the card.
+   */
+  art?: { x: number; y: number; w: number; h: number };
 }
 
 /**
@@ -595,6 +726,8 @@ export interface SheetLayout {
   count: number;
   /** Top-left of the first copy's media box, bleed included. */
   origin: { x: number; y: number };
+  /** False when one copy is already larger than the sheet itself. */
+  fits: boolean;
 }
 
 export const SHEET_GAP_MM = 3;
@@ -630,6 +763,9 @@ export function sheetLayoutFor(options: {
       x: Math.max(0, (options.sheet.widthMm - usedW) / 2),
       y: Math.max(0, (options.sheet.heightMm - usedH) / 2),
     },
+    // One copy bigger than the stock can never be imposed: the caller must be
+    // told instead of silently shrinking or overlapping it.
+    fits: mediaW <= options.sheet.widthMm && mediaH <= options.sheet.heightMm,
   };
 }
 
@@ -682,7 +818,7 @@ export async function buildSheetPdf(
   captures: SheetCapture[],
   layout: SheetLayout,
   title: string,
-  options: { cropMarks?: boolean } = {},
+  options: { cropMarks?: boolean; copies?: number } = {},
 ): Promise<Blob> {
   const { PDFDocument, rgb } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
@@ -697,14 +833,38 @@ export async function buildSheetPdf(
     const sheet = pdf.addPage([pageW, pageH]);
     sheet.drawRectangle({ x: 0, y: 0, width: pageW, height: pageH, color: rgb(1, 1, 1) });
     const image = images[index];
-    for (let copy = 0; copy < layout.count; copy += 1) {
+    const capture = captures[index];
+    // The host may want fewer copies than fit; never more.
+    const total = Math.max(
+      1,
+      Math.min(
+        layout.count,
+        options.copies && options.copies > 0
+          ? Math.floor(options.copies)
+          : layout.count,
+      ),
+    );
+    for (let copy = 0; copy < total; copy += 1) {
       const cell = sheetCellRect(layout, copy);
-      sheet.drawImage(image, {
-        x: mmToPt(cell.x),
-        y: pageH - mmToPt(cell.y + cell.h),
-        width: mmToPt(cell.w),
-        height: mmToPt(cell.h),
-      });
+      const art = capture.art;
+      if (art) {
+        // Place the artwork at its own rectangle inside the trim and let it
+        // reach into the bleed band, exactly like the single-page PDF.
+        const bleed = layout.bleedMm;
+        sheet.drawImage(image, {
+          x: mmToPt(cell.x + bleed + art.x - bleed),
+          y: pageH - mmToPt(cell.y + bleed + art.y - bleed + art.h + bleed * 2),
+          width: mmToPt(art.w + bleed * 2),
+          height: mmToPt(art.h + bleed * 2),
+        });
+      } else {
+        sheet.drawImage(image, {
+          x: mmToPt(cell.x),
+          y: pageH - mmToPt(cell.y + cell.h),
+          width: mmToPt(cell.w),
+          height: mmToPt(cell.h),
+        });
+      }
       if (options.cropMarks && layout.bleedMm > 0) {
         const trim = {
           x: cell.x + layout.bleedMm,

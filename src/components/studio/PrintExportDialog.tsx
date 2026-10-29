@@ -20,7 +20,9 @@ import { cn } from "@/lib/utils";
 import {
   DEFAULT_PRINT_SETTINGS,
   PAPER_SIZES,
+  actualDpiFor,
   buildPrintPdf,
+  buildSheetPdf,
   downloadBlob,
   formatMeasurement,
   formatToMillimetres,
@@ -32,6 +34,9 @@ import {
   preflightDesign,
   printableArea,
   safeFilename,
+  sheetCellRect,
+  sheetLayoutFor,
+  sheetSizeFor,
   toMm,
   type PaperId,
   type PreflightIssue,
@@ -39,6 +44,7 @@ import {
   type PrintSettings,
   type PrintUnit,
 } from "@/lib/print";
+import { ensureDesignFonts, fontById } from "@/lib/fonts";
 import {
   pageAspectOf,
   pageSizeOf,
@@ -94,6 +100,19 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 
 const smallInput =
   "field-compact h-7 border-[var(--edge)] bg-[var(--surface-card)] px-1.5 text-right text-[0.7rem] shadow-none focus-visible:ring-0";
+
+/** JPEG has no alpha channel: paint the capture onto white paper first. */
+function flattenOnWhite(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const flat = document.createElement("canvas");
+  flat.width = canvas.width;
+  flat.height = canvas.height;
+  const ctx = flat.getContext("2d");
+  if (!ctx) return canvas;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, flat.width, flat.height);
+  ctx.drawImage(canvas, 0, 0);
+  return flat;
+}
 
 function PreflightPanel({
   issues,
@@ -272,6 +291,17 @@ export function PrintExportDialog({
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
+        // Fetch every family these pages use before measuring, so the check
+        // below only ever reports a face that genuinely could not load.
+        const fontIds = new Set<string>();
+        for (const entry of selectedPages) {
+          for (const element of entry.page.elements) {
+            if (element.kind === "text" && element.font) fontIds.add(element.font);
+          }
+        }
+        ensureDesignFonts(
+          [...fontIds].map((id) => ({ id, weight: fontById(id).weights[0] ?? 400 })),
+        );
         if (document.fonts?.ready) await document.fonts.ready;
         const roots = selectedPages
           .map((entry) => captureRefs.current[entry.page.id])
@@ -317,7 +347,18 @@ export function PrintExportDialog({
             }
           }
         }
-        if (!cancelled) setMeasurements({ imageWidths, textHeights });
+        // Faces that still will not load after that attempt are the only ones
+        // worth reporting.
+        const unloadedFontIds: string[] = [];
+        if (document.fonts) {
+          for (const id of fontIds) {
+            const font = fontById(id);
+            const spec = `${font.weights[0] ?? 400} 20px "${font.name}"`;
+            if (!document.fonts.check(spec)) unloadedFontIds.push(id);
+          }
+        }
+        if (!cancelled)
+          setMeasurements({ imageWidths, textHeights, unloadedFontIds });
       } catch {
         // Measurement is advisory; export still works if it cannot run.
       }
@@ -326,7 +367,7 @@ export function PrintExportDialog({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [open, selectedPages, settings.includeBackground]);
+  }, [open, selectedPages, settings.includeBackground, settings.transparent]);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const previewEntry =
     selectedPages.find((entry) => entry.page.id === previewId) ??
@@ -352,7 +393,83 @@ export function PrintExportDialog({
   };
 
   const exportPage = (source: DesignPage): DesignPage =>
-    settings.includeBackground ? source : { ...source, background: "#ffffff" };
+    // Transparent wins: the export carries no background at all, so a PNG
+    // keeps its alpha channel and a PDF falls back to the white sheet.
+    settings.transparent
+      ? { ...source, background: "transparent" }
+      : settings.includeBackground
+        ? source
+        : { ...source, background: "#ffffff" };
+
+  /* ------------------------------- sheet imposition ---------------------- */
+
+  const sheet = sheetSizeFor(settings);
+  const sheetLayout = useMemo(() => {
+    const trim = paperDimensions(settings);
+    return sheetLayoutFor({
+      trim,
+      sheet,
+      bleedMm: Math.max(0, settings.bleed),
+      gapMm: Math.max(0, settings.sheetGapMm ?? 3),
+      rotate: Boolean(settings.sheetRotate),
+    });
+    // `sheet` is a fresh object each render, so it is derived from settings.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+  const sheetCopies = Math.max(
+    1,
+    Math.min(
+      sheetLayout.count,
+      settings.sheetCopies && settings.sheetCopies > 0
+        ? Math.floor(settings.sheetCopies)
+        : sheetLayout.count,
+    ),
+  );
+  const sheetName =
+    (PAPER_SIZES.find((paper) => paper.id === (settings.sheetPaper ?? "a4"))
+      ?.name ?? "Custom") + (settings.sheetPaper === "custom" ? " sheet" : "");
+  const previewArt = previewEntry
+    ? pageArtworkRect(settings, previewEntry.page)
+    : null;
+
+  const exportSheet = async () => {
+    if (busy || !sheetLayout.fits) return;
+    setError(null);
+    setDone(false);
+    setBusy("Preparing sheet");
+    try {
+      await prepareCapture();
+      const captures: Parameters<typeof buildSheetPdf>[0] = [];
+      for (let index = 0; index < selectedPages.length; index += 1) {
+        const entry = selectedPages[index];
+        setBusy(`Drawing sheet ${index + 1} of ${selectedPages.length}`);
+        const canvas = await capturePageCanvas(entry);
+        const artRect = pageArtworkRect(settings, entry.page);
+        captures.push({
+          image: canvas.toDataURL("image/png"),
+          label: entry.page.name,
+          art: { x: artRect.x, y: artRect.y, w: artRect.w, h: artRect.h },
+        });
+        canvas.width = 1;
+        canvas.height = 1;
+      }
+      setBusy("Composing sheet PDF");
+      const blob = await buildSheetPdf(captures, sheetLayout, title, {
+        cropMarks: settings.cropMarks,
+        copies: sheetCopies,
+      });
+      downloadBlob(blob, `${safeFilename(title)}-sheet.pdf`);
+      setDone(true);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "The sheet PDF could not be generated in this browser.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // Renders each selected page from its live canvas node. Everything else —
   // PDF and flat images alike — is built from these exact captures, so print
@@ -369,7 +486,8 @@ export function PrintExportDialog({
       scale,
       dpr: 1,
       embedFonts: true,
-      backgroundColor: settings.includeBackground ? undefined : "#ffffff",
+      backgroundColor:
+        settings.transparent || settings.includeBackground ? undefined : "#ffffff",
     });
     return await shot.toCanvas();
   };
@@ -392,9 +510,19 @@ export function PrintExportDialog({
         const entry = selectedPages[index];
         setBusy(`Rendering image ${index + 1} of ${selectedPages.length}`);
         const canvas = await capturePageCanvas(entry);
+        // JPEG cannot store alpha, so a transparent capture is painted onto
+        // white paper instead of coming out black.
+        const flat =
+          format === "jpeg" && settings.transparent
+            ? flattenOnWhite(canvas)
+            : canvas;
         const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, format === "png" ? "image/png" : "image/jpeg", 0.94),
+          flat.toBlob(resolve, format === "png" ? "image/png" : "image/jpeg", 0.94),
         );
+        if (flat !== canvas) {
+          flat.width = 1;
+          flat.height = 1;
+        }
         canvas.width = 1;
         canvas.height = 1;
         if (!blob) throw new Error("This browser could not encode the image.");
@@ -667,7 +795,8 @@ export function PrintExportDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All pages</SelectItem>
+                      <SelectItem value="all">All pages · full suite</SelectItem>
+                      <SelectItem value="piece">This piece</SelectItem>
                       <SelectItem value="current">This page</SelectItem>
                     </SelectContent>
                   </Select>
@@ -690,6 +819,20 @@ export function PrintExportDialog({
                   </Select>
                 </FieldRow>
               </div>
+              <p className="text-[9px] leading-relaxed text-ink/40">
+                Actual output for the previewed page:{" "}
+                <span className="font-medium text-ink/60">
+                  {previewEntry
+                    ? `${actualDpiFor(
+                        settings,
+                        pageSizeOf(previewEntry.page).width,
+                        art.w,
+                      )} DPI`
+                    : `${settings.dpi} DPI`}
+                </span>{" "}
+                at {formatMeasurement(art.w, settings.unit)} wide — the capture is
+                scaled to hit the selected resolution and its browser limit.
+              </p>
               <label className="flex items-center justify-between gap-2">
                 <span className="text-[11px] text-ink/60">Include page background</span>
                 <Switch
@@ -698,6 +841,19 @@ export function PrintExportDialog({
                   className="scale-90"
                 />
               </label>
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-ink/60">Transparent background</span>
+                <Switch
+                  checked={Boolean(settings.transparent)}
+                  onCheckedChange={(transparent) => patch({ transparent })}
+                  className="scale-90"
+                />
+              </label>
+              <p className="text-[9px] leading-relaxed text-ink/40">
+                PNG keeps the alpha channel — no background at all. JPEG has no
+                transparency and is painted onto white paper instead; the PDF
+                sheet stays white.
+              </p>
               <label className="flex items-center justify-between gap-2">
                 <span className="text-[11px] text-ink/60">Show print guides</span>
                 <Switch
@@ -708,6 +864,169 @@ export function PrintExportDialog({
               </label>
               <p className="text-[9px] leading-relaxed text-ink/40">
                 Guides and safe-area lines are preview-only and never printed.
+              </p>
+            </Section>
+
+            <Section title="Print sheet · multiple copies">
+              <FieldRow label="Sheet">
+                <Select
+                  value={settings.sheetPaper ?? "a4"}
+                  onValueChange={(value) => patch({ sheetPaper: value as PaperId })}
+                >
+                  <SelectTrigger className="h-7 rounded-none text-[11px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAPER_SIZES.map((paper) => (
+                      <SelectItem key={paper.id} value={paper.id}>
+                        {paper.name}
+                        {paper.id === "custom"
+                          ? ""
+                          : ` · ${Math.round(paper.widthMm)}×${Math.round(paper.heightMm)} mm`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FieldRow>
+              {settings.sheetPaper === "custom" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <FieldRow label="Sheet width">
+                    <UnitInput
+                      valueMm={toMm(settings.sheetWidth ?? 297, settings.unit)}
+                      unit={settings.unit}
+                      onChange={(mm) =>
+                        patch({ sheetWidth: fromMm(mm, settings.unit) })
+                      }
+                    />
+                  </FieldRow>
+                  <FieldRow label="Sheet height">
+                    <UnitInput
+                      valueMm={toMm(settings.sheetHeight ?? 420, settings.unit)}
+                      unit={settings.unit}
+                      onChange={(mm) =>
+                        patch({ sheetHeight: fromMm(mm, settings.unit) })
+                      }
+                    />
+                  </FieldRow>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <FieldRow label={`Gap (${settings.unit})`}>
+                  <UnitInput
+                    valueMm={settings.sheetGapMm ?? 3}
+                    unit={settings.unit}
+                    onChange={(mm) =>
+                      patch({ sheetGapMm: Math.max(0, Math.round(mm * 10) / 10) })
+                    }
+                  />
+                </FieldRow>
+                <FieldRow label="Copies · 0 = fit">
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={sheetLayout.count}
+                    value={String(settings.sheetCopies ?? 0)}
+                    onChange={(event) => {
+                      const parsed = Number(event.target.value);
+                      if (Number.isFinite(parsed))
+                        patch({ sheetCopies: Math.max(0, Math.floor(parsed)) });
+                    }}
+                    className={cn(smallInput, "w-full")}
+                  />
+                </FieldRow>
+              </div>
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-ink/60">Turn copies 90° to fit</span>
+                <Switch
+                  checked={Boolean(settings.sheetRotate)}
+                  onCheckedChange={(sheetRotate) => patch({ sheetRotate })}
+                  className="scale-90"
+                />
+              </label>
+
+              {sheetLayout.fits ? (
+                <div className="space-y-1.5">
+                  {/* The whole sheet, to scale: every cell is the copy's media
+                      box (trim + bleed) with the artwork inside it. */}
+                  <div
+                    className="relative w-full border border-ink/25 bg-white shadow-[var(--shadow-xs)]"
+                    style={{ aspectRatio: `${sheet.widthMm} / ${sheet.heightMm}` }}
+                  >
+                    {Array.from({
+                      length: Math.min(sheetCopies, 24),
+                    }).map((_, index) => {
+                      const cell = sheetCellRect(sheetLayout, index);
+                      return (
+                        <span
+                          key={index}
+                          className="absolute border border-ink/30"
+                          style={{
+                            left: `${(cell.x / sheet.widthMm) * 100}%`,
+                            top: `${(cell.y / sheet.heightMm) * 100}%`,
+                            width: `${(cell.w / sheet.widthMm) * 100}%`,
+                            height: `${(cell.h / sheet.heightMm) * 100}%`,
+                          }}
+                        >
+                          {previewArt && previewEntry && (
+                            <span
+                              className="absolute block"
+                              style={{
+                                left: `${((settings.bleed + previewArt.x) / cell.w) * 100}%`,
+                                top: `${((settings.bleed + previewArt.y) / cell.h) * 100}%`,
+                                width: `${(previewArt.w / cell.w) * 100}%`,
+                                height: `${(previewArt.h / cell.h) * 100}%`,
+                                background: previewEntry.page.background,
+                              }}
+                            />
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] leading-relaxed text-ink/40">
+                    {sheetCopies} {sheetCopies === 1 ? "copy" : "copies"} of “
+                    {previewEntry?.page.name ?? "this page"}” on {sheetName} ({formatMeasurement(
+                      sheet.widthMm,
+                      settings.unit,
+                    )} × {formatMeasurement(sheet.heightMm, settings.unit)}), {sheetLayout.columns}{" "}
+                    × {sheetLayout.rows} with{" "}
+                    {settings.bleed > 0
+                      ? `${settings.bleed} mm bleed between copies`
+                      : "no bleed"}
+                    . Schematic — every copy renders exactly like the preview above.
+                  </p>
+                </div>
+              ) : (
+                <p className="border border-[var(--red)]/30 bg-[var(--red)]/5 p-2 text-[10px] leading-relaxed text-[var(--red)]">
+                  One copy ({formatMeasurement(
+                    paperDimensions(settings).widthMm + settings.bleed * 2,
+                    settings.unit,
+                  )} × {formatMeasurement(
+                    paperDimensions(settings).heightMm + settings.bleed * 2,
+                    settings.unit,
+                  )}{settings.sheetRotate ? ", turned" : ""}) is larger than this sheet. Choose a bigger
+                  sheet, or turn the copies off.
+                </p>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void exportSheet()}
+                disabled={Boolean(busy) || !sheetLayout.fits}
+                className="h-8 w-full rounded-none text-[9px] uppercase tracking-[0.12em]"
+              >
+                <Download className="size-3.5" />
+                {busy && busy.toLowerCase().includes("sheet")
+                  ? busy
+                  : `Download sheet PDF · ${sheetCopies} ${sheetCopies === 1 ? "copy" : "copies"}`}
+              </Button>
+              <p className="text-[9px] leading-relaxed text-ink/35">
+                Copies are placed from the sheet's own grid — spacing {settings.sheetGapMm ?? 3}{" "}
+                mm apart and centred — so they can never overlap, and crop marks{" "}
+                {settings.cropMarks ? "mark every trim edge" : "are off"}. Same RGB,
+                rasterised output as the single-page PDF.
               </p>
             </Section>
 

@@ -4,6 +4,8 @@ import {
   outputDimensions,
   printableArea,
   artworkRect,
+  actualDpiFor,
+  captureScaleFor,
   formatToMillimetres,
   overflowElements,
   pageArtworkRect,
@@ -12,6 +14,9 @@ import {
   preflightPage,
   printablePage,
   safeFilename,
+  sheetCellRect,
+  sheetLayoutFor,
+  sheetSizeFor,
   DEFAULT_PRINT_SETTINGS,
   type PrintSettings,
 } from "./print";
@@ -40,6 +45,241 @@ function makeDesign(pages: DesignPage[]): DesignDocument {
     transition: { preset: "fade", duration: 600 },
   };
 }
+
+function makeTextElement(
+  id: string,
+  font = "cormorant-garamond",
+  hidden = false,
+): DesignElement {
+  return {
+    id,
+    kind: "text",
+    name: "Names",
+    x: 10,
+    y: 10,
+    w: 240,
+    h: 80,
+    rotation: 0,
+    opacity: 1,
+    locked: false,
+    hidden,
+    text: "Alexandra & Omar",
+    font,
+    fontSize: 40,
+    fontWeight: 400,
+    align: "center",
+    color: "#161616",
+    animation: {
+      enabled: true,
+      preset: "fade",
+      trigger: "load",
+      delay: 0,
+      duration: 1000,
+      easing: "easeOut",
+    },
+  } as DesignElement;
+}
+
+describe("capture resolution", () => {
+  const settings: PrintSettings = { ...DEFAULT_PRINT_SETTINGS, dpi: 300 };
+
+  it("lands on the chosen DPI when the browser clamp is not in play", () => {
+    // A 480 px page printed 105 mm wide at 300 DPI wants 1240 px — under the
+    // 6× cap, so the output really is 300 DPI.
+    expect(captureScaleFor(settings, 480, 105)).toBeCloseTo(
+      ((105 / 25.4) * 300) / 480,
+      6,
+    );
+    expect(actualDpiFor(settings, 480, 105)).toBe(300);
+  });
+
+  it("reports the real, lower DPI when the scale is clamped", () => {
+    // 200 mm at 300 DPI wants 2362 px from a 300 px page: 7.9×, capped at 6×.
+    const actual = actualDpiFor(settings, 300, 200);
+    expect(actual).toBeLessThan(300);
+    expect(actual).toBeCloseTo(229, 0);
+  });
+
+  it("never divides by a zero-sized page", () => {
+    const actual = actualDpiFor(settings, 0, 105);
+    expect(Number.isFinite(actual)).toBe(true);
+    expect(actual).toBeGreaterThan(0);
+  });
+});
+
+describe("sheet stock", () => {
+  it("reads the chosen stock in millimetres", () => {
+    expect(sheetSizeFor({ ...DEFAULT_PRINT_SETTINGS, sheetPaper: "a3" })).toEqual({
+      widthMm: 297,
+      heightMm: 420,
+    });
+  });
+
+  it("converts a custom sheet from the chosen unit", () => {
+    const settings: PrintSettings = {
+      ...DEFAULT_PRINT_SETTINGS,
+      sheetPaper: "custom",
+      unit: "in",
+      sheetWidth: 11,
+      sheetHeight: 17,
+    };
+    expect(sheetSizeFor(settings).widthMm).toBeCloseTo(279.4, 1);
+    expect(sheetSizeFor(settings).heightMm).toBeCloseTo(431.8, 1);
+  });
+});
+
+describe("sheet placement safety", () => {
+  it("keeps every copy inside the sheet with the full gap between them", () => {
+    const layout = sheetLayoutFor({
+      // A7-sized cards impose two-by-two on A4 with room to spare.
+      trim: { widthMm: 74, heightMm: 105 },
+      sheet: { widthMm: 210, heightMm: 297 },
+      bleedMm: 3,
+      gapMm: 4,
+    });
+    expect(layout.fits).toBe(true);
+    expect(layout.count).toBeGreaterThan(1);
+
+    const cells = Array.from({ length: layout.count }, (_, index) =>
+      sheetCellRect(layout, index),
+    );
+    for (const cell of cells) {
+      expect(cell.x).toBeGreaterThanOrEqual(-1e-6);
+      expect(cell.y).toBeGreaterThanOrEqual(-1e-6);
+      expect(cell.x + cell.w).toBeLessThanOrEqual(210 + 1e-6);
+      expect(cell.y + cell.h).toBeLessThanOrEqual(297 + 1e-6);
+    }
+    // Neighbours in a row are exactly the gap apart — no overlap, ever.
+    if (layout.columns > 1) {
+      const [first, second] = cells;
+      expect(second.x - (first.x + first.w)).toBeCloseTo(4, 5);
+    }
+    // And the grid is centred: the left and right margins match.
+    const lastCell = cells[cells.length - 1];
+    expect(cells[0].x).toBeCloseTo(210 - (lastCell.x + lastCell.w), 5);
+  });
+
+  it("refuses to impose a copy larger than the stock", () => {
+    const layout = sheetLayoutFor({
+      trim: { widthMm: 300, heightMm: 400 },
+      sheet: { widthMm: 210, heightMm: 297 },
+    });
+    expect(layout.fits).toBe(false);
+    // The grid still reports exactly one cell, so nothing can overlap.
+    expect(layout.count).toBe(1);
+  });
+});
+
+describe("preflight: content, fonts and real DPI", () => {
+  it("flags a page with nothing visible on it", () => {
+    const empty = preflightPage(makePage("p1", "Back", []), DEFAULT_PRINT_SETTINGS);
+    expect(
+      empty.find((issue) => issue.id === "empty-page")?.severity,
+    ).toBe("warning");
+
+    const withContent = preflightPage(
+      makePage("p2", "Front", [makeTextElement("t1")]),
+      DEFAULT_PRINT_SETTINGS,
+    );
+    expect(withContent.some((issue) => issue.id === "empty-page")).toBe(false);
+
+    const onlyHidden = preflightPage(
+      makePage("p3", "Side", [makeTextElement("t2", "cormorant-garamond", true)]),
+      DEFAULT_PRINT_SETTINGS,
+    );
+    expect(onlyHidden.some((issue) => issue.id === "empty-page")).toBe(true);
+  });
+
+  it("names the substitute when a saved font is no longer in the kit", () => {
+    const issues = preflightPage(
+      makePage("p", "Front", [makeTextElement("t1", "retired-font")]),
+      DEFAULT_PRINT_SETTINGS,
+    );
+    const issue = issues.find((found) => found.id === "font-missing:t1");
+    expect(issue?.severity).toBe("warning");
+    expect(issue?.elementId).toBe("t1");
+    expect(issue?.detail).toContain("Cormorant Garamond");
+  });
+
+  it("reports only faces that genuinely failed to load", () => {
+    const page = makePage("p", "Front", [makeTextElement("t1", "amiri")]);
+    const failed = preflightPage(page, DEFAULT_PRINT_SETTINGS, {
+      unloadedFontIds: ["amiri"],
+    });
+    expect(failed.find((issue) => issue.id === "font-unloaded:t1")?.severity).toBe(
+      "warning",
+    );
+
+    const loaded = preflightPage(page, DEFAULT_PRINT_SETTINGS, {
+      unloadedFontIds: [],
+    });
+    expect(loaded.some((issue) => issue.id.startsWith("font-unloaded"))).toBe(
+      false,
+    );
+  });
+
+  it("warns when the capture clamp drops the output below the chosen DPI", () => {
+    const settings: PrintSettings = {
+      ...DEFAULT_PRINT_SETTINGS,
+      paper: "custom",
+      orientation: "portrait",
+      unit: "mm",
+      customWidth: 200,
+      customHeight: 200,
+      margins: { top: 0, right: 0, bottom: 0, left: 0 },
+      fit: "fill",
+      dpi: 300,
+    };
+    // A 300 px-wide page printed 200 mm wide needs 7.9× — over the 6× cap.
+    const page: DesignPage = {
+      ...makePage("p", "Wide", [makeTextElement("t1")]),
+      width: 300,
+      height: 400,
+    };
+    const issues = preflightDesign(makeDesign([page]), settings, 0);
+    const capped = issues.find((issue) => issue.id.startsWith("dpi-cap:"));
+    expect(capped?.severity).toBe("warning");
+    expect(capped?.detail).toContain("DPI");
+
+    // A roomy page keeps its promise and says nothing.
+    const calm = preflightDesign(
+      makeDesign([{ ...page, width: 3000, height: 4000 }]),
+      settings,
+      0,
+    );
+    expect(calm.some((issue) => issue.id.startsWith("dpi-cap:"))).toBe(false);
+  });
+});
+
+describe("piece scope", () => {
+  it("exports only the active piece's pages", () => {
+    const pages = [
+      makePage("p1", "Front", []),
+      makePage("p2", "Back", []),
+      makePage("p3", "Reply", []),
+    ];
+    const design = makeDesign(pages);
+    (design as { suite?: unknown }).suite = {
+      activePieceId: "piece-a",
+      pieces: [
+        { id: "piece-a", name: "Invitation", pageIds: ["p1", "p2"] },
+        { id: "piece-b", name: "Reply card", pageIds: ["p3"] },
+      ],
+    };
+    const list = pagesForPrint(design, { ...DEFAULT_PRINT_SETTINGS, scope: "piece" }, 0);
+    expect(list.map((entry) => entry.page.id)).toEqual(["p1", "p2"]);
+  });
+
+  it("treats a design without a suite as one piece", () => {
+    const pages = [makePage("p1", "Front", []), makePage("p2", "Back", [])];
+    const list = pagesForPrint(
+      makeDesign(pages),
+      { ...DEFAULT_PRINT_SETTINGS, scope: "piece" },
+      0,
+    );
+    expect(list).toHaveLength(2);
+  });
+});
 
 describe("print geometry", () => {
   it("computes A4 portrait dimensions", () => {
@@ -586,11 +826,12 @@ describe("print preflight", () => {
       0,
     );
     expect(issues).toEqual([
+      expect.objectContaining({ id: "empty-page", severity: "warning" }),
       expect.objectContaining({ id: "paper-format", severity: "info" }),
     ]);
   });
 
-  it("stays quiet when the paper matches the brief in either orientation", () => {
+  it("stays quiet about the paper when it matches the brief in either orientation", () => {
     const design = {
       ...makeDesign([makePage("p0", "Invitation", [])]),
       format: {
@@ -602,19 +843,21 @@ describe("print preflight", () => {
         bleed: 3,
       },
     };
+    // The fixture page is empty, so the only note is the honest empty-page one.
     expect(
       preflightDesign(
         design,
         { ...settings, paper: "a5", orientation: "landscape" },
         0,
       ),
-    ).toEqual([]);
+    ).toEqual([expect.objectContaining({ id: "empty-page" })]);
   });
 
   it("notes that Fill crops an off-proportion card", () => {
     const design = makeDesign([makePage("p0", "Invitation", [])]);
     const issues = preflightDesign(design, { ...settings, fit: "fill" }, 0);
     expect(issues).toEqual([
+      expect.objectContaining({ id: "empty-page", severity: "warning" }),
       expect.objectContaining({ id: "fill-crop", severity: "info" }),
     ]);
   });
