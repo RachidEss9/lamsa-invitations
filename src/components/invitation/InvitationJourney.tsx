@@ -378,11 +378,6 @@ export function InvitationJourney({
               rtl={rtl}
               autoOpen={design.opening.autoOpen}
               reducedMotion={reducedMotion}
-              coverUrl={
-                design.opening.coverStorageId
-                  ? imageUrls[design.opening.coverStorageId]
-                  : undefined
-              }
               onDone={handleOpeningDone}
             />
           ) : (

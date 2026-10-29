@@ -42,8 +42,8 @@ function design(): DesignDocument {
       },
     ],
     opening: {
-      experience: "envelope",
-      duration: 1400,
+      experience: "cinematic",
+      duration: 3200,
       autoOpen: false,
       welcome: "For {{guest}}",
     },
@@ -82,9 +82,12 @@ describe("invitation journey rendering", () => {
     );
     // The opening stage renders its own tap affordance before any page, and
     // the invitation card inside it is the saved first section itself.
-    expect(html).toContain("Tap the seal to begin");
+    expect(html).toContain("Begin the reveal");
     expect(html).toContain("Amelia &amp; Søren");
     expect(html).toContain("data-opening-card");
+    // Exactly one invitation and one environment — no duplicate reveal layer.
+    expect(html.split("data-opening-card").length - 1).toBe(1);
+    expect(html.split("data-opening-environment").length - 1).toBe(1);
     expect(html).not.toContain("Close the invitation");
     expect(html).not.toContain("data-journey-cue");
   });

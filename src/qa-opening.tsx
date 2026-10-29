@@ -1,16 +1,24 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { InteractiveOpening } from "@/components/invitation/InteractiveOpening";
-import { defaultAnimation, type DesignPage } from "@/lib/design";
+import { OpeningStage } from "@/components/invitation/OpeningStage";
+import {
+  defaultAnimation,
+  type DesignPage,
+  type OpeningExperienceId,
+  type OpeningSettings,
+} from "@/lib/design";
 import "./index.css";
 
-/** Standalone harness for the reference-driven opening: open qa-opening.html
- * through the dev server, tap the wax seal and step through the real scene —
- * the same renderer the Studio preview and the published invitation use.
+/**
+ * Standalone harness for the opening engine: open qa-opening.html through the
+ * dev server to watch the same renderer the Studio preview and the published
+ * invitation use, with a real (if small) invitation being revealed.
  */
 const page: DesignPage = {
   id: "qa",
   name: "QA",
+  width: 1000,
+  height: 1333,
   background: "#f6f1e6",
   elements: [
     {
@@ -54,35 +62,64 @@ const page: DesignPage = {
   ],
 };
 
+const STYLES: OpeningExperienceId[] = ["cinematic", "monogram", "silk"];
+
+function openingFor(style: OpeningExperienceId): OpeningSettings {
+  return {
+    experience: style,
+    duration: 3200,
+    autoOpen: true,
+    welcome: "For {{guest}}",
+  };
+}
+
 function Harness() {
+  const [style, setStyle] = useState<OpeningExperienceId>("cinematic");
   const [runs, setRuns] = useState(0);
   const [done, setDone] = useState(false);
 
   return (
     <div className="relative h-screen w-screen bg-[#101010] text-[#f6f1e6]">
-      <InteractiveOpening
-        key={runs}
-        variant="full"
+      <OpeningStage
+        key={`${style}-${runs}`}
+        opening={openingFor(style)}
         page={page}
+        imageUrls={{}}
         accent="#a3182f"
         background="#f6f1e6"
         ink="#4a000d"
+        guestName="Amira"
+        names="Amira & Yusuf"
         onDone={() => setDone(true)}
         className="absolute inset-0"
       />
-      <div className="absolute left-3 top-3 z-30 flex gap-2">
+      <div className="absolute left-3 top-3 z-50 flex flex-wrap gap-2">
+        {STYLES.map((styleId) => (
+          <button
+            key={styleId}
+            type="button"
+            className="rounded border border-white/30 bg-black/50 px-3 py-1.5 text-[11px] uppercase tracking-widest"
+            onClick={() => {
+              setDone(false);
+              setStyle(styleId);
+              setRuns((value) => value + 1);
+            }}
+          >
+            {styleId}
+          </button>
+        ))}
         <button
           type="button"
           className="rounded border border-white/30 bg-black/50 px-3 py-1.5 text-[11px] uppercase tracking-widest"
           onClick={() => {
             setDone(false);
-            setRuns((n) => n + 1);
+            setRuns((value) => value + 1);
           }}
         >
           Replay
         </button>
         <span className="rounded border border-white/15 bg-black/50 px-3 py-1.5 text-[11px]">
-          {done ? "opened" : "sealed"}
+          {done ? "opened" : "closed"}
         </span>
       </div>
     </div>

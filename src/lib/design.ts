@@ -12,28 +12,6 @@ import {
   type InvitationContent,
   type MotifId,
 } from "@/lib/invitation";
-import { normalizeSequence, type OpeningStep } from "@/lib/opening-sequence";
-import {
-  normalizeInteractiveOpening,
-  type InteractiveOpeningSettings,
-} from "@/lib/opening-interactive";
-
-// The sequence model lives with its timing maths so the editor, the stage and
-// the tests share one definition.
-export { OPENING_STEP_ROLES } from "@/lib/opening-sequence";
-export type { OpeningStep, OpeningStepRole } from "@/lib/opening-sequence";
-// The guest-driven opening engine: its scenes, layers and settings.
-export {
-  INTERACTIVE_OPENING_SCENES,
-  OPENING_LAYERS,
-} from "@/lib/opening-interactive";
-export type {
-  InteractiveOpeningMotion,
-  InteractiveOpeningSceneId,
-  InteractiveOpeningSettings,
-  OpeningLayerAsset,
-  OpeningLayerId,
-} from "@/lib/opening-interactive";
 
 /**
  * The canvas studio document.
@@ -666,44 +644,56 @@ export function canvasScaleFor(page?: Pick<DesignPage, "width" | "height"> | nul
   return pageSizeOf(page).width / DESIGN_WIDTH;
 }
 
-export type OpeningExperienceId =
-  | "none"
-  | "envelope"
-  | "wax-seal"
-  | "arch"
-  | "curtain"
-  | "door"
-  | "cards"
-  | "folding"
-  | "paper"
-  | "box"
-  | "typography"
-  | "floral"
-  | "cinematic"
-  | "image"
-  | "fade"
-  | "personal";
+/**
+ * The three opening styles the engine actually renders, plus "none".
+ *
+ * Values that used to name a procedural scene (`envelope`, `curtain`, `door`,
+ * …) are no longer part of the model: the opening system was rebuilt around
+ * one engine, so `legacyOpeningStyle` maps anything saved before it to the
+ * style that reads closest.
+ */
+export type OpeningExperienceId = "none" | "cinematic" | "monogram" | "silk";
+
+/** Invitations saved under a pre-engine opening arrive with their old name. */
+const LEGACY_OPENING_STYLES: Record<string, OpeningExperienceId> = {
+  none: "none",
+  cinematic: "cinematic",
+  fade: "cinematic",
+  image: "cinematic",
+  envelope: "cinematic",
+  "wax-seal": "cinematic",
+  arch: "cinematic",
+  door: "cinematic",
+  box: "cinematic",
+  cards: "cinematic",
+  typography: "monogram",
+  personal: "monogram",
+  curtain: "silk",
+  floral: "silk",
+  folding: "silk",
+  paper: "silk",
+};
+
+/** Coerce a saved experience value onto one the engine can render. */
+export function toOpeningExperience(
+  value: unknown,
+  fallback: OpeningExperienceId = "none",
+): OpeningExperienceId {
+  if (typeof value !== "string") return fallback;
+  if (value === "none" || value === "cinematic" || value === "monogram" || value === "silk") {
+    return value;
+  }
+  return LEGACY_OPENING_STYLES[value] ?? fallback;
+}
 
 export const OPENING_EXPERIENCES: {
   id: OpeningExperienceId;
   label: string;
   note: string;
 }[] = [
-  { id: "envelope", label: "Envelope", note: "A wax seal cracks a crimson envelope open" },
-  { id: "wax-seal", label: "Wax seal", note: "A single seal breaks over dark paper" },
-  { id: "arch", label: "Glowing arch", note: "A lit arch opens onto the invitation" },
-  { id: "curtain", label: "Curtain", note: "Two heavy panels part slowly" },
-  { id: "door", label: "Double doors", note: "Panelled doors swing inward" },
-  { id: "cards", label: "Layered cards", note: "Stacked paper lifts away one by one" },
-  { id: "folding", label: "Folding card", note: "A gate-fold card opens in three panels" },
-  { id: "paper", label: "Paper unfold", note: "A creased sheet flattens across the screen" },
-  { id: "box", label: "Gift box", note: "A keepsake box lifts its lid and presents the card" },
-  { id: "typography", label: "Typography reveal", note: "The names are set, then the card appears" },
-  { id: "floral", label: "Floral reveal", note: "An ornamental wreath opens around the card" },
-  { id: "cinematic", label: "Cinematic layers", note: "Letterbox bars and a slow zoom part" },
-  { id: "image", label: "Image opening", note: "A cover photograph opens into the invitation" },
-  { id: "fade", label: "Cinematic fade", note: "A slow reveal from darkness" },
-  { id: "personal", label: "Personal welcome", note: "A named greeting before the card" },
+  { id: "cinematic", label: "Cinematic Reveal", note: "A soft spotlight and gentle depth uncover the invitation" },
+  { id: "monogram", label: "Golden Monogram", note: "Metallic initials set the tone, then give way to the card" },
+  { id: "silk", label: "Silk Flow", note: "A ribbon sweeps across and draws the invitation into view" },
   { id: "none", label: "No opening", note: "Opens directly on the first page" },
 ];
 
@@ -779,20 +769,8 @@ export interface OpeningSettings {
   motion?: OpeningMotion;
   /** Optional physical envelope; omitted keeps the classic suite. */
   stationery?: EnvelopeSettings;
-  /**
-   * The ordered choreography the Opening Designer edits. Absent on every
-   * invitation saved before sequences existed, which keep the preset's own
-   * timing untouched — a missing sequence is never a behaviour change.
-   */
-  sequence?: OpeningStep[];
   /** Stage background behind the suite; absent keeps the page or suite gradient. */
   background?: string;
-  /**
-   * The guest-driven opening: an envelope the visitor unseals and opens by
-   * hand. Absent means the invitation keeps its automatic opening exactly as
-   * saved, so nothing changes for designs created before the engine existed.
-   */
-  interactive?: InteractiveOpeningSettings;
 }
 
 export type ClosingStyleId = "message" | "seal" | "curtain" | "fade";
@@ -1627,13 +1605,14 @@ export function createDefaultDesign(content: InvitationContent): DesignDocument 
       },
     ],
     opening: {
+      // The v4 reveal layouts map onto the styles the engine actually renders.
       experience:
         content.layout === "envelope"
-          ? "envelope"
+          ? "cinematic"
           : content.layout === "arch"
-            ? "arch"
+            ? "cinematic"
             : content.layout === "ribbon"
-              ? "curtain"
+              ? "silk"
               : "none",
       duration: 2600,
       autoOpen: false,
@@ -1775,18 +1754,15 @@ export function normalizeDesign(
     opening: {
       ...fallback.opening,
       ...(value.opening ?? {}),
-      experience: value.opening?.experience ?? "none",
-      // A sequence is repaired rather than trusted: junk roles and timings are
-      // dropped, and an invitation saved before sequences existed keeps none.
-      sequence: normalizeSequence(value.opening?.sequence),
       background:
         typeof value.opening?.background === "string" &&
         value.opening.background.trim()
           ? value.opening.background
           : undefined,
-      // The interactive opening is repaired on load: a disabled or damaged
-      // configuration simply falls back to the saved automatic opening.
-      interactive: normalizeInteractiveOpening(value.opening?.interactive),
+      // The opening experience is repaired on load: an invitation saved under
+      // one of the removed procedural scenes maps onto the style that reads
+      // closest, so no old invitation opens on a missing renderer.
+      experience: toOpeningExperience(value.opening?.experience),
     },
     closing: {
       ...fallback.closing,
@@ -2020,36 +1996,12 @@ export function pageTransitionStyle(
 
 export function openingHint(experience: OpeningExperienceId): string {
   switch (experience) {
-    case "envelope":
-      return "Break the seal";
-    case "wax-seal":
-      return "Press the seal";
-    case "folding":
-      return "Open the fold";
-    case "paper":
-      return "Unfold the paper";
-    case "box":
-      return "Lift the lid";
-    case "typography":
-      return "Reveal the names";
-    case "floral":
-      return "Part the wreath";
     case "cinematic":
-      return "Begin";
-    case "image":
+      return "Begin the reveal";
+    case "monogram":
+      return "Reveal the names";
+    case "silk":
       return "Open the invitation";
-    case "arch":
-      return "Step through the arch";
-    case "curtain":
-      return "Draw the curtain";
-    case "door":
-      return "Open the doors";
-    case "cards":
-      return "Lift the card";
-    case "fade":
-      return "Begin";
-    case "personal":
-      return "Open your invitation";
     default:
       return "";
   }

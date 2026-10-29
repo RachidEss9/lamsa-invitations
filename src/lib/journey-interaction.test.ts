@@ -135,8 +135,8 @@ describe("guest journey interaction", () => {
 
     const withOpening = design();
     withOpening.opening = {
-      experience: "envelope",
-      duration: 1200,
+      experience: "cinematic",
+      duration: 3200,
       autoOpen: false,
       welcome: "",
     };
@@ -150,16 +150,19 @@ describe("guest journey interaction", () => {
       }),
     );
 
-    // The envelope suite runs the reference engine even though this saved
-    // design carries no guest-driven settings: the guest taps the real seal.
-    const open = buttonByLabel(container, "Tap the seal to begin");
+    // The opening suite runs the real engine even though this saved design
+    // carries no guest-driven settings: the guest taps the start prompt.
+    const open = buttonByLabel(container, "Begin the reveal");
     expect(open).toBeTruthy();
     act(() => open?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(
       container
-        .querySelector("[data-interactive-opening]")
+        .querySelector("[data-opening-engine]")
         ?.getAttribute("data-stage"),
-    ).toBe("breaking");
+    ).toBe("playing");
+    // One environment, one invitation — no duplicate card layer.
+    expect(container.querySelectorAll("[data-opening-card]")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-opening-environment]")).toHaveLength(1);
 
     // The invitation is inside the envelope before the guest opens it.
     expect(container.querySelector("[data-opening-card]")).toBeTruthy();

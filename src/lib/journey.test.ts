@@ -53,7 +53,7 @@ function design(pages: DesignPage[], closing = true): DesignDocument {
   return {
     version: 1,
     pages,
-    opening: { experience: "envelope", duration: 1400, autoOpen: false, welcome: "" },
+    opening: { experience: "cinematic", duration: 3200, autoOpen: false, welcome: "" },
     closing: { enabled: closing, style: "message", message: "", duration: 1400 },
     transition: { preset: "fade", duration: 700 },
   };

@@ -4,8 +4,6 @@ import {
   type OpeningSettings,
   type OpeningToneId,
 } from "./design";
-import { normalizeSequence } from "./opening-sequence";
-import type { OpeningPresetId } from "./opening";
 
 /**
  * The Opening Designer's saved configurations.
@@ -42,27 +40,27 @@ export interface OpeningLook {
 export const OPENING_LOOKS: OpeningLook[] = [
   {
     id: "look-oxblood",
-    name: "Oxblood wax",
-    note: "A wine envelope with ivory tissue and a gold seal",
-    experience: "envelope",
+    name: "Oxblood reveal",
+    note: "A spotlight opens over deep oxblood onto the card",
+    experience: "cinematic",
     tone: "crimson",
     palette: { accent: "#d8bd97", hull: "#5c1214", paper: "#f4e7d4" },
     duration: 3200,
   },
   {
     id: "look-garden",
-    name: "Ivory garden",
-    note: "Eucalyptus green wreath opening on white stock",
-    experience: "floral",
+    name: "Ivory ribbon",
+    note: "A pale silk drawing across eucalyptus green",
+    experience: "silk",
     tone: "ivory",
     palette: { accent: "#8fa088", hull: "#eef1ea", paper: "#ffffff" },
     duration: 3000,
   },
   {
     id: "look-champagne",
-    name: "Champagne stack",
-    note: "Layered greige cards lifting one by one",
-    experience: "cards",
+    name: "Champagne monogram",
+    note: "Gilded initials set over warm champagne stock",
+    experience: "monogram",
     tone: "ivory",
     palette: { accent: "#b38f6f", hull: "#e7dcc7", paper: "#fbf6ec" },
     duration: 3000,
@@ -70,7 +68,7 @@ export const OPENING_LOOKS: OpeningLook[] = [
   {
     id: "look-midnight",
     name: "Midnight cinema",
-    note: "Ink-blue letterbox bars with a gold horizon",
+    note: "Ink-blue darkness lit by a gold horizon",
     experience: "cinematic",
     tone: "ink",
     palette: { accent: "#c9a76a", hull: "#0f1a33", paper: "#efe7d6" },
@@ -78,36 +76,36 @@ export const OPENING_LOOKS: OpeningLook[] = [
   },
   {
     id: "look-rose",
-    name: "Rose gate-fold",
-    note: "Blush panels folding open onto pearl paper",
-    experience: "folding",
+    name: "Rose silk",
+    note: "Blush silk sweeping open onto pearl paper",
+    experience: "silk",
     tone: "ivory",
     palette: { accent: "#c0857f", hull: "#eedad3", paper: "#fffaf7" },
     duration: 3000,
   },
   {
     id: "look-cocoa",
-    name: "Cocoa curtain",
-    note: "Heavy brown panels parting onto champagne script",
-    experience: "curtain",
+    name: "Cocoa monogram",
+    note: "Bronze initials over deep cocoa",
+    experience: "monogram",
     tone: "ink",
     palette: { accent: "#c98f63", hull: "#3a2018", paper: "#f2e6d6" },
     duration: 3200,
   },
   {
     id: "look-emerald",
-    name: "Emerald doors",
-    note: "Panelled doors in deep green with gilded light",
-    experience: "door",
+    name: "Emerald reveal",
+    note: "A lit reveal in deep green with gilded light",
+    experience: "cinematic",
     tone: "ink",
     palette: { accent: "#cda96c", hull: "#123026", paper: "#f3eddc" },
     duration: 3200,
   },
   {
     id: "look-blush",
-    name: "Blush welcome",
-    note: "A named greeting before a soft pearl card",
-    experience: "personal",
+    name: "Blush monogram",
+    note: "A named greeting set in warm pearl",
+    experience: "monogram",
     tone: "ivory",
     palette: { accent: "#e0a9ad", hull: "#f6e8e4", paper: "#fffdfb" },
     duration: 2800,
@@ -148,12 +146,14 @@ function safeColour(value: string | undefined, fallback: string): string {
   return trimmed && HEX.test(trimmed) ? trimmed : fallback;
 }
 
-/** The tone a saved opening uses, with each preset's own natural default. */
+/** The tone a saved opening uses, with each style's own natural default. */
 export function openingToneOf(settings: OpeningSettings): OpeningToneId {
   if (settings.tone && OPENING_TONES.some((tone) => tone.id === settings.tone)) {
     return settings.tone;
   }
-  return settings.experience === "wax-seal" ? "ink" : "crimson";
+  if (settings.experience === "silk") return "ivory";
+  if (settings.experience === "monogram") return "ink";
+  return "crimson";
 }
 
 /** Brilliant white and ink fallbacks, used when an override is not a colour. */
@@ -181,9 +181,6 @@ function payloadOf(settings: OpeningSettings): OpeningSettings {
     // The physical suite travels with a saved opening: an envelope size is part
     // of the look, not a per-invitation afterthought.
     stationery: settings.stationery,
-    // So is the choreography: a saved sequence is the timing the host designed,
-    // repaired on the way in so junk never reaches another invitation.
-    sequence: normalizeSequence(settings.sequence),
     background: settings.background,
   };
 }
@@ -259,9 +256,6 @@ export function applySavedOpening(
     palette: saved.opening.palette,
     motion: saved.opening.motion,
     stationery: saved.opening.stationery,
-    // The saved choreography replaces this invitation's own; one saved before
-    // sequences existed falls back to the preset's timing, as it always did.
-    sequence: normalizeSequence(saved.opening.sequence),
     background: saved.opening.background,
   };
 }
@@ -297,7 +291,7 @@ export const OPENING_STAGES: {
 ];
 
 export function presetLabel(
-  preset: OpeningPresetId | undefined,
+  preset: string | undefined,
   fallback = "Opening",
 ): string {
   return preset ? preset.replace(/-/g, " ") : fallback;

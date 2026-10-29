@@ -932,7 +932,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "flourish",
     edge: "deckle",
     opening: {
-      experience: "envelope",
+      experience: "cinematic",
       duration: 3200,
       tone: "crimson",
       palette: { accent: "#d8bd97", hull: "#5c1214", paper: "#f4e7d4" },
@@ -960,7 +960,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "blossom",
     edge: "deckle",
     opening: {
-      experience: "floral",
+      experience: "silk",
       duration: 3000,
       tone: "ivory",
       palette: { accent: "#8fa088", hull: "#eef1ea", paper: "#ffffff" },
@@ -988,7 +988,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "flourish",
     edge: "scallop",
     opening: {
-      experience: "cards",
+      experience: "cinematic",
       duration: 3000,
       tone: "ivory",
       palette: { accent: "#b38f6f", hull: "#e7dcc7", paper: "#fbf6ec" },
@@ -1046,7 +1046,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "branch",
     edge: "petal",
     opening: {
-      experience: "folding",
+      experience: "silk",
       duration: 3000,
       tone: "ivory",
       palette: { accent: "#c0857f", hull: "#eedad3", paper: "#fffaf7" },
@@ -1074,7 +1074,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "paisley",
     edge: "wave",
     opening: {
-      experience: "arch",
+      experience: "cinematic",
       duration: 3000,
       tone: "ivory",
       palette: { accent: "#b4674a", hull: "#dcbfa6", paper: "#fbf1e7" },
@@ -1132,7 +1132,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "blossom",
     edge: "scallop",
     opening: {
-      experience: "floral",
+      experience: "silk",
       duration: 2800,
       tone: "ivory",
       palette: { accent: "#e0a9ad", hull: "#f6e8e4", paper: "#fffdfb" },
@@ -1162,7 +1162,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "sunburst",
     edge: "straight",
     opening: {
-      experience: "typography",
+      experience: "monogram",
       duration: 3000,
       tone: "ink",
       palette: { accent: "#c9a76a", hull: "#101c3c", paper: "#f1ecdc" },
@@ -1190,7 +1190,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "none",
     edge: "deckle",
     opening: {
-      experience: "paper",
+      experience: "silk",
       duration: 3000,
       tone: "ivory",
       palette: { accent: "#8a7b52", hull: "#e9e1d0", paper: "#fbf7ee" },
@@ -1221,7 +1221,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     edge: "arch",
     rtl: true,
     opening: {
-      experience: "door",
+      experience: "cinematic",
       duration: 3200,
       tone: "ink",
       palette: { accent: "#cda96c", hull: "#123026", paper: "#f3eddc" },
@@ -1250,7 +1250,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     edge: "scallop",
     rtl: true,
     opening: {
-      experience: "arch",
+      experience: "cinematic",
       duration: 3000,
       tone: "ivory",
       palette: { accent: "#a9803f", hull: "#e5d5b8", paper: "#fbf5e9" },
@@ -1280,7 +1280,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "blossom",
     edge: "petal",
     opening: {
-      experience: "personal",
+      experience: "monogram",
       duration: 2800,
       tone: "ivory",
       palette: { accent: "#9db3a4", hull: "#eee9df", paper: "#fffdf8" },
@@ -1310,7 +1310,7 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "gem",
     edge: "wave",
     opening: {
-      experience: "curtain",
+      experience: "silk",
       duration: 3200,
       tone: "ink",
       palette: { accent: "#c98f63", hull: "#3a2018", paper: "#f2e6d6" },

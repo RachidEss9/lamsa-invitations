@@ -68,7 +68,6 @@ import {
   type DesignElement,
   type DesignPage,
   type ElementAnimation,
-  type OpeningLayerId,
   type OpeningSettings,
   type PageResizeMode,
   type StylePreset,
@@ -382,7 +381,6 @@ export default function Studio() {
   const [closingPreviewKey, setClosingPreviewKey] = useState(0);
   const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [uploadingLayer, setUploadingLayer] = useState<OpeningLayerId | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const [historyTick, setHistoryTick] = useState(0);
   const [historyFlags, setHistoryFlags] = useState({ undo: false, redo: false });
@@ -1195,39 +1193,6 @@ export default function Studio() {
     }
     if (file.size > 10 * 1024 * 1024) {
       throw new Error("Choose an image under 10 MB.");
-    }
-    const uploadUrl = await generateUploadUrl({});
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "Content-Type": file.type },
-      body: file,
-    });
-    if (!response.ok) throw new Error(`The upload failed (${response.status}).`);
-    const result = (await response.json()) as { storageId: string };
-    const url = URL.createObjectURL(file);
-    setLocalImageUrls((previous) => ({ ...previous, [result.storageId]: url }));
-    return { storageId: result.storageId, url };
-  };
-
-  /**
-   * Reference artwork for an opening layer: photographs for the printed
-   * pieces, clips for the backdrop. Same storage, same URL resolution guests
-   * already use for every other image in the design.
-   */
-  const uploadMedia = async (file: File): Promise<{ storageId: string; url: string }> => {
-    const allowed = [
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-      "image/gif",
-      "video/mp4",
-      "video/webm",
-    ];
-    if (!allowed.includes(file.type)) {
-      throw new Error("Choose a PNG, JPG, WebP or GIF image, or an MP4 / WebM clip.");
-    }
-    if (file.size > 20 * 1024 * 1024) {
-      throw new Error("Choose a file under 20 MB.");
     }
     const uploadUrl = await generateUploadUrl({});
     const response = await fetch(uploadUrl, {
@@ -2494,44 +2459,6 @@ export default function Studio() {
       ink={content.palette.ink}
       guestName="Amelia"
       names={namesLabel}
-      coverUrl={
-        design.opening.coverStorageId
-          ? imageUrls[design.opening.coverStorageId]
-          : undefined
-      }
-      uploadingCover={uploadingImage}
-      onCoverUpload={async (file) => {
-        try {
-          const { storageId } = await uploadImage(file);
-          applyOpening({ ...design.opening, coverStorageId: storageId });
-        } catch (error) {
-          toast.error(messageOf(error));
-        }
-      }}
-      uploadingLayer={uploadingLayer}
-      onLayerUpload={async (layer, file) => {
-        setUploadingLayer(layer);
-        try {
-          const { storageId } = await uploadMedia(file);
-          const kind = file.type.startsWith("video/") ? ("video" as const) : ("image" as const);
-          applyOpening({
-            ...design.opening,
-            interactive: {
-              enabled: true,
-              scene: "envelope-seal",
-              ...design.opening.interactive,
-              layers: {
-                ...design.opening.interactive?.layers,
-                [layer]: { storageId, kind },
-              },
-            },
-          });
-        } catch (error) {
-          toast.error(messageOf(error));
-        } finally {
-          setUploadingLayer(null);
-        }
-      }}
     />
   );
 
@@ -2549,11 +2476,6 @@ export default function Studio() {
             ink={content.palette.ink}
             guestName="Amelia"
             names={namesLabel}
-            coverUrl={
-              design.opening.coverStorageId
-                ? imageUrls[design.opening.coverStorageId]
-                : undefined
-            }
             onDone={() => setShowOpeningPreview(false)}
           />              <button
                 type="button"
@@ -2589,23 +2511,6 @@ export default function Studio() {
   // The hidden file input lives outside the panel tree, so the picker is
   // opened from this event handler instead of touching the ref while rendering.
   const pickImageFile = () => imageFileRef.current?.click();
-
-  // The opening cover is chosen from its own file input; the upload lives here
-  // so the panel only hands over a plain event handler.
-  const uploadOpeningCover = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    setUploadingImage(true);
-    try {
-      const { storageId } = await uploadImage(file);
-      applyOpening({ ...design.opening, coverStorageId: storageId });
-    } catch (error) {
-      toast.error(messageOf(error));
-    } finally {
-      setUploadingImage(false);
-    }
-  };
 
   const renderLeftPanel = () => {
     if (leftPanel === "add") {
@@ -2797,13 +2702,15 @@ export default function Studio() {
               <Input
                 type="number"
                 value={design.opening.duration}
-                min={600}
+                min={1600}
+                max={8000}
                 step={100}
                 onChange={(event) =>
-                  applyOpening({ ...design.opening, duration: Number(event.target.value) || 600 })
+                  applyOpening({ ...design.opening, duration: Number(event.target.value) || 3000 })
                 }
                 className="h-8 rounded-none text-[11px]"
               />
+              <span className="mt-1 block text-[9px] text-ink/35">Between 1.6s and 8s.</span>
             </label>
             <label className="block">
               <span className="mb-1 block text-[10px] text-ink/55">Welcome line</span>
@@ -2821,39 +2728,6 @@ export default function Studio() {
                 onCheckedChange={(autoOpen) => applyOpening({ ...design.opening, autoOpen })}
                 className="scale-90"
               />
-            </div>
-            <div>
-              <span className="mb-1 block text-[10px] text-ink/55">Opening cover</span>
-              {design.opening.coverStorageId && imageUrls[design.opening.coverStorageId] ? (
-                <div className="mb-1.5 flex items-center gap-2">
-                  <img
-                    src={imageUrls[design.opening.coverStorageId]}
-                    alt="Opening cover"
-                    className="h-12 w-12 object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => applyOpening({ ...design.opening, coverStorageId: undefined })}
-                    className="text-[9px] uppercase tracking-[0.1em] text-ink/45 hover:text-[var(--red)]"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : null}
-              <label className="flex h-8 cursor-pointer items-center justify-center border border-ink/20 text-[10px] uppercase tracking-[0.1em] text-ink/55 hover:border-ink hover:text-ink">
-                {uploadingImage ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <ImageIcon className="size-3.5" />
-                )}
-                <span className="ml-1.5">Upload cover image</span>
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="sr-only"
-                  onChange={(event) => void uploadOpeningCover(event)}
-                />
-              </label>
             </div>
             <div className="grid grid-cols-2 gap-1">
               <Button
@@ -2876,8 +2750,9 @@ export default function Studio() {
               </Button>
             </div>
             <p className="text-[9px] leading-relaxed text-ink/35">
-              Envelope, arch, curtain, doors, layered paper, cinematic fade, and a
-              personalised welcome. The opening never replays on page navigation.
+              Cinematic Reveal, Golden Monogram and Silk Flow — three openings,
+              each with its own sequence, revealing the real invitation. The
+              opening never replays on page navigation.
             </p>
 
             <div className="mt-2 border-t border-ink/12 pt-3">

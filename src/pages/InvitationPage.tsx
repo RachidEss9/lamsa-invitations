@@ -2,7 +2,6 @@ import { api } from "@/convex/_generated/api";
 import { BrandLink, Wordmark } from "@/components/brand/Wordmark";
 import { InvitationCanvas } from "@/components/invitation/InvitationCanvas";
 import { SequentialInvitation } from "@/components/invitation/SequentialInvitation";
-import { RevealOpening } from "@/components/invitation/RevealOpening";
 import { Button } from "@/components/ui/button";
 import {
   CalendarDays,
@@ -22,7 +21,6 @@ import {
   formatEventDate,
   formatEventTime,
   isPairedOccasion,
-  isRevealLayout,
   whatsappShareHref,
   type InvitationContent,
   type Occasion,
@@ -158,7 +156,6 @@ export default function InvitationPage() {
   const reducedMotion = usePrefersReducedMotion();
   const [opened, setOpened] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [revealGo, setRevealGo] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -195,27 +192,10 @@ export default function InvitationPage() {
     };
   }, [coverVisible]);
 
-  // LAMSA v5 animated reveal layouts: the cover opens with the touch-to-open
-  // animation before the invitation fades in beneath it.
-  const reveal =
-    data &&
-    !savedDesign &&
-    !reducedMotion &&
-    Boolean(data.animations) &&
-    isRevealLayout(data.layout)
-      ? data.layout
-      : null;
-
-  const handleOpen = () => {
-    if (reveal && !revealGo) {
-      setRevealGo(true);
-      // Let the opener finish: the envelope flies away a beat after the
-      // flap opens; the arch/ribbons resolve a little faster.
-      window.setTimeout(() => setOpened(true), reveal === "envelope" ? 2100 : 1500);
-    } else {
-      setOpened(true);
-    }
-  };
+  // The animated reveal layouts belonged to the retired opening system. A
+  // pre-design invitation now opens on the plain cover below; a design-based
+  // invitation opens inside the journey's own opening stage, which is the only
+  // renderer left.
 
   // Music: only present when the host enabled it, and never auto-plays.
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -862,30 +842,11 @@ export default function InvitationPage() {
             className="fixed inset-0 z-[60] flex flex-col"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.7, ease: "easeInOut" } }}
-            style={
-              reveal
-                ? {
-                    backgroundColor:
-                      reveal === "arch" ? "#161616" : data.palette.background,
-                    color: data.palette.background,
-                  }
-                : { backgroundColor: data.palette.ink, color: data.palette.background }
-            }
+            style={{
+              backgroundColor: data.palette.ink,
+              color: data.palette.background,
+            }}
           >
-            {reveal ? (
-              <RevealOpening
-                layout={reveal}
-                accent={data.palette.accent}
-                background={data.palette.background}
-                ink={data.palette.ink}
-                interactive={designDoc?.opening.interactive}
-                stationery={designDoc?.opening.stationery}
-                imageUrls={designImageUrls}
-                go={revealGo}
-                reducedMotion={reducedMotion}
-                onOpen={handleOpen}
-              />
-            ) : (
               <>
             <div
               aria-hidden
@@ -1032,7 +993,6 @@ export default function InvitationPage() {
               </span>
             </div>
               </>
-            )}
           </motion.div>
         )}
       </AnimatePresence>

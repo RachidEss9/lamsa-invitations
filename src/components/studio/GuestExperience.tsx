@@ -272,11 +272,6 @@ export function GuestExperience({
                 rtl={rtl}
                 autoOpen={design.opening.autoOpen}
                 reducedMotion={reducedMotion}
-                coverUrl={
-                  design.opening.coverStorageId
-                    ? imageUrls[design.opening.coverStorageId]
-                    : undefined
-                }
                 onDone={() => {
                   setPhase("invitation");
                   timeRef.current = 0;

@@ -77,7 +77,7 @@ function savedDesign(): DesignDocument {
       },
     ],
     opening: {
-      experience: "envelope",
+      experience: "cinematic",
       duration: 1700,
       autoOpen: false,
       welcome: "For {{guest}}, with love",
@@ -131,6 +131,30 @@ describe("saved-design integrity", () => {
     expect(reloaded.closing.style).toBe("seal");
     expect(reloaded.transition.preset).toBe("flip");
     expect(reloaded.opening.welcome).toBe("For {{guest}}, with love");
+    expect(reloaded.opening.experience).toBe("cinematic");
+  });
+
+  it("maps an opening saved under a retired scene onto a style that renders", () => {
+    // Invitations saved before the three-style engine keep opening on a
+    // renderer that exists instead of falling back to nothing.
+    const retired: Record<string, string> = {
+      envelope: "cinematic",
+      curtain: "silk",
+      typography: "monogram",
+      "wax-seal": "cinematic",
+      personal: "monogram",
+      paper: "silk",
+      unknownScene: "none",
+    };
+    for (const [legacy, expected] of Object.entries(retired)) {
+      const saved = savedDesign();
+      (saved.opening as { experience?: string }).experience = legacy;
+      const reloaded = normalizeDesign(
+        JSON.parse(JSON.stringify(saved)) as DesignDocument,
+        content,
+      );
+      expect(reloaded.opening.experience, legacy).toBe(expected);
+    }
   });
 
   it("does not leak edits into the guest's personalized fields", () => {

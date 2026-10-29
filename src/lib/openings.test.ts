@@ -12,7 +12,7 @@ import {
 } from "./openings";
 
 const base: OpeningSettings = {
-  experience: "envelope",
+  experience: "cinematic",
   duration: 2800,
   autoOpen: false,
   welcome: "You are invited",
@@ -35,8 +35,11 @@ describe("opening materials", () => {
   it("uses each suite's natural material until one is chosen", () => {
     expect(openingToneOf({ ...base, tone: undefined })).toBe("crimson");
     expect(
-      openingToneOf({ ...base, tone: undefined, experience: "wax-seal" }),
+      openingToneOf({ ...base, tone: undefined, experience: "monogram" }),
     ).toBe("ink");
+    expect(
+      openingToneOf({ ...base, tone: undefined, experience: "silk" }),
+    ).toBe("ivory");
     expect(openingToneOf({ ...base, tone: "ink" })).toBe("ink");
     expect(openingToneOf({ ...base, tone: "ivory" })).toBe("ivory");
   });
@@ -98,14 +101,14 @@ describe("saved opening configurations", () => {
   it("carries the suite but never another invitation's cover or auto-open", () => {
     const saved = upsertSavedOpening([], { ...base, autoOpen: true }, "Ink suite", 5)[0];
     const target: OpeningSettings = {
-      experience: "fade",
+      experience: "silk",
       duration: 2600,
       autoOpen: false,
       welcome: "With love",
       coverStorageId: "storage-b",
     };
     const applied = applySavedOpening(target, saved);
-    expect(applied.experience).toBe("envelope");
+    expect(applied.experience).toBe("cinematic");
     expect(applied.tone).toBe("ivory");
     expect(applied.palette).toEqual(base.palette);
     expect(applied.motion).toEqual(base.motion);
@@ -115,35 +118,25 @@ describe("saved opening configurations", () => {
     expect(applied.autoOpen).toBe(false);
   });
 
-  it("carries the saved choreography to the next invitation", () => {
-    const sequenced = upsertSavedOpening(
+  it("carries the saved stage background to the next invitation", () => {
+    const saved = upsertSavedOpening(
       [],
-      {
-        ...base,
-        background: "#101010",
-        sequence: [
-          { id: "a", role: "cover", delay: 0, duration: 1200, easing: "easeInOut" },
-          { id: "b", role: "card", delay: -600, duration: 1500, easing: "easeOut" },
-        ],
-      },
+      { ...base, background: "#101010" },
       "Sequenced suite",
       7,
     )[0];
     const applied = applySavedOpening(
-      { experience: "fade", duration: 2600, autoOpen: false, welcome: "With love" },
-      sequenced,
+      { experience: "silk", duration: 2600, autoOpen: false, welcome: "With love" },
+      saved,
     );
-    expect(applied.sequence?.map((step) => step.role)).toEqual(["cover", "card"]);
-    expect(applied.sequence?.[1].duration).toBe(1500);
     expect(applied.background).toBe("#101010");
 
-    // A configuration saved before sequences existed clears rather than keeps
-    // the host's old timing: applying a look replaces the choreography.
+    // A look replaces the stage background rather than leaving a stale one.
     const plain = applySavedOpening(
-      { experience: "fade", duration: 2600, autoOpen: false, welcome: "x", sequence: sequenced.opening.sequence },
+      { experience: "silk", duration: 2600, autoOpen: false, welcome: "x", background: "#101010" },
       upsertSavedOpening([], base, "Plain suite", 8)[0],
     );
-    expect(plain.sequence).toBeUndefined();
+    expect(plain.background).toBeUndefined();
   });
 
   it("summarises a configuration for the library list", () => {
