@@ -57,7 +57,9 @@ import {
   makeElement,
   makeId,
   normalizeDesign,
+  pageFitScale,
   pageSizeOf,
+  placeOnPage,
   resizePage,
   toDesignPx,
   PAGE_RESIZE_MODES,
@@ -611,18 +613,39 @@ export default function Studio() {
     };
   }, [persistDesign]);
 
+  /* Field edits arrive one keystroke or one slider tick at a time. Without a
+     memory of the edit in progress, each tick would become its own undo step:
+     typing "150" would cost three ⌘Z and a single slider drag could flush the
+     whole 60-step history. Consecutive patches to the same layer and the same
+     set of properties inside a short window share the snapshot the first one
+     pushed, so one field edit is one undo step. */
+  const coalescing = useRef<{ key: string | null; at: number }>({
+    key: null,
+    at: 0,
+  });
+  const COALESCE_WINDOW = 900;
+
   const apply = useCallback(
-    (updater: (current: DesignDocument) => DesignDocument) => {
+    (updater: (current: DesignDocument) => DesignDocument, coalesceKey?: string) => {
       const current = designRef.current;
       if (!current) return;
       const next = updater(current);
       if (next === current) return;
-      pastRef.current = pushHistory(pastRef.current, current);
+      const now = Date.now();
+      const continuesEdit =
+        Boolean(coalesceKey) &&
+        coalescing.current.key === coalesceKey &&
+        now - coalescing.current.at < COALESCE_WINDOW;
+      if (!continuesEdit) pastRef.current = pushHistory(pastRef.current, current);
+      coalescing.current = { key: coalesceKey ?? null, at: now };
       futureRef.current = [];
       designRef.current = next;
       setDesignState(next);
       scheduleSave(next);
-      setHistoryFlags({ undo: true, redo: false });
+      setHistoryFlags({
+        undo: true,
+        redo: false,
+      });
       setHistoryTick((tick) => tick + 1);
       gestureStart.current = null;
     },
@@ -666,6 +689,7 @@ export default function Studio() {
     if (!start || !designRef.current || start === designRef.current) return;
     pastRef.current = pushHistory(pastRef.current, start);
     futureRef.current = [];
+    coalescing.current = { key: null, at: 0 };
     setHistoryFlags({ undo: true, redo: false });
     setHistoryTick((tick) => tick + 1);
   }, []);
@@ -697,6 +721,7 @@ export default function Studio() {
       undo: step.stacks.past.length > 0,
       redo: true,
     });
+    coalescing.current = { key: null, at: 0 };
     setHistoryTick((tick) => tick + 1);
   }, [scheduleSave]);
 
@@ -717,6 +742,7 @@ export default function Studio() {
       undo: true,
       redo: step.stacks.future.length > 0,
     });
+    coalescing.current = { key: null, at: 0 };
     setHistoryTick((tick) => tick + 1);
   }, [scheduleSave]);
 
@@ -789,45 +815,55 @@ export default function Studio() {
 
   const patchElement = useCallback(
     (elementId: string, patch: Partial<DesignElement>) => {
-      apply((current) => ({
-        ...current,
-        pages: current.pages.map((candidate, index) =>
-          index === pageIndex
-            ? {
-                ...candidate,
-                elements: candidate.elements.map((element) =>
-                  element.id === elementId ? { ...element, ...patch } : element,
-                ),
-              }
-            : candidate,
-        ),
-      }));
+      apply(
+        (current) => ({
+          ...current,
+          pages: current.pages.map((candidate, index) =>
+            index === pageIndex
+              ? {
+                  ...candidate,
+                  elements: candidate.elements.map((element) =>
+                    element.id === elementId ? { ...element, ...patch } : element,
+                  ),
+                }
+              : candidate,
+          ),
+        }),
+        // Same layer + same fields typed into = one continuous edit.
+        `patch:${elementId}:${Object.keys(patch).sort().join(",")}`,
+      );
     },
     [apply, pageIndex],
   );
 
   const patchPage = useCallback(
     (patch: Partial<DesignPage>) => {
-      apply((current) => ({
-        ...current,
-        pages: current.pages.map((candidate, index) =>
-          index === pageIndex ? { ...candidate, ...patch } : candidate,
-        ),
-      }));
+      apply(
+        (current) => ({
+          ...current,
+          pages: current.pages.map((candidate, index) =>
+            index === pageIndex ? { ...candidate, ...patch } : candidate,
+          ),
+        }),
+        `page:${Object.keys(patch).sort().join(",")}`,
+      );
     },
     [apply, pageIndex],
   );
 
   const setPageElements = useCallback(
-    (updater: (elements: DesignElement[]) => DesignElement[]) => {
-      apply((current) => ({
-        ...current,
-        pages: current.pages.map((candidate, index) =>
-          index === pageIndex
-            ? { ...candidate, elements: updater(candidate.elements) }
-            : candidate,
-        ),
-      }));
+    (updater: (elements: DesignElement[]) => DesignElement[], coalesceKey?: string) => {
+      apply(
+        (current) => ({
+          ...current,
+          pages: current.pages.map((candidate, index) =>
+            index === pageIndex
+              ? { ...candidate, elements: updater(candidate.elements) }
+              : candidate,
+          ),
+        }),
+        coalesceKey,
+      );
     },
     [apply, pageIndex],
   );
@@ -1036,6 +1072,21 @@ export default function Studio() {
    * depth in the stack (frames go beneath the content, above any backdrop);
    * everything else appends on top.
    */
+  /**
+   * New layers are composed in classic 1000 × 1333 card coordinates — the
+   * space the defaults and templates are written in — but suite pieces are
+   * sold in millimetres (the invitation page is 480 × 672). `fit` maps a box
+   * onto the page being edited so a freshly added layer lands on the card at
+   * the same proportion it has on the classic canvas, fully inside the trim,
+   * instead of running off the right edge.
+   */
+  const fit = <T extends { x: number; y: number; w: number; h: number }>(box: T): T =>
+    placeOnPage(page, box);
+
+  /** Type sizes travel with the box, floored so a small card stays editable. */
+  const fitFont = (size: number) =>
+    Math.max(10, Math.round(size * pageFitScale(page)));
+
   const addElement = (element: DesignElement, insertIndex?: number) => {
     setPageElements((elements) => {
       const at =
@@ -1046,10 +1097,23 @@ export default function Studio() {
     });
     setSelectedIds([element.id]);
     setAnimating(false);
+    /* On a phone the inspector lives in the bottom sheet. Adding from the Add
+       sheet brings the new layer's own controls up with it, instead of
+       leaving the insert palette sitting over the canvas. */
+    if (mobileSheet === "add") setMobileSheet("properties");
+    /* …and on a wide screen the properties rail opens if it was collapsed, so
+       a new layer never lands with its controls out of sight. */
+    if (!rightOpen) setRightOpen(true);
   };
 
   const addText = (variant: "heading" | "body" | "caption") => {
     const fontSize = variant === "heading" ? 78 : variant === "body" ? 30 : 16;
+    const box = fit({
+      x: 140,
+      y: variant === "heading" ? 520 : 620,
+      w: 720,
+      h: variant === "heading" ? 160 : 120,
+    });
     addElement(
       makeElement("text", {
         name: variant === "heading" ? "Heading" : variant === "body" ? "Body text" : "Caption",
@@ -1059,17 +1123,14 @@ export default function Studio() {
             : variant === "body"
               ? "A few considered words."
               : "A SMALL NOTE",
-        fontSize,
+        fontSize: fitFont(fontSize),
         font: (content && content.fontPair) || "cormorant-garamond",
         color: content?.palette.ink ?? "#161616",
         align: "center",
         letterSpacing: variant === "caption" ? 0.28 : 0,
         uppercase: variant === "caption",
         lineHeight: 1.35,
-        x: 140,
-        y: variant === "heading" ? 520 : 620,
-        w: 720,
-        h: variant === "heading" ? 160 : 120,
+        ...box,
         animation: {
           enabled: true,
           preset: variant === "heading" ? "fadeUp" : "fade",
@@ -1083,13 +1144,16 @@ export default function Studio() {
   };
 
   const addShape = (shape: DesignElement["shape"], imageStorageId?: string) => {
+    const box = fit({
+      x: 380,
+      y: 640,
+      w: 240,
+      h: shape === "line" ? 2 : 240,
+    });
     const element = makeElement("shape", {
       name: shape === "line" ? "Rule" : shape === "frame" ? "Frame" : "Shape",
       shape,
-      x: shape === "line" ? 380 : 380,
-      y: 640,
-      w: shape === "line" ? 240 : 240,
-      h: shape === "line" ? 2 : 240,
+      ...box,
       fill: content?.palette.accent ?? "#710014",
       stroke: "transparent",
       strokeWidth: 0,
@@ -1113,10 +1177,7 @@ export default function Studio() {
       makeElement("motif", {
         name: "Ornament",
         motif: "sprig",
-        x: 430,
-        y: 250,
-        w: 140,
-        h: 140,
+        ...fit({ x: 430, y: 250, w: 140, h: 140 }),
         color: content?.palette.ink ?? "#161616",
         animation: {
           enabled: true,
@@ -1134,11 +1195,8 @@ export default function Studio() {
     const target = makeElement("text", {
       name: "Hidden message",
       text: "Meet us under the olive tree at four.",
-      x: 170,
-      y: 560,
-      w: 660,
-      h: 220,
-      fontSize: 40,
+      ...fit({ x: 170, y: 560, w: 660, h: 220 }),
+      fontSize: fitFont(40),
       font: (content && content.fontPair) || "cormorant-garamond",
       color: content?.palette.ink ?? "#161616",
       align: "center",
@@ -1155,10 +1213,7 @@ export default function Studio() {
     const cover = makeElement("shape", {
       name: "Heart cover",
       shape: "heart",
-      x: 350,
-      y: 520,
-      w: 300,
-      h: 290,
+      ...fit({ x: 350, y: 520, w: 300, h: 290 }),
       fill: content?.palette.accent ?? "#710014",
       opacity: 1,
       animation: {
@@ -1218,10 +1273,7 @@ export default function Studio() {
         makeElement("image", {
           name: file.name.replace(/\.[^.]+$/, "").slice(0, 48) || "Image",
           imageStorageId: storageId,
-          x: 190,
-          y: 470,
-          w: 620,
-          h: 420,
+          ...fit({ x: 190, y: 470, w: 620, h: 420 }),
           fit: "cover",
           animation: {
             enabled: true,
@@ -1298,6 +1350,7 @@ export default function Studio() {
       elements.map((element) =>
         element.id === layerId ? { ...element, name: clean } : element,
       ),
+      `rename:${layerId}`,
     );
   };
 
@@ -1499,10 +1552,7 @@ export default function Studio() {
         name: spec.name,
         shape: spec.shape,
         motif: spec.motif,
-        x: spec.x,
-        y: spec.y,
-        w: spec.w,
-        h: spec.h,
+        ...fit({ x: spec.x, y: spec.y, w: spec.w, h: spec.h }),
         rotation: spec.rotation ?? 0,
         fill:
           spec.fill ??
@@ -1608,10 +1658,12 @@ export default function Studio() {
                 : preset.target === "details"
                   ? "Revealed details"
                   : "Revealed message",
-            x: 250,
-            y: 520,
-            w: 500,
-            h: preset.target === "photo" ? 420 : 220,
+            ...fit({
+              x: 250,
+              y: 520,
+              w: 500,
+              h: preset.target === "photo" ? 420 : 220,
+            }),
             text:
               preset.target === "photo"
                 ? undefined
@@ -1619,7 +1671,7 @@ export default function Studio() {
                   ? [content.venueName, content.venueAddress].filter(Boolean).join("\n")
                   : (content.message || "A note for {{guest}}"),
             font: content.fontPair,
-            fontSize: preset.target === "details" ? 23 : 28,
+            fontSize: fitFont(preset.target === "details" ? 23 : 28),
             lineHeight: 1.6,
             letterSpacing: 0.04,
             align: "center",
@@ -1628,18 +1680,23 @@ export default function Studio() {
             animation: defaultAnimation("fade", 150),
           });
 
+    /* The cover sizes below are authored in classic-card pixels while the
+       target is already on this page, so every floor travels by the page's
+       fit scale: the cover still wraps the target instead of dwarfing it on a
+       small A6 card or a belly band. */
+    const k = pageFitScale(page);
     const coverWidth =
       preset.cover.kind === "motif"
-        ? 280
+        ? 280 * k
         : preset.cover.shape === "ellipse"
-          ? Math.max(280, Math.min(460, targetElement.w + 20))
-          : Math.max(240, Math.min(840, targetElement.w + 40));
+          ? Math.max(280 * k, targetElement.w + 20 * k)
+          : Math.max(240 * k, targetElement.w + 40 * k);
     const coverHeight =
       preset.cover.kind === "motif"
-        ? 280
+        ? 280 * k
         : preset.cover.shape === "heart"
-          ? Math.max(220, Math.min(600, targetElement.h + 60))
-          : Math.max(260, Math.min(720, targetElement.h + 80));
+          ? Math.max(220 * k, targetElement.h + 60 * k)
+          : Math.max(260 * k, targetElement.h + 80 * k);
     const cover = makeElement(preset.cover.kind, {
       name: `${preset.name} cover`,
       shape: preset.cover.kind === "shape" ? preset.cover.shape : undefined,
@@ -2596,10 +2653,7 @@ export default function Studio() {
                       makeElement("motif", {
                         name: motif.label,
                         motif: motif.id,
-                        x: 420,
-                        y: 300,
-                        w: 160,
-                        h: 160,
+                        ...fit({ x: 420, y: 300, w: 160, h: 160 }),
                         color: content.palette.ink,
                         animation: {
                           enabled: true,

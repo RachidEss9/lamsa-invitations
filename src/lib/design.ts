@@ -645,6 +645,46 @@ export function canvasScaleFor(page?: Pick<DesignPage, "width" | "height"> | nul
 }
 
 /**
+ * The scale a layer authored on the classic 1000 × 1333 card needs to sit on
+ * the current page. The smaller of the two axis ratios wins, so a box keeps
+ * its proportions whatever shape the card is; on the classic card it is 1.
+ */
+export function pageFitScale(
+  page?: Pick<DesignPage, "width" | "height"> | null,
+): number {
+  const { width, height } = pageSizeOf(page);
+  return Math.max(0.01, Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT));
+}
+
+/**
+ * Places a box given in classic-card coordinates onto `page`.
+ *
+ * The size scales uniformly by the fit scale, the position follows each axis
+ * proportionally (so a centred box stays centred on any shape of card), and
+ * the result is clamped inside the trim. Together that guarantees a layer
+ * authored inside the 1000 × 1333 design space always lands fully on the page
+ * — an A6 RSVP card, a landscape 7 × 5 or a belly band all receive it on-card
+ * instead of half off the right edge.
+ */
+export function placeOnPage<
+  T extends { x: number; y: number; w: number; h: number },
+>(page: Pick<DesignPage, "width" | "height"> | null | undefined, box: T): T {
+  const { width, height } = pageSizeOf(page);
+  const scale = pageFitScale(page);
+  const w = Math.max(1, box.w * scale);
+  const h = Math.max(1, box.h * scale);
+  const clamp = (value: number, span: number) =>
+    Math.round(Math.min(Math.max(value, 0), Math.max(0, span)) * 100) / 100;
+  return {
+    ...box,
+    x: clamp((box.x / DESIGN_WIDTH) * width, width - w),
+    y: clamp((box.y / DESIGN_HEIGHT) * height, height - h),
+    w: Math.round(w * 100) / 100,
+    h: Math.round(h * 100) / 100,
+  };
+}
+
+/**
  * The three opening styles the engine actually renders, plus "none".
  *
  * Values that used to name a procedural scene (`envelope`, `curtain`, `door`,

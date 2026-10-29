@@ -1,3 +1,4 @@
+import { NumberField } from "@/components/studio/inspector-fields";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import type { DesignElement } from "@/lib/design";
@@ -28,17 +29,12 @@ import {
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
-function compactNumber(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
 function EffectNumber({
   label,
   value,
   onChange,
   min,
   max,
-  step = 1,
   suffix,
 }: {
   label: string;
@@ -46,7 +42,6 @@ function EffectNumber({
   onChange: (value: number) => void;
   min?: number;
   max?: number;
-  step?: number;
   suffix?: string;
 }) {
   return (
@@ -55,20 +50,12 @@ function EffectNumber({
         {label}
         {suffix ? ` · ${suffix}` : ""}
       </span>
-      <Input
-        type="number"
-        value={compactNumber(value)}
-        step={step}
+      <NumberField
+        value={value}
         min={min}
         max={max}
-        onChange={(event) => {
-          const parsed = Number(event.target.value);
-          if (!Number.isFinite(parsed)) return;
-          let next = parsed;
-          if (typeof min === "number") next = Math.max(min, next);
-          if (typeof max === "number") next = Math.min(max, next);
-          onChange(next);
-        }}
+        ariaLabel={label}
+        onChange={onChange}
         className="mt-1 h-7 rounded-[8px] border-[var(--edge)] bg-[var(--surface-card)] px-2 text-right font-ui text-[10.5px] tabular-nums"
       />
     </label>

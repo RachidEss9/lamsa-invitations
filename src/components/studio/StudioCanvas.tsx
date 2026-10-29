@@ -1094,6 +1094,7 @@ export function StudioCanvas({
             rtl={rtl}
             interactive={false}
             editor
+            showHidden={showHidden}
             selectedIds={[]}
             revealPreview={revealPreview}
             onReveal={onReveal}

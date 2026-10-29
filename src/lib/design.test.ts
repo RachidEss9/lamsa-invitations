@@ -5,6 +5,8 @@ import {
   isDesignDocument,
   normalizeDesign,
   pageEdgeClipPath,
+  pageFitScale,
+  placeOnPage,
   type DesignDocument,
 } from "./design";
 import type { InvitationContent } from "./invitation";
@@ -298,5 +300,61 @@ describe("page cut edges", () => {
       content,
     );
     expect(dropped.pages[0].edge).toBeUndefined();
+  });
+});
+
+describe("placeOnPage", () => {
+  /* The classic coordinates every studio default is written in: a heading
+     box centred on the 1000 × 1333 card. */
+  const heading = { x: 140, y: 520, w: 720, h: 160 };
+
+  it("is the identity on the classic studio card", () => {
+    expect(pageFitScale({ width: 1000, height: 1333.33 })).toBe(1);
+    expect(placeOnPage({ width: 1000, height: 1333.33 }, heading)).toEqual(
+      heading,
+    );
+  });
+
+  it("keeps a new layer fully on a millimetre-sized suite piece", () => {
+    // The invitation piece is 127 × 178 mm, which is 480 × 672 design px —
+    // the old defaults ran 380 px off its right edge.
+    const page = { width: 480, height: 672 };
+    const box = placeOnPage(page, heading);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.w).toBeLessThanOrEqual(page.width);
+    expect(box.y + box.h).toBeLessThanOrEqual(page.height);
+    // The box keeps its proportions rather than being squashed.
+    expect(box.w / box.h).toBeCloseTo(heading.w / heading.h, 2);
+    // A box centred on the classic card stays centred on a card of the same
+    // proportions at any size.
+    expect(box.x + box.w / 2).toBeCloseTo(page.width / 2, 1);
+  });
+
+  it("lands inside the trim on every page shape the studio offers", () => {
+    const pages = [
+      { width: 672, height: 480 }, // 7 × 5 in, landscape
+      { width: 567, height: 567 }, // 150 mm square
+      { width: 397, height: 559 }, // A6
+      { width: 1080, height: 1920 }, // mobile story
+      { width: 794, height: 189 }, // belly band strip
+    ];
+    for (const page of pages) {
+      const box = placeOnPage(page, { x: 190, y: 470, w: 620, h: 420 });
+      const label = `${page.width}×${page.height}`;
+      expect(box.x, label).toBeGreaterThanOrEqual(0);
+      expect(box.y, label).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.w, label).toBeLessThanOrEqual(page.width);
+      expect(box.y + box.h, label).toBeLessThanOrEqual(page.height);
+    }
+  });
+
+  it("clamps a box authored outside the design space", () => {
+    const page = { width: 480, height: 672 };
+    const box = placeOnPage(page, { x: 900, y: 1300, w: 400, h: 400 });
+    expect(box.x + box.w).toBeLessThanOrEqual(page.width);
+    expect(box.y + box.h).toBeLessThanOrEqual(page.height);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
   });
 });

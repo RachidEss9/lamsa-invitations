@@ -869,6 +869,12 @@ export interface DesignPageViewProps {
   /** Studio inline editing: the text editor replaces this layer visually. */
   hideElementId?: string | null;
   /**
+   * Studio: whether a layer the host hid is still drawn (dimmed) on the card.
+   * Guests never see a hidden layer either way; the studio toggle only decides
+   * whether its ghost stays findable on the canvas.
+   */
+  showHidden?: boolean;
+  /**
    * Time at which the card entered the viewport, in page milliseconds. Scroll
    * triggered elements wait for this moment (null) and then animate locally.
    */
@@ -900,6 +906,7 @@ export function DesignPageView({
   revealPreview,
   ignoreExit,
   hideElementId,
+  showHidden = true,
   scrollActivationTime = 0,
   materialPreview = true,
   className,
@@ -976,7 +983,7 @@ export function DesignPageView({
         className="paper-grain pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-multiply"
       />
       {page.elements.map((element) => {
-        if (element.hidden && !editor) return null;
+        if (element.hidden && (!editor || !showHidden)) return null;
         if (hideElementId === element.id) return null;
         const isCovered = covered.has(element.id);
         const cover = page.elements.find(

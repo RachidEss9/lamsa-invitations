@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { NumberField } from "@/components/studio/inspector-fields";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -65,20 +66,12 @@ function NumberInput({
   step?: number;
 }) {
   return (
-    <Input
-      type="number"
-      value={Math.round(value * 100) / 100}
+    <NumberField
+      value={value}
       step={step}
       min={min}
       max={max}
-      onChange={(event) => {
-        const parsed = Number(event.target.value);
-        if (!Number.isFinite(parsed)) return;
-        let next = parsed;
-        if (typeof min === "number") next = Math.max(min, next);
-        if (typeof max === "number") next = Math.min(max, next);
-        onChange(next);
-      }}
+      onChange={onChange}
       className="h-8 rounded-[var(--radius-control)] border-[var(--edge)] bg-[var(--surface-card)] px-2 text-right font-ui text-[11px] tabular-nums"
     />
   );

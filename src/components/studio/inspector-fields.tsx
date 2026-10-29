@@ -2,7 +2,7 @@ import { FieldRow } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 /**
  * The field primitives the right-hand inspector is built from.
@@ -31,31 +31,74 @@ export function NumberField({
   min,
   max,
   ariaLabel,
+  className,
 }: {
   value: number;
   onChange: (value: number) => void;
+  /** Arrow-key increment, so a value can be nudged without retyping it. */
   step?: number;
   min?: number;
   max?: number;
   ariaLabel?: string;
+  /** Panel-specific sizing; the type, focus ring and behaviour stay shared. */
+  className?: string;
 }) {
+  /* While the field is being typed, the raw keystrokes are shown verbatim.
+     A controlled number input would round and clamp on every keystroke, which
+     swallows the decimal point in "12.5" and turns a cleared field into 0 —
+     so the draft is only parsed when it actually parses, and normalised on
+     blur. Escape puts the committed value back. */
+  const [draft, setDraft] = useState<string | null>(null);
+  const clamp = (next: number) => {
+    let result = next;
+    if (typeof min === "number") result = Math.max(min, result);
+    if (typeof max === "number") result = Math.min(max, result);
+    return result;
+  };
+  const commit = (raw: string) => {
+    const parsed = Number(raw.trim());
+    if (raw.trim() === "" || !Number.isFinite(parsed)) return;
+    onChange(clamp(parsed));
+  };
+
   return (
     <Input
-      type="number"
-      value={Math.round(value * 100) / 100}
-      step={step}
-      min={min}
-      max={max}
+      type="text"
+      inputMode="decimal"
+      enterKeyHint="done"
+      value={draft ?? String(Math.round(value * 100) / 100)}
       aria-label={ariaLabel}
       onChange={(event) => {
-        const parsed = Number(event.target.value);
-        if (!Number.isFinite(parsed)) return;
-        let next = parsed;
-        if (typeof min === "number") next = Math.max(min, next);
-        if (typeof max === "number") next = Math.min(max, next);
-        onChange(next);
+        const raw = event.target.value;
+        setDraft(raw);
+        commit(raw);
       }}
-      className={cn(numberInput, "w-full")}
+      onBlur={() => {
+        if (draft !== null) commit(draft);
+        setDraft(null);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setDraft(null);
+          return;
+        }
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          event.preventDefault();
+          const typed = draft !== null ? Number(draft.trim()) : NaN;
+          const base = draft !== null && Number.isFinite(typed) ? typed : value;
+          const delta = (event.key === "ArrowUp" ? 1 : -1) * step;
+          const next = clamp(Math.round((base + delta) * 1000) / 1000);
+          setDraft(String(next));
+          onChange(next);
+        }
+      }}
+      className={cn(numberInput, "w-full", className)}
     />
   );
 }
