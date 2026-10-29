@@ -22,10 +22,14 @@ import {
   PAGE_EDGES,
   REVEAL_EFFECTS,
   SHAPES,
+  designValueFromInput,
   elementTypeLabel,
+  formatDesignValue,
   makeId,
+  pageDimensionsLabel,
   type DesignElement,
   type DesignPage,
+  type DesignUnit,
   type ElementAnimation,
   type PageEdgeId,
   type RevealEffect,
@@ -84,6 +88,8 @@ interface InspectorProps {
   page: DesignPage;
   selected: DesignElement[];
   aspectLocked: boolean;
+  /** Display unit for every measurement in the panel. */
+  unit: DesignUnit;
   onAspectLocked: (value: boolean) => void;
   onPatch: (id: string, patch: Partial<DesignElement>) => void;
   onPagePatch: (patch: Partial<DesignPage>) => void;
@@ -188,6 +194,7 @@ function InspectorBody({
   page,
   selected,
   aspectLocked,
+  unit,
   onAspectLocked,
   onPatch,
   onPagePatch,
@@ -267,6 +274,13 @@ function InspectorBody({
                 ))}
               </SelectContent>
             </Select>
+          </Row>
+          {/* The sheet's real, physical size — never the size it happens to be
+              showing at on screen. */}
+          <Row label="Size">
+            <span className="font-meta text-[11px] tabular-nums text-ink/60">
+              {pageDimensionsLabel(page, unit)}
+            </span>
           </Row>
         </Section>
         <Section title="Material" defaultOpen={false}>
@@ -370,15 +384,26 @@ function InspectorBody({
         />
       </div>
 
-      <Section title="Geometry">
+      <Section title={`Geometry (${unit})`}>
         <div className="grid grid-cols-2 gap-2">
-          <Row label="X"><NumberField value={element.x} onChange={(x) => patch({ x })} /></Row>
-          <Row label="Y"><NumberField value={element.y} onChange={(y) => patch({ y })} /></Row>
+          <Row label="X">
+            <NumberField
+              value={formatDesignValue(element.x, unit)}
+              onChange={(x) => patch({ x: designValueFromInput(x, unit) })}
+            />
+          </Row>
+          <Row label="Y">
+            <NumberField
+              value={formatDesignValue(element.y, unit)}
+              onChange={(y) => patch({ y: designValueFromInput(y, unit) })}
+            />
+          </Row>
           <Row label="W">
             <NumberField
-              value={element.w}
-              min={8}
-              onChange={(w) => {
+              value={formatDesignValue(element.w, unit)}
+              min={formatDesignValue(8, unit)}
+              onChange={(fieldW) => {
+                const w = designValueFromInput(fieldW, unit);
                 if (!aspectLocked) {
                   patch({ w });
                   return;
@@ -390,9 +415,10 @@ function InspectorBody({
           </Row>
           <Row label="H">
             <NumberField
-              value={element.h}
-              min={8}
-              onChange={(h) => {
+              value={formatDesignValue(element.h, unit)}
+              min={formatDesignValue(8, unit)}
+              onChange={(fieldH) => {
+                const h = designValueFromInput(fieldH, unit);
                 if (!aspectLocked) {
                   patch({ h });
                   return;

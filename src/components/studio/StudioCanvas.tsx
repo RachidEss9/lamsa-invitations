@@ -1,7 +1,9 @@
 import {
   pageSizeOf,
+  rulerTicksFor,
   type DesignElement,
   type DesignPage,
+  type DesignUnit,
 } from "@/lib/design";
 import { cn } from "@/lib/utils";
 import {
@@ -58,6 +60,18 @@ interface StudioCanvasProps {
   showGrid?: boolean;
   showRulers?: boolean;
   showSafeArea?: boolean;
+  /**
+   * Display unit for rulers and measurements. It only changes what the
+   * workspace reads out — every stored number stays in canvas units.
+   */
+  unit?: DesignUnit;
+  /** Snapping to the page, centrelines, guides and neighbouring layers. */
+  enableSnap?: boolean;
+  /** Drafting guides: the user's own guides, centrelines and the trim edge. */
+  showGuides?: boolean;
+  /** The user's guides for this page, in canvas units. */
+  userGuides?: { x: number[]; y: number[] };
+  onUserGuidesChange?: (next: { x: number[]; y: number[] }) => void;
   /** Artwork / Print mode (false) hides every material finish on the canvas. */
   materialPreview?: boolean;
   /**
@@ -322,6 +336,11 @@ export function StudioCanvas({
   showGrid = false,
   showRulers = false,
   showSafeArea = false,
+  unit = "mm",
+  enableSnap = true,
+  showGuides = false,
+  userGuides = { x: [], y: [] },
+  onUserGuidesChange,
   materialPreview = true,
   envelope = null,
   resetViewToken = 0,
@@ -401,14 +420,15 @@ export function StudioCanvas({
       ? page.margin
       : Math.round(size.width * 0.04),
   );
-  const rulerTicks = (() => {
-    const step = size.width > 1600 ? 200 : 100;
-    const ticks: { value: number; major: boolean }[] = [];
-    for (let value = 0; value <= size.width + 0.5; value += step) {
-      ticks.push({ value, major: value % (step * 2) === 0 });
-    }
-    return ticks;
-  })();
+  /* Bleed beyond the trim, in canvas units. The band is drawn outside the
+     page box, so the guide shows exactly what the guillotine will cut away. */
+  const bleed = Math.max(0, page.bleed ?? 0);
+  /* Rulers tick in the workspace's display unit: millimetres on a printed
+     suite, inches on a 5 × 7, pixels on a story. Both axes are labelled, so a
+     measurement read off the ruler is always a physical one — the zoom only
+     changes how large those ticks appear, never the number on them. */
+  const rulerXTicks = rulerTicksFor(size.width, unit);
+  const rulerYTicks = rulerTicksFor(size.height, unit);
 
 
   // Inline editing is local to the canvas; the studio needs to know so it can
@@ -573,13 +593,20 @@ export function StudioCanvas({
         let snapDx = dx;
         let snapDy = dy;
 
-        if (current.originals.size === 1 && !event.altKey) {
+        if (current.originals.size === 1 && !event.altKey && enableSnap) {
           const candidateX = anchor.x + dx;
           const candidateY = anchor.y + dy;
           const xTargets = [
             0,
             size.width / 2 - anchor.w / 2,
             size.width - anchor.w,
+            ...(showGuides
+              ? userGuides.x.flatMap((guide) => [
+                  guide,
+                  guide - anchor.w / 2,
+                  guide - anchor.w,
+                ])
+              : []),
             ...page.elements
               .filter((element) => element.id !== anchor.id && !element.hidden)
               .flatMap((element) => [
@@ -592,6 +619,13 @@ export function StudioCanvas({
             0,
             size.height / 2 - anchor.h / 2,
             size.height - anchor.h,
+            ...(showGuides
+              ? userGuides.y.flatMap((guide) => [
+                  guide,
+                  guide - anchor.h / 2,
+                  guide - anchor.h,
+                ])
+              : []),
             ...page.elements
               .filter((element) => element.id !== anchor.id && !element.hidden)
               .flatMap((element) => [
@@ -752,15 +786,17 @@ export function StudioCanvas({
          on the page, its centre line, or a neighbouring layer. Rotated layers
          and proportional resizes stay free, because snapping either would
          fight the ratio or the layer's own axes. */
-      if (!proportional && Math.abs(original.rotation) < 0.01) {
+      if (!proportional && Math.abs(original.rotation) < 0.01 && enableSnap) {
         const others = page.elements.filter(
           (candidate) =>
             candidate.id !== original.id && !candidate.hidden && !candidate.locked,
         );
+        const guideTargets = (list: number[]) => (showGuides ? list : []);
         const xTargets = [
           0,
           size.width / 2,
           size.width,
+          ...guideTargets(userGuides.x),
           ...others.flatMap((element) => [
             element.x,
             element.x + element.w / 2,
@@ -771,6 +807,7 @@ export function StudioCanvas({
           0,
           size.height / 2,
           size.height,
+          ...guideTargets(userGuides.y),
           ...others.flatMap((element) => [
             element.y,
             element.y + element.h / 2,
@@ -842,7 +879,7 @@ export function StudioCanvas({
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
     };
-  }, [aspectLocked, drag, onMove, onResize, onRotate, page.elements, scale, schedule, size.height, size.width]);
+  }, [aspectLocked, drag, enableSnap, onMove, onResize, onRotate, page.elements, scale, schedule, showGuides, size.height, size.width, userGuides.x, userGuides.y]);
 
   useEffect(() => {
     if (!panning) return;
@@ -867,6 +904,108 @@ export function StudioCanvas({
       window.removeEventListener("pointercancel", end);
     };
   }, [panning]);
+
+  /* ---------------------------------------------------------- draft guides */
+
+  /**
+   * A guide being created from a ruler (`index: null`) or dragged around the
+   * page. Guides are a workspace aid, never design data: they live in the
+   * studio and no export path can pick them up.
+   */
+  const [guideDrag, setGuideDrag] = useState<{
+    axis: "x" | "y";
+    at: number;
+    index: number | null;
+  } | null>(null);
+
+  /* The top ruler lays horizontal guides, the left ruler vertical ones — the
+     same rule every drafting app follows. */
+  const startGuideFromRuler = (axis: "x" | "y", event: ReactPointerEvent) => {
+    if (!onUserGuidesChange) return;
+    const rect = designRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const raw =
+      axis === "x"
+        ? (event.clientX - rect.left) / scale
+        : (event.clientY - rect.top) / scale;
+    event.preventDefault();
+    event.stopPropagation();
+    setGuideDrag({ axis, at: raw, index: null });
+  };
+
+  const startGuideMove = (
+    axis: "x" | "y",
+    index: number,
+    event: ReactPointerEvent,
+  ) => {
+    if (!onUserGuidesChange) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setGuideDrag({
+      axis,
+      at: axis === "x" ? userGuides.x[index] : userGuides.y[index],
+      index,
+    });
+  };
+
+  useEffect(() => {
+    if (!guideDrag || !onUserGuidesChange) return;
+    const axis = guideDrag.axis;
+    const index = guideDrag.index;
+
+    /** Pointer → canvas units along the dragged axis, and whether it is over
+        the page (a guide dropped off the page is deleted, not clamped). */
+    const positionAt = (event: PointerEvent) => {
+      const rect = designRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const raw =
+        axis === "x"
+          ? (event.clientX - rect.left) / scale
+          : (event.clientY - rect.top) / scale;
+      const limit = axis === "x" ? size.width : size.height;
+      return { raw, inside: raw >= 0 && raw <= limit, at: clamp(raw, 0, limit) };
+    };
+
+    const commit = (updater: (list: number[]) => number[]) => {
+      const next = { x: [...userGuides.x], y: [...userGuides.y] };
+      next[axis] = updater(next[axis]);
+      onUserGuidesChange(next);
+    };
+
+    const move = (event: PointerEvent) => {
+      const position = positionAt(event);
+      if (!position) return;
+      if (index !== null) {
+        commit((list) =>
+          list.map((value, itemIndex) => (itemIndex === index ? position.at : value)),
+        );
+      }
+      setGuideDrag((current) =>
+        current ? { ...current, at: position.at } : current,
+      );
+    };
+
+    const end = (event: PointerEvent) => {
+      const position = positionAt(event);
+      if (position && index === null && position.inside) {
+        // Released on the page: keep it, sorted so the list stays readable.
+        commit((list) => [...list, position.at].sort((a, b) => a - b));
+      } else if (position && index !== null && !position.inside) {
+        // Dropped back onto a ruler (or off the page): the guide is deleted.
+        commit((list) => list.filter((_, itemIndex) => itemIndex !== index));
+      }
+      setGuideDrag(null);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+  }, [guideDrag, onUserGuidesChange, scale, size.height, size.width, userGuides.x, userGuides.y]);
 
   useEffect(() => {
     const typing = (target: EventTarget | null) => {
@@ -1118,18 +1257,56 @@ export function StudioCanvas({
               }}
             />
           )}
-          {showSafeArea && safeMargin > 0 && (
+          {/* Print guides: bleed, trim and safe area, each drawn distinctly.
+              They live on the canvas only — no export path reads them. */}
+          {showSafeArea && (
             <div
               aria-hidden
-              className="pointer-events-none absolute border border-dashed border-[#710014]/35"
-              style={{
-                zIndex: 5,
-                left: safeMargin,
-                top: safeMargin,
-                width: Math.max(1, size.width - safeMargin * 2),
-                height: Math.max(1, size.height - safeMargin * 2),
-              }}
-            />
+              className="pointer-events-none absolute inset-0"
+              style={{ zIndex: 5 }}
+            >
+              {bleed > 0 && (
+                <div
+                  className="absolute border border-dashed border-[#a67c00]/65"
+                  style={{
+                    left: -bleed,
+                    top: -bleed,
+                    width: size.width + bleed * 2,
+                    height: size.height + bleed * 2,
+                  }}
+                />
+              )}
+              <div className="absolute inset-0 border border-[#710014]/55" />
+              {safeMargin > 0 && (
+                <div
+                  className="absolute border border-dashed border-[#710014]/35"
+                  style={{
+                    left: safeMargin,
+                    top: safeMargin,
+                    width: Math.max(1, size.width - safeMargin * 2),
+                    height: Math.max(1, size.height - safeMargin * 2),
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Centre lines: optional drafting aids for centring by eye. */}
+          {showGuides && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{ zIndex: 6 }}
+            >
+              <span
+                className="absolute top-0 h-full border-l border-dashed border-[#710014]/30"
+                style={{ left: size.width / 2 }}
+              />
+              <span
+                className="absolute left-0 w-full border-t border-dashed border-[#710014]/30"
+                style={{ top: size.height / 2 }}
+              />
+            </div>
           )}
 
           {/* Envelope drafting guides: measurement, never artwork. */}
@@ -1473,13 +1650,70 @@ export function StudioCanvas({
               ))}
             </div>
           )}
+
+          {/* The user's own guides. They sit above the artwork so they can be
+              grabbed, but their hit strip is only a few pixels wide, so a click
+              anywhere else still reaches the layer underneath. */}
+          {(showGuides || guideDrag?.index === null) && (
+            <div className="absolute inset-0" style={{ zIndex: 54 }}>
+              {showGuides &&
+                userGuides.x.map((gx, index) => (
+                <div
+                  key={`guide-x-${index}`}
+                  className="absolute top-0 cursor-ew-resize"
+                  style={{
+                    left: gx - Math.max(6, 8 / scale) / 2,
+                    width: Math.max(6, 8 / scale),
+                    height: size.height,
+                  }}
+                  onPointerDown={(event) => startGuideMove("x", index, event)}
+                >
+                  <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-[#35708f]" />
+                </div>
+              ))}
+              {showGuides &&
+                userGuides.y.map((gy, index) => (
+                <div
+                  key={`guide-y-${index}`}
+                  className="absolute left-0 cursor-ns-resize"
+                  style={{
+                    top: gy - Math.max(6, 8 / scale) / 2,
+                    height: Math.max(6, 8 / scale),
+                    width: size.width,
+                  }}
+                  onPointerDown={(event) => startGuideMove("y", index, event)}
+                >
+                  <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-[#35708f]" />
+                </div>
+              ))}
+              {/* A guide being pulled out of a ruler follows the pointer until
+                  it is released on the page — or dropped off it to cancel. */}
+              {guideDrag?.index === null &&
+                (guideDrag.axis === "x" ? (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute top-0 w-px bg-[#35708f]/70"
+                    style={{ left: guideDrag.at, height: size.height }}
+                  />
+                ) : (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute left-0 h-px bg-[#35708f]/70"
+                    style={{ top: guideDrag.at, width: size.width }}
+                  />
+                ))}
+            </div>
+          )}
         </div>
 
         {showRulers && (
           <>
+            {/* Top ruler: reads the horizontal axis. Dragging out of it lays a
+                horizontal guide down the page. */}
             <div
               aria-hidden
-              className="pointer-events-none absolute border border-ink/15 bg-[var(--paper-light)] text-[8px] text-ink/45"
+              title="Drag down from the ruler to drop a horizontal guide"
+              className="absolute cursor-ns-resize border border-ink/15 bg-[var(--paper-light)] text-[8px] text-ink/45"
               style={{
                 left: 0,
                 top: -16,
@@ -1487,8 +1721,9 @@ export function StudioCanvas({
                 width: size.width * scale,
                 zIndex: 60,
               }}
+              onPointerDown={(event) => startGuideFromRuler("y", event)}
             >
-              {rulerTicks.map((tick) => (
+              {rulerXTicks.map((tick) => (
                 <span
                   key={`x-${tick.value}`}
                   className="absolute top-0 h-full"
@@ -1500,15 +1735,23 @@ export function StudioCanvas({
                   />
                   {tick.major && (
                     <span className="absolute left-1 top-1/2 -translate-y-1/2 whitespace-nowrap tabular-nums">
-                      {Math.round(tick.value)}
+                      {tick.label}
                     </span>
                   )}
                 </span>
               ))}
+              <span
+                className="absolute right-0 top-0 flex h-full items-center bg-[var(--paper-light)] px-1 font-meta uppercase tracking-[0.08em] text-ink/40"
+                style={{ fontSize: 7 }}
+              >
+                {unit}
+              </span>
             </div>
+            {/* Left ruler: reads the vertical axis, labels turned on their side. */}
             <div
               aria-hidden
-              className="pointer-events-none absolute border border-ink/15 bg-[var(--paper-light)]"
+              title="Drag across the ruler to drop a vertical guide"
+              className="absolute cursor-ew-resize border border-ink/15 bg-[var(--paper-light)] text-[8px] text-ink/45"
               style={{
                 left: -16,
                 top: 0,
@@ -1516,8 +1759,9 @@ export function StudioCanvas({
                 height: size.height * scale,
                 zIndex: 60,
               }}
+              onPointerDown={(event) => startGuideFromRuler("x", event)}
             >
-              {rulerTicks.map((tick) => (
+              {rulerYTicks.map((tick) => (
                 <span
                   key={`y-${tick.value}`}
                   className="absolute left-0 w-full"
@@ -1527,6 +1771,18 @@ export function StudioCanvas({
                     className="absolute left-0 top-0 h-px bg-ink/25"
                     style={{ width: tick.major ? 7 : 4 }}
                   />
+                  {tick.major && (
+                    <span
+                      className="absolute left-px whitespace-nowrap tabular-nums"
+                      style={{
+                        top: 4,
+                        transform: "rotate(-90deg)",
+                        transformOrigin: "0 0",
+                      }}
+                    >
+                      {tick.label}
+                    </span>
+                  )}
                 </span>
               ))}
             </div>

@@ -1,12 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
   PAGE_EDGES,
+  designValueFromInput,
   elementStyleAt,
+  formatDesignValue,
   isDesignDocument,
   normalizeDesign,
+  pageDimensionsLabel,
   pageEdgeClipPath,
   pageFitScale,
   placeOnPage,
+  rulerTicksFor,
+  toDesignPx,
   type DesignDocument,
 } from "./design";
 import type { InvitationContent } from "./invitation";
@@ -356,5 +361,71 @@ describe("placeOnPage", () => {
     expect(box.y + box.h).toBeLessThanOrEqual(page.height);
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.y).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("display units", () => {
+  /* Every field reads a converted number and writes it back, so the round trip
+     has to be exact: a workspace left open all evening must not creep a layer
+     a pixel at a time. */
+  it("reads and types every unit without walking the stored value", () => {
+    for (const unit of ["mm", "cm", "in", "px"] as const) {
+      for (const px of [8, 137, 480, 672, 1000]) {
+        const back = designValueFromInput(formatDesignValue(px, unit), unit);
+        expect(back, `${px}px shown as ${unit}`).toBe(px);
+        // And doing it again changes nothing either.
+        expect(designValueFromInput(formatDesignValue(back, unit), unit), unit).toBe(px);
+      }
+    }
+  });
+
+  it("keeps whole pixels whole and physical values to two decimals", () => {
+    expect(formatDesignValue(137.6, "px")).toBe(138);
+    expect(formatDesignValue(toDesignPx(25, "mm"), "mm")).toBe(25);
+    expect(formatDesignValue(toDesignPx(12.5, "mm"), "mm")).toBe(12.5);
+    expect(formatDesignValue(toDesignPx(5, "in"), "in")).toBe(5);
+  });
+
+  it("ticks the ruler in the display unit, labelling major ticks only", () => {
+    // An A6 sheet measured in millimetres.
+    const mm = rulerTicksFor(toDesignPx(105, "mm"), "mm");
+    expect(mm[0]).toEqual({ value: 0, major: true, label: "0" });
+    expect(mm[1].major).toBe(false);
+    expect(mm[1].label).toBe("");
+    expect(mm.filter((tick) => tick.major).map((tick) => tick.label)).toContain("100");
+    // Ticks never run off the page they describe.
+    expect(mm[mm.length - 1].value).toBeLessThanOrEqual(toDesignPx(105, "mm") + 0.01);
+
+    // A 5 × 7 card measured in inches: quarter-inch ticks, half-inch labels.
+    const inches = rulerTicksFor(toDesignPx(5, "in"), "in");
+    const labels = inches.filter((tick) => tick.major).map((tick) => tick.label);
+    expect(labels).toContain("0.5");
+    expect(labels).toContain("5");
+
+    // A pixel page stays in pixels.
+    const pixels = rulerTicksFor(480, "px");
+    expect(pixels.filter((tick) => tick.major).map((tick) => tick.label)).toContain("100");
+
+    expect(rulerTicksFor(0, "mm")).toEqual([]);
+  });
+
+  it("reads a page's physical size, in its own orientation", () => {
+    const portrait = {
+      width: toDesignPx(105, "mm"),
+      height: toDesignPx(148, "mm"),
+    };
+    expect(pageDimensionsLabel(portrait, "mm")).toBe("105 × 148 mm");
+    // Landscape keeps its own order instead of being normalised to portrait.
+    expect(pageDimensionsLabel({ width: portrait.height, height: portrait.width }, "mm")).toBe(
+      "148 × 105 mm",
+    );
+    expect(pageDimensionsLabel({ width: toDesignPx(7, "in"), height: toDesignPx(5, "in") }, "in")).toBe(
+      "7 × 5 in",
+    );
+    expect(pageDimensionsLabel({ width: 1000, height: 1333.33 }, "px")).toBe(
+      "1000 × 1333 px",
+    );
+    // Absent pages fall back to the classic card rather than throwing.
+    expect(pageDimensionsLabel(null, "mm")).toMatch(/mm$/);
   });
 });

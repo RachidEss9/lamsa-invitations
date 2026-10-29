@@ -486,6 +486,81 @@ export function fromDesignPx(value: number, unit: DesignUnit): number {
   return value / PX_PER_UNIT[unit];
 }
 
+/**
+ * The number shown in a measurement field: whole pixels stay whole, physical
+ * units keep two decimals (0.01 mm is well under a canvas pixel, so the value
+ * on screen still describes the value in the document).
+ */
+export function formatDesignValue(valuePx: number, unit: DesignUnit): number {
+  if (unit === "px") return Math.round(valuePx);
+  return Math.round(fromDesignPx(valuePx, unit) * 100) / 100;
+}
+
+/**
+ * A typed physical measurement back into canvas units. Rounded to the nearest
+ * canvas pixel so typing the value that is displayed can never walk the stored
+ * number away from itself over repeated edits.
+ */
+export function designValueFromInput(value: number, unit: DesignUnit): number {
+  if (unit === "px") return Math.round(value);
+  return Math.round(toDesignPx(value, unit));
+}
+
+/** Physical value → the short label the rulers and status readouts show. */
+export function physicalLabel(valueInUnit: number, unit: DesignUnit): string {
+  if (unit === "px") return String(Math.round(valueInUnit));
+  const rounded =
+    unit === "in"
+      ? Math.round(valueInUnit * 100) / 100
+      : Math.round(valueInUnit * 10) / 10;
+  return String(rounded);
+}
+
+export interface RulerTick {
+  /** Tick position, in canvas units. */
+  value: number;
+  major: boolean;
+  /** Label for major ticks, in the display unit. */
+  label: string;
+}
+
+/** Minor ruler spacing per display unit, in that unit. */
+const RULER_MINOR: Record<DesignUnit, number> = { mm: 10, cm: 1, in: 0.25, px: 50 };
+
+/**
+ * Ruler ticks for one edge of the page, measured in canvas units but labelled
+ * in the workspace's display unit. Ticks are walked by index, not by repeated
+ * addition, so a 96/25.4 conversion can never drift off the page edge.
+ */
+export function rulerTicksFor(lengthPx: number, unit: DesignUnit): RulerTick[] {
+  const minorPx = toDesignPx(RULER_MINOR[unit], unit);
+  if (!(minorPx > 0) || !(lengthPx > 0)) return [];
+  const count = Math.max(1, Math.floor(lengthPx / minorPx + 1e-6));
+  const ticks: RulerTick[] = [];
+  for (let index = 0; index <= count; index += 1) {
+    const major = index % 2 === 0;
+    const value = index * minorPx;
+    ticks.push({
+      value,
+      major,
+      label: major ? physicalLabel(fromDesignPx(value, unit), unit) : "",
+    });
+  }
+  return ticks;
+}
+
+/** The page's physical trim size, e.g. `105 × 148 mm`. Never the zoomed size. */
+export function pageDimensionsLabel(
+  page: Pick<DesignPage, "width" | "height"> | null | undefined,
+  unit: DesignUnit,
+): string {
+  const { width, height } = pageSizeOf(page);
+  return `${physicalLabel(fromDesignPx(width, unit), unit)} × ${physicalLabel(
+    fromDesignPx(height, unit),
+    unit,
+  )} ${unit}`;
+}
+
 export interface PageSize {
   width: number;
   height: number;

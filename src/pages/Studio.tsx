@@ -57,11 +57,13 @@ import {
   makeElement,
   makeId,
   normalizeDesign,
+  pageDimensionsLabel,
   pageFitScale,
   pageSizeOf,
   placeOnPage,
   resizePage,
   toDesignPx,
+  type DesignUnit,
   PAGE_RESIZE_MODES,
   SHAPES,
   timelineDuration,
@@ -137,6 +139,11 @@ import {
   undoHistory,
 } from "@/lib/studio-edit";
 import { applyTypeStyle, type TypeStyle } from "@/lib/type-styles";
+import {
+  alignPositions,
+  distributePositions,
+  type AlignKind,
+} from "@/lib/arrange";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -146,6 +153,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  Crosshair,
   Eye,
   EyeOff,
   FileText,
@@ -160,6 +168,7 @@ import {
   Keyboard,
   Loader2,
   Lock,
+  Magnet,
   Mail,
   Minus,
   Monitor,
@@ -196,6 +205,10 @@ type SaveState = "saved" | "saving" | "unsaved" | "error";
 type Device = "desktop" | "tablet" | "phone";
 type LeftPanel = "add" | "layers" | "colour" | "opening" | "pages";
 type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline";
+
+/** Shared empty guides, so the canvas never sees a fresh object each render. */
+const NO_GUIDES: PageGuides = { x: [], y: [] };
+type PageGuides = { x: number[]; y: number[] };
 
 const DEVICE_WIDTH: Record<Device, string> = {
   desktop: "100%",
@@ -303,8 +316,10 @@ export default function Studio() {
     grid: boolean;
     rulers: boolean;
     safe: boolean;
+    guides: boolean;
+    snap: boolean;
   }>(() => {
-    const fallback = { grid: false, rulers: false, safe: false };
+    const fallback = { grid: false, rulers: false, safe: false, guides: false, snap: true };
     if (typeof window === "undefined") return fallback;
     try {
       const raw = JSON.parse(
@@ -315,6 +330,10 @@ export default function Studio() {
         grid: Boolean(raw.grid),
         rulers: Boolean(raw.rulers),
         safe: Boolean(raw.safe),
+        guides: Boolean(raw.guides),
+        // Snapping predates this switch, so a preference saved without it
+        // keeps the behaviour the workspace always had.
+        snap: raw.snap === undefined ? true : Boolean(raw.snap),
       };
     } catch {
       return fallback;
@@ -330,6 +349,66 @@ export default function Studio() {
       }
       return next;
     });
+  /* The unit the workspace reads measurements in. Display only: every stored
+     number stays in canvas units, so no project's dimensions ever change. */
+  const [unit, setUnit] = useState<DesignUnit>(() => {
+    if (typeof window === "undefined") return "mm";
+    const saved = window.localStorage.getItem("lamsa.canvas.unit");
+    return saved === "mm" || saved === "cm" || saved === "in" || saved === "px"
+      ? saved
+      : "mm";
+  });
+  const changeUnit = (next: string) => {
+    const value: DesignUnit =
+      next === "mm" || next === "cm" || next === "in" || next === "px"
+        ? next
+        : "mm";
+    setUnit(value);
+    try {
+      window.localStorage.setItem("lamsa.canvas.unit", value);
+    } catch {
+      // Losing a display preference is harmless.
+    }
+  };
+  /* Drafting guides, kept per page and per browser. They are a workspace aid,
+     not part of the invitation — nothing here reaches the saved design or any
+     export. */
+  const [guidesByPage, setGuidesByPage] = useState<Record<string, PageGuides>>(
+    () => {
+      if (typeof window === "undefined") return {};
+      try {
+        const raw = JSON.parse(
+          window.localStorage.getItem("lamsa.canvas.guides") ?? "{}",
+        );
+        if (!raw || typeof raw !== "object") return {};
+        const clean = (list: unknown) =>
+          Array.isArray(list)
+            ? list.filter(
+                (value) => typeof value === "number" && Number.isFinite(value),
+              )
+            : [];
+        const map: Record<string, PageGuides> = {};
+        for (const [pageId, axes] of Object.entries(raw)) {
+          const value = axes as { x?: unknown; y?: unknown };
+          map[pageId] = { x: clean(value.x), y: clean(value.y) };
+        }
+        return map;
+      } catch {
+        return {};
+      }
+    },
+  );
+  const updatePageGuides = useCallback((pageId: string, next: PageGuides) => {
+    setGuidesByPage((current) => {
+      const map = { ...current, [pageId]: next };
+      try {
+        window.localStorage.setItem("lamsa.canvas.guides", JSON.stringify(map));
+      } catch {
+        // Losing a drafting aid is harmless.
+      }
+      return map;
+    });
+  }, []);
   const [aspectLocked, setAspectLocked] = useState(false);
   /**
    * Material Preview draws the studio's paper, foil and relief simulations;
@@ -1880,52 +1959,64 @@ export default function Studio() {
     );
   };
 
-  const alignSelection = (kind: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") => {
+  const alignSelection = (kind: AlignKind) => {
     if (!page) return;
-    // The page can be any size the host chose, so alignment uses its real
-    // geometry instead of the classic 1000 × 1333 card.
+    // The page can be any size the host chose, so a lone layer aligns to its
+    // real geometry instead of the classic 1000 × 1333 card — and a selection
+    // of several lines up against their own shared bounds, which is what
+    // "align left" has to mean when more than one layer is involved.
     const { width, height } = pageSizeOf(page);
-    const inset = Math.max(16, Math.round(width * 0.04));
+    const chosen = page.elements.filter(
+      (element) => selectedIds.includes(element.id) && !element.locked,
+    );
+    const positions = alignPositions(
+      chosen.map((element) => ({
+        id: element.id,
+        x: element.x,
+        y: element.y,
+        w: element.w,
+        h: element.h,
+        locked: element.locked,
+      })),
+      kind,
+      { x: 0, y: 0, w: width, h: height },
+    );
+    if (positions.size === 0) return;
     setPageElements((elements) =>
       elements.map((element) => {
-        if (!selectedIds.includes(element.id)) return element;
-        if (kind === "left") return { ...element, x: inset };
-        if (kind === "right") return { ...element, x: width - inset - element.w };
-        if (kind === "hcenter") return { ...element, x: (width - element.w) / 2 };
-        if (kind === "top") return { ...element, y: inset };
-        if (kind === "bottom") return { ...element, y: height - inset - element.h };
-        return { ...element, y: (height - element.h) / 2 };
+        const position = positions.get(element.id);
+        return position ? { ...element, x: position.x, y: position.y } : element;
       }),
     );
   };
 
   const distributeSelection = (axis: "h" | "v") => {
-    const items = page?.elements.filter((element) => selectedIds.includes(element.id)) ?? [];
-    if (items.length < 3) {
+    const chosen = (page?.elements ?? []).filter((element) =>
+      selectedIds.includes(element.id),
+    );
+    const positions = distributePositions(
+      chosen.map((element) => ({
+        id: element.id,
+        x: element.x,
+        y: element.y,
+        w: element.w,
+        h: element.h,
+        locked: element.locked,
+      })),
+      axis,
+    );
+    if (!positions) {
       toast.error("Select at least three layers to distribute them.");
       return;
     }
-    const sorted = [...items].sort((a, b) => (axis === "h" ? a.x - b.x : a.y - b.y));
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
-    const span =
-      axis === "h" ? last.x + last.w - first.x : last.y + last.h - first.y;
-    const total = sorted.reduce((sum, item) => sum + (axis === "h" ? item.w : item.h), 0);
-    const gap = (span - total) / (sorted.length - 1);
-    let cursor = axis === "h" ? first.x : first.y;
-    const positions = new Map<string, number>();
-    for (const item of sorted) {
-      positions.set(item.id, cursor);
-      cursor += (axis === "h" ? item.w : item.h) + gap;
-    }
     setPageElements((elements) =>
-      elements.map((element) =>
-        positions.has(element.id)
-          ? axis === "h"
-            ? { ...element, x: Math.round(positions.get(element.id)!) }
-            : { ...element, y: Math.round(positions.get(element.id)!) }
-          : element,
-      ),
+      elements.map((element) => {
+        const position = positions.get(element.id);
+        if (position === undefined) return element;
+        return axis === "h"
+          ? { ...element, x: position }
+          : { ...element, y: position };
+      }),
     );
   };
 
@@ -3350,7 +3441,9 @@ export default function Studio() {
           <span className="mx-1 h-5 w-px bg-ink/12" />
           <IconButton label="Grid" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
           <IconButton label="Rulers" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
-          <IconButton label="Safe area" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
+          <IconButton label="Safe area, trim and bleed" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
+          <IconButton label="Centre guides" active={overlays.guides} onClick={() => toggleOverlay("guides")}><Crosshair className="size-3.5" /></IconButton>
+          <IconButton label="Snapping" active={overlays.snap} onClick={() => toggleOverlay("snap")}><Magnet className="size-3.5" /></IconButton>
         </div>
 
         <div className="hidden items-center gap-1 lg:flex">
@@ -3364,7 +3457,9 @@ export default function Studio() {
           <div className="flex items-center gap-0.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-0.5 shadow-[var(--shadow-xs)]">
             <IconButton label="Grid" className="rounded-full border-transparent" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
             <IconButton label="Rulers" className="rounded-full border-transparent" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
-            <IconButton label="Safe area" className="rounded-full border-transparent" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
+            <IconButton label="Safe area, trim and bleed" className="rounded-full border-transparent" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
+            <IconButton label="Centre guides" className="rounded-full border-transparent" active={overlays.guides} onClick={() => toggleOverlay("guides")}><Crosshair className="size-3.5" /></IconButton>
+            <IconButton label="Snapping" className="rounded-full border-transparent" active={overlays.snap} onClick={() => toggleOverlay("snap")}><Magnet className="size-3.5" /></IconButton>
           </div>
           <span className="mx-1 h-5 w-px bg-ink/10" />
           <IconButton label="Toggle left panel" active={leftOpen} onClick={() => setLeftOpen((value) => !value)}><PanelLeft className="size-3.5" /></IconButton>
@@ -3537,6 +3632,11 @@ export default function Studio() {
                 showGrid={overlays.grid}
                 showRulers={overlays.rulers}
                 showSafeArea={overlays.safe}
+                unit={unit}
+                enableSnap={overlays.snap}
+                showGuides={overlays.guides}
+                userGuides={guidesByPage[page.id] ?? NO_GUIDES}
+                onUserGuidesChange={(next) => updatePageGuides(page.id, next)}
                 materialPreview={materialPreview}
                 envelope={envelopeGuide}
                 resetViewToken={resetViewToken}
@@ -3639,7 +3739,7 @@ export default function Studio() {
 
             <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col gap-1">
               <span className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-ink/55 backdrop-blur">
-                {page.name} · {page.elements.length} layers
+                {page.name} · {page.elements.length} layers · {pageDimensionsLabel(page, unit)}
               </span>
               {/* The two ways to look at this card, kept next to the card. */}
               <span className="pointer-events-auto flex w-fit items-center gap-0.5 rounded-full border border-ink/15 bg-[var(--paper-light)]/90 p-0.5 backdrop-blur">
@@ -3672,6 +3772,29 @@ export default function Studio() {
                   Materials
                 </button>
               </span>
+              {/* One unit for every readout — rulers, inspector, page size.
+                  It changes what the numbers say, never what they are. */}
+              <span
+                className="pointer-events-auto flex w-fit items-center gap-0.5 rounded-full border border-ink/15 bg-[var(--paper-light)]/90 p-0.5 backdrop-blur"
+                title="Measure ruler and inspector values in"
+              >
+                {(["mm", "cm", "in", "px"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={unit === option}
+                    onClick={() => changeUnit(option)}
+                    className={cn(
+                      "rounded-full px-2 py-0.5 font-meta text-[8px] uppercase tracking-[0.1em] transition-colors",
+                      unit === option
+                        ? "bg-[var(--ink)] text-[var(--paper-light)]"
+                        : "text-ink/50 hover:text-ink",
+                    )}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </span>
               {selected.length > 0 && (
                 <span className="pointer-events-auto rounded-md border border-[var(--red)]/30 bg-[var(--paper-light)]/90 px-2 py-1 font-meta text-[8px] uppercase tracking-[0.12em] text-[var(--red)] backdrop-blur">
                   {selected.length === 1 ? selected[0].name : `${selected.length} selected`}
@@ -3685,6 +3808,51 @@ export default function Studio() {
                 selected.length > 0 ? "bottom-[54px]" : "bottom-3",
               )}
             >
+              {/* Drawing aids on a phone: the header rows these live in only
+                  appear at md and above, so the same toggles are repeated here
+                  as thumb-sized buttons over the canvas. */}
+              <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-ink/8 bg-white/85 p-0.5 shadow-[var(--shadow-soft)] backdrop-blur md:hidden">
+                <IconButton
+                  label="Grid"
+                  active={overlays.grid}
+                  onClick={() => toggleOverlay("grid")}
+                  className="size-8 border-transparent"
+                >
+                  <Grid2x2 className="size-3.5" />
+                </IconButton>
+                <IconButton
+                  label="Rulers"
+                  active={overlays.rulers}
+                  onClick={() => toggleOverlay("rulers")}
+                  className="size-8 border-transparent"
+                >
+                  <Ruler className="size-3.5" />
+                </IconButton>
+                <IconButton
+                  label="Safe area, trim and bleed"
+                  active={overlays.safe}
+                  onClick={() => toggleOverlay("safe")}
+                  className="size-8 border-transparent"
+                >
+                  <Frame className="size-3.5" />
+                </IconButton>
+                <IconButton
+                  label="Centre guides"
+                  active={overlays.guides}
+                  onClick={() => toggleOverlay("guides")}
+                  className="size-8 border-transparent"
+                >
+                  <Crosshair className="size-3.5" />
+                </IconButton>
+                <IconButton
+                  label="Snapping"
+                  active={overlays.snap}
+                  onClick={() => toggleOverlay("snap")}
+                  className="size-8 border-transparent"
+                >
+                  <Magnet className="size-3.5" />
+                </IconButton>
+              </div>
               <div className="pointer-events-auto flex items-center gap-0.5 overflow-hidden rounded-full border border-ink/8 bg-white/85 p-0.5 shadow-[var(--shadow-soft)] backdrop-blur">
                 <button
                   type="button"
@@ -3836,6 +4004,7 @@ export default function Studio() {
             onAspectLocked={setAspectLocked}
             onPatch={patchElement}
             onPagePatch={patchPage}
+            unit={unit}
             onAlign={alignSelection}
             onDistribute={distributeSelection}
             onLayer={orderSelection}
@@ -3936,6 +4105,7 @@ export default function Studio() {
                   onAspectLocked={setAspectLocked}
                   onPatch={patchElement}
                   onPagePatch={patchPage}
+                  unit={unit}
                   onAlign={alignSelection}
                   onDistribute={distributeSelection}
                   onLayer={orderSelection}
