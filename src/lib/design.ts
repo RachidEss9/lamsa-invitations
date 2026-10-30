@@ -110,9 +110,12 @@ export interface ElementAnimation {
 }
 
 export interface ExitAnimation {
+  enabled: boolean;
   preset: AnimationPresetId;
   duration: number;
   delay: number;
+  start: number;
+  easing: EasingId;
 }
 
 export type ShapeKind =
@@ -1169,6 +1172,12 @@ export interface LinerGeometry {
 }
 
 /** The current draft of the envelope. */
+export interface TimelineClip {
+  elementId: string;
+  start?: number;
+  duration?: number;
+}
+
 export interface EnvelopSettings {
   enabled: boolean;
   geometry: EnvelopeGeometry;
