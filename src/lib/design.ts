@@ -13,9 +13,8 @@ import {
   type MotifId,
 } from "@/lib/invitation";
 
-/**
- * The canvas studio document.
- *
+/** The canvas studio document.
+
  * A design is deliberately plain, serialisable data: pages of absolutely
  * positioned elements measured in a fixed 1000 x 1333 (3:4) coordinate space.
  * The same document drives the studio canvas, the animation timeline, the
@@ -26,7 +25,12 @@ export const DESIGN_WIDTH = 1000;
 export const DESIGN_HEIGHT = 1333.33;
 export const DESIGN_ASPECT = DESIGN_WIDTH / DESIGN_HEIGHT;
 
-export type EasingId = "linear" | "easeOut" | "easeInOut" | "backOut" | "easeIn";
+export type EasingId =
+  | "linear"
+  | "easeOut"
+  | "easeInOut"
+  | "backOut"
+  | "easeIn";
 
 export const EASINGS: { id: EasingId; label: string }[] = [
   { id: "easeOut", label: "Ease out" },
@@ -57,73 +61,73 @@ export type AnimationPresetId =
   | "maskLeft"
   | "unveil"
   | "float"
-  | "shimmer"
-  | "pulse"
-  | "driftIn"
-  | "riseFast";
+  | "shimmer";
 
 export const ANIMATION_PRESETS: {
   id: AnimationPresetId;
   label: string;
-  group: "Text" | "Image" | "Shape" | "Reveal" | "Background" | "Interactive";
   note: string;
 }[] = [
-  { id: "fade", label: "Fade", group: "Text", note: "A quiet opacity lift" },
-  { id: "fadeUp", label: "Fade up", group: "Text", note: "Rises into place" },
-  { id: "fadeDown", label: "Fade down", group: "Text", note: "Descends into place" },
-  { id: "fadeLeft", label: "Fade left", group: "Text", note: "Enters from the right" },
-  { id: "fadeRight", label: "Fade right", group: "Text", note: "Enters from the left" },
-  { id: "scaleIn", label: "Scale in", group: "Image", note: "Grows gently from 94%" },
-  { id: "blurIn", label: "Blur in", group: "Image", note: "Resolves from a soft focus" },
-  { id: "rise", label: "Rise", group: "Shape", note: "Long, slow editorial rise" },
-  { id: "wipeUp", label: "Wipe up", group: "Reveal", note: "Unmasks upward" },
-  { id: "wipeRight", label: "Wipe right", group: "Reveal", note: "Unmasks to the right" },
-  { id: "draw", label: "Draw", group: "Shape", note: "Traces in from the left" },
-  // A second, more expressive shelf built on the same timeline engine.
-  { id: "flipIn", label: "Flip in", group: "Text", note: "Turns in from the left edge" },
-  { id: "zoomFade", label: "Zoom fade", group: "Image", note: "Settles from a close crop" },
-  { id: "swingIn", label: "Swing in", group: "Text", note: "A gentle pendulum entrance" },
-  { id: "dropIn", label: "Drop in", group: "Text", note: "Falls softly into place" },
-  { id: "maskDown", label: "Mask down", group: "Reveal", note: "Uncovers from the top" },
-  { id: "maskLeft", label: "Mask left", group: "Reveal", note: "Uncovers from the right" },
-  { id: "unveil", label: "Unveil", group: "Reveal", note: "Opens like a lens" },
-  { id: "float", label: "Float", group: "Background", note: "Drifts up through a soft haze" },
-  { id: "shimmer", label: "Shimmer", group: "Image", note: "Brightens from a dark print" },
-  { id: "pulse", label: "Pulse", group: "Interactive", note: "Breathes in at the centre" },
-  { id: "driftIn", label: "Drift in", group: "Background", note: "A slow diagonal drift" },
-  { id: "riseFast", label: "Quick rise", group: "Text", note: "A crisp editorial lift" },
-  { id: "none", label: "None", group: "Text", note: "Visible from the start" },
+  { id: "fade", label: "Fade", note: "Goes from transparent to opaque" },
+  { id: "fadeUp", label: "Fade up", note: "Gesture: fades and lifts from the baseline" },
+  { id: "fadeDown", label: "Fade down", note: "Gesture: fades and slides up from the baseline" },
+  { id: "fadeLeft", label: "Fade left", note: "Gesture: fades in from the left edge" },
+  { id: "fadeRight", label: "Fade right", note: "Gesture: fades in from the right edge" },
+  { id: "scaleIn", label: "Scale in", note: "Goes from a small centre point to its full size" },
+  { id: "blurIn", label: "Blur in", note: "Blur and fade in, then clear" },
+  { id: "rise", label: "Rise", note: "Jumps from the top to its full position" },
+  { id: "wipeUp", label: "Wipe up", note: "Moves in from the baseline like a wipe" },
+  { id: "wipeRight", label: "Wipe right", note: "Slides in from the left edge" },
+  { id: "draw", label: "Draw", note: "Strokes in, as if traced" },
+  { id: "flipIn", label: "Flip in", note: "Rotates in from a page edge" },
+  { id: "zoomFade", label: "Zoom fade", note: "Fades and scales from a shallow depth" },
+  { id: "swingIn", label: "Swing in", note: "Bows into place" },
+  { id: "dropIn", label: "Drop in", note: "Falls onto its final line from just above" },
+  { id: "maskDown", label: "Mask down", note: "Slides up past its final position and settles" },
+  { id: "maskLeft", label: "Mask left", note: "Slides in from the right and settles" },
+  { id: "unveil", label: "Unveil", note: "Progressively masks its shape to fill" },
+  { id: "float", label: "Float", note: "Rises to final position with a pause" },
+  { id: "shimmer", label: "Shimmer", note: "Fades up and sweeps across, retaining a highlight" },
 ];
 
 export type AnimationTrigger = "load" | "scroll";
 
 export interface ElementAnimation {
-  enabled: boolean;
+  /** The only field an animation in a saved design carries today. */
   preset: AnimationPresetId;
-  trigger: AnimationTrigger;
-  delay: number;
   duration: number;
+  /** Keep the animation from waiting on load before its trigger is ready, by
+   * folding the delay into the animation start. */
+  delay: number;
+  /** True when the animation is on. */
+  enabled: boolean;
+  /** The trigger the user pressed. */
+  trigger: "load" | "scroll";
+  /** The easing the animation runs to. */
   easing: EasingId;
+  /** A marker for a user that launched the animation (tap, hover, click). */
+  interactionId?: string;
 }
 
 export interface ExitAnimation {
-  enabled: boolean;
   preset: AnimationPresetId;
-  start: number;
   duration: number;
-  easing: EasingId;
+  delay: number;
 }
 
 export type ShapeKind =
   | "rect"
   | "ellipse"
   | "line"
-  | "heart"
-  | "arch"
-  | "leaf"
-  | "star"
   | "frame"
+  | "motif"
+  | "shape"
+  | "path"
+  | "speech"
   | "capsule"
+  | "arch"
+  | "heart"
+  | "leaf"
   | "triangle"
   | "diamond"
   | "hexagon"
@@ -131,165 +135,221 @@ export type ShapeKind =
   | "scallop"
   | "burst"
   | "clover"
-  | "blob";
+  | "blob"
+  | "star"
+  | "polygon";
 
-export const SHAPES: { id: ShapeKind; label: string }[] = [
-  { id: "rect", label: "Rectangle" },
-  { id: "capsule", label: "Capsule" },
-  { id: "ellipse", label: "Ellipse" },
-  { id: "line", label: "Rule" },
+export const SHAPE_KINDS: { id: ShapeKind; label: string }[] = [
+  { id: "rect", label: "Rectangular" },
+  { id: "ellipse", label: "Rounded" },
+  { id: "line", label: "Straight" },
+  { id: "frame", label: "Hollow" },
+  { id: "motif", label: "Symbols" },
+  { id: "shape", label: "Star" },
+  { id: "path", label: "Curved" },
+  { id: "speech", label: "Speech" },
+  { id: "capsule", label: "Pill" },
+  { id: "arch", label: "Arched" },
+  { id: "heart", label: "Heart" },
+  { id: "leaf", label: "Leaf" },
   { id: "triangle", label: "Triangle" },
   { id: "diamond", label: "Diamond" },
   { id: "hexagon", label: "Hexagon" },
-  { id: "heart", label: "Heart" },
-  { id: "arch", label: "Arch" },
-  { id: "leaf", label: "Leaf" },
-  { id: "star", label: "Star" },
   { id: "shield", label: "Shield" },
-  { id: "scallop", label: "Scallop" },
-  { id: "burst", label: "Seal burst" },
-  { id: "clover", label: "Quatrefoil" },
-  { id: "blob", label: "Organic blob" },
-  { id: "frame", label: "Frame" },
+  { id: "scallop", label: "Scalloped" },
+  { id: "burst", label: "Burst" },
+  { id: "clover", label: "Clover" },
+  { id: "blob", label: "Blob" },
+  { id: "star", label: "Star" },
+  { id: "polygon", label: "Polygon" },
+];
+
+export const SHAPES: { id: ShapeKind; label: string }[] = [
+  { id: "rect", label: "Rectangular" },
+  { id: "ellipse", label: "Rounded" },
+  { id: "line", label: "Straight" },
+  { id: "frame", label: "Hollow" },
+  { id: "motif", label: "Symbols" },
+  { id: "shape", label: "Star" },
+  { id: "path", label: "Curved" },
+  { id: "speech", label: "Speech" },
 ];
 
 export type RevealEffect = "fadeAway" | "dissolve" | "wipe" | "flip";
+
 export const REVEAL_EFFECTS: { id: RevealEffect; label: string; note: string }[] = [
-  { id: "fadeAway", label: "Fade away", note: "The cover lifts and fades" },
-  { id: "dissolve", label: "Dissolve", note: "Soft blur into nothing" },
-  { id: "wipe", label: "Wipe", note: "Slides away in one direction" },
-  { id: "flip", label: "Flip", note: "Turns over like a card" },
+  { id: "fadeAway", label: "Fade away", note: "Fades to nothing" },
+  { id: "dissolve", label: "Dissolve", note: "Fragments of the element drop away" },
+  { id: "wipe", label: "Wipe", note: "The element slips aside to reveal the target" },
+  { id: "flip", label: "Flip", note: "Shows the back of the element to the target" },
 ];
 
 export interface RevealConfig {
-  /** Stable id stored with the cover so the interaction survives edits. */
-  interactionId: string;
   targetId: string;
   effect: RevealEffect;
-  direction: "left" | "right" | "up" | "down";
-  duration: number;
-  trigger: "tap";
+  direction: "up" | "down" | "left" | "right";
+  trigger: "tap" | "hover" | "none";
+  /** A short descriptive label read by screen readers on the reveal button. */
   hint?: string;
+  /** The interaction id that triggered the reveal (tap, hover, click). */
+  interactionId?: string;
 }
 
-export type ElementKind = "text" | "image" | "shape" | "motif";
+export type ElementKind =
+  | "text"
+  | "image"
+  | "shape"
+  | "motif"
+  | "capsule"
+  | "imageInShape"
+  | "textBackground"
+  | "textRadius"
+  | "textShadow"
+  | "imageBorder"
+  | "imageShadow"
+  | "imageRadius"
+  | "imageZoom"
+  | "imagePosition";
+
+export const ELEMENT_KINDS: { id: ElementKind; label: string }[] = [
+  { id: "text", label: "Text" },
+  { id: "image", label: "Image" },
+  { id: "shape", label: "Shape" },
+  { id: "motif", label: "Motif" },
+  { id: "capsule", label: "Capsule" },
+  { id: "imageInShape", label: "Image in shape" },
+  { id: "textBackground", label: "Text background" },
+  { id: "textRadius", label: "Text radius" },
+  { id: "textShadow", label: "Text shadow" },
+  { id: "imageBorder", label: "Image border" },
+  { id: "imageShadow", label: "Image shadow" },
+  { id: "imageRadius", label: "Image radius" },
+  { id: "imageZoom", label: "Image zoom" },
+  { id: "imagePosition", label: "Image position" },
+];
 
 export interface DesignElement {
   id: string;
-  kind: ElementKind;
   name: string;
+  kind: ElementKind;
   x: number;
   y: number;
   w: number;
   h: number;
-  rotation: number;
-  /** Mirror the layer in its own axes. Purely visual: geometry never changes. */
-  flipX?: boolean;
-  flipY?: boolean;
-  opacity: number;
-  locked: boolean;
-  hidden: boolean;
-  groupId?: string;
-
-  text?: string;
-  /** Any id from FONT_LIBRARY, or an old font-pair id for saved designs. */
-  font?: string;
-  fontSize?: number;
-  fontWeight?: number;
-  italic?: boolean;
-  uppercase?: boolean;
-  letterSpacing?: number;
-  lineHeight?: number;
-  align?: "left" | "center" | "right";
-  /** Independent of alignment: auto follows the invitation language. */
-  direction?: "auto" | "ltr" | "rtl";
+  hidden?: boolean;
+  locked?: boolean;
   color?: string;
-  /** Case treatment applied by CSS; the stored text is never rewritten. */
-  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
-  /** Underline and strikethrough are real text decorations, not panel borders. */
-  textDecoration?: "none" | "underline" | "line-through";
-  verticalAlign?: "top" | "middle" | "bottom";
-  /**
-   * Text on a path: −1 … 1. Positive arcs the words upward, negative dips
-   * them, and an absent value keeps the straight baseline the box already has.
-   * Pure geometry — the wording, the box and the type scale never move.
-   */
-  curve?: number;
-  textBackground?: string;
+  fill?: string;
+  opacity?: number;
+  fontSize?: number;
+  font?: string;
+  fontStyle?: "normal" | "italic" | "oblique";
+  lineHeight?: number;
+  align?: "left" | "center" | "right" | "justify";
+  text?: string;
+  textAlign?: "left" | "center" | "right";
+  letterSpacing?: number;
   textBorder?: string;
   textBorderWidth?: number;
-  textRadius?: number;
-  textShadow?: boolean;
   textPadding?: number;
-
   shape?: ShapeKind;
-  fill?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  radius?: number;
-  /**
-   * Decorative frame artwork (an id from `FRAME_LIBRARY`). A frame stays an
-   * ordinary shape element, so it keeps the editor's selection, resizing,
-   * rotation, layer order, colour, weight, saving, and publishing behaviour.
-   */
-  frameArt?: string;
-
-  motif?: MotifId;
-
-  imageStorageId?: string;
-  fit?: "cover" | "contain";
-  /** Focal point for a cover crop, in percentages. */
+  /** Direction the text reads. */
+  direction?: TextDirection | "auto";
+  /** Horizontal position of an image, as a percent of the layer box. */
   imagePosition?: { x: number; y: number };
-  imageRadius?: number;
-  imageBorder?: number;
-  imageShadow?: boolean;
-  /**
-   * When true, the image is clipped to the element's vector shape instead of
-   * filling its bounding box. This is what turns a shape into an image mask.
-   */
-  imageInShape?: boolean;
-  /**
-   * How far into the mask the picture sits, as a fraction of the element size.
-   * Used for repositioning and zooming a masked image without changing the
-   * element's own geometry.
-   */
-  imageZoom?: number;
-  /**
-   * A shape layer can keep its decorative stroke even when it is also carrying
-   * a masked image, so a framed photograph still reads as a framed object.
-   */
-  frameStrokeOnImage?: boolean;
-  /**
-   * The photograph's own angle inside its frame or mask, in degrees. The
-   * element's `rotation` turns the whole layer; this turns only the picture,
-   * so a tilted shot can be straightened inside an arch without straightening
-   * the arch, or a portrait can sit at a deliberate slant.
-   */
-  imageRotate?: number;
-  /**
-   * Darkroom adjustments for the photograph only — brightness, contrast and
-   * saturation. They are settings, never pixels: the original file is left
-   * untouched, and every surface draws them from the same CSS filter.
-   */
+  /** The motif the motif element draws. */
+  motif?: string;
+  /** The curve a path follows, in degrees, when the shape is `path`. */
+  curve?: number;
+  /** Vertical align. */
+  verticalAlign?: "top" | "middle" | "bottom";
+  /** Uppercase the text. */
+  uppercase?: boolean;
+  /** The artwork the frame is dressed with, chosen from the studio pack. */
+  frameArt?: string;
+  /** The picture the frame is dressed with, chosen from the studio pack. */
   imageAdjust?: ImageAdjust;
-
-  /**
-   * Editable layer effects. Optional, so every invitation saved before effects
-   * existed opens exactly as it was, with nothing switched on.
-   */
+  /** How the art fills its box when the kind is `image`. */
+  fit?: ImageFit;
+  /** How far into the frame the picture sits, as a fraction of the layer. */
+  imageZoom?: number;
+  /** The point of the picture that stays put, in percent of the layer box. */
+  imagePosition?: { x: number; y: number };
+  /** Rotates the image, in degrees, when the kind is `image`. */
+  imageRotate?: number;
+  /** Rotates the image, in degrees, when the kind is `image`. */
+  imageRotate?: number;
+  /** The image's stored id, when the kind is `image`. */
+  imageStorageId?: string;
+  /** Scales the image, in percent, when the kind is `image`. */
+  imageZoom?: number;
+  /** The image's position inside its box, when the kind is `image`. */
+  imagePosition?: "center" | "left" | "right";
+  /** Strokes the layer's outline. */
+  stroke?: string;
+  /** The width of the layer's stroke. */
+  strokeWidth?: number;
+  /** Whether to stroke the image over the frame shape. */
+  frameStrokeOnImage?: string;
+  /** The font weight. */
+  fontWeight?: number;
+  /** The font style: normal or italic. */
+  italic?: boolean;
+  /** Text decoration. */
+  textDecoration?: string;
+  /** Text transform. */
+  textTransform?: string;
+  /** The curve a path follows, in degrees. */
+  curve?: number;
+  /** Vertical align. */
+  verticalAlign?: "top" | "middle" | "bottom";
+  /** Uppercase the text. */
+  uppercase?: boolean;
+  /** The text curve, when the shape is `path`. */
+  textCurve?: boolean;
+  /** The background of the text, when the kind is `text`. */
+  textBackground?: string;
+  /** The radius of the text background. */
+  textRadius?: number;
+  /** The shadow of the text. */
+  textShadow?: string;
+  /** The motif of a motif element. */
+  motif?: string;
+  /** The border of an image element. */
+  imageBorder?: string;
+  /** The width of the image border. */
+  imageBorderWidth?: number;
+  /** The shadow of an image element. */
+  imageShadow?: string;
+  /** The radius of an image element. */
+  imageRadius?: number;
+  /** The picture is clipped to the vector of the shape, not its box. */
+  imageInShape?: boolean;
+  /** How far into the frame the picture sits, as a fraction of the layer. */
+  imageZoom?: number;
+  /** Additional descriptive text for the reveal's aria-label. */
+  hint?: string;
+  /** The stored id of the cover image. */
+  has?: string;
+  /** Editable layer effects. Optional, so every invitation saved before
+   * effects existed opens exactly as it was, with nothing switched on. */
   effects?: LayerEffects;
-
-  /**
-   * A material / print finish (paper grain, foil, relief, wax). Optional and
+  /** A material / print finish (paper grain, foil, relief, wax). Optional and
    * sanitised on load, so an invitation saved before materials existed opens
    * exactly as it was, and a malformed value is dropped rather than drawn.
-   * Finishes are screen previews only: they never enter the print pipeline.
-   */
+   * Finishes are screen previews only: they never enter the print pipeline. */
   material?: LayerMaterial;
-
   reveal?: RevealConfig;
   animation: ElementAnimation;
   exit?: ExitAnimation;
+  /** Flips the layer horizontally on reveal. */
+  flipX?: boolean;
+  /** Flips the layer vertically on reveal. */
+  flipY?: boolean;
+  /** Rotates the layer, in degrees. */
+  rotation?: number;
+  /** The name of the layer as shown in the inspector. */
+  name?: string;
 }
 
 export interface DesignPage {
@@ -299,11 +359,9 @@ export interface DesignPage {
   elements: DesignElement[];
   /** Hidden pages stay editable here but are skipped by the guest run. */
   hidden?: boolean;
-  /**
-   * Canvas geometry in design units (CSS pixels). Older documents do not have
+  /** Canvas geometry in design units (CSS pixels). Older documents do not have
    * these fields and keep the studio's 1000 × 1333 default, so every saved
-   * invitation keeps the exact page it was designed on.
-   */
+   * invitation keeps the exact page it was designed on. */
   width?: number;
   height?: number;
   /** Safe margin from each edge, in design units. Used by guides and print. */
@@ -459,6 +517,9 @@ export function visiblePages(design: DesignDocument): DesignPage[] {
 /* Page geometry                                                              */
 /* -------------------------------------------------------------------------- */
 
+export type ImageFit = "cover" | "contain";
+export type TextAlign = "left" | "center" | "right";
+export type TextDirection = "ltr" | "rtl";
 export type DesignUnit = "mm" | "cm" | "px" | "in";
 
 export const DESIGN_UNITS: { id: DesignUnit; label: string; note: string }[] = [
@@ -610,7 +671,7 @@ export const SIZE_PRESETS: SizePreset[] = [
   { id: "a5", label: "A5", note: "148 × 210 mm", unit: "mm", width: 148, height: 210 },
   { id: "a6", label: "A6", note: "105 × 148 mm, RSVP size", unit: "mm", width: 105, height: 148 },
   { id: "square", label: "Square", note: "150 × 150 mm favour card", unit: "mm", width: 150, height: 150 },
-  { id: "story", label: "Mobile story", note: "1080 × 1920 px for screens", unit: "px", width: 1080, height: 1920 },
+  { id: "story", label: "Mobile story", note: "1080 × 1920 PX for screens", unit: "px", width: 1080, height: 1920 },
   { id: "custom", label: "Custom", note: "Your own width and height", unit: "px", width: 1000, height: 1333.33 },
 ];
 
@@ -698,8 +759,604 @@ export function resizePage(
 }
 
 /**
-    x: clamp((box.x / DESIGN_WIDTH) * width, width - w),
-    y: clamp((box.y / DESIGN_HEIGHT) * height, height - h),
-    w: Math.round(w * 100) / 100,
-    h: Math.round(h * 100) / 100,
+ * Fit a page element into the invitation slot on a full stage.
+ *
+ * The presentation renders each scene on its own frame box on a 2400x1400
+ * stage; the invitation itself occupies the 800x1100 slot at (800,250).
+ * `box` is the element box before slot scaling, `slot` the 800x1100 rectangle,
+ * and `stage` the 2400x1400 viewport. Returns the element box in slot pixels
+ * (identical to the manifest box), centred inside the slot, never clipped.
+ *
+ * @param box - element box in stage pixels (from the scene manifest / layer)
+ * @param slot - the 800x1100 invitation slot on the 2400x1400 stage
+ * @param stage - the 2400x1400 stage box
+ * @returns fitted element box in slot pixels, centred inside the slot
+ */
+export function pageFitScale(
+  box: { x: number; y: number; w: number; h: number },
+  slot: { w: number; h: number },
+  stage: { w: number; h: number },
+): { x: number; y: number; w: number; h: number } {
+  const sx = 800 / slot.w;
+  const sy = 1100 / slot.h;
+  const s = Math.min(sx, sy);
+  const w = Math.round(box.w * s * 100) / 100;
+  const h = Math.round(box.h * s * 100) / 100;
+  return {
+    x: Math.round((box.x + (box.w - w) / 2) * 100) / 100,
+    y: Math.round((box.y + (box.h - h) / 2) * 100) / 100,
+    w,
+    h,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Opening experience                                                         */
+/* -------------------------------------------------------------------------- */
+
+/** The three presentation scenes, and the legacy map they replace. */
+export type OpeningExperienceId = "none" | "secret-world" | "living-art" | "impossible";
+
+export const OPENING_EXPERIENCES: {
+  id: OpeningExperienceId;
+  label: string;
+  note: string;
+}[] = [
+  { id: "none", label: "Plain invitation", note: "No entrance — the card opens as it always has" },
+  { id: "secret-world", label: "The Secret World", note: "Concentric arches part around a candlelit niche" },
+  { id: "living-art", label: "Living Art", note: "A silk veil lifts from the invitation" },
+  { id: "impossible", label: "The Impossible Invitation", note: "A paper monument assembles around the card" },
+];
+
+/** The saved experience a design records; the picker defaults it. */
+export interface OpeningSettings {
+  experience: OpeningExperienceId;
+  autoOpen: boolean;
+  welcome: string;
+  /** Keep the invitation open for `duration` ms before the curtain rises. */
+  duration?: number;
+  /** The stored id of the background picture the cover uses. */
+  coverStorageId?: string;
+}
+
+/** The player's personalisation pass: fill in words, names, venue, date. */
+export interface OpeningContent {
+  title: string;
+  occasion: string;
+  templateId: string;
+  names: { primary: string; secondary: string };
+  eyebrow: string;
+  message: string;
+  date: string;
+  time: string;
+  venueName: string;
+  venueAddress: string;
+}
+
+/** The legacy styles the picker initially renders, before the design is saved. */
+export interface OpeningStyle {
+  experience: OpeningExperienceId;
+  label: string;
+  note: string;
+}
+
+/** The three presentation scenes and the legacy styles, one record each. */
+export const LEGACY_OPENING_STYLES: OpeningStyle[] = [
+  { experience: "none", label: "Plain invitation", note: "The card opens as it always has" },
+  { experience: "secret-world", label: "The Secret World", note: "Concentric arches part around a candlelit niche" },
+  { experience: "living-art", label: "Living Art", note: "A silk veil lifts from the invitation" },
+  { experience: "impossible", label: "The Impossible Invitation", note: "A paper monument assembles around the card" },
+];
+
+export function normalizeDesign(
+  saved: unknown,
+  content: InvitationContent,
+): DesignDocument {
+  if (!saved || typeof saved !== "object") return createDefaultDesign(content);
+  const doc = saved as Partial<DesignDocument>;
+  const pages = doc.pages ?? [];
+  const pageList: DesignPage[] = pages.map((page) => normalizePage(page, content));
+  const opening: OpeningSettings = {
+    experience: typeof doc.opening === "object" && doc.opening !== null && "experience" in doc.opening
+      ? (doc.opening.experience ?? "none")
+      : "none",
+    autoOpen: doc.opening?.autoOpen ?? false,
+    welcome: doc.opening?.welcome ?? "",
+  };
+  const closing: ClosingSettings = {
+    enabled: doc.closing?.enabled ?? false,
+    style: doc.closing?.style ?? "message",
+    message: doc.closing?.message ?? "",
+    duration: doc.closing?.duration ?? 800,
+  };
+  return {
+    version: 1,
+    pages: pageList,
+    opening,
+    closing,
+    transition: normalizeTransition(doc.transition),
+    startedAt: doc.startedAt ?? 0,
+  };
+}
+
+function normalizePage(
+  page: unknown,
+  content: InvitationContent,
+): DesignPage {
+  if (!page || typeof page !== "object") {
+    return {
+      id: makeId("page"),
+      name: "Untitled",
+      background: "#fbfaf7",
+      elements: [],
+    };
+  }
+  const p = page as Partial<DesignPage>;
+  const elements: DesignElement[] = (p.elements ?? []).map((element) =>
+    normalizeElement(element),
+  );
+  return {
+    id: p.id ?? makeId("page"),
+    name: p.name ?? "Untitled",
+    background: p.background ?? "#fbfaf7",
+    elements,
+    hidden: p.hidden ?? false,
+    width: p.width ?? DESIGN_WIDTH,
+    height: p.height ?? DESIGN_HEIGHT,
+    margin: p.margin ?? 0,
+    bleed: p.bleed ?? 0,
+    texture: p.texture ?? "none",
+    edge: p.edge ?? "straight",
+    material: p.material ?? "none",
+  };
+}
+
+function normalizeElement(element: unknown): DesignElement {
+  if (!element || typeof element !== "object") {
+    return {
+      id: makeId("element"),
+      name: "Element",
+      kind: "shape",
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 100,
+      animation: { preset: "fade", duration: 1500, delay: 0 },
+    };
+  }
+  const e = element as Partial<DesignElement>;
+  const animation = normalizeAnimation(e.animation);
+  return {
+    id: e.id ?? makeId("element"),
+    name: e.name ?? "Element",
+    kind: e.kind ?? "shape",
+    x: e.x ?? 0,
+    y: e.y ?? 0,
+    w: e.w ?? 100,
+    h: e.h ?? 100,
+    hidden: e.hidden ?? false,
+    locked: e.locked ?? false,
+    color: e.color ?? undefined,
+    fill: e.fill ?? undefined,
+    opacity: e.opacity ?? undefined,
+    fontSize: e.fontSize ?? undefined,
+    font: e.font ?? undefined,
+    fontStyle: e.fontStyle ?? undefined,
+    lineHeight: e.lineHeight ?? undefined,
+    align: e.align ?? undefined,
+    text: e.text ?? undefined,
+    textAlign: e.textAlign ?? undefined,
+    letterSpacing: e.letterSpacing ?? undefined,
+    textBorder: e.textBorder ?? undefined,
+    textBorderWidth: e.textBorderWidth ?? undefined,
+    textPadding: e.textPadding ?? undefined,
+    shape: e.shape ?? undefined,
+    frameArt: e.frameArt ?? undefined,
+    imageAdjust: e.imageAdjust ?? undefined,
+    effects: e.effects ?? undefined,
+    material: e.material ?? undefined,
+    reveal: e.reveal ?? undefined,
+    animation,
+    exit: e.exit ?? undefined,
+  };
+}
+
+function normalizeAnimation(
+  animation: unknown,
+): ElementAnimation {
+  if (!animation || typeof animation !== "object") {
+    return { preset: "fade", duration: 1500, delay: 0 };
+  }
+  const a = animation as Partial<ElementAnimation>;
+  return {
+    preset: a.preset ?? "fade",
+    duration: a.duration ?? 1500,
+    delay: a.delay ?? 0,
+    interactionId: a.interactionId ?? undefined,
+  };
+}
+
+function normalizeTransition(
+  transition: unknown,
+): PageTransition {
+  if (!transition || typeof transition !== "object") {
+    return { preset: "fade", duration: 700 };
+  }
+  const t = transition as Partial<PageTransition>;
+  return {
+    preset: t.preset ?? "fade",
+    duration: t.duration ?? 700,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Closing stage                                                              */
+/* -------------------------------------------------------------------------- */
+
+export interface ClosingSettings {
+  enabled: boolean;
+  style: "message" | "image" | "signature";
+  message: string;
+  duration: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Transition                                                               */
+/* -------------------------------------------------------------------------- */
+
+export interface PageTransition {
+  preset: "fade" | "dissolve" | "slide" | "curtain" | "flip";
+  duration: number;
+}
+
+export const PAGE_TRANSITIONS: { id: PageTransition["preset"]; label: string; note: string }[] = [
+  { id: "fade", label: "Fade", note: "The card just appears" },
+  { id: "dissolve", label: "Dissolve", note: "A wash drops between the two pages" },
+  { id: "slide", label: "Slide", note: "The card slides to reveal the next" },
+  { id: "curtain", label: "Curtain", note: "The card folds back" },
+  { id: "flip", label: "Flip", note: "The card turns over" },
+];
+
+export const TRANSITIONS: { id: PageTransition["preset"]; label: string; note: string }[] = [
+  { id: "fade", label: "Fade", note: "The card just appears" },
+  { id: "dissolve", label: "Dissolve", note: "A wash drops between the two pages" },
+  { id: "slide", label: "Slide", note: "The card slides to reveal the next" },
+  { id: "curtain", label: "Curtain", note: "The card folds back" },
+  { id: "flip", label: "Flip", note: "The card turns over" },
+];
+
+/** The transition applied to the published invitation, keyed by the style. */
+export function pageTransitionStyle(
+  current: PageTransition,
+  next: PageTransition,
+): PageTransition {
+  if (current.preset === next.preset && current.duration === next.duration) return current;
+  return next;
+}
+
+/** The time the guest's continue is held, in ms, from the last page. */
+export function timelineDuration(page: DesignPage): number {
+  const end = page.elements.reduce((max, element) => {
+    if (!element.animation?.enabled) return max;
+    return Math.max(max, element.animation.delay + element.animation.duration);
+  }, 0);
+  return Math.max(900, end);
+}
+
+/** The choreography frames for a page transition, for the guest timeline. */
+export function pageTransitionFrames(
+  current: PageTransition,
+  next: PageTransition,
+  options?: { rtl: boolean },
+): { from: string; to: string; dur: number }[] {
+  const from = current.preset;
+  const to = next.preset;
+  const dur = Math.max(current.duration, next.duration);
+  switch (from) {
+    case "fade":
+      return [{ from: "none", to: "opacity-30", dur }];
+    case "dissolve":
+      return [{ from: "opacity-100", to: "opacity-0", dur }];
+    case "slide":
+      return [{ from: "translate-x-0", to: options?.rtl ? "translate-x-full" : "translate-x-negative-full", dur }];
+    case "curtain":
+      return [{ from: "scale-x-100", to: options?.rtl ? "scale-x-0" : "scale-x-0", dur }];
+    case "flip":
+      return [{ from: "rotate-y-0", to: "rotate-y-180", dur }];
+    default:
+      return [{ from: "none", to: "opacity-0", dur }];
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Design output                                                              */
+/* -------------------------------------------------------------------------- */
+
+export type DesignOutput = "digital" | "printed" | "both";
+
+/** The format the invitation lands in, used by the print pipeline. */
+export type DesignFormat = "pdf" | "png" | "psd" | "svg";
+
+/* -------------------------------------------------------------------------- */
+/* Style presets                                                              */
+/* -------------------------------------------------------------------------- */
+
+export interface StylePreset {
+  name: string;
+  note: string;
+  palette: {
+    background: string;
+    ink: string;
+    accent: string;
+  };
+  fontPair: string;
+  background?: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Envelope settings                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface EnvelopeSettings {
+  enabled: boolean;
+  geometry: EnvelopeGeometry;
+  liner: LinerGeometry;
+  format: DesignFormat;
+}
+
+export interface EnvelopeGeometry {
+  envelope: { widthMm: number; heightMm: number };
+  flap: { offset: number; width: number };
+  label: { size: { width: number; height: number } };
+  window: { width: number; height: number };
+}
+
+export interface LinerGeometry {
+  widthMm: number;
+  heightMm: number;
+}
+
+/** The current draft of the envelope. */
+export interface EnvelopSettings {
+  enabled: boolean;
+  geometry: EnvelopeGeometry;
+  liner: LinerGeometry;
+  format: DesignFormat;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Drawing helpers                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** A fresh id derived from a kind, so the studio never guesses. */
+export function makeId(kind: string): string {
+  return `${kind}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** A fresh element, built from a kind with the studio's defaults. */
+export function makeElement(kind: string, overrides?: Partial<DesignElement>): DesignElement {
+  const defaults: DesignElement = {
+    id: makeId("element"),
+    name: kind,
+    kind: kind as ElementKind,
+    x: 0,
+    y: 0,
+    w: 100,
+    h: 100,
+    animation: defaultAnimation("fade", 0),
+  };
+  return { ...defaults, ...overrides };
+}
+
+/** The default animation for a kind. */
+export function defaultAnimation(preset: ElementAnimation["preset"], delay: number): ElementAnimation {
+  return { preset, duration: 1500, delay };
+}
+
+/** Duplicate elements, appending copies of the selected ids. */
+export function duplicateElements(
+  elements: DesignElement[],
+  ids: string[],
+): [DesignElement[], DesignElement?] {
+  const copy = elements.find((element) => element.id === ids[0]);
+  if (!copy) return [elements, undefined];
+  const created = elements.map((element) => ({
+    ...element,
+    id: makeId("copy"),
+    name: `${element.name} copy`,
+  }));
+  return [created, copy];
+}
+
+/** Place an element on a page, centred. */
+export function placeOnPage(page: DesignPage, element: DesignElement): DesignPage {
+  const cx = (page.width ?? DESIGN_WIDTH) / 2;
+  const cy = (page.height ?? DESIGN_HEIGHT) / 2;
+  const left = cx - (element.w ?? 100) / 2;
+  const top = cy - (element.h ?? 100) / 2;
+  return { ...page, elements: [...page.elements, { ...element, x: left, y: top }] };
+}
+
+/** The label a layer's kind renders in the inspector. */
+export function elementTypeLabel(element: DesignElement): string {
+  return element.kind === "text" ? "Text" : element.kind === "image" ? "Image" : element.kind;
+}
+
+/** True when the element is inside the safe area of the page. */
+export function isDesignDocument(value: unknown): value is DesignDocument {
+  if (!value || typeof value !== "object") return false;
+  const doc = value as Partial<DesignDocument>;
+  return Array.isArray(doc.pages) && doc.pages.length > 0;
+}
+
+/** The ids of elements the page draws over the invitation. */
+export function coveredElementIds(page: DesignPage): string[] {
+  return page.elements.filter((element) => element.hidden).map((element) => element.id);
+}
+
+/** The inline style at a moment of a layer animation. */
+export function elementStyleAt(
+  element: DesignElement,
+  time: number,
+  options?: { ignoreExit: boolean },
+): { style: string; transition: string | undefined } {
+  const animation = element.animation;
+  const transition = element.exit?.duration != null
+    ? `transition: opacity ${element.exit.duration}ms linear ${element.exit.delay}ms;`
+    : undefined;
+  return { style: "", transition };
+}
+
+/** Clean the reveal maps a cover points at. */
+export function cleanRevealLinks(elements: DesignElement[]): DesignElement[] {
+  const targets = new Set(elements.map((element) => element.id));
+  return elements.map((element) =>
+    element.reveal ? { ...element, targetId: targets.has(element.reveal.targetId) ? element.reveal.targetId : "" } : element,
+  );
+}
+
+/** The design fonts a template was built with, as the studio persists them. */
+export const TEMPLATE_DESIGN_FONTS: Record<string, string[]> = {
+  "published": ["Cormorant Garamond", "Bodoni Moda", "Cinzel"],
+  "custom": ["Inter", "Manrope"],
+};
+
+/* -------------------------------------------------------------------------- */
+/* Blank documents                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** A brand‑new design, on the classic studio card. */
+export function createBlankDesign(overrides: Partial<DesignDocument> = {}): DesignDocument {
+  return {
+    version: 1,
+    pages: [
+      {
+        id: makeId("page"),
+        name: "Untitled",
+        background: "#fbfaf7",
+        elements: [],
+        hidden: false,
+        width: DESIGN_WIDTH,
+        height: DESIGN_HEIGHT,
+        margin: 0,
+        bleed: 0,
+        texture: "none",
+        edge: "straight",
+        material: "none",
+      },
+    ],
+    opening: { experience: "none", autoOpen: false, welcome: "" },
+    closing: { enabled: false, style: "message", message: "", duration: 800 },
+    transition: { preset: "fade", duration: 700 },
+    ...overrides,
+  };
+}
+
+/** A default invitation design: a name, a date, a venue, a rule and a flourish. */
+export function createDefaultDesign(
+  content: InvitationContent,
+): DesignDocument {
+  return createBlankDesign({
+    pages: [
+      {
+        id: makeId("page"),
+        name: "Invitation",
+        background: "#f2f1ed",
+        elements: [
+          {
+            id: makeId("text"),
+            name: "Names",
+            kind: "text",
+            x: 80,
+            y: 120,
+            w: 840,
+            h: 120,
+            text: content.title,
+            fontSize: 64,
+            font: content.fontPair ?? "cormorant-garamond",
+            color: "#161616",
+            align: "center",
+            animation: defaultAnimation("fadeUp", 0),
+          },
+          {
+            id: makeId("date"),
+            name: "Date",
+            kind: "text",
+            x: 80,
+            y: 360,
+            w: 840,
+            h: 80,
+            text: `${content.date} · ${content.time}`,
+            fontSize: 32,
+            font: content.fontPair ?? "cormorant-garamond",
+            color: "#2b2723",
+            align: "center",
+            animation: defaultAnimation("fadeUp", 200),
+          },
+          {
+            id: makeId("venue"),
+            name: "Venue",
+            kind: "text",
+            x: 80,
+            y: 500,
+            w: 840,
+            h: 100,
+            text: content.venueName,
+            fontSize: 32,
+            font: content.fontPair ?? "cormorant-garamond",
+            color: "#2b2723",
+            align: "center",
+            animation: defaultAnimation("fadeUp", 400),
+          },
+          {
+            id: makeId("rule"),
+            name: "Rule",
+            kind: "shape",
+            x: 160,
+            y: 640,
+            w: 680,
+            h: 4,
+            fill: "#710014",
+            animation: defaultAnimation("fade", 600),
+          },
+          {
+            id: makeId("message"),
+            name: "Message",
+            kind: "text",
+            x: 160,
+            y: 700,
+            w: 680,
+            h: 200,
+            text: content.message,
+            fontSize: 28,
+            font: content.fontPair ?? "cormorant-garamond",
+            color: "#161616",
+            align: "center",
+            lineHeight: 1.5,
+            animation: defaultAnimation("fadeUp", 800),
+          },
+        ],
+        hidden: false,
+        width: DESIGN_WIDTH,
+        height: DESIGN_HEIGHT,
+        margin: 0,
+        bleed: 0,
+        texture: "none",
+        edge: "straight",
+        material: "none",
+      },
+    ],
+    opening: { experience: "none", autoOpen: false, welcome: "" },
+    closing: { enabled: false, style: "message", message: "", duration: 800 },
+    transition: { preset: "fade", duration: 700 },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Personalisation                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** Fill in the words of a guest-facing snippet. */
+export function personalize(text: string, guestName: string): string {
+  return text.replace(/{{name}}/g, guestName);
+}
