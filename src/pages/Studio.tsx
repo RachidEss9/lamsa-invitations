@@ -17,7 +17,7 @@ import {
 } from "@/components/studio/LibraryPanel";
 import { FrameThumb } from "@/components/invitation/FrameArt";
 import { PrintExportDialog } from "@/components/studio/PrintExportDialog";
-import { MockupStudio } from "@/components/studio/MockupStudio";
+import { DetailPresentationStudio } from "@/components/studio/DetailPresentationStudio";
 import { ShareStyleDialog } from "@/components/studio/ShareStyleDialog";
 import { SuiteBar } from "@/components/studio/SuiteBar";
 import { StudioCanvas, type CanvasContextAction } from "@/components/studio/StudioCanvas";
@@ -466,9 +466,9 @@ export default function Studio() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareStyleOpen, setShareStyleOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
-  const [mockupOpen, setMockupOpen] = useState(false);
-  // Mockup arrangements live in this device's storage, keyed per invitation.
-  const mockupDesignKey = invitation?._id ?? `draft:${invitationId || "new"}`;
+  const [presentationOpen, setPresentationOpen] = useState(false);
+  // Detail presentations live in this device's storage, keyed per invitation.
+  const presentationDesignKey = invitation?._id ?? `draft:${invitationId || "new"}`;
   const [publishing, setPublishing] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(0);
   const [showOpeningPreview, setShowOpeningPreview] = useState(false);
@@ -3514,13 +3514,13 @@ export default function Studio() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => setMockupOpen(true)}
+            onClick={() => setPresentationOpen(true)}
             className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
-            aria-label="Open the mockup studio"
-            title="Mockup studio — present your pieces as product photography"
+            aria-label="Open the detail presentation studio"
+            title="Detail presentation — close-up views of your invitation"
           >
             <Presentation className="size-3.5" />
-            <span className="hidden sm:inline">Mockup</span>
+            <span className="hidden sm:inline">Detail</span>
           </Button>
           <Button
             type="button"
@@ -4268,25 +4268,14 @@ export default function Studio() {
         rtl={Boolean(content.rtl)}
       />
 
-      <MockupStudio
-        open={mockupOpen}
-        onOpenChange={setMockupOpen}
+      <DetailPresentationStudio
+        open={presentationOpen}
+        onOpenChange={setPresentationOpen}
         design={design}
-        designKey={mockupDesignKey}
+        designKey={presentationDesignKey}
         imageUrls={imageUrls}
         title={content.title}
         rtl={Boolean(content.rtl)}
-        onCreatePiece={addSuitePiece}
-        onAddInsidePage={() => {
-          const invitation = suiteOf(design).find(
-            (candidate) => candidate.kind === "invitation",
-          );
-          if (!invitation) return;
-          addPage(false, {
-            pieceId: invitation.id,
-            name: `${pieceNameOf(design, invitation.id)} · Inside`,
-          });
-        }}
       />
 
       {openingStagePreview}

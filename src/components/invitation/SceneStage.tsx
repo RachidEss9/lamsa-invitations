@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import {
   SCENES,
-  SCENE_IDS,
   SceneId,
   SceneState,
   SceneLayer,

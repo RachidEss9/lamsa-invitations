@@ -4,11 +4,7 @@ import { guestVisiblePageIds, normalizeSuite, type DesignSuite } from "@/lib/sui
 import { normalizeMaterial, type LayerMaterial } from "@/lib/materials";
 import { normalizeImageAdjust, type ImageAdjust } from "@/lib/image-frame";
 import { normalizeCurve } from "@/lib/text-path";
-import { fontNameFor } from "@/lib/fonts";
 import {
-  formatEventDate,
-  formatEventTime,
-  isPairedOccasion,
   type InvitationContent,
   type MotifId,
 } from "@/lib/invitation";
