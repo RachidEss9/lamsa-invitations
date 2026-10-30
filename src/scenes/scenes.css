@@ -1,0 +1,182 @@
+/*
+ * Scene mechanics for the presentation stage.
+ *
+ * tokens.css (supplied with the pack) provides the palette, the easing
+ * tokens, `.lamsa-stage` / `.lamsa-layer` / `.lamsa-slot` positioning and its
+ * reduced-motion floor. This file adds only what the choreography needs:
+ * artwork fitting, the gold stroke draw, and the idle loops.
+ *
+ * All idle motion is expressed in stage pixels scaled by `--lamsa-k`
+ * (stage width ÷ 2400), so a drift authored as 24px on the 2400-wide stage
+ * stays 24 stage pixels at every viewport size.
+ */
+
+.lamsa-stage {
+  position: relative;
+  overflow: hidden;
+  /* Blend layers must composite inside the stage, never with the page. */
+  isolation: isolate;
+}
+
+/* will-change only while a layer is actually moving (pack performance note). */
+.lamsa-layer {
+  will-change: auto;
+}
+.lamsa-stage[data-state="pre"] .lamsa-layer,
+.lamsa-stage[data-state="intro"] .lamsa-layer,
+.lamsa-stage[data-state="opening"] .lamsa-layer {
+  will-change: transform, opacity;
+}
+
+.lamsa-layer > img.lamsa-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* The invitation lives strictly inside the manifest's slot. */
+.lamsa-slot {
+  overflow: hidden;
+}
+.lamsa-invitation {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- Gold accents: stroke draw-on (pack ships pathLength) ---------------- */
+
+.lamsa-layer--gold > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.lamsa-layer--gold path {
+  fill: none;
+  stroke-dasharray: 1;
+  stroke-dashoffset: var(--draw, 0);
+  transition: stroke-dashoffset var(--td, 0ms) var(--te, linear) var(--tf, 0ms);
+}
+
+/* ---- Idle loops: revealed state only, subtle by design ------------------- */
+
+@keyframes lamsa-dust {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.72;
+  }
+  to {
+    transform: translate3d(0, calc(-24px * var(--lamsa-k, 1)), 0);
+    opacity: 1;
+  }
+}
+@keyframes lamsa-rays {
+  from {
+    transform: translate3d(calc(-12px * var(--lamsa-k, 1)), 0, 0);
+  }
+  to {
+    transform: translate3d(calc(12px * var(--lamsa-k, 1)), 0, 0);
+  }
+}
+@keyframes lamsa-sweep {
+  0%,
+  100% {
+    transform: translate3d(calc(-15px * var(--lamsa-k, 1)), 0, 0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate3d(calc(15px * var(--lamsa-k, 1)), 0, 0);
+    opacity: 1;
+  }
+}
+@keyframes lamsa-silk-back {
+  from {
+    transform: translate3d(calc(10px * var(--lamsa-k, 1)), calc(6px * var(--lamsa-k, 1)), 0)
+      skewX(-1.2deg);
+  }
+  to {
+    transform: translate3d(calc(-10px * var(--lamsa-k, 1)), calc(-6px * var(--lamsa-k, 1)), 0)
+      skewX(1.2deg);
+  }
+}
+@keyframes lamsa-silk-front-l {
+  from {
+    transform: translate3d(calc(-14px * var(--lamsa-k, 1)), calc(-8px * var(--lamsa-k, 1)), 0)
+      rotate(-0.8deg);
+  }
+  to {
+    transform: translate3d(calc(14px * var(--lamsa-k, 1)), calc(8px * var(--lamsa-k, 1)), 0)
+      rotate(0.8deg);
+  }
+}
+@keyframes lamsa-silk-front-r {
+  from {
+    transform: translate3d(calc(14px * var(--lamsa-k, 1)), calc(8px * var(--lamsa-k, 1)), 0)
+      rotate(0.8deg);
+  }
+  to {
+    transform: translate3d(calc(-14px * var(--lamsa-k, 1)), calc(-8px * var(--lamsa-k, 1)), 0)
+      rotate(-0.8deg);
+  }
+}
+@keyframes lamsa-sculpt {
+  from {
+    transform: translate3d(0, calc(6px * var(--lamsa-k, 1)), 0) rotate(0.6deg);
+  }
+  to {
+    transform: translate3d(0, calc(-6px * var(--lamsa-k, 1)), 0) rotate(-0.6deg);
+  }
+}
+@keyframes lamsa-fin {
+  from {
+    transform: translate3d(0, calc(-5px * var(--lamsa-k, 1)), 0);
+  }
+  to {
+    transform: translate3d(0, calc(5px * var(--lamsa-k, 1)), 0);
+  }
+}
+
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-dust {
+  animation: lamsa-dust 7.5s ease-in-out infinite alternate;
+}
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-rays {
+  animation: lamsa-rays 14s ease-in-out infinite alternate;
+}
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-sweep-2 {
+  animation: lamsa-sweep 10s ease-in-out infinite;
+}
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-sweep-3 {
+  animation: lamsa-sweep 9s ease-in-out infinite;
+}
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-silk-back {
+  animation: lamsa-silk-back 11s ease-in-out infinite alternate;
+}
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-silk-front-l {
+  animation: lamsa-silk-front-l 8s ease-in-out infinite alternate;
+}
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-silk-front-r {
+  animation: lamsa-silk-front-r 8s ease-in-out infinite alternate;
+}
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-sculpt-l,
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-sculpt-r {
+  animation: lamsa-sculpt 9s ease-in-out infinite alternate;
+}
+.lamsa-stage[data-state="revealed"] .lamsa-art.idle-fin {
+  animation: lamsa-fin 7s ease-in-out infinite alternate;
+}
+
+/* ---- Reduced motion: everything lands instantly, nothing loops ----------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .lamsa-stage,
+  .lamsa-stage * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.lamsa-stage.is-reduced,
+.lamsa-stage.is-reduced * {
+  animation: none !important;
+  transition: none !important;
+}

@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
-import sealUrl from "@/assets/opening/seal.png";
+import sealUrl from "@/assets/mockup/seal.png";
 import { pageSizeOf, type DesignDocument } from "@/lib/design";
 import { pieceKindSpec, type PieceKind } from "@/lib/suite";
 import {

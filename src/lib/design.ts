@@ -593,20 +593,6 @@ export function pageBackgroundStyle(
     : { backgroundColor: value };
 }
 
-/**
- * A single flat colour for a surface that has to sit behind something else
- * (a translucent plate, a tinted shadow). A wash cannot be tinted, so it falls
- * back to the studio ivory rather than producing an invalid colour.
- */
-export function flatBackgroundOf(
-  background: string | undefined,
-  fallback = "#f4f3ef",
-): string {
-  const value = (background || "").trim();
-  if (!value) return fallback;
-  return isGradientBackground(value) ? fallback : value;
-}
-
 export interface SizePreset {
   id: string;
   label: string;
@@ -760,42 +746,56 @@ export function placeOnPage<
 }
 
 /**
- * The three opening styles the engine actually renders, plus "none".
+ * The three presentation scenes the stage can play, plus "none".
  *
- * Values that used to name a procedural scene (`envelope`, `curtain`, `door`,
- * …) are no longer part of the model: the opening system was rebuilt around
- * one engine, so `legacyOpeningStyle` maps anything saved before it to the
- * style that reads closest.
+ * The presentation system was rebuilt around the supplied scene pack, so
+ * anything saved under an older name — the procedural scenes (`envelope`,
+ * `curtain`, `door`, …) and the old engine's three styles — is mapped onto
+ * the scene that reads closest on load.
  */
-export type OpeningExperienceId = "none" | "cinematic" | "monogram" | "silk";
+export type OpeningExperienceId =
+  | "none"
+  | "secret-world"
+  | "living-art"
+  | "impossible";
 
-/** Invitations saved under a pre-engine opening arrive with their old name. */
+/** Saved invitations arrive with the old style names. */
 const LEGACY_OPENING_STYLES: Record<string, OpeningExperienceId> = {
   none: "none",
-  cinematic: "cinematic",
-  fade: "cinematic",
-  image: "cinematic",
-  envelope: "cinematic",
-  "wax-seal": "cinematic",
-  arch: "cinematic",
-  door: "cinematic",
-  box: "cinematic",
-  cards: "cinematic",
-  typography: "monogram",
-  personal: "monogram",
-  curtain: "silk",
-  floral: "silk",
-  folding: "silk",
-  paper: "silk",
+  // The sealed-surface family: arch, door, box, wax seal, cinematic reveal.
+  cinematic: "secret-world",
+  fade: "secret-world",
+  image: "secret-world",
+  envelope: "secret-world",
+  "wax-seal": "secret-world",
+  arch: "secret-world",
+  door: "secret-world",
+  box: "secret-world",
+  cards: "secret-world",
+  // Drapery and ribbons become the silk veil.
+  silk: "living-art",
+  curtain: "living-art",
+  floral: "living-art",
+  folding: "living-art",
+  paper: "living-art",
+  // Typographic, monogram-led openings become the assembled monument.
+  monogram: "impossible",
+  typography: "impossible",
+  personal: "impossible",
 };
 
-/** Coerce a saved experience value onto one the engine can render. */
+/** Coerce a saved experience value onto one the scene stage can render. */
 export function toOpeningExperience(
   value: unknown,
   fallback: OpeningExperienceId = "none",
 ): OpeningExperienceId {
   if (typeof value !== "string") return fallback;
-  if (value === "none" || value === "cinematic" || value === "monogram" || value === "silk") {
+  if (
+    value === "none" ||
+    value === "secret-world" ||
+    value === "living-art" ||
+    value === "impossible"
+  ) {
     return value;
   }
   return LEGACY_OPENING_STYLES[value] ?? fallback;
@@ -806,47 +806,11 @@ export const OPENING_EXPERIENCES: {
   label: string;
   note: string;
 }[] = [
-  { id: "cinematic", label: "Cinematic Reveal", note: "A soft spotlight and gentle depth uncover the invitation" },
-  { id: "monogram", label: "Golden Monogram", note: "Metallic initials set the tone, then give way to the card" },
-  { id: "silk", label: "Silk Flow", note: "A ribbon sweeps across and draws the invitation into view" },
-  { id: "none", label: "No opening", note: "Opens directly on the first page" },
+  { id: "secret-world", label: "The Secret World", note: "Concentric paper arches part to uncover a candlelit niche" },
+  { id: "living-art", label: "Living Art", note: "Burgundy silk and a veil lift away from the invitation" },
+  { id: "impossible", label: "The Impossible Invitation", note: "Rings, fins and lintels assemble into a paper monument" },
+  { id: "none", label: "No presentation", note: "Opens directly on the first page" },
 ];
-
-export type OpeningToneId = "crimson" | "ink" | "ivory";
-
-export const OPENING_TONES: {
-  id: OpeningToneId;
-  label: string;
-  note: string;
-  swatch: string;
-}[] = [
-  { id: "crimson", label: "Burgundy", note: "Dyed cotton stock", swatch: "#710014" },
-  { id: "ink", label: "Charcoal", note: "Deep matte board", swatch: "#1b1a18" },
-  { id: "ivory", label: "Ivory", note: "Warm pressed paper", swatch: "#efe9dd" },
-];
-
-/**
- * Optional choreography overrides from the Opening Designer. Every field falls
- * back to the preset's own timeline, so an untouched opening behaves exactly as
- * it always has and older saved designs keep their motion.
- */
-export interface OpeningMotion {
-  /** Scale the card starts at, before it leaves the frame. */
-  startScale?: number;
-  /** How far below its resting place the card begins, in design pixels. */
-  rise?: number;
-  /** Fraction of the opening at which the card starts to emerge. */
-  cardStart?: number;
-}
-
-/** Colours used by the opening only; the invitation keeps its own palette. */
-export interface OpeningPalette {
-  accent?: string;
-  /** The envelope, door or deep surface colour. */
-  hull?: string;
-  /** The paper colour of the suite. */
-  paper?: string;
-}
 
 /**
  * The physical suite around the card. Sizes are in millimetres, the way an
@@ -872,20 +836,17 @@ export interface EnvelopeSettings {
   showSeal?: boolean;
 }
 
+/**
+ * The presentation shown once, before the first page. How a scene looks and
+ * moves lives in the scene pack itself (manifest + CSS); the design only
+ * records which scene the host chose and how the guest is greeted.
+ */
 export interface OpeningSettings {
   experience: OpeningExperienceId;
-  duration: number;
+  /** Skip the scene picker and start playing the saved scene at once. */
   autoOpen: boolean;
+  /** Personalised greeting shown while the guest chooses a scene. */
   welcome: string;
-  coverStorageId?: string;
-  /** Material treatment of the frame. */
-  tone?: OpeningToneId;
-  palette?: OpeningPalette;
-  motion?: OpeningMotion;
-  /** Optional physical envelope; omitted keeps the classic suite. */
-  stationery?: EnvelopeSettings;
-  /** Stage background behind the suite; absent keeps the page or suite gradient. */
-  background?: string;
 }
 
 export type ClosingStyleId = "message" | "seal" | "curtain" | "fade";
@@ -1502,7 +1463,6 @@ export function createBlankDesign(
     pages,
     opening: {
       experience: "none",
-      duration: 2600,
       autoOpen: false,
       welcome: "For {{guest}}",
       ...options.opening,
@@ -1720,16 +1680,13 @@ export function createDefaultDesign(content: InvitationContent): DesignDocument 
       },
     ],
     opening: {
-      // The v4 reveal layouts map onto the styles the engine actually renders.
+      // The v4 reveal layouts map onto the scene that reads closest.
       experience:
-        content.layout === "envelope"
-          ? "cinematic"
-          : content.layout === "arch"
-            ? "cinematic"
-            : content.layout === "ribbon"
-              ? "silk"
-              : "none",
-      duration: 2600,
+        content.layout === "envelope" || content.layout === "arch"
+          ? "secret-world"
+          : content.layout === "ribbon"
+            ? "living-art"
+            : "none",
       autoOpen: false,
       welcome: "For {{guest}}",
     },
@@ -1866,18 +1823,17 @@ export function normalizeDesign(
         elements,
       };
     }),
+    // The presentation is rebuilt on load: only the fields the scene system
+    // understands survive, so a design saved under the legacy opening carries
+    // none of its dead tone/palette/motion data forward, and a scene name that
+    // no longer exists maps onto the scene that reads closest.
     opening: {
-      ...fallback.opening,
-      ...(value.opening ?? {}),
-      background:
-        typeof value.opening?.background === "string" &&
-        value.opening.background.trim()
-          ? value.opening.background
-          : undefined,
-      // The opening experience is repaired on load: an invitation saved under
-      // one of the removed procedural scenes maps onto the style that reads
-      // closest, so no old invitation opens on a missing renderer.
       experience: toOpeningExperience(value.opening?.experience),
+      autoOpen: value.opening?.autoOpen === true,
+      welcome:
+        typeof value.opening?.welcome === "string"
+          ? value.opening.welcome
+          : fallback.opening.welcome,
     },
     closing: {
       ...fallback.closing,
@@ -2108,19 +2064,6 @@ export function pageTransitionStyle(
 /* -------------------------------------------------------------------------- */
 /* Opening metadata                                                           */
 /* -------------------------------------------------------------------------- */
-
-export function openingHint(experience: OpeningExperienceId): string {
-  switch (experience) {
-    case "cinematic":
-      return "Begin the reveal";
-    case "monogram":
-      return "Reveal the names";
-    case "silk":
-      return "Open the invitation";
-    default:
-      return "";
-  }
-}
 
 export function defaultFontLabel(font: string | undefined): string {
   return fontNameFor(font ?? "cormorant-garamond");

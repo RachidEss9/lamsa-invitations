@@ -1,6 +1,6 @@
 import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
-import { OpeningStage } from "@/components/invitation/OpeningStage";
+import { PresentationStage } from "@/components/invitation/PresentationStage";
 import {
   pageTransitionStyle,
   pageSizeOf,
@@ -260,13 +260,12 @@ export function GuestExperience({
             )}
 
             {phase === "opening" && (
-              <OpeningStage
+              <PresentationStage
                 opening={design.opening}
                 page={page}
                 imageUrls={imageUrls}
                 accent={palette.accent}
-                background={palette.background}
-                ink={palette.ink}
+                background={page.background}
                 guestName={guestName}
                 names={names}
                 rtl={rtl}

@@ -3,7 +3,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
-import { OpeningStage } from "@/components/invitation/OpeningStage";
+import { PresentationStage } from "@/components/invitation/PresentationStage";
+import { SceneThumb } from "@/components/invitation/SceneThumb";
 import { GuestExperience } from "@/components/studio/GuestExperience";
 import { SequentialGuestPreview } from "@/components/studio/SequentialGuestPreview";
 import { ColourPanel } from "@/components/studio/ColourPanel";
@@ -15,7 +16,6 @@ import {
   type LibraryTab,
 } from "@/components/studio/LibraryPanel";
 import { FrameThumb } from "@/components/invitation/FrameArt";
-import { OpeningDesigner } from "@/components/studio/OpeningDesigner";
 import { PrintExportDialog } from "@/components/studio/PrintExportDialog";
 import { MockupStudio } from "@/components/studio/MockupStudio";
 import { ShareStyleDialog } from "@/components/studio/ShareStyleDialog";
@@ -44,9 +44,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
+import { SCENES, SCENE_IDS } from "@/lib/presentation";
 import {
   CLOSING_STYLES,
-  OPENING_EXPERIENCES,
   PAGE_TRANSITIONS,
   PAGE_TRANSITIONS as TRANSITIONS,
   applyStylePreset,
@@ -472,7 +472,6 @@ export default function Studio() {
   const [publishing, setPublishing] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(0);
   const [showOpeningPreview, setShowOpeningPreview] = useState(false);
-  const [showOpeningDesigner, setShowOpeningDesigner] = useState(false);
   const [showClosingPreview, setShowClosingPreview] = useState(false);
   const [closingPreviewKey, setClosingPreviewKey] = useState(0);
   const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({});
@@ -2110,11 +2109,6 @@ export default function Studio() {
     apply((current) => ({ ...current, opening }));
   };
 
-  // Used by the Opening Designer's sliders: live changes, one undo step.
-  const applyOpeningLive = (opening: OpeningSettings) => {
-    applyGesture((current) => ({ ...current, opening }));
-  };
-
   const applyClosing = (closing: ClosingSettings) => {
     apply((current) => ({ ...current, closing }));
   };
@@ -2621,46 +2615,25 @@ export default function Studio() {
           ? "Save failed"
           : "All changes saved";
 
-  const openingDesigner = (
-    <OpeningDesigner
-      open={showOpeningDesigner}
-      onOpenChange={setShowOpeningDesigner}
-      opening={design.opening}
-      onChange={applyOpening}
-      onLiveChange={applyOpeningLive}
-      page={design.pages.find((candidate) => !candidate.hidden) ?? design.pages[0] ?? null}
-      imageUrls={imageUrls}
-      accent={content.palette.accent}
-      background={content.palette.background}
-      ink={content.palette.ink}
-      guestName="Amelia"
-      names={namesLabel}
-    />
-  );
-
   const openingStagePreview = (
     <Dialog open={showOpeningPreview} onOpenChange={setShowOpeningPreview}>
-      <DialogContent className="max-w-[440px] overflow-hidden p-0">
-        <div className="relative aspect-[3/4] w-full">
-          <OpeningStage
+      <DialogContent className="max-w-[640px] overflow-hidden p-0">
+        <div className="relative aspect-[3/2] w-full">
+          <PresentationStage
             key={openingPreview}
             opening={{ ...design.opening, autoOpen: false }}
             page={design.pages.find((candidate) => !candidate.hidden) ?? design.pages[0] ?? null}
             imageUrls={imageUrls}
             accent={content.palette.accent}
-            background={content.palette.background}
-            ink={content.palette.ink}
+            background={
+              (design.pages.find((candidate) => !candidate.hidden) ?? design.pages[0])
+                ?.background ?? content.palette.background
+            }
             guestName="Amelia"
             names={namesLabel}
+            reducedMotion={reducedMotion}
             onDone={() => setShowOpeningPreview(false)}
-          />              <button
-                type="button"
-                onClick={() => setOpeningPreview((value) => value + 1)}
-                className="absolute left-3 top-3 z-50 border border-ink/20 bg-[var(--paper-light)] px-2 py-1 text-[9px] uppercase tracking-[0.12em]"
-                aria-label="Replay opening animation"
-              >
-                Replay
-              </button>
+          />
         </div>
       </DialogContent>
     </Dialog>
@@ -2848,43 +2821,55 @@ export default function Studio() {
       return (
         <>
           <PanelHeading
-            title="Opening"
-            note="The entrance shown once, before the first page. Separate from page transitions."
+            title="Presentation"
+            note="The scene shown once, before the first page. Separate from page transitions."
           />
           <div className="space-y-3 p-3">
-            <label className="block">
-              <span className="mb-1 block text-[10px] text-ink/55">Experience</span>
-              <Select
-                value={design.opening.experience}
-                onValueChange={(experience) =>
-                  applyOpening({ ...design.opening, experience: experience as OpeningSettings["experience"] })
+            <div>
+              <span className="mb-1 block text-[10px] text-ink/55">Scene</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {SCENE_IDS.map((sceneId) => (
+                  <button
+                    key={sceneId}
+                    type="button"
+                    onClick={() =>
+                      applyOpening({ ...design.opening, experience: sceneId })
+                    }
+                    aria-pressed={design.opening.experience === sceneId}
+                    className={cn(
+                      "relative overflow-hidden border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/60",
+                      design.opening.experience === sceneId
+                        ? "border-[var(--edge-strong)] shadow-[0_0_0_1px_var(--edge-strong)]"
+                        : "border-ink/15 hover:border-ink/45",
+                    )}
+                  >
+                    <SceneThumb scene={sceneId} />
+                    <span className="absolute inset-x-0 bottom-0 bg-ink/70 px-1 py-0.5 text-center text-[7px] uppercase tracking-[0.1em] text-[var(--paper-light)]">
+                      {SCENES[sceneId].title.replace(/^The /, "")}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  applyOpening({ ...design.opening, experience: "none" })
                 }
+                className={cn(
+                  "mt-1.5 w-full border px-2 py-1 text-[9px] uppercase tracking-[0.12em] transition-colors",
+                  design.opening.experience === "none"
+                    ? "border-[var(--edge-strong)] text-ink"
+                    : "border-ink/15 text-ink/50 hover:border-ink/40",
+                )}
               >
-                <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {OPENING_EXPERIENCES.map((experience) => (
-                    <SelectItem key={experience.id} value={experience.id}>
-                      {experience.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[10px] text-ink/55">Length (ms)</span>
-              <Input
-                type="number"
-                value={design.opening.duration}
-                min={1600}
-                max={8000}
-                step={100}
-                onChange={(event) =>
-                  applyOpening({ ...design.opening, duration: Number(event.target.value) || 3000 })
-                }
-                className="h-8 rounded-none text-[11px]"
-              />
-              <span className="mt-1 block text-[9px] text-ink/35">Between 1.6s and 8s.</span>
-            </label>
+                No presentation
+              </button>
+              <p className="mt-1.5 text-[9px] leading-relaxed text-ink/40">
+                Guests may choose any of the three scenes; the one picked here
+                is highlighted first. The presentation never replays on page
+                navigation.
+              </p>
+            </div>
             <label className="block">
               <span className="mb-1 block text-[10px] text-ink/55">Welcome line</span>
               <Input
@@ -2895,37 +2880,28 @@ export default function Studio() {
               <span className="mt-1 block text-[9px] text-ink/35">Use {"{{guest}}"} for the guest's name.</span>
             </label>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-ink/55">Open automatically</span>
+              <span className="text-[10px] text-ink/55">Start automatically</span>
               <Switch
                 checked={design.opening.autoOpen}
                 onCheckedChange={(autoOpen) => applyOpening({ ...design.opening, autoOpen })}
                 className="scale-90"
               />
             </div>
-            <div className="grid grid-cols-2 gap-1">
-              <Button
-                type="button"
-                className="h-8 rounded-none text-[10px]"
-                onClick={() => setShowOpeningDesigner(true)}
-              >
-                <Sparkles className="size-3.5" /> Design opening
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-8 rounded-none text-[10px]"
-                onClick={() => {
-                  setOpeningPreview((value) => value + 1);
-                  setShowOpeningPreview(true);
-                }}
-              >
-                <Play className="size-3.5" /> Preview
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 w-full rounded-none text-[10px]"
+              onClick={() => {
+                setOpeningPreview((value) => value + 1);
+                setShowOpeningPreview(true);
+              }}
+            >
+              <Play className="size-3.5" /> Preview
+            </Button>
             <p className="text-[9px] leading-relaxed text-ink/35">
-              Cinematic Reveal, Golden Monogram and Silk Flow — three openings,
-              each with its own sequence, revealing the real invitation. The
-              opening never replays on page navigation.
+              The Secret World, Living Art and The Impossible Invitation — three
+              scenes built from real layered artwork, each revealing the actual
+              invitation in its own slot.
             </p>
 
             <div className="mt-2 border-t border-ink/12 pt-3">
@@ -3608,7 +3584,7 @@ export default function Studio() {
               { id: "add" as LeftPanel, icon: Plus, label: "Add" },
               { id: "layers" as LeftPanel, icon: Layers, label: "Layers" },
               { id: "colour" as LeftPanel, icon: Palette, label: "Colour" },
-              { id: "opening" as LeftPanel, icon: Mail, label: "Opening" },
+              { id: "opening" as LeftPanel, icon: Mail, label: "Presentation" },
               { id: "pages" as LeftPanel, icon: Layout, label: "Pages" },
             ]).map(({ id, icon: Icon, label }) => (
               <button
@@ -4313,7 +4289,6 @@ export default function Studio() {
         }}
       />
 
-      {openingDesigner}
       {openingStagePreview}
       {closingPreview}
 

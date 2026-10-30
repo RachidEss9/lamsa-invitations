@@ -1,7 +1,7 @@
 import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, useStageScale } from "@/components/invitation/DesignPageView";
 import { JourneyCue } from "@/components/invitation/JourneyCue";
-import { OpeningStage } from "@/components/invitation/OpeningStage";
+import { PresentationStage } from "@/components/invitation/PresentationStage";
 import {
   pageTransitionFrames,
   pageSizeOf,
@@ -356,31 +356,16 @@ export function InvitationJourney({
         className="relative w-full overflow-hidden bg-[var(--paper-light)] shadow-[0_24px_70px_rgba(22,22,22,0.16)]"
         style={{ aspectRatio: `${pageSize.width} / ${pageSize.height}` }}
       >
-        <div
-          className="absolute left-0 top-0 origin-top-left"
-          style={{
-            width: pageSize.width,
-            height: pageSize.height,
-            transform: `scale(${scale || 0.0001})`,
-            visibility: scale ? "visible" : "hidden",
-          }}
-        >
-          {phase === "opening" ? (
-            <OpeningStage
-              opening={design.opening}
-              page={page}
-              imageUrls={imageUrls}
-              accent={accent}
-              background={page.background}
-              ink={ink}
-              guestName={guestName}
-              names={names}
-              rtl={rtl}
-              autoOpen={design.opening.autoOpen}
-              reducedMotion={reducedMotion}
-              onDone={handleOpeningDone}
-            />
-          ) : (
+        {phase !== "opening" && (
+          <div
+            className="absolute left-0 top-0 origin-top-left"
+            style={{
+              width: pageSize.width,
+              height: pageSize.height,
+              transform: `scale(${scale || 0.0001})`,
+              visibility: scale ? "visible" : "hidden",
+            }}
+          >
             <>
               {outgoing && (
                 <div
@@ -442,8 +427,24 @@ export function InvitationJourney({
                 </div>
               )}
             </>
-          )}
-        </div>
+          </div>
+        )}
+
+        {phase === "opening" && (
+          <PresentationStage
+            opening={design.opening}
+            page={page}
+            imageUrls={imageUrls}
+            accent={accent}
+            background={page.background}
+            guestName={guestName}
+            names={names}
+            rtl={rtl}
+            autoOpen={design.opening.autoOpen}
+            reducedMotion={reducedMotion}
+            onDone={handleOpeningDone}
+          />
+        )}
 
         {phase === "page" && continueInfo.visible && (
           <JourneyCue
@@ -462,7 +463,7 @@ export function InvitationJourney({
 
       <p className="sr-only" aria-live="polite">
         {phase === "opening"
-          ? "The invitation cover. Open it to begin."
+          ? "Choose a scene and open the invitation."
           : phase === "closing"
             ? "The closing note."
             : `Section ${step + 1} of ${total}: ${page?.name ?? ""}`}

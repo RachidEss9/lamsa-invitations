@@ -26,7 +26,8 @@ import { BUILTIN_STYLES, type BuiltinStyle } from "@/lib/styles";
 import { FONT_LIBRARY, fontById, fontSamples } from "@/lib/fonts";
 import { TEMPLATES, type InvitationTemplate } from "@/lib/invitation";
 import { OPENING_EXPERIENCES } from "@/lib/design";
-import { OPENING_LOOKS, openingLookSettings } from "@/lib/openings";
+import { SceneThumb } from "@/components/invitation/SceneThumb";
+import type { SceneId } from "@/lib/presentation";
 import type { ShapeKind } from "@/lib/design";
 import { PALETTES, PALETTE_GROUPS, type ColourPalette } from "@/lib/palettes";
 import { paletteSwatches as deriveSwatches } from "@/lib/library-colour";
@@ -275,10 +276,10 @@ const CATEGORIES: CategorySpec[] = [
   },
   {
     id: "opening",
-    label: "Opening",
+    label: "Presentation",
     icon: Sparkle,
-    blurb: "The moment a guest first meets the invitation.",
-    placeholder: "Search openings…",
+    blurb: "The scene a guest opens the invitation with.",
+    placeholder: "Search scenes…",
   },
 ];
 
@@ -1360,7 +1361,7 @@ export function LibraryPanel({
       case "reveals":
         return `${filteredReveals.length} reveal presets`;
       case "opening":
-        return `${countFor("opening")} experiences · ${OPENING_LOOKS.length} looks`;
+        return `${countFor("opening")} saved · 3 scenes`;
     }
   })();
 
@@ -2180,68 +2181,15 @@ export function LibraryPanel({
 
               {tab === "opening" && (
                 <>
-                  <p className="section-label">Looks</p>
+                  <p className="section-label">Scenes</p>
                   <p className="mb-2.5 -mt-2 font-ui text-[0.63rem] leading-relaxed text-ink/45">
-                    A finished mood — experience, tone and palette in one tap.
-                    Your wording and cover photograph stay as they are.
+                    Three presentation scenes built from real layered artwork.
+                    The one picked here is what guests see first; they may
+                    still choose either of the others.
                   </p>
-                  <div className="mb-4 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
-                    {OPENING_LOOKS.filter((look) =>
-                      matchesQuery(look.name, look.note),
-                    ).map((look) => {
-                      const active =
-                        design.opening.experience === look.experience &&
-                        design.opening.tone === look.tone;
-                      return (
-                        <button
-                          key={look.id}
-                          type="button"
-                          onClick={() => {
-                            onApplyOpening(openingLookSettings(look, design.opening));
-                            onClose();
-                          }}
-                          className={cn(
-                            "ui-tile group gap-1.5 text-left",
-                            active && "border-[var(--edge-strong)]",
-                          )}
-                        >
-                          <span
-                            className="ui-tile-art grid aspect-[4/3] w-full place-items-center"
-                            style={{
-                              background: `linear-gradient(150deg, ${look.palette.paper} 0%, ${look.palette.hull} 78%)`,
-                            }}
-                          >
-                            <span className="flex gap-1.5">
-                              {[look.palette.accent, look.palette.hull, look.palette.paper].map(
-                                (swatch) => (
-                                  <span
-                                    key={swatch}
-                                    className="size-4 rounded-full border border-black/15 shadow-[0_1px_2px_rgba(0,0,0,0.18)]"
-                                    style={{ background: swatch }}
-                                  />
-                                ),
-                              )}
-                            </span>
-                            <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-ink/85 py-1 text-center font-ui text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Use look
-                            </span>
-                          </span>
-                          <span className="block px-1 pb-0.5">
-                            <span className="block truncate font-ui text-[0.72rem] font-medium text-ink">
-                              {look.name}
-                            </span>
-                            <span className="mt-0.5 line-clamp-2 font-ui text-[0.6rem] leading-snug text-ink/45">
-                              {look.note}
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
                   <p className="section-label">Experiences</p>
                   <p className="mb-2.5 -mt-2 font-ui text-[0.63rem] leading-relaxed text-ink/45">
-                    Only the experience changes here — the suite's materials,
+                    Only the scene changes here — the suite's materials,
                     envelope size and palette stay.
                   </p>
                   {OPENING_EXPERIENCES.filter(
@@ -2261,7 +2209,7 @@ export function LibraryPanel({
                           key={experience.id}
                           type="button"
                           onClick={() => {
-                            // Only the experience changes here: the suite's
+                            // Only the scene changes here: the suite's
                             // materials, envelope size and palette stay.
                             onApplyOpening({
                               ...design.opening,
@@ -2270,14 +2218,16 @@ export function LibraryPanel({
                             });
                             onClose();
                           }}
-                          className="ui-tile group gap-1.5"
+                          className={cn(
+                            "ui-tile group gap-1.5",
+                            design.opening.experience === experience.id &&
+                              "border-[var(--edge-strong)]",
+                          )}
                         >
-                          <span className="ui-tile-art grid aspect-[4/3] w-full place-items-center bg-[var(--paper-deep)]/45">
-                            <span className="flex size-10 items-center justify-center rounded-full border border-[var(--edge-strong)] bg-[var(--surface-card)] text-[var(--red)]">
-                              <Sparkle className="size-4" strokeWidth={1.6} />
-                            </span>
+                          <span className="ui-tile-art aspect-[3/2] w-full">
+                            <SceneThumb scene={experience.id as SceneId} />
                             <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-ink/85 py-1 text-center font-ui text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Use opening
+                              Use scene
                             </span>
                           </span>
                           <span className="block px-1 pb-0.5">
