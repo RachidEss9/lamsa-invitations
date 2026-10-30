@@ -148,6 +148,7 @@ describe("saved-design integrity", () => {
       personal: "impossible",
       paper: "living-art",
       unknownScene: "secret-world",
+    };
     for (const [legacy, expected] of Object.entries(retired)) {
       const saved = savedDesign();
       (saved.opening as { experience?: string }).experience = legacy;

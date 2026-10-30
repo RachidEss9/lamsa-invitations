@@ -162,11 +162,8 @@ describe("guest journey interaction", () => {
     expect(
       container.querySelector("[data-testid=\"invitation\"]"),
     ).toBeTruthy();
-    expect(
       container.querySelectorAll("[data-testid=\"invitation\"]"),
     ).toHaveLength(1);
-
-    // The guest can always reach the invitation: the stage offers the hand-off.
     const skip = buttonByLabel(container, "Skip the opening animation");
     expect(skip).toBeTruthy();
     act(() => skip?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
