@@ -10,17 +10,21 @@ import {
 import { Slider } from "@/components/ui/slider";
 import sealUrl from "@/assets/opening/seal.png";
 import { pageSizeOf, type DesignDocument } from "@/lib/design";
+import { pieceKindSpec, type PieceKind } from "@/lib/suite";
 import {
   MOCKUP_SCENES,
   MOCKUP_SURFACES,
   clampPlacement,
   defaultMockupState,
+  flapBoxFor,
   loadMockupState,
+  missingSceneKinds,
   mockupExportName,
   mockupPieces,
   normalizeMockupState,
   resolvePlacements,
   sceneById,
+  scenePieceIds,
   stageSizeFor,
   surfaceById,
   writeMockupState,
@@ -61,6 +65,14 @@ interface MockupStudioProps {
   imageUrls: Record<string, string>;
   title: string;
   rtl?: boolean;
+  /**
+   * Creates a real, editable suite piece (envelope, RSVP, details, liner …)
+   * through the studio's own add-piece flow and returns its id, so the new
+   * piece appears in the arrangement immediately. Never a placeholder.
+   */
+  onCreatePiece: (kind: PieceKind) => string | null;
+  /** Adds a real inside page to the invitation for the folded scene. */
+  onAddInsidePage: () => void;
 }
 
 /**
@@ -78,6 +90,8 @@ export function MockupStudio({
   imageUrls,
   title,
   rtl,
+  onCreatePiece,
+  onAddInsidePage,
 }: MockupStudioProps) {
   const pieces = useMemo(() => mockupPieces(design), [design]);
   const [draft, setDraft] = useState<MockupState | null>(null);
@@ -132,7 +146,30 @@ export function MockupStudio({
   const active = placements.find((item) => item.slotId === selectedSlot) ?? null;
   const activePiece = active ? pieceById.get(active.pieceId) : undefined;
 
+  // What this scene still needs from the project, and what it can show now.
+  const missingKinds = missingSceneKinds(scene, pieces);
+  const invitationPiece = pieces.find((piece) => piece.kind === "invitation");
+  const needsInsidePage = Boolean(
+    scene.needsInside && invitationPiece && invitationPiece.pages.length < 2,
+  );
+  const flapPlacement = placements.find((item) => item.style === "flap");
+  const flapPiece = flapPlacement
+    ? pieceById.get(flapPlacement.pieceId)
+    : undefined;
+  const openFlap =
+    flapPlacement && flapPiece ? flapBoxFor(flapPlacement, flapPiece, stage) : null;
+
   const patch = (value: Partial<MockupState>) => setDraft({ ...state, ...value });
+
+  /** Scene changes also pull the pieces the scene composes with onto the stage. */
+  const changeScene = (sceneId: string) => {
+    const next = sceneById(sceneId);
+    patch({
+      sceneId,
+      overrides: {},
+      pieceIds: scenePieceIds(next, pieces, state.pieceIds),
+    });
+  };
 
   const updateOverrides = (slotId: string, values: PlacementOverride) => {
     setDraft({
@@ -226,6 +263,7 @@ export function MockupStudio({
   const stageNode = (
     <div
       ref={stageRef}
+      data-mockup-scene={scene.id}
       className="relative w-full overflow-hidden"
       style={{
         aspectRatio: `${stage.widthMm} / ${stage.heightMm}`,
@@ -256,6 +294,31 @@ export function MockupStudio({
             }}
           />
         )}
+        {openFlap && (
+          <div
+            data-mockup-flap="open"
+            aria-hidden
+            className="pointer-events-none absolute"
+            style={{
+              left: `${openFlap.x * 100}%`,
+              top: `${openFlap.y * 100}%`,
+              width: `${openFlap.w * 100}%`,
+              height: `${openFlap.h * 100}%`,
+              transform: `translate(-50%, -50%) rotate(${openFlap.rotation}deg)`,
+              zIndex: 1,
+              filter: "drop-shadow(0 -3px 8px rgba(20,16,12,0.22))",
+            }}
+          >
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+              <polygon
+                points="0,100 100,100 50,3"
+                fill="rgba(22,20,18,0.07)"
+                stroke="rgba(22,20,18,0.2)"
+                strokeWidth="0.5"
+              />
+            </svg>
+          </div>
+        )}
         {placements.map((placement) => {
           const piece = pieceById.get(placement.pieceId);
           const page = piece?.pages[placement.pageIndex] ?? piece?.pages[0];
@@ -264,6 +327,8 @@ export function MockupStudio({
           return (
             <div
               key={placement.slotId}
+              data-mockup-piece={piece.id}
+              data-mockup-kind={piece.kind}
               className={cn(
                 "absolute touch-none select-none",
                 !presenting && "cursor-grab active:cursor-grabbing",
@@ -304,6 +369,35 @@ export function MockupStudio({
                     />
                   )}
                 </DesignStage>
+                {piece.kind === "envelope" &&
+                  placement.pageIndex === 1 &&
+                  placement.style !== "flap" && (
+                    <svg
+                      data-mockup-flap="closed"
+                      aria-hidden
+                      viewBox="0 0 100 100"
+                      preserveAspectRatio="none"
+                      className="pointer-events-none absolute inset-0 h-full w-full"
+                    >
+                      <polygon
+                        points="0,0 100,0 50,56"
+                        fill="rgba(22,20,18,0.05)"
+                        stroke="rgba(22,20,18,0.16)"
+                        strokeWidth="0.5"
+                      />
+                    </svg>
+                  )}
+                {placement.style === "flap" && (
+                  <div
+                    data-mockup-mouth
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 top-0 h-[12%]"
+                    style={{
+                      background:
+                        "linear-gradient(180deg, rgba(16,13,11,0.34), rgba(16,13,11,0))",
+                    }}
+                  />
+                )}
                 {/* Editor chrome only: never while presenting, never captured
                     in an export — the downloaded image contains just the art. */}
                 {selectedSlot === placement.slotId && !presenting && !busy && (
@@ -331,6 +425,23 @@ export function MockupStudio({
             }}
           />
         )}
+        {scene.id === "box" && (
+          <div
+            data-mockup-tray
+            aria-hidden
+            className="pointer-events-none absolute"
+            style={{
+              left: "5%",
+              top: "6%",
+              right: "5%",
+              bottom: "6%",
+              borderRadius: 10,
+              zIndex: 60,
+              boxShadow:
+                "inset 0 0 0 10px rgba(56,46,38,0.9), inset 0 10px 24px rgba(0,0,0,0.30), inset 0 -8px 18px rgba(0,0,0,0.18), 0 16px 36px rgba(24,20,16,0.28)",
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -345,8 +456,9 @@ export function MockupStudio({
           </DialogTitle>
           <DialogDescription className="text-[11px] leading-relaxed text-ink/55">
             Your real pieces, restaged as product photography. This is a screen
-            presentation only — surfaces, shadows, tilt, thickness and the seal
-            are simulations. Print-ready PDFs stay under Export.
+            presentation only — surfaces, shadows, tilt, thickness, the seal,
+            envelope flaps and the box tray are simulations. Print-ready PDFs
+            stay under Export.
           </DialogDescription>
         </DialogHeader>
 
@@ -360,7 +472,7 @@ export function MockupStudio({
                     type="button"
                     title={item.note}
                     aria-pressed={state.sceneId === item.id}
-                    onClick={() => patch({ sceneId: item.id, overrides: {} })}
+                    onClick={() => changeScene(item.id)}
                     className={cn(
                       "border px-2 py-1.5 text-left text-[9px] leading-tight uppercase tracking-[0.06em] transition-colors",
                       state.sceneId === item.id
@@ -374,6 +486,65 @@ export function MockupStudio({
               </div>
               <p className="text-[9px] leading-relaxed text-ink/40">{scene.note}</p>
             </Section>
+
+            {(missingKinds.length > 0 || needsInsidePage) && (
+              <Section title="Missing for this scene">
+                {missingKinds.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] leading-relaxed text-ink/55">
+                      This scene composes with{" "}
+                      {missingKinds
+                        .map((kind) => pieceKindSpec(kind).label)
+                        .join(", ")}{" "}
+                      {missingKinds.length === 1 ? "that does" : "that do"} not
+                      exist in this project yet. Nothing is faked or substituted
+                      — create the real piece and it appears on stage
+                      immediately.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {missingKinds.map((kind) => (
+                        <Button
+                          key={kind}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 rounded-none text-[9px] uppercase tracking-[0.1em]"
+                          onClick={() => {
+                            const created = onCreatePiece(kind);
+                            if (created) {
+                              patch({
+                                pieceIds: [
+                                  ...new Set([...state.pieceIds, created]),
+                                ],
+                              });
+                            }
+                          }}
+                        >
+                          Create {pieceKindSpec(kind).label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {needsInsidePage && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] leading-relaxed text-ink/55">
+                      The folded scene shows a face and an inside spread side by
+                      side. This invitation has one page so far.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 rounded-none text-[9px] uppercase tracking-[0.1em]"
+                      onClick={onAddInsidePage}
+                    >
+                      Add inside page
+                    </Button>
+                  </div>
+                )}
+              </Section>
+            )}
 
             <Section title={`Pieces · ${selectedPieces.length}`}>
               {pieces.length === 0 ? (

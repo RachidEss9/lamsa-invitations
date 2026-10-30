@@ -1014,18 +1014,19 @@ export default function Studio() {
     suiteOf(document).find((piece) => piece.id === pieceId)?.name ?? "Piece";
 
   const addSuitePiece = useCallback(
-    (kind: PieceKind) => {
+    (kind: PieceKind): string | null => {
       const source = designRef.current;
-      if (!source) return;
+      if (!source) return null;
       const result = addPiece(source, kind, { afterPieceId: currentPiece?.id });
       if (result.error || !result.design) {
         toast.error(result.error ?? "That piece could not be added.");
-        return;
+        return null;
       }
       apply(() => result.design);
       setPageIndex(result.pageIndex);
       setSelectedIds([]);
       toast.success(`“${pieceNameOf(result.design, result.pieceId)}” added to the suite.`);
+      return result.pieceId;
     },
     [apply, currentPiece],
   );
@@ -2298,7 +2299,10 @@ export default function Studio() {
     }));
   };
 
-  const addPage = (duplicate: boolean) => {
+  const addPage = (
+    duplicate: boolean,
+    options: { pieceId?: string; name?: string } = {},
+  ) => {
     if (!design) return;
     const current = design.pages[pageIndex];
     const nextPage: DesignPage = duplicate
@@ -2316,7 +2320,7 @@ export default function Studio() {
         }
       : {
           id: makeId("page"),
-          name: `Page ${design.pages.length + 1}`,
+          name: options.name ?? `Page ${design.pages.length + 1}`,
           background: current.background,
           elements: [],
         };
@@ -2332,15 +2336,19 @@ export default function Studio() {
           : element,
       );
     }
-    // A new page belongs to the piece being worked on and lands inside its
-    // block, so pieces stay contiguous in the page list.
-    const piece = activePiece(design);
+    // A new page belongs to the piece being worked on (or the piece a
+    // caller names, such as the invitation's inside page) and lands inside
+    // its block, so pieces stay contiguous in the page list.
+    const piece = options.pieceId
+      ? suiteOf(design).find((candidate) => candidate.id === options.pieceId) ??
+        activePiece(design)
+      : activePiece(design);
     const range = piece ? pieceRange(design, piece.id) : null;
     const insertAt = range ? range.end : design.pages.length;
     apply((currentDesign) => {
       const pages = [...currentDesign.pages];
       pages.splice(insertAt, 0, nextPage);
-      return addPageToSuite({ ...currentDesign, pages }, nextPage.id);
+      return addPageToSuite({ ...currentDesign, pages }, nextPage.id, piece?.id);
     });
     setPageIndex(insertAt);
     setSelectedIds([]);
@@ -4292,6 +4300,17 @@ export default function Studio() {
         imageUrls={imageUrls}
         title={content.title}
         rtl={Boolean(content.rtl)}
+        onCreatePiece={addSuitePiece}
+        onAddInsidePage={() => {
+          const invitation = suiteOf(design).find(
+            (candidate) => candidate.kind === "invitation",
+          );
+          if (!invitation) return;
+          addPage(false, {
+            pieceId: invitation.id,
+            name: `${pieceNameOf(design, invitation.id)} · Inside`,
+          });
+        }}
       />
 
       {openingDesigner}

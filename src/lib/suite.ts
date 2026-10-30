@@ -648,10 +648,13 @@ export function movePiece(
 export function addPageToSuite(
   design: DesignDocument,
   pageId: string,
+  pieceId?: string,
 ): DesignDocument {
   const suite = design.suite;
   if (!suite) return design;
-  const piece = activePiece(design);
+  const piece = pieceId
+    ? suite.pieces.find((item) => item.id === pieceId) ?? activePiece(design)
+    : activePiece(design);
   if (!piece || piece.pageIds.includes(pageId)) return design;
   const pieces = suite.pieces.map((item) =>
     item.id === piece.id ? { ...item, pageIds: [...item.pageIds, pageId] } : item,

@@ -1,5 +1,6 @@
 import { pageSizeOf, type DesignDocument, type DesignPage } from "@/lib/design";
 import { safeFilename } from "@/lib/print";
+import type { PieceKind } from "@/lib/suite";
 
 /**
  * Mockup scenes: a screen-only product presentation of the owner's real pieces.
@@ -87,6 +88,14 @@ export interface MockupScene {
   id: string;
   label: string;
   note: string;
+  /** Kinds the scene composes with; missing ones get a create prompt. */
+  requires?: PieceKind[];
+  /** Kinds auto-selected when the scene is chosen (existing pieces only). */
+  wants?: PieceKind[];
+  /** The scene wants every available piece (collection, box). */
+  selectAll?: boolean;
+  /** The folded scene needs an inside page on the invitation. */
+  needsInside?: boolean;
   /** Stage size as a multiple of the largest selected piece. */
   stage: { w: number; h: number };
   slots: MockupSlot[];
@@ -107,16 +116,19 @@ export const MOCKUP_SCENES: MockupScene[] = [
     id: "card",
     label: "Single invitation",
     note: "One card, softly tilted on the surface.",
+    wants: ["invitation"],
     stage: { w: 1.55, h: 1.45 },
     slots: [slot("card", { prefer: "invitation", x: 0.5, y: 0.5, w: 0.64, rotation: -2, z: 3 })],
   },
   {
     id: "card-envelope",
     label: "Invitation with envelope",
-    note: "The card resting on its closed envelope.",
+    note: "The card resting on its closed envelope, flap side up.",
+    requires: ["envelope"],
+    wants: ["invitation", "envelope"],
     stage: { w: 2, h: 1.6 },
     slots: [
-      slot("envelope", { prefer: "envelope", x: 0.6, y: 0.4, w: 0.6, rotation: -7, z: 1 }),
+      slot("envelope", { prefer: "envelope", pageIndex: 1, x: 0.6, y: 0.4, w: 0.6, rotation: -7, z: 1 }),
       slot("card", { prefer: "invitation", x: 0.42, y: 0.6, w: 0.52, rotation: 5, z: 3 }),
       slot("extra", { x: 0.8, y: 0.76, w: 0.3, rotation: 11, z: 2 }),
     ],
@@ -124,27 +136,33 @@ export const MOCKUP_SCENES: MockupScene[] = [
   {
     id: "open-envelope",
     label: "Open envelope",
-    note: "The envelope's flap side behind the card sliding out of it.",
+    note: "An open envelope with the invitation sliding out of its mouth.",
+    requires: ["envelope"],
+    wants: ["invitation", "envelope"],
     stage: { w: 1.9, h: 1.7 },
     slots: [
+      // The envelope is the FRONT layer (z 3): the invitation slides out from
+      // behind its mouth, with the opened flap drawn behind both (stage z 1).
       slot("envelope", {
         prefer: "envelope",
         pageIndex: 1,
         x: 0.5,
-        y: 0.66,
+        y: 0.68,
         w: 0.66,
         rotation: -3,
-        z: 1,
+        z: 3,
         style: "flap",
       }),
-      slot("card", { prefer: "invitation", x: 0.52, y: 0.36, w: 0.5, rotation: 3, z: 3 }),
-      slot("extra", { x: 0.78, y: 0.8, w: 0.26, rotation: 9, z: 2 }),
+      slot("card", { prefer: "invitation", x: 0.5, y: 0.34, w: 0.46, rotation: 2, z: 2 }),
+      slot("extra", { x: 0.86, y: 0.74, w: 0.24, rotation: 10, z: 1 }),
     ],
   },
   {
     id: "suite-spread",
     label: "Invitation, RSVP & details",
     note: "Three cards fanned as a set.",
+    requires: ["rsvp", "details"],
+    wants: ["invitation", "rsvp", "details"],
     stage: { w: 2.2, h: 1.5 },
     slots: [
       slot("rsvp", { prefer: "rsvp", x: 0.2, y: 0.66, w: 0.3, rotation: -9, z: 1 }),
@@ -156,6 +174,8 @@ export const MOCKUP_SCENES: MockupScene[] = [
     id: "collection",
     label: "Stationery collection",
     note: "Every piece laid out as a coordinated flat lay.",
+    requires: ["envelope", "rsvp"],
+    selectAll: true,
     stage: { w: 2.3, h: 1.9 },
     slots: [
       slot("a", { x: 0.27, y: 0.28, w: 0.3, rotation: -4, z: 1 }),
@@ -169,7 +189,9 @@ export const MOCKUP_SCENES: MockupScene[] = [
     id: "folded",
     label: "Folded / gatefold",
     note:
-      "The piece's face and inside spread side by side; falls back to a single card when there is no second page.",
+      "The invitation's face and inside spread side by side; falls back to a single card when there is no second page.",
+    wants: ["invitation"],
+    needsInside: true,
     stage: { w: 2.4, h: 1.5 },
     slots: [
       slot("panel-left", { prefer: "invitation", pageIndex: 0, x: 0.27, y: 0.5, w: 0.44, z: 1 }),
@@ -179,17 +201,89 @@ export const MOCKUP_SCENES: MockupScene[] = [
   {
     id: "box",
     label: "Luxury invitation box",
-    note: "The card presented inside a lined box tray.",
+    note: "The invitation presented in a box tray with the stationery around it.",
+    selectAll: true,
     stage: { w: 1.9, h: 1.7 },
     slots: [
-      slot("envelope", { prefer: "liner", x: 0.5, y: 0.48, w: 0.66, rotation: 0, z: 1 }),
-      slot("card", { prefer: "invitation", x: 0.5, y: 0.52, w: 0.5, rotation: -1, z: 3 }),
+      slot("envelope", { prefer: "envelope", pageIndex: 1, x: 0.5, y: 0.5, w: 0.62, rotation: 0, z: 1 }),
+      slot("left", { x: 0.24, y: 0.7, w: 0.24, rotation: -7, z: 2 }),
+      slot("right", { x: 0.76, y: 0.7, w: 0.24, rotation: 7, z: 2 }),
+      slot("card", { prefer: "invitation", x: 0.5, y: 0.44, w: 0.42, rotation: -1, z: 3 }),
     ],
   },
 ];
 
 export function sceneById(id: string): MockupScene {
   return MOCKUP_SCENES.find((scene) => scene.id === id) ?? MOCKUP_SCENES[0];
+}
+
+/**
+ * The piece ids a scene should show: the current selection plus everything
+ * the scene asks for that the project actually has. Selecting a scene with an
+ * envelope slot pulls the real envelope into the arrangement instead of
+ * leaving the invitation alone on stage.
+ */
+export function scenePieceIds(
+  scene: MockupScene,
+  pieces: MockupPiece[],
+  current: string[],
+): string[] {
+  const chosen = new Set(
+    current.filter((id) => pieces.some((piece) => piece.id === id)),
+  );
+  if (scene.selectAll) {
+    for (const piece of pieces) chosen.add(piece.id);
+  } else {
+    for (const kind of scene.wants ?? []) {
+      const piece = pieces.find((item) => item.kind === kind);
+      if (piece) chosen.add(piece.id);
+    }
+  }
+  if (chosen.size === 0 && pieces.length > 0) chosen.add(pieces[0].id);
+  return pieces.map((piece) => piece.id).filter((id) => chosen.has(id));
+}
+
+/**
+ * Kinds the scene composes with that this project does not have yet. The
+ * studio offers to create each one as a real, editable piece — nothing is
+ * faked or substituted with the invitation.
+ */
+export function missingSceneKinds(
+  scene: MockupScene,
+  pieces: MockupPiece[],
+): PieceKind[] {
+  const kinds = new Set(pieces.map((piece) => piece.kind));
+  return (scene.requires ?? []).filter((kind) => !kinds.has(kind));
+}
+
+/**
+ * Geometry of the opened envelope flap, drawn behind the invitation in the
+ * open-envelope scene: a box whose bottom edge sits on the envelope's mouth,
+ * rotated with the envelope around its centre.
+ */
+export function flapBoxFor(
+  placement: MockupPlacement,
+  piece: MockupPiece,
+  stage: { widthMm: number; heightMm: number },
+): { x: number; y: number; w: number; h: number; rotation: number } | null {
+  const page = piece.pages[placement.pageIndex] ?? piece.pages[0];
+  if (!page) return null;
+  const { width, height } = pageSizeOf(page);
+  const aspect = width > 0 && height > 0 ? height / width : 1;
+  const wMm = placement.w * placement.scale * stage.widthMm;
+  const hMm = wMm * aspect;
+  const flapMm = hMm * 0.5;
+  const d = hMm / 2 + flapMm / 2;
+  const rad = (placement.rotation * Math.PI) / 180;
+  const cx = placement.x * stage.widthMm + d * Math.sin(rad);
+  const cy = placement.y * stage.heightMm - d * Math.cos(rad);
+  return {
+    x: cx / stage.widthMm,
+    y: cy / stage.heightMm,
+    w: wMm / stage.widthMm,
+    h: flapMm / stage.heightMm,
+    rotation: placement.rotation,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -266,10 +360,14 @@ export function resolvePlacements(
 
   const filled: RawPlacement[] = [];
   const fill = (slotDef: MockupSlot, piece: MockupPiece) => {
+    // An envelope shows its flap side unless a slot explicitly asks for the
+    // address side, so it reads as an envelope wherever it lands.
+    const wanted =
+      slotDef.pageIndex ?? (piece.kind === "envelope" ? 1 : 0);
     filled.push({
       slotDef,
       piece,
-      pageIndex: Math.min(slotDef.pageIndex ?? 0, piece.pages.length - 1),
+      pageIndex: Math.min(wanted, piece.pages.length - 1),
     });
   };
 
@@ -478,7 +576,7 @@ export function defaultMockupState(pieces: MockupPiece[]): MockupState {
   return {
     sceneId: "card",
     surfaceId: "ivory",
-    pieceIds: pieces.slice(0, 3).map((piece) => piece.id),
+    pieceIds: pieces.map((piece) => piece.id),
     light: 55,
     tilt: 0,
     thickness: 1,

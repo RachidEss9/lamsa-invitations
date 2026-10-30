@@ -12,12 +12,15 @@ import {
   clampPlacement,
   clearMockupState,
   defaultMockupState,
+  flapBoxFor,
   loadMockupState,
+  missingSceneKinds,
   mockupExportName,
   mockupPieces,
   normalizeMockupState,
   resolvePlacements,
   sceneById,
+  scenePieceIds,
   stageSizeFor,
   surfaceById,
   writeMockupState,
@@ -397,6 +400,34 @@ function foldDesign(): DesignDocument {
   };
 }
 
+const PRINT = { unit: "mm" as const, bleedMm: 3, safeMm: 5, cropMarks: false };
+
+/** The suite at LAMSA's real trim sizes: portrait 114 × 162 mm envelope. */
+function defaultSuiteDesign(): DesignDocument {
+  const base = createDefaultDesign(blankInvitationContent());
+  const pages: DesignPage[] = [
+    page("inv", 480, 673),
+    page("env-front", 431, 613),
+    page("env-back", 431, 613),
+    page("rsvp", 408, 525),
+    page("details", 397, 559),
+  ];
+  return {
+    ...base,
+    pages,
+    suite: {
+      version: 1,
+      activePieceId: "inv",
+      pieces: [
+        { id: "inv", name: "Invitation", kind: "invitation", pageIds: ["inv"], print: PRINT, guestVisible: true },
+        { id: "env", name: "Outer envelope", kind: "envelope", pageIds: ["env-front", "env-back"], print: PRINT, guestVisible: false },
+        { id: "rsvp", name: "RSVP card", kind: "rsvp", pageIds: ["rsvp"], print: PRINT, guestVisible: false },
+        { id: "details", name: "Details card", kind: "details", pageIds: ["details"], print: PRINT, guestVisible: false },
+      ],
+    },
+  };
+}
+
 /** Every placement's rotated bounding box must sit fully on the stage. */
 function clippedScenes(
   sceneIds: string[],
@@ -531,6 +562,126 @@ describe("scene slot honesty (visual QA)", () => {
   });
 });
 
+describe("scene requirements: missing pieces and auto-selection", () => {
+  const pieces = mockupPieces(suiteDesign());
+  const invitationOnly = pieces.filter((piece) => piece.kind === "invitation");
+
+  it("reports exactly the kinds a scene needs and the project lacks", () => {
+    // Project A — invitation only.
+    expect(missingSceneKinds(sceneById("card"), invitationOnly)).toEqual([]);
+    expect(missingSceneKinds(sceneById("box"), invitationOnly)).toEqual([]);
+    expect(missingSceneKinds(sceneById("card-envelope"), invitationOnly)).toEqual([
+      "envelope",
+    ]);
+    expect(missingSceneKinds(sceneById("suite-spread"), invitationOnly)).toEqual([
+      "rsvp",
+      "details",
+    ]);
+    expect(missingSceneKinds(sceneById("collection"), invitationOnly)).toEqual([
+      "envelope",
+      "rsvp",
+    ]);
+    // Project B — invitation, envelope and RSVP; only the details card is absent.
+    expect(missingSceneKinds(sceneById("card-envelope"), pieces)).toEqual([]);
+    expect(missingSceneKinds(sceneById("suite-spread"), pieces)).toEqual([
+      "details",
+    ]);
+  });
+
+  it("pulls a scene's pieces onto the stage when the scene is chosen", () => {
+    // Invitation-only project: nothing to add, nothing faked.
+    expect(
+      scenePieceIds(sceneById("card-envelope"), invitationOnly, ["piece-inv"]),
+    ).toEqual(["piece-inv"]);
+    // Full suite: the scene selects the pieces it composes with.
+    expect(
+      scenePieceIds(sceneById("card-envelope"), pieces, ["piece-inv"]),
+    ).toEqual(["piece-inv", "piece-env"]);
+    expect(
+      scenePieceIds(sceneById("suite-spread"), pieces, []),
+    ).toEqual(["piece-inv", "piece-rsvp"]);
+    // Collection and box take every piece.
+    expect(scenePieceIds(sceneById("collection"), pieces, ["piece-inv"])).toEqual(
+      pieces.map((piece) => piece.id),
+    );
+    // Stale ids from another project are dropped; the stage is never empty.
+    expect(scenePieceIds(sceneById("card"), pieces, ["ghost"])).toEqual([
+      "piece-inv",
+    ]);
+  });
+});
+
+describe("each scene renders a different composition", () => {
+  it("gives all 7 scenes distinct piece arrangements for a full suite", () => {
+    const pieces = mockupPieces(suiteDesign());
+    const seen = new Set<string>();
+    for (const scene of MOCKUP_SCENES) {
+      const ids = scenePieceIds(scene, pieces, []);
+      const shown = resolvePlacements(scene, pieces, ids, {})
+        .map(
+          (item) =>
+            `${item.slotId}:${item.pieceId}:p${item.pageIndex}:z${item.z}`,
+        )
+        .sort()
+        .join("|");
+      expect(seen.has(shown), scene.id).toBe(false);
+      seen.add(shown);
+    }
+    expect(seen.size).toBe(MOCKUP_SCENES.length);
+  });
+
+  it("keeps the invitation visible in every scene of an invitation-only project", () => {
+    const pieces = mockupPieces(suiteDesign()).filter(
+      (piece) => piece.kind === "invitation",
+    );
+    for (const scene of MOCKUP_SCENES) {
+      const ids = scenePieceIds(scene, pieces, []);
+      const shown = resolvePlacements(scene, pieces, ids, {});
+      expect(shown.map((item) => item.pieceId), scene.id).toContain(
+        "piece-inv",
+      );
+    }
+  });
+});
+
+describe("open-envelope flap geometry", () => {
+  it("hangs the opened flap exactly on the envelope's mouth", () => {
+    const pieces = mockupPieces(suiteDesign());
+    const envelope = pieces.find((piece) => piece.id === "piece-env");
+    const scene = sceneById("open-envelope");
+    const stage = stageSizeFor(scene, pieces);
+    const placements = resolvePlacements(
+      scene,
+      pieces,
+      ["piece-env", "piece-inv"],
+      {},
+    );
+    const envelopePlacement = placements.find(
+      (item) => item.style === "flap",
+    );
+    expect(envelopePlacement).toBeTruthy();
+    const flap = flapBoxFor(envelopePlacement!, envelope!, stage);
+    expect(flap).not.toBeNull();
+    // The envelope's mouth — its top edge, rotated with the envelope — is
+    // exactly the flap box's bottom edge.
+    const envW = envelopePlacement!.w * stage.widthMm;
+    const envH = envW * (1100 / 1600);
+    const rad = (envelopePlacement!.rotation * Math.PI) / 180;
+    const envTop =
+      envelopePlacement!.y * stage.heightMm - (envH / 2) * Math.cos(rad);
+    const flapBottom =
+      flap!.y * stage.heightMm +
+      ((flap!.h * stage.heightMm) / 2) * Math.cos(rad);
+    expect(flapBottom).toBeCloseTo(envTop, 4);
+    // Same width and rotation as the envelope, half its height.
+    expect(flap!.w).toBeCloseTo(envelopePlacement!.w, 6);
+    expect(flap!.rotation).toBe(envelopePlacement!.rotation);
+    expect(flap!.h * stage.heightMm).toBeCloseTo(envH * 0.5, 4);
+    // And the flap reaches up, away from the envelope body.
+    expect(flap!.y).toBeLessThan(envelopePlacement!.y);
+  });
+});
+
 describe("stage fitting (visual QA)", () => {
   const pieces = mockupPieces(suiteDesign());
   const sceneIds = MOCKUP_SCENES.map((scene) => scene.id);
@@ -547,6 +698,13 @@ describe("stage fitting (visual QA)", () => {
   it("keeps every default placement on-stage for a folded two-page piece", () => {
     const fold = mockupPieces(foldDesign());
     expect(clippedScenes(sceneIds, fold)).toEqual([]);
+  });
+
+  it("keeps every scene on-stage at LAMSA's real portrait envelope size", () => {
+    const real = mockupPieces(defaultSuiteDesign());
+    expect(clippedScenes(sceneIds, real)).toEqual([]);
+    const invitation = real.filter((piece) => piece.kind === "invitation");
+    expect(clippedScenes(sceneIds, invitation)).toEqual([]);
   });
 
   it("applies the fit before overrides, never rewriting the owner's own layout", () => {
