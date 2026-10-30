@@ -538,7 +538,7 @@ function ElementVisual({
             <CurvedText
               element={element}
               direction={direction}
-              text={personalize(element.text, guestName)}
+              text={personalize(element.text ?? "", guestName ?? "")}
             />
           ) : (
             <div
@@ -574,7 +574,7 @@ function ElementVisual({
           }}
             dir={direction}
           >
-            {personalize(element.text, guestName)}
+            {personalize(element.text ?? "", guestName ?? "")}
           </div>
           )}
         </div>
@@ -988,14 +988,14 @@ export function DesignPageView({
       {page.elements.map((element) => {
         if (element.hidden && (!editor || !showHidden)) return null;
         if (hideElementId === element.id) return null;
-        const isCovered = covered.has(element.id);
+        const isCovered = covered.includes(element.id);
         const cover = page.elements.find(
           (candidate) => candidate.reveal?.targetId === element.id,
         );
         const isRevealed = Boolean(
           cover?.reveal &&
-            (opened.has(cover.reveal.interactionId) ||
-              revealPreview?.has(cover.reveal.interactionId)),
+            (opened.has(cover.reveal.interactionId ?? "") ||
+              revealPreview?.has(cover.reveal.interactionId ?? "")),
         );
         if (isCovered && !isRevealed && !editor) return null;
 
@@ -1100,9 +1100,9 @@ export function DesignPageView({
                 element={element}
                 revealed={isRevealed}
                 onReveal={() =>
-                  handleReveal(element.reveal!.targetId, element.reveal!.interactionId)
+                  handleReveal(element.reveal!.targetId, element.reveal!.interactionId ?? "")
                 }
-                duration={element.reveal.duration}
+                duration={element.reveal.duration ?? 800}
                 reducedMotion={reducedMotion}
                 interactive={interactive}
               >

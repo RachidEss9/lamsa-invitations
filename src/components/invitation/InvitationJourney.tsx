@@ -102,7 +102,9 @@ export function InvitationJourney({
   const entrance = pageEntranceEnd(page);
   const closingEnabled = design.closing.enabled && step === total - 1;
   const settled = reducedMotion || (phase === "page" && time >= entrance);
-  const frames = pageTransitionFrames(design.transition, { preset: "fade", duration: 600 }, { rtl });
+  const frames = pageTransitionFrames(design.transition, transition, {
+    rtl: rtl ?? false,
+  });
 
   useEffect(() => {
     onStepChange?.(step, total);
@@ -372,7 +374,7 @@ export function InvitationJourney({
                   key={`out-${outgoing.key}`}
                   aria-hidden
                   className="absolute inset-0"
-                  style={frames[0] ? { transition: `opacity 0ms linear 0ms` } : undefined}
+                  style={{ ...frames.outgoing, transition: "opacity 0ms linear 0ms" }}
                 >
                   <DesignPageView
                     page={outgoing.page}
@@ -391,7 +393,7 @@ export function InvitationJourney({
                 key={`in-${page.id}-${step}`}
                 className="absolute inset-0"
                 aria-hidden={phase === "closing"}
-                style={phase === "page" ? (frames[0] ?? undefined) : undefined}
+                style={phase === "page" ? frames.incoming : undefined}
               >
                 <DesignPageView
                   page={page}
@@ -412,7 +414,7 @@ export function InvitationJourney({
               {phase === "closing" && (
                 <div
                   className="absolute inset-0 z-50"
-                  style={frames[0] ?? undefined}
+                  style={frames.incoming}
                 >
                   <ClosingStage
                     closing={design.closing}

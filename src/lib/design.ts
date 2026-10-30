@@ -113,7 +113,8 @@ export interface ExitAnimation {
   enabled: boolean;
   preset: AnimationPresetId;
   duration: number;
-  delay: number;
+  /** When the exit begins, in ms from the layer's own start. */
+  delay?: number;
   start: number;
   easing: EasingId;
 }
@@ -200,37 +201,13 @@ export interface RevealConfig {
   duration?: number;
 }
 
-export type ElementKind =
-  | "text"
-  | "image"
-  | "shape"
-  | "motif"
-  | "capsule"
-  | "imageInShape"
-  | "textBackground"
-  | "textRadius"
-  | "textShadow"
-  | "imageBorder"
-  | "imageShadow"
-  | "imageRadius"
-  | "imageZoom"
-  | "imagePosition";
+export type ElementKind = "text" | "image" | "shape" | "motif";
 
 export const ELEMENT_KINDS: { id: ElementKind; label: string }[] = [
   { id: "text", label: "Text" },
   { id: "image", label: "Image" },
   { id: "shape", label: "Shape" },
   { id: "motif", label: "Motif" },
-  { id: "capsule", label: "Capsule" },
-  { id: "imageInShape", label: "Image in shape" },
-  { id: "textBackground", label: "Text background" },
-  { id: "textRadius", label: "Text radius" },
-  { id: "textShadow", label: "Text shadow" },
-  { id: "imageBorder", label: "Image border" },
-  { id: "imageShadow", label: "Image shadow" },
-  { id: "imageRadius", label: "Image radius" },
-  { id: "imageZoom", label: "Image zoom" },
-  { id: "imagePosition", label: "Image position" },
 ];
 
 export interface DesignElement {
@@ -243,32 +220,44 @@ export interface DesignElement {
   h: number;
   hidden?: boolean;
   locked?: boolean;
+  /** Elements sharing a group id move, select and duplicate together. */
+  groupId?: string;
   color?: string;
   fill?: string;
   opacity?: number;
   fontSize?: number;
   /** The radius of the element in pixels. */
   radius?: number;
+  /** Strokes the layer's outline. */
   stroke?: string;
+  /** The width of the layer's stroke. */
   strokeWidth?: number;
   font?: string;
   fontStyle?: "normal" | "italic" | "oblique";
   lineHeight?: number;
-  align?: "left" | "center" | "right" | "justify";
+  align?: TextAlign;
+  /** The font weight. */
   fontWeight?: number;
+  /** The font style: normal or italic. */
   italic?: boolean;
-  textTransform?: TextTransform;
+  /** Text decoration. */
+  textDecoration?: string;
+  /** The case the text renders in. */
+  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
   text?: string;
-  textAlign?: "left" | "center" | "right" | "justify";
+  textAlign?: TextAlign;
   letterSpacing?: number;
   textBorder?: string;
   textBorderWidth?: number;
   textPadding?: number;
+  /** The background of the text, when the kind is `text`. */
   textBackground?: string;
+  /** The radius of the text background. */
   textRadius?: number;
+  /** The shadow of the text. */
   textShadow?: string;
-  textBorderWidth?: number;
-  textPadding?: number;
+  /** The text curve, when the shape is `path`. */
+  textCurve?: boolean;
   shape?: ShapeKind;
   /** Direction the text reads. */
   direction?: TextDirection | "auto";
@@ -282,92 +271,36 @@ export interface DesignElement {
   story?: string;
   /** The stored id of the cover picture the element holds. */
   has?: string;
-  /** The motif the motif element draws. */
-  motif?: string;
-  /** The border of an image element. */
-  imageBorder?: string;
+  /** The motif a motif element draws. */
+  motif?: MotifId;
+  /** The border width around an image, in pixels. */
+  imageBorder?: number;
   /** The width of the image border. */
   imageBorderWidth?: number;
-  /** The shadow of an image element. */
-  imageShadow?: string;
+  /** Soft shadow behind an image. */
+  imageShadow?: boolean;
   /** The radius of an image element. */
   imageRadius?: number;
   /** How far into the frame the picture sits, as a fraction of the layer. */
   imageZoom?: number;
-  /** The curve a path follows, in degrees, when the shape is `path`. */
-  curve?: number;
-  /** Vertical align. */
-  verticalAlign?: "top" | "middle" | "bottom";
-  /** Uppercase the text. */
-  uppercase?: boolean;
-  /** The artwork the frame is dressed with, chosen from the studio pack. */
-  frameArt?: string;
-  /** The picture the frame is dressed with, chosen from the studio pack. */
-  imageAdjust?: ImageAdjust;
-  /** How the art fills its box when the kind is `image`. */
-  fit?: ImageFit;
-  /** How far into the frame the picture sits, as a fraction of the layer. */
-  imageZoom?: number;
+  /** The picture is clipped to the vector of the shape, not its box. */
+  imageInShape?: boolean;
   /** The point of the picture that stays put, in percent of the layer box. */
   imagePosition?: { x: number; y: number };
   /** Rotates the image, in degrees, when the kind is `image`. */
   imageRotate?: number;
-  /** Rotates the image, in degrees, when the kind is `image`. */
-  imageRotate?: number;
   /** The image's stored id, when the kind is `image`. */
   imageStorageId?: string;
-  /** Scales the image, in percent, when the kind is `image`. */
-  imageZoom?: number;
-  /** The image's position inside its box, when the kind is `image`. */
-  imagePosition?: "center" | "left" | "right";
-  /** Strokes the layer's outline. */
-  stroke?: string;
-  /** The width of the layer's stroke. */
-  strokeWidth?: number;
+  /** How the art fills its box when the kind is `image`. */
+  fit?: ImageFit;
+  /** The artwork the frame is dressed with, chosen from the studio pack. */
+  frameArt?: string;
+  /** The picture the frame is dressed with, chosen from the studio pack. */
+  imageAdjust?: ImageAdjust;
   /** Whether to stroke the image over the frame shape. */
-  frameStrokeOnImage?: string;
-  /** The font weight. */
-  fontWeight?: number;
-  /** The font style: normal or italic. */
-  italic?: boolean;
-  /** Text decoration. */
-  textDecoration?: string;
-  /** Text transform. */
-  textTransform?: string;
-  /** The curve a path follows, in degrees. */
-  curve?: number;
-  /** Vertical align. */
-  verticalAlign?: "top" | "middle" | "bottom";
-  /** Uppercase the text. */
-  uppercase?: boolean;
-  /** The text case transform: `textTransform` (CSS value) and/or `uppercase` flag. */
-  textTransform?: TextCaseTransform;
-  /** The text curve, when the shape is `path`. */
-  textCurve?: boolean;
-  /** The background of the text, when the kind is `text`. */
-  textBackground?: string;
-  /** The radius of the text background. */
-  textRadius?: number;
-  /** The shadow of the text. */
-  textShadow?: string;
-  /** The motif of a motif element. */
-  motif?: string;
-  /** The border of an image element. */
-  imageBorder?: string;
-  /** The width of the image border. */
-  imageBorderWidth?: number;
-  /** The shadow of an image element. */
-  imageShadow?: string;
-  /** The radius of an image element. */
-  imageRadius?: number;
-  /** The picture is clipped to the vector of the shape, not its box. */
-  imageInShape?: boolean;
-  /** How far into the frame the picture sits, as a fraction of the layer. */
-  imageZoom?: number;
+  frameStrokeOnImage?: boolean;
   /** Additional descriptive text for the reveal's aria-label. */
   hint?: string;
-  /** The stored id of the cover image. */
-  has?: string;
   /** Editable layer effects. Optional, so every invitation saved before
    * effects existed opens exactly as it was, with nothing switched on. */
   effects?: LayerEffects;
@@ -385,8 +318,6 @@ export interface DesignElement {
   flipY?: boolean;
   /** Rotates the layer, in degrees. */
   rotation?: number;
-  /** The name of the layer as shown in the inspector. */
-  name?: string;
 }
 
 export interface DesignDocument {
@@ -400,6 +331,8 @@ export interface DesignDocument {
   output?: DesignOutput;
   physicalWidth?: number;
   physicalHeight?: number;
+  /** The physical brief the host asked for when the document was created. */
+  format?: DesignFormat;
 }
 
 export interface DesignPage {
@@ -814,35 +747,20 @@ export function resizePage(
 }
 
 /**
- * Fit a page element into the invitation slot on a full stage.
+ * How much a box authored on the classic 1000 × 1333 studio card must be
+ * scaled to sit on this page. The smaller of the two axes wins, so nothing
+ * ever runs off the card; a classic card gives exactly 1.
  *
- * The presentation renders each scene on its own frame box on a 2400x1400
- * stage; the invitation itself occupies the 800x1100 slot at (800,250).
- * `box` is the element box before slot scaling, `slot` the 800x1100 rectangle,
- * and `stage` the 2400x1400 viewport. Returns the element box in slot pixels
- * (identical to the manifest box), centred inside the slot, never clipped.
- *
- * @param box - element box in stage pixels (from the scene manifest / layer)
- * @param slot - the 800x1100 invitation slot on the 2400x1400 stage
- * @param stage - the 2400x1400 stage box
- * @returns fitted element box in slot pixels, centred inside the slot
+ * @param page - the page being edited (null uses the classic card)
+ * @returns the scale factor from classic-card units to page units
  */
 export function pageFitScale(
-  box: { x: number; y: number; w: number; h: number },
-  slot: { w: number; h: number },
-  stage: { w: number; h: number },
-): { x: number; y: number; w: number; h: number } {
-  const sx = 800 / slot.w;
-  const sy = 1100 / slot.h;
-  const s = Math.min(sx, sy);
-  const w = Math.round(box.w * s * 100) / 100;
-  const h = Math.round(box.h * s * 100) / 100;
-  return {
-    x: Math.round((box.x + (box.w - w) / 2) * 100) / 100,
-    y: Math.round((box.y + (box.h - h) / 2) * 100) / 100,
-    w,
-    h,
-  };
+  page?: Pick<DesignPage, "width" | "height"> | null,
+): number {
+  const width = page?.width ?? DESIGN_WIDTH;
+  const height = page?.height ?? DESIGN_HEIGHT;
+  if (!(width > 0) || !(height > 0)) return 1;
+  return Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -850,7 +768,7 @@ export function pageFitScale(
 /* -------------------------------------------------------------------------- */
 
 /** The three presentation scenes, and the legacy map they replace. */
-export type OpeningExperienceId = "none" | "secret-world" | "living-art" | "impossible";
+export type OpeningExperienceId = "none" | "secret-world" | "living-art" | "impossible" | "cinematic";
 
 export const OPENING_EXPERIENCES: {
   id: OpeningExperienceId;
@@ -870,6 +788,10 @@ export interface OpeningSettings {
   welcome: string;
   /** Keep the invitation open for `duration` ms before the curtain rises. */
   duration?: number;
+  /** The colour story the opening scene is dressed in. */
+  tone?: string;
+  /** Scene colours: accent gold, hull (deep ink) and paper. */
+  palette?: { accent: string; hull: string; paper: string };
   /** The stored id of the background picture the cover uses. */
   coverStorageId?: string;
 }
@@ -909,14 +831,23 @@ export function normalizeDesign(
 ): DesignDocument {
   if (!saved || typeof saved !== "object") return createDefaultDesign(content);
   const doc = saved as Partial<DesignDocument>;
-  const pages = doc.pages ?? [];
-  const pageList: DesignPage[] = pages.map((page) => normalizePage(page, content));
+  const rawPages = Array.isArray(doc.pages) ? doc.pages : [];
+  const pageList: DesignPage[] =
+    rawPages.length > 0
+      ? rawPages.map((page) => normalizePage(page, content))
+      : [normalizePage(null, content)];
+  const stored =
+    typeof doc.opening === "object" && doc.opening !== null
+      ? doc.opening
+      : ({} as Partial<OpeningSettings>);
   const opening: OpeningSettings = {
-    experience: typeof doc.opening === "object" && doc.opening !== null && "experience" in doc.opening
-      ? (doc.opening.experience ?? "none")
-      : "none",
-    autoOpen: doc.opening?.autoOpen ?? false,
-    welcome: doc.opening?.welcome ?? "",
+    experience: stored.experience ?? "none",
+    autoOpen: stored.autoOpen ?? false,
+    welcome: stored.welcome ?? "",
+    duration: stored.duration ?? undefined,
+    tone: stored.tone ?? undefined,
+    palette: stored.palette ?? undefined,
+    coverStorageId: stored.coverStorageId ?? undefined,
   };
   const closing: ClosingSettings = {
     enabled: doc.closing?.enabled ?? false,
@@ -931,6 +862,11 @@ export function normalizeDesign(
     closing,
     transition: normalizeTransition(doc.transition),
     startedAt: doc.startedAt ?? 0,
+    suite: normalizeSuite(doc.suite, pageList),
+    output: doc.output ?? undefined,
+    physicalWidth: doc.physicalWidth ?? undefined,
+    physicalHeight: doc.physicalHeight ?? undefined,
+    format: doc.format ?? undefined,
   };
 }
 
@@ -947,13 +883,13 @@ function normalizePage(
     };
   }
   const p = page as Partial<DesignPage>;
-  const elements: DesignElement[] = (p.elements ?? []).map((element) =>
-    normalizeElement(element),
+  const elements: DesignElement[] = (Array.isArray(p.elements) ? p.elements : []).map(
+    (element) => normalizeElement(element),
   );
   return {
-    id: p.id ?? makeId("page"),
-    name: p.name ?? "Untitled",
-    background: p.background ?? "#fbfaf7",
+    id: p.id || makeId("page"),
+    name: p.name || "Untitled",
+    background: p.background || content.palette.background,
     elements,
     hidden: p.hidden ?? false,
     width: p.width ?? DESIGN_WIDTH,
@@ -961,8 +897,8 @@ function normalizePage(
     margin: p.margin ?? 0,
     bleed: p.bleed ?? 0,
     texture: p.texture ?? "none",
-    edge: p.edge ?? "straight",
-    material: p.material ?? "none",
+    edge: p.edge && isPageEdgeId(p.edge) ? p.edge : undefined,
+    material: normalizeMaterial(p.material),
   };
 }
 
@@ -976,7 +912,7 @@ function normalizeElement(element: unknown): DesignElement {
       y: 0,
       w: 100,
       h: 100,
-      animation: { preset: "fade", duration: 1500, delay: 0 },
+      animation: defaultAnimation("fade", 0),
     };
   }
   const e = element as Partial<DesignElement>;
@@ -991,28 +927,81 @@ function normalizeElement(element: unknown): DesignElement {
     h: e.h ?? 100,
     hidden: e.hidden ?? false,
     locked: e.locked ?? false,
+    groupId: e.groupId ?? undefined,
     color: e.color ?? undefined,
     fill: e.fill ?? undefined,
     opacity: e.opacity ?? undefined,
     fontSize: e.fontSize ?? undefined,
+    radius: e.radius ?? undefined,
+    stroke: e.stroke ?? undefined,
+    strokeWidth: e.strokeWidth ?? undefined,
     font: e.font ?? undefined,
     fontStyle: e.fontStyle ?? undefined,
     lineHeight: e.lineHeight ?? undefined,
     align: e.align ?? undefined,
+    fontWeight: e.fontWeight ?? undefined,
+    italic: e.italic ?? undefined,
+    textDecoration: e.textDecoration ?? undefined,
+    textTransform: e.textTransform ?? undefined,
     text: e.text ?? undefined,
     textAlign: e.textAlign ?? undefined,
     letterSpacing: e.letterSpacing ?? undefined,
     textBorder: e.textBorder ?? undefined,
     textBorderWidth: e.textBorderWidth ?? undefined,
     textPadding: e.textPadding ?? undefined,
+    textBackground: e.textBackground ?? undefined,
+    textRadius: e.textRadius ?? undefined,
+    textShadow: e.textShadow ?? undefined,
+    textCurve: e.textCurve ?? undefined,
     shape: e.shape ?? undefined,
+    direction: e.direction ?? undefined,
+    curve: normalizeCurve(e.curve),
+    verticalAlign: e.verticalAlign ?? undefined,
+    uppercase: e.uppercase ?? undefined,
+    story: e.story ?? undefined,
+    has: e.has ?? undefined,
+    motif: e.motif ?? undefined,
+    imageBorder: e.imageBorder ?? undefined,
+    imageBorderWidth: e.imageBorderWidth ?? undefined,
+    imageShadow: e.imageShadow ?? undefined,
+    imageRadius: e.imageRadius ?? undefined,
+    imageZoom: e.imageZoom ?? undefined,
+    imageInShape: e.imageInShape ?? undefined,
+    imagePosition: e.imagePosition ? { ...e.imagePosition } : undefined,
+    imageRotate:
+      typeof e.imageRotate === "number" && Number.isFinite(e.imageRotate)
+        ? Math.max(-360, Math.min(360, e.imageRotate))
+        : undefined,
+    imageStorageId: e.imageStorageId ?? undefined,
+    fit: e.fit ?? undefined,
     frameArt: e.frameArt ?? undefined,
-    imageAdjust: e.imageAdjust ?? undefined,
-    effects: e.effects ?? undefined,
-    material: e.material ?? undefined,
-    reveal: e.reveal ?? undefined,
+    imageAdjust: normalizeImageAdjust(e.imageAdjust),
+    frameStrokeOnImage: e.frameStrokeOnImage ?? undefined,
+    hint: e.hint ?? undefined,
+    effects: normalizeEffects(e.effects),
+    material: normalizeMaterial(e.material),
+    reveal: normalizeReveal(e.reveal),
     animation,
     exit: e.exit ?? undefined,
+    flipX: e.flipX ?? undefined,
+    flipY: e.flipY ?? undefined,
+    rotation: e.rotation ?? undefined,
+  };
+}
+
+/** A reveal as the guest meets it: every field present, an interaction id
+ * generated only when the saved one is missing. */
+function normalizeReveal(reveal: unknown): RevealConfig | undefined {
+  if (!reveal || typeof reveal !== "object") return undefined;
+  const r = reveal as Partial<RevealConfig>;
+  return {
+    targetId: r.targetId ?? "",
+    effect: r.effect ?? "fadeAway",
+    direction: r.direction ?? "up",
+    trigger: r.trigger ?? "tap",
+    hint: r.hint ?? undefined,
+    interactionId: r.interactionId || makeId("reveal"),
+    duration: r.duration ?? 900,
   };
 }
 
@@ -1020,13 +1009,16 @@ function normalizeAnimation(
   animation: unknown,
 ): ElementAnimation {
   if (!animation || typeof animation !== "object") {
-    return { preset: "fade", duration: 1500, delay: 0 };
+    return defaultAnimation("fade", 0);
   }
   const a = animation as Partial<ElementAnimation>;
   return {
     preset: a.preset ?? "fade",
     duration: a.duration ?? 1500,
     delay: a.delay ?? 0,
+    enabled: a.enabled ?? true,
+    trigger: a.trigger === "scroll" ? "scroll" : "load",
+    easing: a.easing ?? "easeOut",
     interactionId: a.interactionId ?? undefined,
   };
 }
@@ -1055,16 +1047,30 @@ export interface ClosingSettings {
   duration: number;
 }
 
+/** The closing styles the studio's picker offers. */
+export const CLOSING_STYLES: {
+  id: ClosingSettings["style"];
+  label: string;
+}[] = [
+  { id: "message", label: "Message" },
+  { id: "fade", label: "Fade out" },
+  { id: "image", label: "Picture" },
+  { id: "signature", label: "Signature" },
+  { id: "seal", label: "Wax seal" },
+  { id: "curtain", label: "Curtain" },
+];
+
 /* -------------------------------------------------------------------------- */
 /* Transition                                                               */
 /* -------------------------------------------------------------------------- */
 
 export interface PageTransition {
-  preset: "fade" | "dissolve" | "slide" | "curtain" | "flip";
+  preset: "none" | "fade" | "dissolve" | "slide" | "curtain" | "flip";
   duration: number;
 }
 
 export const PAGE_TRANSITIONS: { id: PageTransition["preset"]; label: string; note: string }[] = [
+  { id: "none", label: "None", note: "The next page simply takes the frame" },
   { id: "fade", label: "Fade", note: "The card just appears" },
   { id: "dissolve", label: "Dissolve", note: "A wash drops between the two pages" },
   { id: "slide", label: "Slide", note: "The card slides to reveal the next" },
@@ -1072,21 +1078,14 @@ export const PAGE_TRANSITIONS: { id: PageTransition["preset"]; label: string; no
   { id: "flip", label: "Flip", note: "The card turns over" },
 ];
 
-export const TRANSITIONS: { id: PageTransition["preset"]; label: string; note: string }[] = [
-  { id: "fade", label: "Fade", note: "The card just appears" },
-  { id: "dissolve", label: "Dissolve", note: "A wash drops between the two pages" },
-  { id: "slide", label: "Slide", note: "The card slides to reveal the next" },
-  { id: "curtain", label: "Curtain", note: "The card folds back" },
-  { id: "flip", label: "Flip", note: "The card turns over" },
-];
+export const TRANSITIONS: { id: PageTransition["preset"]; label: string; note: string }[] = PAGE_TRANSITIONS;
 
-/** The transition applied to the published invitation, keyed by the style. */
+/** The style of the incoming page at `progress` (0…1) of the transition. */
 export function pageTransitionStyle(
   current: PageTransition,
-  next: PageTransition,
-): PageTransition {
-  if (current.preset === next.preset && current.duration === next.duration) return current;
-  return next;
+  progress: number,
+): CSSProperties {
+  return pageTransitionFrames(current, progress).incoming;
 }
 
 /** The time the guest's continue is held, in ms, from the last page. */
@@ -1098,29 +1097,47 @@ export function timelineDuration(page: DesignPage): number {
   return Math.max(900, end);
 }
 
-/** The choreography frames for a page transition, for the guest timeline. */
+/** The incoming and outgoing page styles at `progress` (0…1) of a page
+ * transition. Both pages stay on screen throughout, so a change never blanks
+ * the frame, and the outgoing page stops taking pointers the moment the
+ * incoming one starts to arrive. */
 export function pageTransitionFrames(
   current: PageTransition,
-  next: PageTransition,
+  progress: number,
   options?: { rtl: boolean },
-): { from: string; to: string; dur: number }[] {
-  const from = current.preset;
-  const to = next.preset;
-  const dur = Math.max(current.duration, next.duration);
-  switch (from) {
-    case "fade":
-      return [{ from: "none", to: "opacity-30", dur }];
-    case "dissolve":
-      return [{ from: "opacity-100", to: "opacity-0", dur }];
+): { incoming: CSSProperties; outgoing: CSSProperties } {
+  const p = Math.min(1, Math.max(0, progress));
+  const rtl = options?.rtl ?? false;
+  const incoming: CSSProperties = { opacity: p };
+  const outgoing: CSSProperties = { opacity: 1 - p, pointerEvents: "none" };
+
+  switch (current.preset) {
     case "slide":
-      return [{ from: "translate-x-0", to: options?.rtl ? "translate-x-full" : "translate-x-negative-full", dur }];
-    case "curtain":
-      return [{ from: "scale-x-100", to: options?.rtl ? "scale-x-0" : "scale-x-0", dur }];
+      incoming.transform = `translateX(${(rtl ? -1 : 1) * (1 - p) * 100}%)`;
+      outgoing.transform = `translateX(${(rtl ? 1 : -1) * (1 - p) * 100}%)`;
+      break;
     case "flip":
-      return [{ from: "rotate-y-0", to: "rotate-y-180", dur }];
+      incoming.transformOrigin = rtl ? "right center" : "left center";
+      outgoing.transformOrigin = rtl ? "right center" : "left center";
+      incoming.transform = `perspective(1400px) rotateY(${(rtl ? 1 : -1) * (1 - p) * 90}deg)`;
+      outgoing.transform = `perspective(1400px) rotateY(${(rtl ? -1 : 1) * p * 90}deg)`;
+      break;
+    case "curtain":
+      incoming.clipPath = rtl
+        ? `inset(0 0 0 ${(1 - p) * 100}%)`
+        : `inset(0 ${(1 - p) * 100}% 0 0)`;
+      outgoing.clipPath = rtl
+        ? `inset(0 ${(1 - p) * 100}% 0 0)`
+        : `inset(0 0 0 ${(1 - p) * 100}%)`;
+      break;
+    case "none":
+      incoming.opacity = p;
+      break;
     default:
-      return [{ from: "none", to: "opacity-0", dur }];
+      break;
   }
+
+  return { incoming, outgoing };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1130,7 +1147,14 @@ export function pageTransitionFrames(
 export type DesignOutput = "digital" | "printed" | "both";
 
 /** The format the invitation lands in, used by the print pipeline. */
-export type DesignFormat = "pdf" | "png" | "psd" | "svg";
+export interface DesignFormat {
+  output: DesignOutput | "print";
+  unit: DesignUnit;
+  width: number;
+  height: number;
+  margin: number;
+  bleed: number;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Style presets                                                              */
@@ -1153,10 +1177,16 @@ export interface StylePreset {
 /* -------------------------------------------------------------------------- */
 
 export interface EnvelopeSettings {
-  enabled: boolean;
-  geometry: EnvelopeGeometry;
-  liner: LinerGeometry;
-  format: DesignFormat;
+  enabled?: boolean;
+  /** Envelope width, in millimetres. */
+  width?: number;
+  /** Envelope height, in millimetres. */
+  height?: number;
+  /** Flap depth as a fraction of the envelope height. */
+  flapDepth?: number;
+  geometry?: EnvelopeGeometry;
+  liner?: LinerGeometry;
+  format?: DesignFormat;
 }
 
 export interface EnvelopeGeometry {
@@ -1171,11 +1201,19 @@ export interface LinerGeometry {
   heightMm: number;
 }
 
-/** The current draft of the envelope. */
+/** One layer's window on the timeline. */
 export interface TimelineClip {
   elementId: string;
-  start?: number;
-  duration?: number;
+  /** The layer name shown on the clip. */
+  label: string;
+  /** When the clip starts, in ms from the page's start. */
+  start: number;
+  /** How long the clip runs, in ms. */
+  duration: number;
+  preset: AnimationPresetId;
+  /** When the exit animation starts, in ms; absent when there is none. */
+  exitStart?: number;
+  exitDuration?: number;
 }
 
 export interface EnvelopSettings {
@@ -1192,6 +1230,24 @@ export interface EnvelopSettings {
 /** A fresh id derived from a kind, so the studio never guesses. */
 export function makeId(kind: string): string {
   return `${kind}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** A detached copy of a layer: editing the copy never reaches the original. */
+export function cloneElement(
+  element: DesignElement,
+  overrides?: Partial<DesignElement>,
+): DesignElement {
+  return {
+    ...element,
+    animation: { ...element.animation },
+    exit: element.exit ? { ...element.exit } : undefined,
+    reveal: element.reveal ? { ...element.reveal } : undefined,
+    effects: element.effects ? { ...element.effects } : undefined,
+    material: element.material ? { ...element.material } : undefined,
+    imageAdjust: element.imageAdjust ? { ...element.imageAdjust } : undefined,
+    imagePosition: element.imagePosition ? { ...element.imagePosition } : undefined,
+    ...overrides,
+  };
 }
 
 /** A fresh element, built from a kind with the studio's defaults. */
@@ -1211,31 +1267,47 @@ export function makeElement(kind: string, overrides?: Partial<DesignElement>): D
 
 /** The default animation for a kind. */
 export function defaultAnimation(preset: ElementAnimation["preset"], delay: number): ElementAnimation {
-  return { preset, duration: 1500, delay };
+  return {
+    preset,
+    duration: 1500,
+    delay,
+    enabled: true,
+    trigger: "load",
+    easing: "easeOut",
+  };
 }
 
-/** Duplicate elements, appending copies of the selected ids. */
+/** Duplicate the selected elements, keeping the originals in place and
+ * appending each copy on top with its own nested settings. */
 export function duplicateElements(
   elements: DesignElement[],
   ids: string[],
 ): DesignElement[] {
-  const copy = elements.find((element) => element.id === ids[0]);
-  if (!copy) return elements;
-  const created = elements.map((element) => ({
-    ...element,
-    id: makeId("copy"),
-    name: `${element.name} copy`,
-  }));
-  return created;
+  const selected = new Set(ids);
+  const copies = elements
+    .filter((element) => selected.has(element.id))
+    .map((element) => ({
+      ...cloneElement(element),
+      id: makeId("copy"),
+      name: `${element.name} copy`,
+    }));
+  return copies.length > 0 ? [...elements, ...copies] : elements;
 }
 
 /** Place an element on a page, centred. */
-export function placeOnPage(page: DesignPage, element: DesignElement): DesignPage {
-  const cx = (page.width ?? DESIGN_WIDTH) / 2;
-  const cy = (page.height ?? DESIGN_HEIGHT) / 2;
-  const left = cx - (element.w ?? 100) / 2;
-  const top = cy - (element.h ?? 100) / 2;
-  return { ...page, elements: [...page.elements, { ...element, x: left, y: top }] };
+/** Place an element's box on the page: scaled from the classic card it was
+ * authored on, then clamped fully inside the trim. */
+export function placeOnPage<
+  T extends { x: number; y: number; w: number; h: number },
+>(page: Pick<DesignPage, "width" | "height"> | null | undefined, box: T): T {
+  const pageWidth = page?.width ?? DESIGN_WIDTH;
+  const pageHeight = page?.height ?? DESIGN_HEIGHT;
+  const scale = pageFitScale(page);
+  const w = box.w * scale;
+  const h = box.h * scale;
+  const x = Math.min(Math.max(box.x * scale, 0), Math.max(0, pageWidth - w));
+  const y = Math.min(Math.max(box.y * scale, 0), Math.max(0, pageHeight - h));
+  return { ...box, x, y, w, h };
 }
 
 /** The label a layer's kind renders in the inspector. */
@@ -1243,23 +1315,44 @@ export function elementTypeLabel(element: DesignElement): string {
   return element.kind === "text" ? "Text" : element.kind === "image" ? "Image" : element.kind;
 }
 
-export function clipsForPage(page: DesignPage): string[] {
-  return [];
+export function clipsForPage(page: DesignPage): TimelineClip[] {
+  return page.elements
+    .filter((element) => element.animation?.enabled)
+    .map((element) => ({
+      elementId: element.id,
+      label: element.name,
+      start: element.animation.delay,
+      duration: element.animation.duration,
+      preset: element.animation.preset,
+      exitStart: element.exit?.enabled ? element.exit.start : undefined,
+      exitDuration: element.exit?.enabled ? element.exit.duration : undefined,
+    }));
 }
 
+/** Swap a design's colours for a style's palette, keeping the old inks so the
+ * swap can be undone. */
 export function applyStylePreset(
   design: DesignDocument,
   style: StylePreset,
-  previous: string,
+  previous: { background: string; ink: string; accent: string },
 ): DesignDocument {
   return design;
 }
 
-/** True when the element is inside the safe area of the page. */
+/** True when the value is a document with at least one real page. */
 export function isDesignDocument(value: unknown): value is DesignDocument {
   if (!value || typeof value !== "object") return false;
-  const doc = value as Partial<DesignDocument>;
-  return Array.isArray(doc.pages) && doc.pages.length > 0;
+  const pages = (value as Partial<DesignDocument>).pages;
+  return (
+    Array.isArray(pages) &&
+    pages.length > 0 &&
+    pages.every(
+      (page) =>
+        !!page &&
+        typeof page === "object" &&
+        Array.isArray((page as DesignPage).elements),
+    )
+  );
 }
 
 /** The ids of elements the page draws over the invitation. */
@@ -1268,31 +1361,41 @@ export function coveredElementIds(page: DesignPage): string[] {
 }
 
 /** The inline style at a moment of a layer animation. */
+/** The layer's inline style at `time`: the flips it is saved with, plus the
+ * exit fade's transition when it has one. Animations drive the reveal; the
+ * resting style must never hide a layer. */
 export function elementStyleAt(
   element: DesignElement,
-  time: number,
-  options?: { ignoreExit: boolean },
+  _time: number,
+  options?: { ignoreExit?: boolean },
 ): { style: { transform?: string; opacity?: number; filter?: string }; transition?: string } {
-  const animation = element.animation;
   const transition =
-    element.exit?.duration != null
-      ? `transition: opacity ${element.exit.duration}ms linear ${element.exit.delay}ms;`
+    !options?.ignoreExit && element.exit?.duration != null
+      ? `transition: opacity ${element.exit.duration}ms linear ${element.exit.delay ?? 0}ms;`
       : undefined;
-  return { style: {}, transition };
+  const flips: string[] = [];
+  if (element.flipX) flips.push("scaleX(-1)");
+  if (element.flipY) flips.push("scaleY(-1)");
+  return {
+    style: flips.length > 0 ? { transform: flips.join(" ") } : {},
+    transition,
+  };
 }
 
-/** Clean the reveal maps a cover points at. */
+/** Drop the reveal maps whose target has gone with it. */
 export function cleanRevealLinks(elements: DesignElement[]): DesignElement[] {
   const targets = new Set(elements.map((element) => element.id));
   return elements.map((element) =>
-    element.reveal ? { ...element, targetId: targets.has(element.reveal.targetId) ? element.reveal.targetId : "" } : element,
+    element.reveal && !targets.has(element.reveal.targetId)
+      ? { ...element, reveal: undefined }
+      : element,
   );
 }
 
 /** The design fonts a template was built with, as the studio persists them. */
-export const TEMPLATE_DESIGN_FONTS: Record<string, string[]> = {
-  "published": ["Cormorant Garamond", "Bodoni Moda", "Cinzel"],
-  "custom": ["Inter", "Manrope"],
+export const TEMPLATE_DESIGN_FONTS: Record<string, string> = {
+  "published": "cormorant-garamond",
+  "custom": "inter",
 };
 
 /* -------------------------------------------------------------------------- */
@@ -1300,29 +1403,60 @@ export const TEMPLATE_DESIGN_FONTS: Record<string, string[]> = {
 /* -------------------------------------------------------------------------- */
 
 /** A brand‑new design, on the classic studio card. */
-export function createBlankDesign(overrides: Partial<DesignDocument> = {}): DesignDocument {
+/** What the host asked the blank canvas to be. Pages may be given as a
+ * count (one blank page per slot) or as fully built pages. */
+export interface BlankDesignOptions {
+  width?: number;
+  height?: number;
+  background?: string;
+  pages?: number | DesignPage[];
+  texture?: PageTextureId;
+  margin?: number;
+  bleed?: number;
+  output?: DesignOutput;
+  unit?: DesignUnit;
+  physicalWidth?: number;
+  physicalHeight?: number;
+  opening?: Partial<OpeningSettings>;
+  closing?: ClosingSettings;
+  transition?: PageTransition;
+}
+
+export function createBlankDesign(options: BlankDesignOptions = {}): DesignDocument {
+  const width = options.width ?? DESIGN_WIDTH;
+  const height = options.height ?? DESIGN_HEIGHT;
+  const blankPage = (index: number): DesignPage => ({
+    id: makeId("page"),
+    name: index === 0 ? "Untitled" : `Page ${index + 1}`,
+    background: options.background ?? "#fbfaf7",
+    elements: [],
+    hidden: false,
+    width,
+    height,
+    margin: options.margin ?? 0,
+    bleed: options.bleed ?? 0,
+    texture: options.texture ?? "none",
+    edge: "straight",
+  });
+  const pages = Array.isArray(options.pages)
+    ? options.pages
+    : Array.from({ length: Math.max(1, options.pages ?? 1) }, (_, index) =>
+        blankPage(index),
+      );
   return {
     version: 1,
-    pages: [
-      {
-        id: makeId("page"),
-        name: "Untitled",
-        background: "#fbfaf7",
-        elements: [],
-        hidden: false,
-        width: DESIGN_WIDTH,
-        height: DESIGN_HEIGHT,
-        margin: 0,
-        bleed: 0,
-        texture: "none",
-        edge: "straight",
-        material: "none",
-      },
-    ],
-    opening: { experience: "none", autoOpen: false, welcome: "" },
-    closing: { enabled: false, style: "message", message: "", duration: 800 },
-    transition: { preset: "fade", duration: 700 },
-    ...overrides,
+    pages,
+    opening: { experience: "none", autoOpen: false, welcome: "", ...options.opening },
+    closing: options.closing ?? {
+      enabled: false,
+      style: "message",
+      message: "",
+      duration: 800,
+    },
+    transition: options.transition ?? { preset: "fade", duration: 700 },
+    output: options.output,
+    physicalWidth: options.physicalWidth,
+    physicalHeight: options.physicalHeight,
   };
 }
 
@@ -1417,7 +1551,6 @@ export function createDefaultDesign(
         bleed: 0,
         texture: "none",
         edge: "straight",
-        material: "none",
       },
     ],
     opening: { experience: "none", autoOpen: false, welcome: "" },

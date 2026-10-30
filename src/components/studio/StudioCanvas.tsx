@@ -727,7 +727,7 @@ export function StudioCanvas({
           event.clientX - current.centerX,
         );
         const delta = ((angle - current.startAngle) * 180) / Math.PI;
-        let rotation = current.anchor.rotation + delta;
+        let rotation = (current.anchor.rotation ?? 0) + delta;
         // Shift snaps to a clean fifteen degrees; free rotation stays precise.
         rotation = event.shiftKey ? Math.round(rotation / 15) * 15 : Math.round(rotation);
         rotation = ((rotation % 360) + 360) % 360;
@@ -739,7 +739,7 @@ export function StudioCanvas({
       const original = current.originals.get(current.anchor.id) ?? current.anchor;
       // Work in the element's own axes so a rotated layer resizes along its
       // edges instead of the screen axes.
-      const theta = (original.rotation * Math.PI) / 180;
+      const theta = ((original.rotation ?? 0) * Math.PI) / 180;
       const cos = Math.cos(theta);
       const sin = Math.sin(theta);
       const localDx = dx * cos + dy * sin;
@@ -776,7 +776,7 @@ export function StudioCanvas({
 
       // Keep the opposite corner or edge pinned in screen space even when the
       // layer is rotated: the box grows around the handle the host grabbed.
-      if (Math.abs(original.rotation) > 0.01) {
+      if (Math.abs(original.rotation ?? 0) > 0.01) {
         const centerX0 = original.x + original.w / 2;
         const centerY0 = original.y + original.h / 2;
         const anchorX = handle.includes("e")
@@ -821,7 +821,7 @@ export function StudioCanvas({
          on the page, its centre line, or a neighbouring layer. Rotated layers
          and proportional resizes stay free, because snapping either would
          fight the ratio or the layer's own axes. */
-      if (!proportional && Math.abs(original.rotation) < 0.01 && enableSnap) {
+      if (!proportional && Math.abs(original.rotation ?? 0) < 0.01 && enableSnap) {
         const others = page.elements.filter(
           (candidate) =>
             candidate.id !== original.id && !candidate.hidden && !candidate.locked,
@@ -1486,7 +1486,7 @@ export function StudioCanvas({
                   {isSelected && !element.locked && !editing && (
                     <span
                       className="absolute left-0 top-0 -translate-y-full bg-[#710014] px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em] text-[#f2f1ed]"
-                      style={{ transform: `translateY(-100%) rotate(${-element.rotation}deg)` }}
+                      style={{ transform: `translateY(-100%) rotate(${-(element.rotation ?? 0)}deg)` }}
                     >
                       {element.name}
                     </span>
@@ -1497,7 +1497,7 @@ export function StudioCanvas({
                     <span
                       aria-hidden
                       className="pointer-events-none absolute right-0 top-0 whitespace-nowrap rounded-bl-[3px] bg-[#b45309] px-1.5 py-0.5 font-ui text-[9px] font-semibold uppercase tracking-[0.1em] text-[#fff7ed]"
-                      style={{ transform: `translate(100%, -100%) rotate(${-element.rotation}deg)` }}
+                      style={{ transform: `translate(100%, -100%) rotate(${-(element.rotation ?? 0)}deg)` }}
                       title="This text is clipped by its box — open Typography for fixes"
                     >
                       Clipped

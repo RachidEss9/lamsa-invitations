@@ -1,8 +1,10 @@
+import type { SceneLayer } from "@/lib/presentation";
+
 /** Base shape fed to the scene choreographer. `slot` is the 800×1100 invitation
  * rectangle on a 2400×1400 stage; everything outside the slot is the frame the
  * host chose for that scene. */
 export type SceneSlot = {
-  slot: { w: number; h: number };
+  slot: { x: number; y: number; w: number; h: number };
   box: { x: number; y: number; w: number; h: number };
   stage: { w: number; h: number };
 };

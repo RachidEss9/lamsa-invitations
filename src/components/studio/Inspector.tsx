@@ -432,10 +432,10 @@ function InspectorBody({
               }}
             />
           </Row>
-          <Row label="Angle"><NumberField value={element.rotation} onChange={(rotation) => patch({ rotation })} /></Row>
+          <Row label="Angle"><NumberField value={element.rotation ?? 0} onChange={(rotation) => patch({ rotation })} /></Row>
           <Row label="Opacity">
             <NumberField
-              value={Math.round(element.opacity * 100)}
+              value={Math.round((element.opacity ?? 1) * 100)}
               onChange={(value) => patch({ opacity: Math.min(1, Math.max(0, value / 100)) })}
               min={0}
               max={100}
@@ -969,7 +969,7 @@ function InspectorBody({
                 </Select>
               </Row>
               <Row label="Length ms">
-                <NumberField value={reveal.duration} onChange={(duration) => patch({ reveal: { ...reveal, duration } })} min={200} step={50} />
+                <NumberField value={reveal.duration ?? 800} onChange={(duration) => patch({ reveal: { ...reveal, duration } })} min={200} step={50} />
               </Row>
             </div>
             <Row label="Hint">
@@ -980,7 +980,7 @@ function InspectorBody({
                 className="h-8 rounded-none text-[11px]"
               />
             </Row>
-            <Button type="button" variant="outline" className="h-8 w-full rounded-none text-[10px]" onClick={() => onTestReveal(reveal.interactionId)}>
+            <Button type="button" variant="outline" className="h-8 w-full rounded-none text-[10px]" onClick={() => onTestReveal(reveal.interactionId ?? "")}>
               <ChevronDown className="size-3.5" /> Test interaction
             </Button>
             <p className="text-[10px] leading-relaxed text-ink/45">

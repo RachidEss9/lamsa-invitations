@@ -130,8 +130,8 @@ export function envelopePresetFor(
   if (!settings) return undefined;
   return ENVELOPE_PRESETS.find(
     (preset) =>
-      Math.abs(preset.width - settings.width) < 0.5 &&
-      Math.abs(preset.height - settings.height) < 0.5,
+      Math.abs(preset.width - (settings.width ?? 0)) < 0.5 &&
+      Math.abs(preset.height - (settings.height ?? 0)) < 0.5,
   );
 }
 

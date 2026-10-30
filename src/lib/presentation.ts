@@ -37,29 +37,13 @@ export function sceneFromExperience(experience: OpeningExperienceId): SceneId {
 /* Manifest access                                                            */
 type ManifestLayer = (typeof manifest.scenes)[keyof typeof manifest.scenes][number];
 
-export interface SceneLayer extends ManifestLayer {
+export type SceneLayer = ManifestLayer & {
   /** Absolute path under public/. */
   src: string;
   srcSet?: string;
   /** Prepared markup for the gold layers, drawn as inline SVG strokes. */
   svg?: string;
-  /** The layer's name. */
-  name: string;
-  /** The layer's x position in stage pixels. */
-  x?: number;
-  /** The layer's y position in stage pixels. */
-  y?: number;
-  /** The layer's width in stage pixels. */
-  w?: number;
-  /** The layer's height in stage pixels. */
-  h?: number;
-  /** The layer's z-order in the manifest stack. */
-  z?: number;
-  /** The blend mode for the layer. */
-  blend?: string;
-  /** The layer's role in the scene (background, light bloom, etc.). */
-  role?: string;
-}
+};
 
 const manifestKeyFor = (scene: SceneId) => SCENE_MANIFEST_KEYS[scene];
 

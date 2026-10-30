@@ -63,7 +63,7 @@ export function ClosingStage({
   }, [closing.duration, reducedMotion]);
 
   const p = easeOut(progress);
-  const note = personalize(closing.message, guestName).replace(
+  const note = personalize(closing.message, guestName ?? "").replace(
     /\{\{\s*names\s*\}\}/gi,
     names ?? ""
   );
