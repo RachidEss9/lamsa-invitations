@@ -110,7 +110,7 @@ function writeSavedPresets(presets: SavedPreset[]) {
 
 const OUTPUTS: { id: DesignOutput; label: string; note: string }[] = [
   { id: "digital", label: "Digital", note: "For screens, links and messaging" },
-  { id: "print", label: "Print", note: "Prepared for a printer, with bleed" },
+  { id: "printed", label: "Print", note: "Prepared for a printer, with bleed" },
   { id: "both", label: "Both", note: "One design, screen and paper" },
 ];
 
@@ -975,7 +975,7 @@ function ScratchSetup({
           )}
         </div>
 
-        {(output === "print" || output === "both") && (
+        {(output === "printed" || output === "both") && (
           <div className="grid grid-cols-2 gap-3">
             <Field label={`Safe margin (${unit})`}>
               <Input

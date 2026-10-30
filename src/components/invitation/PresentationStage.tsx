@@ -239,7 +239,7 @@ export function PresentationStage({
     after(HANDOFF_MS, finish);
   };
 
-  const welcome = personalize(opening.welcome, guestName).trim();
+  const welcome = personalize(opening.welcome, guestName ?? "").trim();
   const showPicker = state === "closed" && controlsOn && !leaving;
   const showRevealed = state === "revealed" && controlsOn && !leaving;
 

@@ -65,7 +65,7 @@ export function ClosingStage({
   const p = easeOut(progress);
   const note = personalize(closing.message, guestName).replace(
     /\{\{\s*names\s*\}\}/gi,
-    names || "",
+    names ?? ""
   );
   const noteOpacity = clamp((p - 0.3) / 0.7);
 

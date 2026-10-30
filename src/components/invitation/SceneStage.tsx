@@ -1,5 +1,15 @@
 import { cn } from "@/lib/utils";
-import type { SceneLayer } from "@/lib/presentation";
+import {
+  SCENES,
+  SCENE_IDS,
+  SceneId,
+  SceneState,
+  SceneLayer,
+  SLOT,
+  STAGE,
+  sceneLayers,
+  layerStyle,
+} from "@/lib/presentation";
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import "@/scenes/tokens.css";
 import "@/scenes/scenes.css";

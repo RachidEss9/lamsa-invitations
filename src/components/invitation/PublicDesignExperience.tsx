@@ -203,7 +203,7 @@ export function PublicDesignExperience({
         >
           <div
             className="absolute inset-0"
-            style={pageTransitionStyle(design.transition, transition)}
+            style={pageTransitionStyle(design.transition, { preset: "fade", duration: 600 })}
           >
             <DesignPageView
               key={page.id}

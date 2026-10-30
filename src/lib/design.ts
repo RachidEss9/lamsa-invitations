@@ -193,6 +193,8 @@ export interface RevealConfig {
   hint?: string;
   /** The interaction id that triggered the reveal (tap, hover, click). */
   interactionId?: string;
+  /** The duration of the reveal animation in milliseconds. */
+  duration?: number;
 }
 
 export type ElementKind =
@@ -242,23 +244,53 @@ export interface DesignElement {
   fill?: string;
   opacity?: number;
   fontSize?: number;
+  /** The radius of the element in pixels. */
+  radius?: number;
+  stroke?: string;
+  strokeWidth?: number;
   font?: string;
   fontStyle?: "normal" | "italic" | "oblique";
   lineHeight?: number;
   align?: "left" | "center" | "right" | "justify";
+  fontWeight?: number;
+  italic?: boolean;
+  textTransform?: TextTransform;
   text?: string;
-  textAlign?: "left" | "center" | "right";
+  textAlign?: "left" | "center" | "right" | "justify";
   letterSpacing?: number;
   textBorder?: string;
+  textBorderWidth?: number;
+  textPadding?: number;
+  textBackground?: string;
+  textRadius?: number;
+  textShadow?: string;
   textBorderWidth?: number;
   textPadding?: number;
   shape?: ShapeKind;
   /** Direction the text reads. */
   direction?: TextDirection | "auto";
-  /** Horizontal position of an image, as a percent of the layer box. */
-  imagePosition?: { x: number; y: number };
+  /** The curve a path follows, in degrees. */
+  curve?: number;
+  /** Vertical align. */
+  verticalAlign?: "top" | "middle" | "bottom";
+  /** Uppercase the text. */
+  uppercase?: boolean;
+  /** The story of the element (captured from the CMS for the guest journey). */
+  story?: string;
+  /** The stored id of the cover picture the element holds. */
+  has?: string;
   /** The motif the motif element draws. */
   motif?: string;
+  /** The border of an image element. */
+  imageBorder?: string;
+  /** The width of the image border. */
+  imageBorderWidth?: number;
+  /** The shadow of an image element. */
+  imageShadow?: string;
+  /** The radius of an image element. */
+  imageRadius?: number;
+  /** How far into the frame the picture sits, as a fraction of the layer. */
+  imageZoom?: number;
   /** The curve a path follows, in degrees, when the shape is `path`. */
   curve?: number;
   /** Vertical align. */
@@ -305,6 +337,8 @@ export interface DesignElement {
   verticalAlign?: "top" | "middle" | "bottom";
   /** Uppercase the text. */
   uppercase?: boolean;
+  /** The text case transform: `textTransform` (CSS value) and/or `uppercase` flag. */
+  textTransform?: TextCaseTransform;
   /** The text curve, when the shape is `path`. */
   textCurve?: boolean;
   /** The background of the text, when the kind is `text`. */
@@ -350,6 +384,19 @@ export interface DesignElement {
   rotation?: number;
   /** The name of the layer as shown in the inspector. */
   name?: string;
+}
+
+export interface DesignDocument {
+  version: number;
+  pages: DesignPage[];
+  opening: OpeningSettings;
+  closing: ClosingSettings;
+  transition: PageTransition;
+  startedAt?: number;
+  suite?: DesignSuite;
+  output?: DesignOutput;
+  physicalWidth?: number;
+  physicalHeight?: number;
 }
 
 export interface DesignPage {
@@ -518,8 +565,13 @@ export function visiblePages(design: DesignDocument): DesignPage[] {
 /* -------------------------------------------------------------------------- */
 
 export type ImageFit = "cover" | "contain";
-export type TextAlign = "left" | "center" | "right";
+export type TextAlign = "left" | "center" | "right" | "justify";
+export interface TextCaseTransform {
+  uppercase?: boolean;
+  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+}
 export type TextDirection = "ltr" | "rtl";
+export interface ImageData { id: string; width: number; height: number; }
 export type DesignUnit = "mm" | "cm" | "px" | "in";
 
 export const DESIGN_UNITS: { id: DesignUnit; label: string; note: string }[] = [
@@ -995,7 +1047,7 @@ function normalizeTransition(
 
 export interface ClosingSettings {
   enabled: boolean;
-  style: "message" | "image" | "signature";
+  style: "fade" | "message" | "image" | "signature" | "seal" | "curtain";
   message: string;
   duration: number;
 }
@@ -1157,15 +1209,15 @@ export function defaultAnimation(preset: ElementAnimation["preset"], delay: numb
 export function duplicateElements(
   elements: DesignElement[],
   ids: string[],
-): [DesignElement[], DesignElement?] {
+): DesignElement[] {
   const copy = elements.find((element) => element.id === ids[0]);
-  if (!copy) return [elements, undefined];
+  if (!copy) return elements;
   const created = elements.map((element) => ({
     ...element,
     id: makeId("copy"),
     name: `${element.name} copy`,
   }));
-  return [created, copy];
+  return created;
 }
 
 /** Place an element on a page, centred. */
@@ -1180,6 +1232,18 @@ export function placeOnPage(page: DesignPage, element: DesignElement): DesignPag
 /** The label a layer's kind renders in the inspector. */
 export function elementTypeLabel(element: DesignElement): string {
   return element.kind === "text" ? "Text" : element.kind === "image" ? "Image" : element.kind;
+}
+
+export function clipsForPage(page: DesignPage): string[] {
+  return [];
+}
+
+export function applyStylePreset(
+  design: DesignDocument,
+  style: StylePreset,
+  previous: string,
+): DesignDocument {
+  return design;
 }
 
 /** True when the element is inside the safe area of the page. */
@@ -1199,12 +1263,13 @@ export function elementStyleAt(
   element: DesignElement,
   time: number,
   options?: { ignoreExit: boolean },
-): { style: string; transition: string | undefined } {
+): { style: { transform?: string; opacity?: number; filter?: string }; transition?: string } {
   const animation = element.animation;
-  const transition = element.exit?.duration != null
-    ? `transition: opacity ${element.exit.duration}ms linear ${element.exit.delay}ms;`
-    : undefined;
-  return { style: "", transition };
+  const transition =
+    element.exit?.duration != null
+      ? `transition: opacity ${element.exit.duration}ms linear ${element.exit.delay}ms;`
+      : undefined;
+  return { style: {}, transition };
 }
 
 /** Clean the reveal maps a cover points at. */
