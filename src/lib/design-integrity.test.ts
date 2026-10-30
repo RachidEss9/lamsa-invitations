@@ -131,21 +131,23 @@ describe("saved-design integrity", () => {
     expect(reloaded.closing.style).toBe("seal");
     expect(reloaded.transition.preset).toBe("flip");
     expect(reloaded.opening.welcome).toBe("For {{guest}}, with love");
-    expect(reloaded.opening.experience).toBe("cinematic");
+    // The three approved scenes are the only presentations the studio keeps;
+    // a saved value is preserved verbatim, and anything else falls back to the
+    // first scene, which is the renderer a legacy opening lands on.
+    expect(reloaded.opening.experience).toBe("secret-world");
   });
 
   it("maps an opening saved under a retired scene onto a style that renders", () => {
     // Invitations saved before the three-style engine keep opening on a
     // renderer that exists instead of falling back to nothing.
     const retired: Record<string, string> = {
-      envelope: "cinematic",
-      curtain: "silk",
-      typography: "monogram",
-      "wax-seal": "cinematic",
-      personal: "monogram",
-      paper: "silk",
-      unknownScene: "none",
-    };
+      envelope: "secret-world",
+      curtain: "living-art",
+      typography: "impossible",
+      "wax-seal": "secret-world",
+      personal: "impossible",
+      paper: "living-art",
+      unknownScene: "secret-world",
     for (const [legacy, expected] of Object.entries(retired)) {
       const saved = savedDesign();
       (saved.opening as { experience?: string }).experience = legacy;

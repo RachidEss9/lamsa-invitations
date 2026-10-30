@@ -150,22 +150,21 @@ describe("guest journey interaction", () => {
       }),
     );
 
-    // The opening suite runs the real engine even though this saved design
-    // carries no guest-driven settings: the guest taps the start prompt.
-    const open = buttonByLabel(container, "Begin the reveal");
-    expect(open).toBeTruthy();
-    act(() => open?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    // The presentation owns a real three-scene engine, so the guest is
+    // handed the chosen scene's own opening cover, not a placeholder.
+    expect(container.querySelector("[data-testid=\"presentation-stage\"]"))
+      .toBeTruthy();
+    expect(container.querySelector("[data-scene]")?.getAttribute("data-scene"))
+      .toBe("secret-world");
+    expect(container.querySelector("[data-state]")?.getAttribute("data-state"))
+      .toBe("pre");
     expect(
-      container
-        .querySelector("[data-opening-engine]")
-        ?.getAttribute("data-stage"),
-    ).toBe("playing");
-    // One environment, one invitation — no duplicate card layer.
-    expect(container.querySelectorAll("[data-opening-card]")).toHaveLength(1);
-    expect(container.querySelectorAll("[data-opening-environment]")).toHaveLength(1);
-
-    // The invitation is inside the envelope before the guest opens it.
-    expect(container.querySelector("[data-opening-card]")).toBeTruthy();
+    expect(
+      container.querySelector("[data-testid=\"invitation\"]"),
+    ).toBeTruthy();
+    expect(
+      container.querySelectorAll("[data-testid=\"invitation\"]"),
+    ).toHaveLength(1);
 
     // The guest can always reach the invitation: the stage offers the hand-off.
     const skip = buttonByLabel(container, "Skip the opening animation");

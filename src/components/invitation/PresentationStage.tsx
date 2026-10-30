@@ -201,11 +201,9 @@ export function PresentationStage({
       finish();
       return;
     }
-    if (reducedMotion) {
-      setState("revealed");
-      setControlsOn(true);
-      return;
-    }
+    // A reduced-motion guest starts already revealed: the initial state
+    // above already lands there, and runSequence re-asserts it without
+    // scheduling entrance timers. Either way the entrance runs once per mount.
     runSequence(initialScene, { auto });
     return () => {
       clearTimers();

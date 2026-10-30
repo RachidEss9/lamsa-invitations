@@ -1326,13 +1326,44 @@ export function clipsForPage(page: DesignPage): TimelineClip[] {
 }
 
 /** Swap a design's colours for a style's palette, keeping the old inks so the
- * swap can be undone. */
+ * swap can be undone: colours that matched the design's own dominant roles
+ * before the change are remapped to the style's roles, and the page treatment
+ * moves with it. Only colour and the page background change, so copy, images,
+ * positions, shapes, and interactions are left exactly as they are. */
 export function applyStylePreset(
   design: DesignDocument,
   style: StylePreset,
   previous: { background: string; ink: string; accent: string },
 ): DesignDocument {
-  return design;
+  const map = (value: string | undefined) => {
+    if (!value) return value;
+    const normalized = value.toLowerCase();
+    if (normalized === previous.ink.toLowerCase()) {
+      return style.palette.ink;
+    }
+    if (normalized === previous.accent.toLowerCase()) {
+      return style.palette.accent;
+    }
+    return value;
+  };
+  return {
+    ...design,
+    pages: design.pages.map((page) => ({
+      ...page,
+      background:
+        style.background ??
+        style.palette.background ??
+        page.background,
+      elements: page.elements.map((element) => ({
+        ...element,
+        color: map(element.color),
+        fill: map(element.fill),
+        stroke: map(element.stroke),
+        textBackground: map(element.textBackground),
+        textBorder: map(element.textBorder),
+      })),
+    })),
+  };
 }
 
 /** True when the value is a document with at least one real page. */

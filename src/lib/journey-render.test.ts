@@ -80,14 +80,15 @@ describe("invitation journey rendering", () => {
         reducedMotion: false,
       }),
     );
-    // The opening stage renders its own tap affordance before any page, and
-    // the invitation card inside it is the saved first section itself.
-    expect(html).toContain("Begin the reveal");
-    expect(html).toContain("Amelia &amp; Søren");
-    expect(html).toContain("data-opening-card");
-    // Exactly one invitation and one environment — no duplicate reveal layer.
-    expect(html.split("data-opening-card").length - 1).toBe(1);
-    expect(html.split("data-opening-environment").length - 1).toBe(1);
+    // The opening dialog presents the saved first section: one stage,
+    // the saved scene, and the guest's opening prompt.
+    expect(html).toContain('data-testid="presentation-stage"');
+    expect(html).toContain('data-scene="secret-world"');
+    expect(html).toContain('data-state="pre"');
+    expect(html).toContain("Choose a scene and open the invitation.");
+    // The first section is owned by the stage, not duplicated as a card.
+    expect(html).not.toContain("data-opening-card");
+    expect(html.split("data-testid=\"presentation-stage\"").length - 1).toBe(1);
     expect(html).not.toContain("Close the invitation");
     expect(html).not.toContain("data-journey-cue");
   });
@@ -105,9 +106,10 @@ describe("invitation journey rendering", () => {
           reducedMotion: false,
         }),
       );
-      expect(html, experience.id).toContain("data-opening-card");
-      expect(html, experience.id).toContain("Amelia &amp; Søren");
+      expect(html, experience.id).toContain('data-testid="presentation-stage"');
+      expect(html, experience.id).toContain(`data-scene="${experience.id}"`);
       expect(html, experience.id).toContain('role="dialog"');
+      expect(html, experience.id).toContain("Choose a scene and open the invitation.");
     }
   });
 
