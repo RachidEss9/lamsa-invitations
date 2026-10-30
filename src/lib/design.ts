@@ -698,25 +698,6 @@ export function resizePage(
 }
 
 /**
- * The scale new layers should be created at, so default type on a 397 px A6
- * card is the same proportion as it is on the classic 1000 px canvas.
- */
-export function canvasScaleFor(page?: Pick<DesignPage, "width" | "height"> | null): number {
-  return pageSizeOf(page).width / DESIGN_WIDTH;
-}
-
-/**
- * The scale a layer authored on the classic 1000 × 1333 card needs to sit on
- * the current page. The smaller of the two axis ratios wins, so a box keeps
- * its proportions whatever shape the card is; on the classic card it is 1.
-  const { width, height } = pageSizeOf(page);
-  const scale = pageFitScale(page);
-  const w = Math.max(1, box.w * scale);
-  const h = Math.max(1, box.h * scale);
-  const clamp = (value: number, span: number) =>
-    Math.round(Math.min(Math.max(value, 0), Math.max(0, span)) * 100) / 100;
-  return {
-    ...box,
     x: clamp((box.x / DESIGN_WIDTH) * width, width - w),
     y: clamp((box.y / DESIGN_HEIGHT) * height, height - h),
     w: Math.round(w * 100) / 100,
