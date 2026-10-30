@@ -42,7 +42,7 @@ function design(): DesignDocument {
       },
     ],
     opening: {
-      experience: "cinematic",
+      experience: "secret-world" as const,
       duration: 3200,
       autoOpen: false,
       welcome: "For {{guest}}",

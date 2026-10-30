@@ -77,7 +77,7 @@ function savedDesign(): DesignDocument {
       },
     ],
     opening: {
-      experience: "cinematic",
+      experience: "secret-world" as const,
       duration: 1700,
       autoOpen: false,
       welcome: "For {{guest}}, with love",

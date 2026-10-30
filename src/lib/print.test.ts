@@ -32,7 +32,6 @@ function makeDesign(pages: DesignPage[]): DesignDocument {
     pages,
     opening: {
       experience: "none",
-      duration: 1200,
       autoOpen: false,
       welcome: "",
     },

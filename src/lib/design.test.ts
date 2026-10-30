@@ -65,9 +65,9 @@ const legacy = {
       ],
     },
   ],
-  opening: {},
-  closing: {},
-  transition: {},
+  opening: { experience: "none", autoOpen: false, welcome: "" },
+  closing: { enabled: false, style: "message", message: "" },
+  transition: { preset: "fade", duration: 700 },
 };
 
 describe("normalizeDesign save/reload consistency", () => {

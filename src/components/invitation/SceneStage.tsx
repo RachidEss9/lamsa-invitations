@@ -1,13 +1,5 @@
 import { cn } from "@/lib/utils";
-import {
-  SCENES,
-  SLOT,
-  STAGE,
-  layerStyle,
-  sceneLayers,
-  type SceneId,
-  type SceneState,
-} from "@/lib/presentation";
+import type { SceneLayer } from "@/lib/presentation";
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import "@/scenes/tokens.css";
 import "@/scenes/scenes.css";
@@ -89,7 +81,7 @@ export function SceneStage({
   const slotWidth = stage ? (SLOT.pctWidth / 100) * stage.width : 0;
   const slotHeight = stage ? (SLOT.pctHeight / 100) * stage.height : 0;
 
-  const renderLayer = (layer: (typeof layers)[number]) => {
+  const renderLayer = (layer: SceneLayer) => {
     const plan = meta.layers[layer.name];
     const style: CSSProperties = {
       // tokens.css positions every plate through these four variables.
@@ -161,7 +153,7 @@ export function SceneStage({
             height: stage.height,
           }}
         >
-          {before.map(renderLayer)}
+          {before.map((layer) => renderLayer(layer))}
           <div
             className="lamsa-slot"
             data-testid="invitation-slot"
@@ -175,7 +167,7 @@ export function SceneStage({
           >
             {children?.({ width: slotWidth, height: slotHeight })}
           </div>
-          {after.map(renderLayer)}
+          {after.map((layer) => renderLayer(layer))}
         </div>
       )}
     </div>

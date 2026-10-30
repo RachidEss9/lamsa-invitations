@@ -69,7 +69,7 @@ function design(): DesignDocument {
   return {
     version: 1,
     pages: [page("Cover", "Amelia and Soren"), page("Venue", "The Garden Hall")],
-    opening: { experience: "none", duration: 1200, autoOpen: false, welcome: "" },
+    opening: { experience: "none", autoOpen: false, welcome: "" },
     closing: { enabled: true, style: "message", message: "With love, always", duration: 1200 },
     transition: { preset: "fade", duration: 600 },
   };

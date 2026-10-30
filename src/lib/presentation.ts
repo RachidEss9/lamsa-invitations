@@ -33,16 +33,24 @@ export function isSceneId(value: unknown): value is SceneId {
 /** The design's saved experience, defaulting to the first scene. */
 export function sceneFromExperience(experience: OpeningExperienceId): SceneId {
   return isSceneId(experience) ? experience : "secret-world";
-}
-
-/* -------------------------------------------------------------------------- */
+}/* -------------------------------------------------------------------------- */
 /* Manifest access                                                            */
-/* -------------------------------------------------------------------------- */
-
-export const STAGE = manifest.stage;
-export const SLOT = manifest.invitationSlot;
-
 type ManifestLayer = (typeof manifest.scenes)[keyof typeof manifest.scenes][number];
+
+export interface SceneLayer extends ManifestLayer {
+  /** Absolute path under public/. */
+  src: string;
+  srcSet?: string;
+  /** Prepared markup for the gold layers, drawn as inline SVG strokes. */
+  svg?: string;
+}
+export interface SceneLayer extends ManifestLayer {
+  /** Absolute path under public/. */
+  src: string;
+  srcSet?: string;
+  /** Prepared markup for the gold layers, drawn as inline SVG strokes. */
+  svg?: string;
+}
 
 export interface SceneLayer extends ManifestLayer {
   /** Absolute path under public/. */
@@ -59,15 +67,15 @@ export function sceneLayers(scene: SceneId): SceneLayer[] {
   const raw = manifest.scenes[manifestKeyFor(scene) as keyof typeof manifest.scenes] as ManifestLayer[];
   return [...raw]
     .sort((a, b) => a.z - b.z)
-    .map((layer) => {
+    .map((layer): SceneLayer => {
       const base = `/scenes/${manifestKeyFor(scene)}`;
       const inline = goldSvg(scene, layer.name);
-      if (inline) return { ...layer, src: "", svg: inline };
+      if (inline) return { ...layer, src: "", svg: inline } as SceneLayer;
       return {
         ...layer,
         src: `${base}/${layer.file}`,
         srcSet: `${base}/${layer.file} 1x, ${base}/${layer.file2x} 2x`,
-      };
+      } as SceneLayer;
     });
 }
 

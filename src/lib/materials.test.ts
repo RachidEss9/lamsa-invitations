@@ -246,7 +246,6 @@ describe("document compatibility", () => {
     ],
     opening: {
       experience: "none",
-      duration: 2600,
       autoOpen: false,
       welcome: "",
     },
