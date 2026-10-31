@@ -40,6 +40,21 @@ import {
   type MaterialId,
 } from "@/lib/materials";
 import { MaterialSwatch } from "@/components/studio/MaterialsStudio";
+import { FinishSwatch } from "@/components/studio/FinishComposer";
+import { Slider } from "@/components/ui/slider";
+import {
+  FINISH_ANIMATIONS,
+  FINISH_PREVIEW_MODES,
+  FINISH_PRESETS,
+  LIGHTING_PRESETS,
+  defaultFinishesConfig,
+  patchFinishesConfig,
+  toggleFinishAnimation,
+  type FinishAnimationId,
+  type FinishLighting,
+  type FinishPreviewMode,
+  type FinishesConfig,
+} from "@/lib/finishes";
 import { cn } from "@/lib/utils";
 import {
   Bookmark,
@@ -48,6 +63,7 @@ import {
   Frame as FrameIcon,
   Eye,
   Film,
+  Gem,
   LayoutTemplate,
   Palette,
   Save,
@@ -191,6 +207,7 @@ export type LibraryTab =
   | "assets"
   | "frames"
   | "materials"
+  | "finishes"
   | "layouts"
   | "reveals"
   | "opening";
@@ -261,6 +278,13 @@ const CATEGORIES: CategorySpec[] = [
     placeholder: "Search cotton, foil, wax…",
   },
   {
+    id: "finishes",
+    label: "Finishes",
+    icon: Gem,
+    blurb: "Luxury presets, studio light and optional motion for the whole invitation.",
+    placeholder: "Search royal, pearl, holographic…",
+  },
+  {
     id: "layouts",
     label: "Pages",
     icon: Film,
@@ -315,6 +339,24 @@ interface LibraryPanelProps {
   onApplyMaterial?: (material: LayerMaterial) => void;
   /** The preset the current target is already wearing, for a selected tile. */
   activeMaterialId?: MaterialId;
+  /** The invitation-wide finish configuration: light, motion, applied preset. */
+  finishConfig?: FinishesConfig;
+  /** Writes the finish configuration back to the design. */
+  onFinishConfigChange?: (config: FinishesConfig) => void;
+  /** Applies a luxury finish preset to the selection, or the sheet when empty. */
+  onApplyFinishPreset?: (presetId: string) => void;
+  /** The preset the invitation is already wearing, for the active tile. */
+  activeFinishPreset?: string;
+  /** The preview environment — presentation only, never part of the artwork. */
+  finishPreviewMode?: FinishPreviewMode;
+  onFinishPreviewMode?: (mode: FinishPreviewMode) => void;
+  /** Opens the guest preview in the chosen environment. */
+  onOpenFinishPreview?: () => void;
+  /** Whether the canvas draws finishes, for the before/after compare. */
+  materialPreview?: boolean;
+  onSetMaterialPreview?: (on: boolean) => void;
+  /** Clears every finish from the invitation. */
+  onResetFinishes?: () => void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -396,6 +438,45 @@ function GroupChips<T extends string>({
           {option}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** One knob of the studio light. Writes a setting, never a pixel. */
+function FinishLightSlider({
+  label,
+  value,
+  min,
+  max,
+  step = 0.01,
+  display,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  display?: (value: number) => string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-[64px] shrink-0 font-ui text-[0.6rem] font-medium uppercase tracking-[0.08em] text-ink/40">
+        {label}
+      </span>
+      <Slider
+        value={[value]}
+        min={min}
+        max={max}
+        step={step}
+        aria-label={label}
+        onValueChange={([next]) => onChange(next)}
+        className="flex-1"
+      />
+      <span className="w-10 shrink-0 text-right font-meta text-[0.6rem] tabular-nums text-ink/45">
+        {display ? display(value) : `${Math.round(value * 100)}%`}
+      </span>
     </div>
   );
 }
@@ -922,6 +1003,16 @@ export function LibraryPanel({
   onApplyColour,
   onApplyMaterial,
   activeMaterialId,
+  finishConfig,
+  onFinishConfigChange,
+  onApplyFinishPreset,
+  activeFinishPreset,
+  finishPreviewMode,
+  onFinishPreviewMode,
+  onOpenFinishPreview,
+  materialPreview = true,
+  onSetMaterialPreview,
+  onResetFinishes,
   tab: tabProp,
   onTabChange,
 }: LibraryPanelProps) {
@@ -1309,6 +1400,14 @@ export function LibraryPanel({
           ?.elements.find((element) => element.id === selectedIds[0])?.font
       : undefined;
 
+  const finishLighting = finishConfig?.lighting ?? defaultFinishesConfig().lighting;
+  const finishNeedle = query.trim().toLowerCase();
+  const filteredFinishPresets = FINISH_PRESETS.filter(
+    (preset) =>
+      !finishNeedle ||
+      `${preset.label} ${preset.note}`.toLowerCase().includes(finishNeedle),
+  );
+
   const category = CATEGORIES.find((item) => item.id === tab) ?? CATEGORIES[0];
 
   const countFor = (id: LibraryTab): number => {
@@ -1329,6 +1428,8 @@ export function LibraryPanel({
         return FRAMES.length;
       case "materials":
         return MATERIAL_PRESETS.length;
+      case "finishes":
+        return FINISH_PRESETS.length;
       case "layouts":
         return PAGE_LAYOUTS.length;
       case "reveals":
@@ -1356,6 +1457,8 @@ export function LibraryPanel({
         return `${filteredFrames.length} frames`;
       case "materials":
         return `${filteredMaterials.length} of ${MATERIAL_PRESETS.length} finishes`;
+      case "finishes":
+        return `${filteredFinishPresets.length} of ${FINISH_PRESETS.length} presets · ${FINISH_ANIMATIONS.length} motions`;
       case "layouts":
         return `${PAGE_LAYOUTS.length} page layouts`;
       case "reveals":
@@ -2116,6 +2219,272 @@ export function LibraryPanel({
                     Foil, relief and lace are screen previews of real finishes. PNG and
                     PDF exports print the clean artwork, never the simulation.
                   </p>
+                </div>
+              )}
+
+              {tab === "finishes" && (
+                <div className="space-y-4">
+                  <p className="rounded-[var(--radius-tile)] border border-[var(--edge)] bg-[var(--surface-sunk)]/60 px-3 py-2 font-ui text-[0.66rem] leading-relaxed text-ink/55">
+                    A luxury preset is a stack of real, editable finish layers —
+                    foil, relief and surface — under one studio light. Every layer
+                    stays adjustable afterwards in the inspector's Finish
+                    Composer, and prints keep the clean artwork.
+                  </p>
+
+                  <div>
+                    <span className="section-label">Presets</span>
+                    {filteredFinishPresets.length === 0 ? (
+                      <EmptyNote>No finish presets match that search.</EmptyNote>
+                    ) : (
+                      <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                        {filteredFinishPresets.map((preset) => {
+                          const active = activeFinishPreset === preset.id;
+                          const specs =
+                            preset.text ??
+                            preset.solid ??
+                            preset.motif ??
+                            preset.page ??
+                            [];
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => onApplyFinishPreset?.(preset.id)}
+                              className={cn(
+                                "ui-tile group text-left",
+                                active && "ring-1 ring-[var(--red)]",
+                              )}
+                            >
+                              <span className="ui-tile-art relative flex aspect-[4/3] w-full items-center justify-center gap-1 bg-[var(--paper-deep)]/50 px-2">
+                                {specs.slice(0, 3).map((spec) => (
+                                  <FinishSwatch
+                                    key={spec.finish}
+                                    finish={spec.finish}
+                                    className="size-8 rounded-[5px] shadow-sm"
+                                  />
+                                ))}
+                                <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-ink/85 py-1 text-center font-ui text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Apply preset
+                                </span>
+                              </span>
+                              <span className="block px-1 pb-0.5">
+                                <span className="block truncate font-ui text-[0.72rem] font-medium text-ink">
+                                  {preset.label}
+                                </span>
+                                <span className="mt-0.5 block truncate font-ui text-[0.58rem] text-ink/45">
+                                  {preset.note}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="section-label">Studio light</span>
+                    <p className="mt-1 font-ui text-[0.62rem] leading-relaxed text-ink/45">
+                      Direction, strength, softness and warmth. Metallic and relief
+                      finishes answer the direction live.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {LIGHTING_PRESETS.map((light) => {
+                        const active =
+                          light.lighting.direction === finishLighting.direction &&
+                          light.lighting.intensity === finishLighting.intensity &&
+                          light.lighting.softness === finishLighting.softness &&
+                          light.lighting.temperature === finishLighting.temperature;
+                        return (
+                          <button
+                            key={light.id}
+                            type="button"
+                            aria-pressed={active}
+                            title={light.note}
+                            onClick={() =>
+                              onFinishConfigChange?.(
+                                patchFinishesConfig(finishConfig, {
+                                  lighting: light.lighting,
+                                }),
+                              )
+                            }
+                            className="chip"
+                          >
+                            {light.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2.5 space-y-2">
+                      <FinishLightSlider
+                        label="Direction"
+                        min={0}
+                        max={360}
+                        step={1}
+                        value={finishLighting.direction}
+                        display={(value) => `${Math.round(value)}°`}
+                        onChange={(direction) =>
+                          onFinishConfigChange?.(
+                            patchFinishesConfig(finishConfig, {
+                              lighting: { ...finishLighting, direction },
+                            }),
+                          )
+                        }
+                      />
+                      <FinishLightSlider
+                        label="Intensity"
+                        value={finishLighting.intensity}
+                        onChange={(intensity) =>
+                          onFinishConfigChange?.(
+                            patchFinishesConfig(finishConfig, {
+                              lighting: { ...finishLighting, intensity },
+                            }),
+                          )
+                        }
+                      />
+                      <FinishLightSlider
+                        label="Softness"
+                        value={finishLighting.softness}
+                        onChange={(softness) =>
+                          onFinishConfigChange?.(
+                            patchFinishesConfig(finishConfig, {
+                              lighting: { ...finishLighting, softness },
+                            }),
+                          )
+                        }
+                      />
+                      <FinishLightSlider
+                        label="Warmth"
+                        value={finishLighting.temperature}
+                        onChange={(temperature) =>
+                          onFinishConfigChange?.(
+                            patchFinishesConfig(finishConfig, {
+                              lighting: { ...finishLighting, temperature },
+                            }),
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="section-label">Motion</span>
+                    <p className="mt-1 font-ui text-[0.62rem] leading-relaxed text-ink/45">
+                      Optional. Every animation respects your system's reduced-motion
+                      setting and can be switched off here.
+                    </p>
+                    <div className="mt-2 space-y-1.5">
+                      {FINISH_ANIMATIONS.map((animation) => {
+                        const on = (finishConfig?.animations ?? []).includes(
+                          animation.id as FinishAnimationId,
+                        );
+                        return (
+                          <button
+                            key={animation.id}
+                            type="button"
+                            role="switch"
+                            aria-checked={on}
+                            onClick={() =>
+                              onFinishConfigChange?.(
+                                toggleFinishAnimation(
+                                  finishConfig,
+                                  animation.id,
+                                  !on,
+                                ),
+                              )
+                            }
+                            className="flex w-full items-center justify-between gap-3 border border-[var(--edge)] px-2.5 py-1.5 text-left transition-colors hover:border-[var(--edge-strong)]"
+                          >
+                            <span className="min-w-0">
+                              <span className="block font-ui text-[0.68rem] font-medium text-ink">
+                                {animation.label}
+                              </span>
+                              <span className="block truncate font-ui text-[0.58rem] text-ink/45">
+                                {animation.note}
+                              </span>
+                            </span>
+                            <span
+                              className={cn(
+                                "relative h-4 w-7 shrink-0 rounded-full transition-colors",
+                                on ? "bg-[var(--red)]" : "bg-ink/20",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "absolute top-0.5 size-3 rounded-full bg-white shadow transition-all",
+                                  on ? "left-3.5" : "left-0.5",
+                                )}
+                              />
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="section-label">Preview environment</span>
+                    <p className="mt-1 font-ui text-[0.62rem] leading-relaxed text-ink/45">
+                      Presentation only: the environment changes how you see the
+                      invitation, never the invitation itself.
+                    </p>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {FINISH_PREVIEW_MODES.map((mode) => {
+                        const active = (finishPreviewMode ?? "studio") === mode.id;
+                        return (
+                          <button
+                            key={mode.id}
+                            type="button"
+                            aria-pressed={active}
+                            title={mode.note}
+                            onClick={() => onFinishPreviewMode?.(mode.id)}
+                            className={cn(
+                              "rounded-[8px] border px-2 py-1.5 text-left transition-colors",
+                              active
+                                ? "border-[var(--red)] bg-[var(--red)]/[0.04]"
+                                : "border-[var(--edge)] hover:border-[var(--edge-strong)]",
+                            )}
+                          >
+                            <span className="block font-ui text-[0.66rem] font-medium text-ink">
+                              {mode.label}
+                            </span>
+                            <span className="block truncate font-ui text-[0.55rem] text-ink/45">
+                              {mode.note}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 rounded-none text-[0.66rem]"
+                        onClick={onOpenFinishPreview}
+                      >
+                        Open preview
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 rounded-none text-[0.66rem]"
+                        onClick={() => onSetMaterialPreview?.(!materialPreview)}
+                      >
+                        {materialPreview === false
+                          ? "Show finishes"
+                          : "Compare original"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="col-span-2 h-8 rounded-none text-[0.66rem] text-ink/55"
+                        onClick={onResetFinishes}
+                      >
+                        Reset all finishes
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
 
