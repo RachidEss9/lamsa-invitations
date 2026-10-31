@@ -1,5 +1,10 @@
 import { InvitationJourney } from "@/components/invitation/InvitationJourney";
 import type { DesignDocument } from "@/lib/design";
+import {
+  previewForcesAnimation,
+  previewSurfaceStyle,
+  type FinishPreviewMode,
+} from "@/lib/finishes";
 import type { JourneyPhase } from "@/lib/journey";
 import { useMemo, useState } from "react";
 
@@ -12,6 +17,8 @@ interface SequentialGuestPreviewProps {
   reducedMotion: boolean;
   palette: { background: string; ink: string; accent: string };
   onClose: () => void;
+  /** The preview environment the studio chose — presentation only. */
+  previewMode?: FinishPreviewMode;
 }
 
 /**
@@ -29,7 +36,10 @@ export function SequentialGuestPreview({
   reducedMotion,
   palette,
   onClose,
+  previewMode = "studio",
 }: SequentialGuestPreviewProps) {
+  const previewStyle = previewSurfaceStyle(previewMode);
+  const forceFinishAnimations = previewForcesAnimation(previewMode);
   const [restartSignal, setRestartSignal] = useState(0);
   const [step, setStep] = useState(1);
   const [total, setTotal] = useState(design.pages.length);
@@ -90,7 +100,14 @@ export function SequentialGuestPreview({
       </div>
 
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 py-4">
-        <div style={{ width: stageWidth }}>
+        <div
+          style={{
+            width: stageWidth,
+            filter: previewStyle.filter,
+            transform: previewStyle.transform,
+            transformOrigin: previewStyle.transformOrigin,
+          }}
+        >
           <InvitationJourney
             design={design}
             imageUrls={imageUrls}
@@ -101,6 +118,7 @@ export function SequentialGuestPreview({
             accent={palette.accent}
             ink={palette.ink}
             restartSignal={restartSignal}
+            forceFinishAnimations={forceFinishAnimations}
             onStepChange={(next, count) => {
               setStep(next + 1);
               setTotal(count);
@@ -108,6 +126,15 @@ export function SequentialGuestPreview({
             onPhaseChange={setPhase}
           />
         </div>
+        {/* The preview environment's light: presentation only, never part of
+            the invitation itself. */}
+        {previewStyle.background ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-10"
+            style={{ background: previewStyle.background }}
+          />
+        ) : null}
       </div>
 
       <div className="border-t border-white/12 px-4 py-3 text-[#f2f1ed]">

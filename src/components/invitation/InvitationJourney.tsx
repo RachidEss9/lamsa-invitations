@@ -33,6 +33,72 @@ interface InvitationJourneyProps {
   ink?: string;
   active?: boolean;
   className?: string;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
   /** Increment to replay the journey from its opening. */
   restartSignal?: number;
   onStepChange?: (step: number, total: number) => void;
