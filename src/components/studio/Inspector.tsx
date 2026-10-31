@@ -46,7 +46,6 @@ import {
   MaterialsStudio,
 } from "@/components/studio/MaterialsStudio";
 import { FinishComposer } from "@/components/studio/FinishComposer";
-import { FinishComposer } from "@/components/studio/FinishComposer";
 import {
   supportsMaterial,
   supportsMaterialRelief,
@@ -299,18 +298,6 @@ function InspectorBody({
             previewMode={materialPreview}
             onShowMaterials={onShowMaterials}
             onChange={(material) => onPagePatch({ material })}
-          />
-        </Section>
-        <Section title="Sheet finishes" defaultOpen={false}>
-          <FinishComposer
-            scope="page"
-            layers={page.finishes}
-            previewMode={materialPreview}
-            onShowFinishes={onShowMaterials}
-            onCompare={onCompare}
-            onChange={(finishes) =>
-              onPagePatch({ finishes: finishes.length > 0 ? finishes : undefined })
-            }
           />
         </Section>
         <Section title="Sheet finishes" defaultOpen={false}>
@@ -832,20 +819,6 @@ function InspectorBody({
         ) : (
           <MaterialUnsupportedNote />
         )}
-      </Section>
-
-      <Section title="Finishes" defaultOpen={false}>
-        <FinishComposer
-          scope="element"
-          element={element}
-          layers={element.finishes}
-          previewMode={materialPreview}
-          onShowFinishes={onShowMaterials}
-          onCompare={onCompare}
-          onChange={(finishes) =>
-            patch({ finishes: finishes.length > 0 ? finishes : undefined })
-          }
-        />
       </Section>
 
       <Section title="Finishes" defaultOpen={false}>
