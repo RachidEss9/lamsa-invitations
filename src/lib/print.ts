@@ -516,7 +516,11 @@ export function preflightDesign(
     design.pages.some(
       (page) =>
         page.material?.enabled ||
-        page.elements.some((element) => element.material?.enabled),
+        (page.finishes?.length ?? 0) > 0 ||
+        page.elements.some(
+          (element) =>
+            element.material?.enabled || (element.finishes?.length ?? 0) > 0,
+        ),
     )
   ) {
     issues.push({
@@ -565,10 +569,15 @@ export function printablePage(page: DesignPage): DesignPage {
     // makes "exports print the clean artwork" a structural guarantee of the
     // print path rather than a promise the UI has to keep on its own.
     material: undefined,
+    // The luxury finish stack and its gilded edges are digital-only for the
+    // same reason: foil and emboss live on screen, never in the PDF.
+    finishes: undefined,
     elements: page.elements
       .filter((element) => !covers.has(element.id))
       .map((element) =>
-        element.material ? { ...element, material: undefined } : element,
+        element.material || element.finishes
+          ? { ...element, material: undefined, finishes: undefined }
+          : element,
       ),
   };
 }

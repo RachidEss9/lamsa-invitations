@@ -22,6 +22,27 @@ import {
   materialTargetOf,
 } from "@/lib/materials";
 import {
+  DEFAULT_FINISH_LIGHTING,
+  animationOn,
+  finishAnimationClass,
+  finishEdgeStyle,
+  finishFilterId,
+  finishFilterMarkup,
+  finishFilterRecipe,
+  finishGlyphFill,
+  finishLightStyle,
+  finishMonogram,
+  finishOverlays,
+  finishStackIsActive,
+  finishSurfaceOf,
+  pageEdgeFinish,
+  pageSurfaceFinishes,
+  signatureAnimationClass,
+  type FinishAnimationState,
+  type FinishSurface,
+  type FinishesConfig,
+} from "@/lib/finishes";
+import {
   imageAdjustFilter,
   maskedImageFrame,
   rotationCoverScale,
@@ -890,6 +911,14 @@ export interface DesignPageViewProps {
    * visible immediately and a design without materials looks identical either way.
    */
   materialPreview?: boolean;
+  /**
+   * The invitation's finish configuration: studio lighting and the optional
+   * animated effects. Absent means the default studio light and no motion —
+   * a design saved before the finish composer existed renders untouched.
+   */
+  finishes?: FinishesConfig;
+  /** Motion Preview plays enabled finish effects regardless of a pause. */
+  forceFinishAnimations?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -912,6 +941,8 @@ export function DesignPageView({
   showHidden = true,
   scrollActivationTime = 0,
   materialPreview = true,
+  finishes,
+  forceFinishAnimations = false,
   className,
   style,
 }: DesignPageViewProps) {
@@ -944,6 +975,52 @@ export function DesignPageView({
 
   const size = pageSizeOf(page);
   const pageOverlay = materialPreview ? materialOverlayStyle(page.material) : undefined;
+
+  /* One lighting rig for the whole sheet: every metal ramp, relief shadow and
+     specular pass reads the same direction, so moving the light moves them
+     all together. */
+  const finishPrefix = useId().replace(/[^a-zA-Z0-9_-]/g, "") || "lf";
+  const lighting = finishes?.lighting ?? DEFAULT_FINISH_LIGHTING;
+  const animationState: FinishAnimationState = {
+    enabled: finishes?.animations ?? [],
+    reducedMotion,
+    forced: forceFinishAnimations,
+  };
+  // The ambient light only appears once the host has engaged the finish
+  // system — a design saved before it existed renders exactly as it did.
+  const pageLight = materialPreview && finishes
+    ? finishLightStyle(finishes.lighting)
+    : undefined;
+
+  const effectiveSurface = (element: DesignElement): FinishSurface | null => {
+    const surface = finishSurfaceOf(element);
+    // Curved wording is drawn as SVG paths and its fill lives inside the SVG,
+    // so a curved layer takes its finishes through the filter pass instead.
+    if (surface === "text" && curveIsActive(element.curve)) return "outline";
+    return surface;
+  };
+
+  // Every filter recipe this page needs, deduped: identical reliefs on a
+  // hundred small layers share one <filter> element.
+  const finishRecipes = new Map<string, string>();
+  if (materialPreview) {
+    for (const element of page.elements) {
+      if (!finishStackIsActive(element.finishes)) continue;
+      const recipe = finishFilterRecipe(element.finishes, effectiveSurface(element));
+      if (!recipe) continue;
+      const filterId = finishFilterId(finishPrefix, recipe);
+      if (!finishRecipes.has(filterId)) {
+        finishRecipes.set(filterId, finishFilterMarkup(filterId, recipe, lighting));
+      }
+    }
+  }
+  const pageFinishOverlays = materialPreview
+    ? finishOverlays(pageSurfaceFinishes(page.finishes), lighting)
+    : [];
+  const gildedEdge = materialPreview
+    ? finishEdgeStyle(pageEdgeFinish(page.finishes), lighting)
+    : undefined;
+  const dustOn = animationOn(animationState, "floating-dust");
   // The cut edge of the sheet: a die-cut, torn or domed trim is part of the
   // artwork and travels with it into previews, the public page and export.
   const edgeClip = pageEdgeClipPath(page.edge, size.width, size.height);
@@ -962,6 +1039,18 @@ export function DesignPageView({
         ...style,
       }}
     >
+      {/* The depth and metal filters this page's finishes reference. One svg,
+          zero size, never printed: the export path never mounts them. */}
+      {finishRecipes.size > 0 && (
+        <svg
+          aria-hidden
+          style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+        >
+          <defs
+            dangerouslySetInnerHTML={{ __html: [...finishRecipes.values()].join("") }}
+          />
+        </svg>
+      )}
       <div aria-hidden className="paper-texture pointer-events-none absolute inset-0" />
       {page.texture && page.texture !== "none" && (
         <div
@@ -985,6 +1074,39 @@ export function DesignPageView({
         aria-hidden
         className="paper-grain pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-multiply"
       />
+      {/* The studio light, the sheet's own surface finishes and the gilded
+          edge — all digital, all under the preview gate. */}
+      {pageLight && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={pageLight}
+        />
+      )}
+      {pageFinishOverlays.map((overlay) => (
+        <div
+          key={`page-fin-${overlay.layer.id}`}
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-0",
+            finishAnimationClass(overlay.layer, animationState),
+          )}
+          style={overlay.style}
+        />
+      ))}
+      {gildedEdge && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ ...gildedEdge, boxSizing: "border-box" }}
+        />
+      )}
+      {dustOn && (
+        <div
+          aria-hidden
+          className="pointer-events-none lf-dust absolute inset-0"
+        />
+      )}
       {page.elements.map((element) => {
         if (element.hidden && (!editor || !showHidden)) return null;
         if (hideElementId === element.id) return null;

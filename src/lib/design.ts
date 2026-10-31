@@ -2,6 +2,12 @@ import type { CSSProperties } from "react";
 import { normalizeEffects, type LayerEffects } from "@/lib/effects";
 import { guestVisiblePageIds, normalizeSuite, type DesignSuite } from "@/lib/suite";
 import { normalizeMaterial, type LayerMaterial } from "@/lib/materials";
+import {
+  normalizeFinishesConfig,
+  normalizeFinishLayersOn,
+  type FinishLayer,
+  type FinishesConfig,
+} from "@/lib/finishes";
 import { normalizeImageAdjust, type ImageAdjust } from "@/lib/image-frame";
 import { normalizeCurve } from "@/lib/text-path";
 import {
@@ -305,6 +311,12 @@ export interface DesignElement {
    * exactly as it was, and a malformed value is dropped rather than drawn.
    * Finishes are screen previews only: they never enter the print pipeline. */
   material?: LayerMaterial;
+  /**
+   * The luxury finish stack for this layer (foil, relief, surface). Optional
+   * and sanitised on load, so a design saved before finishes existed opens
+   * exactly as it was. Digital-only: the print path strips it structurally.
+   */
+  finishes?: FinishLayer[];
   reveal?: RevealConfig;
   animation: ElementAnimation;
   exit?: ExitAnimation;
@@ -329,6 +341,12 @@ export interface DesignDocument {
   physicalHeight?: number;
   /** The physical brief the host asked for when the document was created. */
   format?: DesignFormat;
+  /**
+   * Invitation-wide finish configuration: studio lighting, optional animated
+   * effects and the last preset applied. Absent on designs saved before the
+   * finish composer existed — those open under the default studio light.
+   */
+  finishes?: FinishesConfig;
 }
 
 export interface DesignPage {
@@ -359,6 +377,8 @@ export interface DesignPage {
    * Absent on every page saved before materials existed.
    */
   material?: LayerMaterial;
+  /** The sheet's own finish stack: surface materials and gilded edges. */
+  finishes?: FinishLayer[];
 }
 
 export type PageTextureId = "none" | "cotton" | "linen" | "fibre";
@@ -821,6 +841,37 @@ export const LEGACY_OPENING_STYLES: OpeningStyle[] = [
   { experience: "impossible", label: "The Impossible Invitation", note: "A paper monument assembles around the card" },
 ];
 
+/** Retired opening ids and the scene that replaced each one. */
+const RETIRED_OPENING_EXPERIENCES: Record<string, OpeningExperienceId> = {
+  envelope: "secret-world",
+  curtain: "living-art",
+  typography: "impossible",
+  "wax-seal": "secret-world",
+  personal: "impossible",
+  paper: "living-art",
+  cinematic: "secret-world",
+};
+
+/**
+ * A saved opening experience, settled onto something that renders: the three
+ * scenes and "none" pass through verbatim, a retired id lands on the scene
+ * that replaced it, and anything else falls back to the first scene.
+ */
+export function settledOpeningExperience(value: unknown): OpeningExperienceId {
+  if (
+    value === "none" ||
+    value === "secret-world" ||
+    value === "living-art" ||
+    value === "impossible"
+  ) {
+    return value;
+  }
+  if (typeof value === "string" && value in RETIRED_OPENING_EXPERIENCES) {
+    return RETIRED_OPENING_EXPERIENCES[value];
+  }
+  return "secret-world";
+}
+
 export function normalizeDesign(
   saved: unknown,
   content: InvitationContent,
@@ -837,7 +888,7 @@ export function normalizeDesign(
       ? doc.opening
       : ({} as Partial<OpeningSettings>);
   const opening: OpeningSettings = {
-    experience: stored.experience ?? "none",
+    experience: settledOpeningExperience(stored.experience ?? "none"),
     autoOpen: stored.autoOpen ?? false,
     welcome: stored.welcome ?? "",
     duration: stored.duration ?? undefined,
@@ -863,6 +914,7 @@ export function normalizeDesign(
     physicalWidth: doc.physicalWidth ?? undefined,
     physicalHeight: doc.physicalHeight ?? undefined,
     format: doc.format ?? undefined,
+    finishes: normalizeFinishesConfig(doc.finishes),
   };
 }
 
@@ -895,6 +947,7 @@ function normalizePage(
     texture: p.texture ?? "none",
     edge: p.edge && isPageEdgeId(p.edge) ? p.edge : undefined,
     material: normalizeMaterial(p.material),
+    finishes: normalizeFinishLayersOn(p.finishes),
   };
 }
 
@@ -976,6 +1029,7 @@ function normalizeElement(element: unknown): DesignElement {
     hint: e.hint ?? undefined,
     effects: normalizeEffects(e.effects),
     material: normalizeMaterial(e.material),
+    finishes: normalizeFinishLayersOn(e.finishes),
     reveal: normalizeReveal(e.reveal),
     animation,
     exit: e.exit ?? undefined,

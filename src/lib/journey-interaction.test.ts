@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
 import { InvitationJourney } from "@/components/invitation/InvitationJourney";
 import type { DesignDocument, DesignPage } from "./design";
+import { CONTINUE_LABEL, HANDOFF_MS, OPEN_LABEL } from "./presentation";
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -17,6 +18,17 @@ beforeAll(() => {
     (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
       NoopResizeObserver;
   }
+  // jsdom lays nothing out, so every element reports a zero box. Give them a
+  // stage-sized one: the presentation measures its container to place the
+  // invitation slot, and without a box there is no invitation to assert on.
+  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+    configurable: true,
+    get: () => 900,
+  });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+    configurable: true,
+    get: () => 600,
+  });
 });
 
 let root: Root | null = null;
@@ -151,26 +163,57 @@ describe("guest journey interaction", () => {
     );
 
     // The presentation owns a real three-scene engine, so the guest is
-    // handed the chosen scene's own opening cover, not a placeholder.
+    // handed the chosen scene's own opening cover, not a placeholder. A
+    // retired experience falls back to the first scene, from its first frame.
     expect(container.querySelector("[data-testid=\"presentation-stage\"]"))
       .toBeTruthy();
     expect(container.querySelector("[data-scene]")?.getAttribute("data-scene"))
       .toBe("secret-world");
     expect(container.querySelector("[data-state]")?.getAttribute("data-state"))
       .toBe("pre");
-    expect(
-      container.querySelector("[data-testid=\"invitation\"]"),
-    ).toBeTruthy();
-    const skip = buttonByLabel(container, "Skip the opening animation");
-    expect(skip).toBeTruthy();
-    act(() => skip?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    // The real first section sits exactly once, in the scene's invitation slot.
+    const invitations = container.querySelectorAll("[data-testid=\"invitation\"]");
+    expect(invitations.length).toBe(1);
+    const slot = container.querySelector("[data-testid=\"invitation-slot\"]");
+    expect(slot?.contains(invitations[0] as Node)).toBe(true);
+
+    // The entrance plays, then the scene lands closed with the way in.
+    act(() => {
+      vi.advanceTimersByTime(80);
+    });
+    expect(container.querySelector("[data-state]")?.getAttribute("data-state"))
+      .toBe("intro");
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
+    expect(container.querySelector("[data-state]")?.getAttribute("data-state"))
+      .toBe("closed");
+
+    const open = buttonByText(container, OPEN_LABEL);
+    expect(open).toBeTruthy();
+    act(() => open?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(container.querySelector("[data-state]")?.getAttribute("data-state"))
+      .toBe("opening");
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
+    expect(container.querySelector("[data-state]")?.getAttribute("data-state"))
+      .toBe("revealed");
+
+    const onward = buttonByText(container, CONTINUE_LABEL);
+    expect(onward).toBeTruthy();
+    act(() => onward?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    act(() => {
+      vi.advanceTimersByTime(HANDOFF_MS);
+    });
 
     // The opening has handed over to the same section, now a live page.
-    expect(container.querySelector("[data-opening-card]")).toBeNull();
+    expect(container.querySelector("[data-testid=\"presentation-stage\"]")).toBeNull();
     expect(container.textContent).toContain("Amelia and Soren");
 
+    // The flourish returns once the section has settled.
     act(() => {
-      vi.advanceTimersByTime(600);
+      vi.advanceTimersByTime(1000);
     });
     expect(buttonByLabel(container, "Continue to section 2 of 2")).toBeTruthy();
 
