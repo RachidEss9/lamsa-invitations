@@ -33,6 +33,8 @@ import {
   finishLightStyle,
   finishMonogram,
   finishOverlays,
+  finishKindOf,
+  finishLayerIsActive,
   finishStackIsActive,
   finishSurfaceOf,
   pageEdgeFinish,
@@ -486,6 +488,38 @@ function useImageAspect(url: string | undefined): number | undefined {
   return url ? imageAspectCache.get(url) : undefined;
 }
 
+/** One finish overlay, plus the monogram when the layer is a poured wax seal. */
+function FinishSpanNode({
+  span,
+  element,
+}: {
+  span: { style: CSSProperties; className?: string; mono?: string };
+  element: DesignElement;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={cn("pointer-events-none absolute inset-0", span.className)}
+      style={span.style}
+    >
+      {span.mono ? (
+        <span
+          className="absolute inset-0 grid place-items-center font-semibold uppercase"
+          style={{
+            fontSize: Math.max(9, Math.round(Math.min(element.w, element.h) * 0.3)),
+            letterSpacing: "0.06em",
+            lineHeight: 1,
+            color: "rgba(20,16,19,0.55)",
+            textShadow: "0 1px 0 rgba(255,255,255,0.35)",
+          }}
+        >
+          {span.mono}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function ElementVisual({
   element,
   imageUrls,
@@ -494,6 +528,9 @@ function ElementVisual({
   clipId,
   material,
   boxClip,
+  glyphFill,
+  glyphMotion,
+  finishSpans,
 }: {
   element: DesignElement;
   imageUrls: Record<string, string>;
@@ -504,6 +541,12 @@ function ElementVisual({
   material?: CSSProperties;
   /** True when the silhouette has to be referenced through a clip path. */
   boxClip?: boolean;
+  /** The finish stack's fill, already clipped into the glyphs (type only). */
+  glyphFill?: CSSProperties;
+  /** The motion class for filled lettering (type only). */
+  glyphMotion?: string;
+  /** Finish overlays, already clipped to this layer's own silhouette. */
+  finishSpans?: { style: CSSProperties; className?: string; mono?: string }[];
 }) {
   // Hooks run before any branch: an invitation without a photograph simply
   // probes nothing.
@@ -563,7 +606,7 @@ function ElementVisual({
             />
           ) : (
             <div
-              className="w-full whitespace-pre-wrap break-words"
+              className={cn("w-full whitespace-pre-wrap break-words", glyphMotion)}
               style={{
             fontFamily: fontFamilyFor(element.font ?? "cormorant-garamond"),
             fontSize: element.fontSize ?? 26,
@@ -592,6 +635,9 @@ function ElementVisual({
                 : undefined,
             direction,
             unicodeBidi: element.direction === "auto" ? "plaintext" : "normal",
+            // The finish fill wins over the effects gradient: it is the richer,
+            // light-aware treatment, and it still clips to the exact glyphs.
+            ...(glyphFill ?? {}),
           }}
             dir={direction}
           >
@@ -684,6 +730,13 @@ function ElementVisual({
             style={material}
           />
         ) : null}
+        {finishSpans?.map((span, index) => (
+          <FinishSpanNode
+            key={`fin-${index}`}
+            span={span}
+            element={element}
+          />
+        ))}
       </div>
     );
   }
@@ -744,7 +797,14 @@ function ElementVisual({
       style={material}
     />
   ) : null;
-  if (!shapeInner && !materialOverlay) return shapeArt;
+  const finishOverlay = finishSpans && finishSpans.length > 0 ? (
+    <>
+      {finishSpans.map((span, index) => (
+        <FinishSpanNode key={`fin-${index}`} span={span} element={element} />
+      ))}
+    </>
+  ) : null;
+  if (!shapeInner && !materialOverlay && !finishOverlay) return shapeArt;
   const boxRadius =
     shape === "capsule"
       ? "999px"
@@ -762,6 +822,7 @@ function ElementVisual({
         />
       ) : null}
       {materialOverlay}
+      {finishOverlay}
     </div>
   );
 }
@@ -1139,17 +1200,70 @@ export function DesignPageView({
         // so switching back to Artwork / Print restores the untouched card.
         const finishTarget = materialPreview ? materialTargetOf(element) : null;
         const finish = finishTarget ? materialOverlayStyle(element.material) : undefined;
-        const finishRadius = finish ? materialShapeRadius(element) : undefined;
-        const finishFor = (clipId: string): CSSProperties | undefined => {
-          if (!finish) return undefined;
-          if (finishRadius) return { ...finish, borderRadius: finishRadius };
-          // A vector silhouette has no border radius to clip against, so the
-          // overlay borrows the shape's own clip path in the layer's pixels.
-          return finishTarget === "shape"
-            ? { ...finish, clipPath: `url(#${clipId}-box)` }
-            : finish;
+
+        // The luxury finish stack for this layer: overlays clipped to its own
+        // silhouette, the glyph fill for type, and a filter recipe whose
+        // reference goes on the wrapper so the relief shades real pixels.
+        const surface = materialPreview ? effectiveSurface(element) : null;
+        const stack = materialPreview ? element.finishes : undefined;
+        const finishRecipe =
+          stack && surface ? finishFilterRecipe(stack, surface) : undefined;
+        const finishFilterRef = finishRecipe
+          ? `url("#${finishFilterId(finishPrefix, finishRecipe)}")`
+          : undefined;
+        const finishSpans =
+          surface === "solid"
+            ? finishOverlays(stack, lighting).map((overlay) => ({
+                style: overlay.style,
+                className: finishAnimationClass(overlay.layer, animationState),
+                mono: finishMonogram(overlay.layer),
+              }))
+            : [];
+        const glyphFill =
+          surface === "text"
+            ? finishGlyphFill(stack, lighting, element.color ?? "#161616")
+            : undefined;
+        const signature =
+          element.kind === "text" ? signatureAnimationClass(animationState) : undefined;
+
+        // Motion that belongs to this layer: a breathing contact shadow on
+        // embossed details, and the glint that runs across filled lettering.
+        if (
+          surface === "solid" &&
+          animationOn(animationState, "dynamic-shadows") &&
+          stack?.some(
+            (layer) => finishLayerIsActive(layer) && finishKindOf(layer.finish) === "depth",
+          )
+        ) {
+          finishSpans.push({ style: {}, className: "lf-shadow", mono: undefined });
+        }
+        const glyphMotionRaw = stack
+          ?.map((layer) => finishAnimationClass(layer, animationState))
+          .find((name) => name && name !== "lf-shadow");
+        const glyphMotion =
+          surface === "text" && glyphMotionRaw
+            ? glyphMotionRaw === "lf-holo"
+              ? "lf-holo"
+              : "lf-glint"
+            : undefined;
+
+        const silhouetted = Boolean(finish) || finishSpans.length > 0;
+        const finishRadius = silhouetted ? materialShapeRadius(element) : undefined;
+        const boxClip =
+          silhouetted &&
+          !finishRadius &&
+          finishTarget === "shape" &&
+          surface === "solid";
+        // The material and every finish overlay clip to the same silhouette —
+        // a finish never paints past the layer's own edge. The cover branch
+        // draws its own copy of the shape, so the clip id is per branch.
+        const clipTo = (style: CSSProperties, clipId: string): CSSProperties => {
+          if (finishRadius) return { ...style, borderRadius: finishRadius };
+          if (boxClip) return { ...style, clipPath: `url(#${clipId}-box)` };
+          return style;
         };
-        const boxClip = Boolean(finish && !finishRadius && finishTarget === "shape");
+        const spansFor = (clipId: string) =>
+          finishSpans.map((span) => ({ ...span, style: clipTo(span.style, clipId) }));
 
         const content = (
           <div
@@ -1159,6 +1273,7 @@ export function DesignPageView({
               "absolute",
               element.hidden && "opacity-40",
               selected && "outline-1 outline-offset-4 outline-dashed outline-[var(--red)]",
+              signature,
             )}
             style={{
               left: element.x,
@@ -1168,9 +1283,10 @@ export function DesignPageView({
               ...animated.style,
               // Motion may already carry a filter (blur, for example); the
               // layer's own shadow and glow compose with it rather than
-              // replacing the entrance animation's look.
+              // replacing the entrance animation's look. The finish filter
+              // joins the chain so relief and metal shade the same pixels.
               filter:
-                [animated.style.filter, effectFilter(element.effects)]
+                [animated.style.filter, effectFilter(element.effects), finishFilterRef]
                   .filter(Boolean)
                   .join(" ") || undefined,
               opacity: dimmed ? 0.25 : animated.style.opacity,
@@ -1178,7 +1294,7 @@ export function DesignPageView({
               outline: dimmed ? "1px dashed rgba(113,0,20,0.55)" : undefined,
               // Keeps a finish's blend inside this layer, so a foil panel never
               // blends with the sheet behind it.
-              isolation: finish ? "isolate" : undefined,
+              isolation: finish || finishSpans.length > 0 ? "isolate" : undefined,
               zIndex: undefined,
             }}
           >
@@ -1188,8 +1304,11 @@ export function DesignPageView({
               guestName={guestName}
               rtl={rtl}
               clipId={`clip-${element.id}`}
-              material={finishFor(`clip-${element.id}`)}
+              material={finish ? clipTo(finish, `clip-${element.id}`) : undefined}
               boxClip={boxClip}
+              glyphFill={glyphFill?.style}
+              glyphMotion={glyphMotion}
+              finishSpans={spansFor(`clip-${element.id}`)}
             />
             {dimmed && (
               <span className="absolute -top-4 left-0 bg-[#710014] px-1.5 py-0.5 text-[11px] uppercase tracking-[0.16em] text-white">
@@ -1209,35 +1328,38 @@ export function DesignPageView({
                 top: element.y,
                 width: element.w,
                 height: element.h,
-                transform: animated.style.transform,
-                opacity: animated.style.opacity,
-                filter:
-                  [animated.style.filter, effectFilter(element.effects)]
-                    .filter(Boolean)
-                    .join(" ") || undefined,
-                zIndex: 20,
-              }}
+              transform: animated.style.transform,
+              opacity: animated.style.opacity,
+              filter:
+                [animated.style.filter, effectFilter(element.effects), finishFilterRef]
+                  .filter(Boolean)
+                  .join(" ") || undefined,
+              zIndex: 20,
+            }}
+          >
+            <RevealCover
+              element={element}
+              revealed={isRevealed}
+              onReveal={() =>
+                handleReveal(element.reveal!.targetId, element.reveal!.interactionId ?? "")
+              }
+              duration={element.reveal.duration ?? 800}
+              reducedMotion={reducedMotion}
+              interactive={interactive}
             >
-              <RevealCover
-                element={element}
-                revealed={isRevealed}
-                onReveal={() =>
-                  handleReveal(element.reveal!.targetId, element.reveal!.interactionId ?? "")
-                }
-                duration={element.reveal.duration ?? 800}
-                reducedMotion={reducedMotion}
-                interactive={interactive}
-              >
-                <ElementVisual
-                  element={{ ...element, x: 0, y: 0 }}
-                  imageUrls={imageUrls}
-                  guestName={guestName}
-                  rtl={rtl}
-                  clipId={`clip-cover-${element.id}`}
-                  material={finishFor(`clip-cover-${element.id}`)}
-                  boxClip={boxClip}
-                />
-              </RevealCover>
+              <ElementVisual
+                element={{ ...element, x: 0, y: 0 }}
+                imageUrls={imageUrls}
+                guestName={guestName}
+                rtl={rtl}
+                clipId={`clip-cover-${element.id}`}
+                material={finish ? clipTo(finish, `clip-cover-${element.id}`) : undefined}
+                boxClip={boxClip}
+                glyphFill={glyphFill?.style}
+                glyphMotion={glyphMotion}
+                finishSpans={spansFor(`clip-cover-${element.id}`)}
+              />
+            </RevealCover>
             </div>
           );
         }

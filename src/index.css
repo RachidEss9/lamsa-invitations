@@ -983,3 +983,201 @@ textarea[class*="rounded-none"],
     margin: 0;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Luxury finish effects — digital only, never captured for print             */
+/* -------------------------------------------------------------------------- */
+
+/* A soft band of light travelling across a metal overlay. */
+.lf-sweep::after,
+.lf-foil::after {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 60%
+  );
+  background-size: 320% 100%;
+  background-position: 130% 0;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.lf-sweep,
+.lf-foil {
+  overflow: hidden;
+}
+
+.lf-sweep::after {
+  animation: lf-sheen 3.8s ease-in-out infinite;
+}
+
+.lf-foil::after {
+  animation: lf-sheen 6.4s ease-in-out infinite;
+}
+
+@keyframes lf-sheen {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -70% 0;
+  }
+}
+
+/* The glint on filled lettering: light breathing over metal and pearl. */
+.lf-glint {
+  animation: lf-glint 4.2s ease-in-out infinite;
+}
+
+@keyframes lf-glint {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  45% {
+    filter: brightness(1.1);
+  }
+  60% {
+    filter: brightness(1.16);
+  }
+}
+
+/* Controlled spectral turn on holographic finishes. */
+.lf-holo {
+  animation: lf-holo 7s ease-in-out infinite;
+}
+
+@keyframes lf-holo {
+  0%,
+  100% {
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    filter: hue-rotate(26deg);
+  }
+}
+
+/* Pearl bands drifting gently in the light. */
+.lf-pearl {
+  animation: lf-pearl 6.5s ease-in-out infinite;
+}
+
+@keyframes lf-pearl {
+  0%,
+  100% {
+    background-position: center;
+  }
+  50% {
+    background-position: calc(50% + 42px) calc(50% + 28px);
+  }
+}
+
+/* Translucent layers lifting off the artwork. */
+.lf-lift {
+  animation: lf-lift 5.5s ease-in-out infinite alternate;
+}
+
+@keyframes lf-lift {
+  from {
+    transform: translateY(0);
+    filter: opacity(0.7);
+  }
+  to {
+    transform: translateY(-6px);
+    filter: opacity(1);
+  }
+}
+
+/* Embossed details breathing very slowly. */
+.lf-shadow {
+  animation: lf-shadow 5s ease-in-out infinite;
+}
+
+@keyframes lf-shadow {
+  0%,
+  100% {
+    box-shadow:
+      inset 3px 3px 7px -2px rgba(20, 16, 19, 0.26),
+      inset -2px -2px 6px -2px rgba(255, 255, 255, 0.22);
+  }
+  50% {
+    box-shadow:
+      inset 5px 6px 10px -2px rgba(20, 16, 19, 0.34),
+      inset -3px -4px 8px -2px rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Barely-there atmosphere over the sheet. */
+.lf-dust {
+  background-image:
+    radial-gradient(circle at 24% 28%, rgba(255, 248, 230, 0.55) 0.9px, transparent 1.8px),
+    radial-gradient(circle at 68% 62%, rgba(255, 248, 230, 0.4) 0.8px, transparent 1.7px),
+    radial-gradient(circle at 46% 84%, rgba(255, 248, 230, 0.35) 0.7px, transparent 1.6px),
+    radial-gradient(circle at 86% 16%, rgba(255, 248, 230, 0.4) 0.7px, transparent 1.6px);
+  background-size: 320px 340px;
+  mix-blend-mode: soft-light;
+  animation: lf-dust 34s linear infinite;
+}
+
+@keyframes lf-dust {
+  from {
+    background-position: 0 0, 0 0, 0 0, 0 0;
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  to {
+    background-position: 320px -340px, -320px -340px, 320px -340px, -320px -340px;
+    opacity: 0.55;
+  }
+}
+
+/* Names written on, left to right (right to left in RTL). */
+.lf-signature {
+  animation: lf-signature 1.7s cubic-bezier(0.33, 0, 0.16, 1) both;
+}
+
+[dir="rtl"] .lf-signature {
+  animation-name: lf-signature-rtl;
+}
+
+@keyframes lf-signature {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes lf-signature-rtl {
+  from {
+    clip-path: inset(0 0 0 100%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* A system-level reduced-motion choice always wins over any preview. */
+@media (prefers-reduced-motion: reduce) {
+  .lf-sweep::after,
+  .lf-foil::after,
+  .lf-glint,
+  .lf-holo,
+  .lf-pearl,
+  .lf-lift,
+  .lf-shadow,
+  .lf-dust,
+  .lf-signature {
+    animation: none !important;
+  }
+  .lf-signature {
+    clip-path: none;
+  }
+}

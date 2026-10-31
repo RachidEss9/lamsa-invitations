@@ -18,6 +18,7 @@ import {
   type SceneId,
   type SceneState,
 } from "@/lib/presentation";
+import type { FinishesConfig } from "@/lib/finishes";
 import { cn } from "@/lib/utils";
 import {
   useCallback,
@@ -45,6 +46,9 @@ interface PresentationStageProps {
   rtl?: boolean;
   autoOpen?: boolean;
   reducedMotion?: boolean;
+  /** The invitation's finish configuration, so the revealed card wears its
+   * saved lighting and effects from the first frame. */
+  finishes?: FinishesConfig;
   /** Fires when the guest continues from the revealed invitation. */
   onDone: () => void;
   className?: string;
@@ -74,6 +78,7 @@ export function PresentationStage({
   rtl,
   autoOpen = false,
   reducedMotion = false,
+  finishes,
   onDone,
   className,
 }: PresentationStageProps) {
@@ -312,6 +317,7 @@ export function PresentationStage({
                     guestName={guestName}
                     rtl={rtl}
                     reducedMotion={reducedMotion}
+                    finishes={finishes}
                   />
                 </div>
               </div>

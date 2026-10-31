@@ -445,13 +445,20 @@ export function finishSurfaceOf(element: {
   return "solid";
 }
 
-/** Is this finish honest on this surface? (Page stacks pass `null`.) */
+/**
+ * Is this finish honest on this surface? The sheet takes surface materials and
+ * gilding; a wax seal belongs on a layer, not across the whole page. Page
+ * stacks pass a `null` surface.
+ */
 export function finishFits(
   def: FinishDef,
   surface: FinishSurface | null,
   scope: "element" | "page",
 ): boolean {
-  if (scope === "page" || surface === null) return Boolean(def.pageOnly);
+  if (scope === "page" || surface === null) {
+    if (def.pageOnly) return true;
+    return def.kind === "surface" && def.id !== "wax-seal";
+  }
   if (def.pageOnly) return false;
   return def.surfaces.includes(surface);
 }

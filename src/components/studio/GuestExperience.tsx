@@ -17,6 +17,11 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import {
+  previewForcesAnimation,
+  previewSurfaceStyle,
+  type FinishPreviewMode,
+} from "@/lib/finishes";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 interface GuestExperienceProps {
@@ -30,6 +35,8 @@ interface GuestExperienceProps {
   onClose: () => void;
   mode?: "guest" | "timeline";
   startPage?: number;
+  /** The preview environment the studio chose — presentation only. */
+  previewMode?: FinishPreviewMode;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -52,7 +59,10 @@ export function GuestExperience({
   onClose,
   mode = "guest",
   startPage = 0,
+  previewMode = "studio",
 }: GuestExperienceProps) {
+  const previewStyle = previewSurfaceStyle(previewMode);
+  const forceFinishAnimations = previewForcesAnimation(previewMode);
   const pages = useMemo(() => visiblePages(design), [design]);
   const [phase, setPhase] = useState<"opening" | "invitation">(
     mode === "timeline" || reducedMotion || design.opening.experience === "none"
@@ -207,6 +217,9 @@ export function GuestExperience({
             width: stageWidth,
             aspectRatio: `${pageSize.width} / ${pageSize.height}`,
             maxHeight: "calc(100vh - 170px)",
+            filter: previewStyle.filter,
+            transform: previewStyle.transform,
+            transformOrigin: previewStyle.transformOrigin,
           }}
         >
           <div className="absolute inset-0">
@@ -233,6 +246,8 @@ export function GuestExperience({
                   rtl={rtl}
                   interactive
                   reducedMotion={reducedMotion}
+                  finishes={design.finishes}
+                  forceFinishAnimations={forceFinishAnimations}
                   revealed={revealed}
                   onReveal={(targetId, interactionId) =>
                     setRevealed((previous) => {
@@ -271,6 +286,7 @@ export function GuestExperience({
                 rtl={rtl}
                 autoOpen={design.opening.autoOpen}
                 reducedMotion={reducedMotion}
+                finishes={design.finishes}
                 onDone={() => {
                   setPhase("invitation");
                   timeRef.current = 0;
@@ -279,6 +295,15 @@ export function GuestExperience({
                 }}
               />
             )}
+            {/* The preview environment's light: presentation only, never part
+                of the invitation itself. */}
+            {previewStyle.background ? (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 z-50"
+                style={{ background: previewStyle.background }}
+              />
+            ) : null}
           </div>
         </div>
       </div>

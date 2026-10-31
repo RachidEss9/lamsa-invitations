@@ -13,6 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { pageSizeOf, visiblePages, type DesignDocument, type DesignPage } from "@/lib/design";
+import type { FinishesConfig } from "@/lib/finishes";
 import {
   DETAIL_VIEW_KINDS,
   PRESENTATION_BACKDROPS,
@@ -148,11 +149,13 @@ function CropPlate({
   view,
   imageUrls,
   rtl,
+  finishes,
 }: {
   page: DesignPage;
   view: DetailView;
   imageUrls: Record<string, string>;
   rtl: boolean;
+  finishes?: FinishesConfig;
 }) {
   const size = pageSizeOf(page);
   const { ref, scale } = useStageScale(view.region.w);
@@ -183,6 +186,7 @@ function CropPlate({
           imageUrls={imageUrls}
           guestName={null}
           rtl={rtl}
+          finishes={finishes}
           ignoreExit
         />
       </div>
@@ -504,7 +508,13 @@ export function DetailPresentationStudio({
                   width: `${doc.style.size}%`,
                 }}
               >
-                <CropPlate page={page} view={view} imageUrls={imageUrls} rtl={Boolean(rtl)} />
+                <CropPlate
+                  page={page}
+                  view={view}
+                  imageUrls={imageUrls}
+                  rtl={Boolean(rtl)}
+                  finishes={design.finishes}
+                />
                 {hasCaption && (
                   <figcaption
                     style={{ textAlign: doc.style.align, marginTop: gapPx * 0.55 }}
@@ -570,6 +580,7 @@ export function DetailPresentationStudio({
               imageUrls={imageUrls}
               guestName={null}
               rtl={Boolean(rtl)}
+              finishes={design.finishes}
               ignoreExit
             />
           )}

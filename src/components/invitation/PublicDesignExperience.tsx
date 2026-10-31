@@ -214,6 +214,7 @@ export function PublicDesignExperience({
               rtl={rtl}
               interactive
               reducedMotion={reducedMotion}
+              finishes={design.finishes}
               revealed={revealed}
               scrollActivationTime={reducedMotion ? 0 : scrollActivationTime}
               onReveal={(targetId, interactionId) =>

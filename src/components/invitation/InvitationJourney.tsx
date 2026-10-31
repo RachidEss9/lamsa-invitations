@@ -383,6 +383,7 @@ export function InvitationJourney({
                     guestName={guestName}
                     rtl={rtl}
                     reducedMotion={reducedMotion}
+                    finishes={design.finishes}
                     revealed={revealed}
                     scrollActivationTime={0}
                   />
@@ -405,6 +406,7 @@ export function InvitationJourney({
                   rtl={rtl}
                   interactive
                   reducedMotion={reducedMotion}
+                  finishes={design.finishes}
                   revealed={revealed}
                   scrollActivationTime={reducedMotion ? 0 : scrollActivationTime}
                   onReveal={handleReveal}
@@ -444,6 +446,7 @@ export function InvitationJourney({
             rtl={rtl}
             autoOpen={design.opening.autoOpen}
             reducedMotion={reducedMotion}
+            finishes={design.finishes}
             onDone={handleOpeningDone}
           />
         )}

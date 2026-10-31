@@ -19,6 +19,7 @@ import { createPortal } from "react-dom";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
 import { EnvelopeGuides } from "@/components/studio/EnvelopeGuides";
 import { geometryForPage, type EnvelopeGeometry } from "@/lib/envelope";
+import type { FinishesConfig } from "@/lib/finishes";
 import { equalSpacingGuides, type SpacingSegments } from "@/lib/smart-guides";
 import { textOverflows, type TextOverflow } from "@/lib/text-fit";
 import { effectFilter, gradientCss, outlineWidth } from "@/lib/effects";
@@ -75,6 +76,8 @@ interface StudioCanvasProps {
   onUserGuidesChange?: (next: { x: number[]; y: number[] }) => void;
   /** Artwork / Print mode (false) hides every material finish on the canvas. */
   materialPreview?: boolean;
+  /** The invitation's finish configuration: studio lighting and effects. */
+  finishes?: FinishesConfig;
   /**
    * Envelope drafting guides for the piece being edited: flap, address
    * windows, postage-safe zone and liner fit. Screen only — the overlay sits
@@ -348,6 +351,7 @@ export function StudioCanvas({
   userGuides = { x: [], y: [] },
   onUserGuidesChange,
   materialPreview = true,
+  finishes,
   envelope = null,
   resetViewToken = 0,
   editRequest,
@@ -1345,6 +1349,7 @@ export function StudioCanvas({
             ignoreExit={ignoreExit}
             hideElementId={editing?.id}
             materialPreview={materialPreview}
+            finishes={finishes}
             className="shadow-none"
           />
 

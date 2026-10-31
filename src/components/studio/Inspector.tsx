@@ -45,6 +45,8 @@ import {
   MaterialUnsupportedNote,
   MaterialsStudio,
 } from "@/components/studio/MaterialsStudio";
+import { FinishComposer } from "@/components/studio/FinishComposer";
+import { FinishComposer } from "@/components/studio/FinishComposer";
 import {
   supportsMaterial,
   supportsMaterialRelief,
@@ -114,6 +116,8 @@ interface InspectorProps {
   materialPreview?: boolean;
   /** Switches the canvas back to Material Preview from the panel. */
   onShowMaterials?: () => void;
+  /** Shows the original design instead of the finished one, to compare. */
+  onCompare?: () => void;
 }
 
 type SectionProps = {
@@ -217,6 +221,7 @@ function InspectorBody({
   onEditText,
   materialPreview = true,
   onShowMaterials,
+  onCompare,
 }: InspectorProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const element = selected.length === 1 ? selected[0] : null;
@@ -294,6 +299,30 @@ function InspectorBody({
             previewMode={materialPreview}
             onShowMaterials={onShowMaterials}
             onChange={(material) => onPagePatch({ material })}
+          />
+        </Section>
+        <Section title="Sheet finishes" defaultOpen={false}>
+          <FinishComposer
+            scope="page"
+            layers={page.finishes}
+            previewMode={materialPreview}
+            onShowFinishes={onShowMaterials}
+            onCompare={onCompare}
+            onChange={(finishes) =>
+              onPagePatch({ finishes: finishes.length > 0 ? finishes : undefined })
+            }
+          />
+        </Section>
+        <Section title="Sheet finishes" defaultOpen={false}>
+          <FinishComposer
+            scope="page"
+            layers={page.finishes}
+            previewMode={materialPreview}
+            onShowFinishes={onShowMaterials}
+            onCompare={onCompare}
+            onChange={(finishes) =>
+              onPagePatch({ finishes: finishes.length > 0 ? finishes : undefined })
+            }
           />
         </Section>
         <div className="px-4 py-5 text-[11px] leading-relaxed text-ink/50">
@@ -803,6 +832,34 @@ function InspectorBody({
         ) : (
           <MaterialUnsupportedNote />
         )}
+      </Section>
+
+      <Section title="Finishes" defaultOpen={false}>
+        <FinishComposer
+          scope="element"
+          element={element}
+          layers={element.finishes}
+          previewMode={materialPreview}
+          onShowFinishes={onShowMaterials}
+          onCompare={onCompare}
+          onChange={(finishes) =>
+            patch({ finishes: finishes.length > 0 ? finishes : undefined })
+          }
+        />
+      </Section>
+
+      <Section title="Finishes" defaultOpen={false}>
+        <FinishComposer
+          scope="element"
+          element={element}
+          layers={element.finishes}
+          previewMode={materialPreview}
+          onShowFinishes={onShowMaterials}
+          onCompare={onCompare}
+          onChange={(finishes) =>
+            patch({ finishes: finishes.length > 0 ? finishes : undefined })
+          }
+        />
       </Section>
 
       {animation && (
