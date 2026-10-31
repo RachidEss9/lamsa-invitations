@@ -159,8 +159,8 @@ describe("guest journey interaction", () => {
     expect(container.querySelector("[data-state]")?.getAttribute("data-state"))
       .toBe("pre");
     expect(
-    expect(container.querySelector("[data-testid=\"invitation\"]"))
-      .toBeTruthy();
+      container.querySelector("[data-testid=\"invitation\"]"),
+    ).toBeTruthy();
     const skip = buttonByLabel(container, "Skip the opening animation");
     expect(skip).toBeTruthy();
     act(() => skip?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
