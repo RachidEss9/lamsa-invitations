@@ -156,9 +156,9 @@ function PreflightPanel({
         </p>
       ) : (
         <div className="space-y-1">
-          {issues.slice(0, 8).map((issue) => (
+          {issues.slice(0, 8).map((issue, index) => (
             <p
-              key={issue.id}
+              key={`${issue.id}-${index}`}
               className={cn(
                 "flex items-start gap-1.5 border p-2 text-[10px] leading-relaxed",
                 tone(issue.severity),

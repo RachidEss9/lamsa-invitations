@@ -45,6 +45,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { SCENES, SCENE_IDS } from "@/lib/presentation";
+import type { FinishPreviewMode } from "@/lib/finishes";
 import {
   CLOSING_STYLES,
   PAGE_TRANSITIONS,
@@ -457,6 +458,8 @@ export default function Studio() {
   const [librariesOpen, setLibrariesOpen] = useState(false);
   const [libraryTab, setLibraryTab] = useState<LibraryTab>("templates");
   const [guestOpen, setGuestOpen] = useState(false);
+  const [finishPreviewMode, setFinishPreviewMode] =
+    useState<FinishPreviewMode>("studio");
   const [timelinePreviewOpen, setTimelinePreviewOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
   const [pendingTemplate, setPendingTemplate] = useState<{
@@ -4228,6 +4231,10 @@ export default function Studio() {
         activeMaterialId={activeMaterialId}
         tab={libraryTab}
         onTabChange={setLibraryTab}
+        finishPreviewMode={finishPreviewMode}
+        onFinishPreviewMode={setFinishPreviewMode}
+        onOpenFinishPreview={() => setGuestOpen(true)}
+        onSetMaterialPreview={setMaterialPreview}
       />
 
       {guestOpen && (
@@ -4239,6 +4246,7 @@ export default function Studio() {
           rtl={Boolean(content.rtl)}
           reducedMotion={reducedMotion}
           palette={content.palette}
+          previewMode={finishPreviewMode}
           onClose={() => setGuestOpen(false)}
         />
       )}
@@ -4252,6 +4260,7 @@ export default function Studio() {
           rtl={Boolean(content.rtl)}
           reducedMotion={reducedMotion}
           palette={content.palette}
+          previewMode={finishPreviewMode}
           mode="timeline"
           startPage={pageIndex}
           onClose={() => setTimelinePreviewOpen(false)}
