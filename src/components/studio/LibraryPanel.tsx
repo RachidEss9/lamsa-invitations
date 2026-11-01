@@ -342,7 +342,7 @@ interface LibraryPanelProps {
   /** The invitation-wide finish configuration: light, motion, applied preset. */
   finishConfig?: FinishesConfig;
   /** Writes the finish configuration back to the design. */
-  onFinishConfigChange?: (config: FinishesConfig) => void;
+  onFinishConfigChange?: (config: FinishesConfig | undefined) => void;
   /** Applies a luxury finish preset to the selection, or the sheet when empty. */
   onApplyFinishPreset?: (presetId: string) => void;
   /** The preset the invitation is already wearing, for the active tile. */
@@ -2334,6 +2334,8 @@ export function LibraryPanel({
                       />
                       <FinishLightSlider
                         label="Intensity"
+                        min={0}
+                        max={1}
                         value={finishLighting.intensity}
                         onChange={(intensity) =>
                           onFinishConfigChange?.(
@@ -2345,6 +2347,8 @@ export function LibraryPanel({
                       />
                       <FinishLightSlider
                         label="Softness"
+                        min={0}
+                        max={1}
                         value={finishLighting.softness}
                         onChange={(softness) =>
                           onFinishConfigChange?.(
@@ -2356,6 +2360,8 @@ export function LibraryPanel({
                       />
                       <FinishLightSlider
                         label="Warmth"
+                        min={0}
+                        max={1}
                         value={finishLighting.temperature}
                         onChange={(temperature) =>
                           onFinishConfigChange?.(
