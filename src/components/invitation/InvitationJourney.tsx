@@ -1,62 +1,25 @@
-import { ClosingStage } from "@/components/invitation/ClosingStage";
-import { DesignPageView, useStageScale } from "@/components/invitation/DesignPageView";
-import { JourneyCue } from "@/components/invitation/JourneyCue";
-import { PresentationStage } from "@/components/invitation/PresentationStage";
 import {
-  pageTransitionFrames,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useReducedMotion } from "framer-motion";
+import { ClosingStage } from "@/components/invitation/ClosingStage";
+import { DesignPageView } from "@/components/invitation/DesignPageView";
+import { PresentationStage } from "@/components/invitation/PresentationStage";
+import { JourneyCue } from "@/components/invitation/JourneyCue";
+import {
+  personalize,
   pageSizeOf,
   type DesignDocument,
   type DesignPage,
 } from "@/lib/design";
-import { fontFamilyFor } from "@/lib/fonts";
-import {
-  advancePhase,
-  continueState,
-  initialTiming,
-  journeyPages,
-  journeyStartsAtOpening,
-  pageDuration,
-  pageEntranceEnd,
-  type JourneyPhase,
-} from "@/lib/journey";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FinishesConfig } from "@/lib/finishes";
 
-interface InvitationJourneyProps {
-  design: DesignDocument;
-  imageUrls: Record<string, string>;
-  guestName?: string | null;
-  names?: string;
-  rtl?: boolean;
-  reducedMotion: boolean;
-  accent?: string;
-  ink?: string;
-  active?: boolean;
-  className?: string;
-  /** Motion Preview plays enabled finish effects regardless of a pause. */
-  forceFinishAnimations?: boolean;
-  /** Increment to replay the journey from its opening. */
-  restartSignal?: number;
-  onStepChange?: (step: number, total: number) => void;
-  onPhaseChange?: (phase: JourneyPhase) => void;
-}
+export type JourneyPhase = "opening" | "page" | "closing";
 
-const CONTINUE_BEAT_MS = 320;
-
-interface OutgoingPage {
-  page: DesignPage;
-  time: number;
-  key: string;
-}
-
-/**
- * The single guest-facing invitation journey.
- *
- * One continuous experience: the opening — in which the real first section is
- * the card being revealed — then each saved page in order, playing its own
- * entrance, and finally the closing. No loop: once a guest has seen the last
- * page, the invitation rests where it landed.
- */
 export function InvitationJourney({
   design,
   imageUrls,
@@ -64,169 +27,196 @@ export function InvitationJourney({
   names,
   rtl,
   reducedMotion,
-  accent,
-  ink,
   active = true,
+  accent = "#710014",
+  ink = "#161616",
   className,
-  forceFinishAnimations = false,
-  restartSignal = 0,
-}: InvitationJourneyProps) {
+}: {
+  design: DesignDocument;
+  imageUrls: Record<string, string>;
+  guestName?: string | null;
+  names?: string;
+  rtl?: boolean;
+  reducedMotion?: boolean;
+  active?: boolean;
+  accent?: string;
+  ink?: string;
+  className?: string;
+}) {
   const [phase, setPhase] = useState<JourneyPhase>("opening");
   const [step, setStep] = useState(0);
-  const [total, setTotal] = useState(design.pages.length);
-  const [revealed, setRevealed] = useState(false);
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const pages = useMemo(() => journeyPages(design), [design]);
-  const firstPage = pages[0];
-  const lastPage = pages[pages.length - 1];
-  const opening = journeyStartsAtOpening(design) ? design.opening.experience : "none";
-  const hasOpening = opening !== "none";
-  const continueLabel = phase === "closing" ? "Close" : (step + 1 < total ? "Continue" : "Close");
+  const [namesText, setNamesText] = useState(() =>
+    personalize(names ?? "", guestName ?? ""),
+  );
+  const reducedMotionState = useReducedMotion();
+  const isOpening = phase === "opening";
+  const total = design.pages.length;
+  const isLast = step + 1 >= total;
 
-  const handleContinue = useCallback(() => {
-    if (phase === "opening") {
-      if (hasOpening) {
-        setPhase("page");
-        setStep(0);
-        setTotal(design.pages.length);
-        setRevealed(true);
-        return;
+  const handleOpen = useCallback(() => {
+    setPhase("page");
+  }, []);
+
+  const handleAdvance = useCallback(() => {
+    setStep((current) => {
+      const next = current + 1;
+      if (next >= total) {
+        setPhase("closing");
       }
-      if (step + 1 < total) {
-        setStep((s) => s + 1);
-      }
-      return;
-    }
-    if (phase === "closing" && step + 1 >= total) return;
-    setStep((s) => s + 1);
-  }, [phase, step, total, hasOpening, design.pages.length]);
+      return next;
+    });
+  }, [total]);
 
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.target instanceof HTMLElement && event.target.closest("input, textarea")) {
-      return;
-    }
-    if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown") {
-      event.preventDefault();
-      handleContinue();
-    }
-  };
+  const handleClose = useCallback(() => {
+    setPhase("closing");
+  }, []);
 
-  const handleTouchStart = (event: React.TouchEvent) => {
-    if (event.target instanceof HTMLElement && event.target.closest("input, textarea")) return;
-    const touch = event.touches[0];
-    touchStart.current = { x: touch.clientX, y: touch.clientY };
-  };
+  const handleReplay = useCallback(() => {
+    setPhase("opening");
+    setStep(0);
+  }, []);
 
-  const handleTouchEnd = (event: React.TouchEvent) => {
-    if (!touchStart.current) return;
-    const target = event.target as HTMLElement;
-    if (target.closest("input, textarea")) {
-      touchStart.current = null;
-      return;
+  const page = useMemo(() => design.pages[step], [design, step]);
+
+  const handleReveal = useCallback(
+    (targetId: string, interactionId: string) => {
+      void targetId;
+      void interactionId;
+    },
+    [active],
+  );
+
+  const stage = useMemo(() => {
+    if (isOpening) {
+      return (
+        <PresentationStage
+          opening={design.opening}
+          imageUrls={imageUrls}
+          guestName={guestName}
+          names={namesText}
+          rtl={rtl}
+          reducedMotion={reducedMotionState}
+          finishes={design.finishes}
+          accent={accent}
+          background={page.background}
+          onDone={handleOpen}
+          className={className}
+        />
+      );
     }
-    const touch = event.changedTouches[0];
-    const dx = touch.clientX - touchStart.current.x;
-    const dy = touch.clientY - touchStart.current.y;
-    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.5) {
-      touchStart.current = null;
-      return;
+    if (phase === "closing") {
+      return (
+        <ClosingStage
+          closing={design.closing}
+          accent={accent}
+          background={page.background}
+          ink={ink}
+          guestName={guestName}
+          names={namesText}
+          reducedMotion={reducedMotionState}
+          onReplay={handleReplay}
+        />
+      );
     }
-    const forward = rtl ? dx > 0 : dx < 0;
-    if (forward) handleContinue();
-    touchStart.current = null;
-  };
+    return (
+      <DesignPageView
+        key={page.id}
+        page={page}
+        time={reducedMotionState ? pageSizeOf(page).width : 0}
+        imageUrls={imageUrls}
+        guestName={guestName}
+        rtl={rtl}
+        interactive
+        reducedMotion={reducedMotionState}
+        onReveal={handleReveal}
+        finishes={design.finishes}
+        forceFinishAnimations={false}
+        revealPreview={new Set() as Set<string>}
+        ignoreExit
+        hideElementId={null}
+        showHidden
+        scrollActivationTime={0}
+        materialPreview
+        className={className}
+      />
+    );
+  },    [isOpening,
+    phase,
+    design,
+    imageUrls,
+    guestName,
+    namesText,
+    rtl,
+    reducedMotionState,
+    page,
+    active,
+    accent,
+    ink,
+    handleOpen,
+    handleReveal,
+    handleReplay,
+  ]);
+
+  const { label, ariaLabel } = useMemo(() => {
+    if (isLast) {
+      return {
+        label: "Close the invitation",
+        ariaLabel: "Close the invitation",
+      };
+    }
+    return {
+      label: "Continue",
+      ariaLabel: `Continue to section ${total - (total - step) + 1} of ${total}`,
+    };
+  }, [isLast, step, total]);
+
+  const journeyCue = useMemo(() => {
+    if (isOpening) return null;
+    return (
+      <JourneyCue
+        label={label}
+        ariaLabel={ariaLabel}
+        accent={accent}
+        background={page.background}
+        ink={ink}
+        rtl={rtl}
+        reducedMotion={reducedMotionState}
+        onAdvance={handleAdvance}
+        className={className}
+      />
+    );
+  }, [
+    isOpening,
+    label,
+    ariaLabel,
+    accent,
+    page,
+    ink,
+    rtl,
+    reducedMotionState,
+    handleAdvance,
+  ]);
 
   return (
     <div
       className={cn("relative w-full", className)}
       role="region"
-      aria-label={names ? `Invitation for ${names}` : "Invitation"}
+      aria-label={`Invitation for ${namesText}`}
       tabIndex={0}
-      onKeyDown={handleKeyDown}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
     >
       <div
         className="relative w-full overflow-hidden bg-[var(--paper-light)] shadow-[0_24px_70px_rgba(22,22,22,0.16)]"
+        style={{ aspectRatio: "1000 / 1333.33" }}
       >
-        {phase !== "opening" && (
-          <div
-            className="absolute left-0 top-0 origin-top-left"
-            style={{
-              width: pageSizeOf(firstPage).width,
-              height: pageSizeOf(firstPage).height,
-              transform: `scale(${1 || 0.0001})`,
-              visibility: "visible",
-            }}
-          >
-            <div
-              className="absolute inset-0"
-              style={{
-                background: firstPage.background ?? "#f2f1ed",
-              }}
-            >
-              {phase === "opening" && hasOpening && (
-                <PresentationStage
-                  opening={design.opening}
-                  page={firstPage}
-                  imageUrls={imageUrls}
-                  accent="#710014"
-                  background={firstPage.background ?? "#f2f1ed"}
-                  guestName={guestName}
-                  names={names}
-                  rtl={rtl}
-                  autoOpen={true}
-                  reducedMotion={reducedMotion}
-                  finishes={design.finishes}
-                  onDone={() => setPhase("page")}
-                />
-              )}
-              {phase === "page" && (
-                <DesignPageView
-                  page={pages[step]}
-                  time={0}
-                  imageUrls={imageUrls}
-                  guestName={guestName}
-                  rtl={rtl}
-                  reducedMotion={reducedMotion}
-                  finishes={design.finishes}
-                  revealed={revealed}
-                  onReveal={() => setRevealed(true)}
-                />
-              )}
-              {phase === "closing" && (
-                <PresentationStage
-                  opening={design.opening}
-                  page={lastPage}
-                  imageUrls={imageUrls}
-                  accent="#710014"
-                  background={lastPage.background ?? "#f2f1ed"}
-                  guestName={guestName}
-                  names={names}
-                  rtl={rtl}
-                  autoOpen={true}
-                  reducedMotion={reducedMotion}
-                  finishes={design.finishes}
-                  onDone={() => setPhase("page")}
-                />
-              )}
-            </div>
-          </div>
-        )}
-        <JourneyCue
-          fontFamily="cormorant-garamond"
-          label={continueLabel}
-          ariaLabel={continueLabel === "Close" ? "Close the invitation" : `Continue to section ${Math.min(step + 2, total)} of ${total}`}
-          accent="#710014"
-          background={firstPage.background ?? "#f2f1ed"}
-          ink="#161616"
-          rtl={rtl}
-          reducedMotion={reducedMotion}
-          onAdvance={handleContinue}
-        />
-        {!active && (
-          <div className="absolute inset-0 z-20 bg-black/40" aria-hidden="true" />
-        )}
+        <div className="sr-only" aria-live="polite">
+          {isOpening
+            ? "Choose a scene and open the invitation."
+            : isLast
+            ? "Close the invitation"
+            : `Continue to section ${total - (total - step) + 1} of ${total}`}
+        </div>
+        {stage}
+        {journeyCue}
       </div>
     </div>
   );

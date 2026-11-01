@@ -151,7 +151,7 @@ export function JourneyCue({
             opacity: 0.62,
           }}
         >
-          {label}
+          {label === "Close" ? ariaLabel : label}
         </span>
       </button>
     </div>
