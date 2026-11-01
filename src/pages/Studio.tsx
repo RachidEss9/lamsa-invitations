@@ -4439,9 +4439,10 @@ export default function Studio() {
                   className="pressable rounded-2xl border border-ink/10 bg-white/70 p-2.5 text-left hover:border-ink/30 hover:shadow-[var(--shadow-soft)] disabled:cursor-wait disabled:opacity-45"
                 >
                   <span className="flex gap-1.5" aria-hidden>
-                    {[palette.paper, palette.ink, palette.accent].map((colour) => (
+                    {[palette.paper, palette.ink, palette.accent].map(
+                      (colour, index) => (
                       <span
-                        key={colour}
+                        key={`${colour}-${index}`}
                         className="size-5 rounded-full border border-black/10"
                         style={{ background: colour }}
                       />

@@ -237,9 +237,9 @@ export function ColourPanel({
         <div className="flex items-center gap-2">
           <span className="flex shrink-0 -space-x-1.5">
             {[derivedPalette.paper, derivedPalette.ink, derivedPalette.accent].map(
-              (colour) => (
+              (colour, index) => (
                 <span
-                  key={colour}
+                  key={`${colour}-${index}`}
                   className="swatch-dot size-5 border border-[var(--paper-light)]"
                   style={{ background: colour }}
                   title={colour}
@@ -285,9 +285,10 @@ export function ColourPanel({
                 className="flex items-center gap-1.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)] py-1 pr-1 pl-1.5"
               >
                 <span className="flex shrink-0 -space-x-1">
-                  {[palette.paper, palette.ink, palette.accent].map((colour) => (
+                  {[palette.paper, palette.ink, palette.accent].map(
+                    (colour, index) => (
                     <span
-                      key={colour}
+                      key={`${colour}-${index}`}
                       className="swatch-dot size-3.5 border border-[var(--paper-light)]"
                       style={{ background: colour }}
                     />
@@ -385,9 +386,10 @@ export function ColourPanel({
               </Button>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-1.5">
-              {[palette.paper, palette.ink, palette.accent].map((colour) => (
+              {[palette.paper, palette.ink, palette.accent].map(
+                (colour, index) => (
                 <Swatch
-                  key={colour}
+                  key={`${colour}-${index}`}
                   value={colour}
                   active={colour.toLowerCase() === current.toLowerCase()}
                   onPick={() => apply(colour)}
