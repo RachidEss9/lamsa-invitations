@@ -25,9 +25,6 @@ import { REVEAL_PRESETS, type RevealPreset } from "@/lib/reveals";
 import { BUILTIN_STYLES, type BuiltinStyle } from "@/lib/styles";
 import { FONT_LIBRARY, fontById, fontSamples } from "@/lib/fonts";
 import { TEMPLATES, type InvitationTemplate } from "@/lib/invitation";
-import { OPENING_EXPERIENCES } from "@/lib/design";
-import { SceneThumb } from "@/components/invitation/SceneThumb";
-import type { SceneId } from "@/lib/presentation";
 import type { ShapeKind } from "@/lib/design";
 import { PALETTES, PALETTE_GROUPS, type ColourPalette } from "@/lib/palettes";
 import { paletteSwatches as deriveSwatches } from "@/lib/library-colour";
@@ -101,7 +98,6 @@ import {
   type DesignElement,
   type DesignPage,
   type ElementAnimation,
-  type OpeningSettings,
 } from "@/lib/design";
 
 /* -------------------------------------------------------------------------- */
@@ -209,8 +205,7 @@ export type LibraryTab =
   | "materials"
   | "finishes"
   | "layouts"
-  | "reveals"
-  | "opening";
+  | "reveals";
 
 interface CategorySpec {
   id: LibraryTab;
@@ -298,13 +293,6 @@ const CATEGORIES: CategorySpec[] = [
     blurb: "Cover-and-reveal moments for a card or a photograph.",
     placeholder: "Search reveals…",
   },
-  {
-    id: "opening",
-    label: "Presentation",
-    icon: Sparkle,
-    blurb: "The scene a guest opens the invitation with.",
-    placeholder: "Search scenes…",
-  },
 ];
 
 interface LibraryPanelProps {
@@ -315,7 +303,7 @@ interface LibraryPanelProps {
   selectedIds: string[];
   selectedAnimations: ElementAnimation[];
   onApplyTemplate: (next: DesignDocument, name: string) => void;
-  onApplyOpening: (opening: OpeningSettings) => void;
+
   onApplyAnimation: (animation: ElementAnimation) => void;
   onApplyFont: (fontId: string) => void;
   onApplyStyle: (style: BuiltinStyle) => void;
@@ -991,7 +979,6 @@ export function LibraryPanel({
   design,
   selectedIds,
   onApplyTemplate,
-  onApplyOpening,
   onApplyFont,
   onApplyStyle,
   onAddPageLayout,
@@ -1435,7 +1422,18 @@ export function LibraryPanel({
       case "reveals":
         return REVEAL_PRESETS.length;
       case "opening":
-        return OPENING_EXPERIENCES.filter((item) => item.id !== "none").length;
+        return 0;
+    }
+  };
+
+  const category = CATEGORIES.find((item) => item.id === tab) ?? CATEGORIES[0];
+        return FINISH_PRESETS.length;
+      case "layouts":
+        return PAGE_LAYOUTS.length;
+      case "reveals":
+        return REVEAL_PRESETS.length;
+    case "opening":
+        return 0;
     }
   };
 
@@ -1463,8 +1461,8 @@ export function LibraryPanel({
         return `${PAGE_LAYOUTS.length} page layouts`;
       case "reveals":
         return `${filteredReveals.length} reveal presets`;
-      case "opening":
-        return `${countFor("opening")} saved · 3 scenes`;
+    case "opening":
+        return 0;
     }
   })();
 
@@ -2563,52 +2561,10 @@ export function LibraryPanel({
                     still choose either of the others.
                   </p>
                   <p className="section-label">Experiences</p>
-                  <p className="mb-2.5 -mt-2 font-ui text-[0.63rem] leading-relaxed text-ink/45">
-                    Only the scene changes here — the suite's materials,
-                    envelope size and palette stay.
-                  </p>
-                  {OPENING_EXPERIENCES.filter(
-                    (experience) =>
-                      experience.id !== "none" &&
-                      matchesQuery(experience.label, experience.note),
-                  ).length === 0 ? (
-                    <EmptyNote>No opening experiences available.</EmptyNote>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
-                      {OPENING_EXPERIENCES.filter(
-                        (experience) =>
-                          experience.id !== "none" &&
-                          matchesQuery(experience.label, experience.note),
-                      ).map((experience) => (
-                        <button
-                          key={experience.id}
-                          type="button"
-                          onClick={() => {
-                            // Only the scene changes here: the suite's
-                            // materials, envelope size and palette stay.
-                            onApplyOpening({
-                              ...design.opening,
-                              experience:
-                                experience.id as OpeningSettings["experience"],
-                            });
-                            onClose();
-                          }}
-                          className={cn(
-                            "ui-tile group gap-1.5",
-                            design.opening.experience === experience.id &&
-                              "border-[var(--edge-strong)]",
-                          )}
-                        >
-                          <span className="ui-tile-art aspect-[3/2] w-full">
-                            <SceneThumb scene={experience.id as SceneId} />
-                            <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-ink/85 py-1 text-center font-ui text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-[var(--paper-light)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Use scene
-                            </span>
-                          </span>
-                          <span className="block px-1 pb-0.5">
-                            <span className="block truncate font-ui text-[0.72rem] font-medium text-ink">
+                                        <span className="block truncate font-ui text-[0.72rem] font-medium text-ink">
                               {experience.label}
                             </span>
+
                             <span className="mt-0.5 line-clamp-2 font-ui text-[0.6rem] leading-snug text-ink/45">
                               {experience.note}
                             </span>

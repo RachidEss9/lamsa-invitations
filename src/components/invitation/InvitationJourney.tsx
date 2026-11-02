@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
 import { JourneyCue } from "@/components/invitation/JourneyCue";
-import { PresentationStage } from "@/components/invitation/PresentationStage";
 import { personalize, type DesignDocument } from "@/lib/design";
 import {
   advancePhase,
@@ -37,11 +36,11 @@ interface InvitationJourneyProps {
   className?: string;
 }
 
-/**
- * The sequential guest journey: the presentation stage opens the invitation,
- * one section is shown at a time behind a single Continue flourish, and the
- * final section hands over to the closing. The public page and the studio's
- * guest preview render exactly this component, so rehearsing is the real run.
+/** 
+ * The sequential guest journey: one section is shown at a time behind a
+ * single Continue flourish, and the final section hands over to the closing.
+ * The public page and the studio's guest preview render exactly this component,
+ * so rehearsal is the real run.
  */
 export function InvitationJourney({
   design,
@@ -159,20 +158,25 @@ export function InvitationJourney({
   let stage = null;
   if (phase === "opening") {
     stage = (
-      <PresentationStage
-        opening={design.opening}
-        page={page}
-        imageUrls={imageUrls}
-        accent={accent}
-        background={page?.background ?? "#f2f1ed"}
-        guestName={guestName}
-        names={namesText}
-        rtl={rtl}
-        reducedMotion={reducedMotion}
-        finishes={design.finishes}
-        onDone={handleOpen}
-        className={className}
-      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: page?.background ?? "#f2f1ed",
+        }}
+      >
+        <DesignPageView
+          key={page?.id}
+          page={page}
+          time={0}
+          imageUrls={imageUrls}
+          guestName={guestName}
+          rtl={rtl}
+          interactive
+          reducedMotion={reducedMotion}
+          finishes={design.finishes}
+          onReveal={handleOpen}
+        />
+      </div>
     );
   } else if (phase === "closing") {
     stage = (

@@ -779,98 +779,7 @@ export function pageFitScale(
   return Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Opening experience                                                         */
-/* -------------------------------------------------------------------------- */
 
-/** The three presentation scenes, and the legacy map they replace. */
-export type OpeningExperienceId = "none" | "secret-world" | "living-art" | "impossible" | "cinematic";
-
-export const OPENING_EXPERIENCES: {
-  id: OpeningExperienceId;
-  label: string;
-  note: string;
-}[] = [
-  { id: "none", label: "Plain invitation", note: "No entrance — the card opens as it always has" },
-  { id: "secret-world", label: "The Secret World", note: "Concentric arches part around a candlelit niche" },
-  { id: "living-art", label: "Living Art", note: "A silk veil lifts from the invitation" },
-  { id: "impossible", label: "The Impossible Invitation", note: "A paper monument assembles around the card" },
-];
-
-/** The saved experience a design records; the picker defaults it. */
-export interface OpeningSettings {
-  experience: OpeningExperienceId;
-  autoOpen: boolean;
-  welcome: string;
-  /** Keep the invitation open for `duration` ms before the curtain rises. */
-  duration?: number;
-  /** The colour story the opening scene is dressed in. */
-  tone?: string;
-  /** Scene colours: accent gold, hull (deep ink) and paper. */
-  palette?: { accent: string; hull: string; paper: string };
-  /** The stored id of the background picture the cover uses. */
-  coverStorageId?: string;
-}
-
-/** The player's personalisation pass: fill in words, names, venue, date. */
-export interface OpeningContent {
-  title: string;
-  occasion: string;
-  templateId: string;
-  names: { primary: string; secondary: string };
-  eyebrow: string;
-  message: string;
-  date: string;
-  time: string;
-  venueName: string;
-  venueAddress: string;
-}
-
-/** The legacy styles the picker initially renders, before the design is saved. */
-export interface OpeningStyle {
-  experience: OpeningExperienceId;
-  label: string;
-  note: string;
-}
-
-/** The three presentation scenes and the legacy styles, one record each. */
-export const LEGACY_OPENING_STYLES: OpeningStyle[] = [
-  { experience: "none", label: "Plain invitation", note: "The card opens as it always has" },
-  { experience: "secret-world", label: "The Secret World", note: "Concentric arches part around a candlelit niche" },
-  { experience: "living-art", label: "Living Art", note: "A silk veil lifts from the invitation" },
-  { experience: "impossible", label: "The Impossible Invitation", note: "A paper monument assembles around the card" },
-];
-
-/** Retired opening ids and the scene that replaced each one. */
-const RETIRED_OPENING_EXPERIENCES: Record<string, OpeningExperienceId> = {
-  envelope: "secret-world",
-  curtain: "living-art",
-  typography: "impossible",
-  "wax-seal": "secret-world",
-  personal: "impossible",
-  paper: "living-art",
-  cinematic: "secret-world",
-};
-
-/**
- * A saved opening experience, settled onto something that renders: the three
- * scenes and "none" pass through verbatim, a retired id lands on the scene
- * that replaced it, and anything else falls back to the first scene.
- */
-export function settledOpeningExperience(value: unknown): OpeningExperienceId {
-  if (
-    value === "none" ||
-    value === "secret-world" ||
-    value === "living-art" ||
-    value === "impossible"
-  ) {
-    return value;
-  }
-  if (typeof value === "string" && value in RETIRED_OPENING_EXPERIENCES) {
-    return RETIRED_OPENING_EXPERIENCES[value];
-  }
-  return "secret-world";
-}
 
 export function normalizeDesign(
   saved: unknown,
@@ -883,19 +792,14 @@ export function normalizeDesign(
     rawPages.length > 0
       ? rawPages.map((page) => normalizePage(page, content))
       : [normalizePage(null, content)];
+  // The invitation used to carry Presentation opening settings. The studio no
+  // longer exposes a scene picker, but these values are kept in the saved
+  // document so a reload never throws and an old invitation still renders.
   const stored =
     typeof doc.opening === "object" && doc.opening !== null
       ? doc.opening
-      : ({} as Partial<OpeningSettings>);
-  const opening: OpeningSettings = {
-    experience: settledOpeningExperience(stored.experience ?? "none"),
-    autoOpen: stored.autoOpen ?? false,
-    welcome: stored.welcome ?? "",
-    duration: stored.duration ?? undefined,
-    tone: stored.tone ?? undefined,
-    palette: stored.palette ?? undefined,
-    coverStorageId: stored.coverStorageId ?? undefined,
-  };
+      : ({} as Partial<{}>);
+  const opening: OpeningSettings = { experience: "none", autoOpen: false, welcome: "", };
   const closing: ClosingSettings = {
     enabled: doc.closing?.enabled ?? false,
     style: doc.closing?.style ?? "message",
@@ -1498,7 +1402,7 @@ export interface BlankDesignOptions {
   unit?: DesignUnit;
   physicalWidth?: number;
   physicalHeight?: number;
-  opening?: Partial<OpeningSettings>;
+  opening?: Partial<{}>;
   closing?: ClosingSettings;
   transition?: PageTransition;
 }

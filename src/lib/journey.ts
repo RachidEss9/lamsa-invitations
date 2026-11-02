@@ -29,17 +29,10 @@ export function journeyPages(design: DesignDocument): DesignPage[] {
   return visiblePages(design);
 }
 
-export function hasOpening(design: DesignDocument): boolean {
-  return design.opening.experience !== "none";
-}
+
 
 /** Opening is skipped entirely when motion is reduced. */
-export function journeyStartsAtOpening(
-  design: DesignDocument,
-  reducedMotion: boolean,
-): boolean {
-  return hasOpening(design) && !reducedMotion;
-}
+
 
 export function pageDuration(page: DesignPage | null): number {
   return page ? timelineDuration(page) : 4000;

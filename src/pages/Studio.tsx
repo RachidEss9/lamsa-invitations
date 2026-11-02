@@ -3,10 +3,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
-import { PresentationStage } from "@/components/invitation/PresentationStage";
-import { SceneThumb } from "@/components/invitation/SceneThumb";
-import { GuestExperience } from "@/components/studio/GuestExperience";
-import { SequentialGuestPreview } from "@/components/studio/SequentialGuestPreview";
 import { ColourPanel } from "@/components/studio/ColourPanel";
 import { Inspector } from "@/components/studio/Inspector";
 import { LayersPanel } from "@/components/studio/LayersPanel";
@@ -17,7 +13,6 @@ import {
 } from "@/components/studio/LibraryPanel";
 import { FrameThumb } from "@/components/invitation/FrameArt";
 import { PrintExportDialog } from "@/components/studio/PrintExportDialog";
-import { DetailPresentationStudio } from "@/components/studio/DetailPresentationStudio";
 import { ShareStyleDialog } from "@/components/studio/ShareStyleDialog";
 import { SuiteBar } from "@/components/studio/SuiteBar";
 import { StudioCanvas, type CanvasContextAction } from "@/components/studio/StudioCanvas";
@@ -44,7 +39,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { SCENES, SCENE_IDS } from "@/lib/presentation";
 import type { FinishPreviewMode } from "@/lib/finishes";
 import {
   CLOSING_STYLES,
@@ -74,7 +68,6 @@ import {
   type DesignElement,
   type DesignPage,
   type ElementAnimation,
-  type OpeningSettings,
   type PageResizeMode,
   type StylePreset,
 } from "@/lib/design";
@@ -207,8 +200,8 @@ import { toast } from "sonner";
 
 type SaveState = "saved" | "saving" | "unsaved" | "error";
 type Device = "desktop" | "tablet" | "phone";
-type LeftPanel = "add" | "layers" | "colour" | "opening" | "pages";
-type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline";
+type LeftPanel = "add" | "layers" | "colour" | "pages" | "finishes";
+type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline" | "finishes";
 
 /** Shared empty guides, so the canvas never sees a fresh object each render. */
 const NO_GUIDES: PageGuides = { x: [], y: [] };
@@ -469,14 +462,10 @@ export default function Studio() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareStyleOpen, setShareStyleOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
-  const [presentationOpen, setPresentationOpen] = useState(false);
-  // Detail presentations live in this device's storage, keyed per invitation.
-  const presentationDesignKey = invitation?._id ?? `draft:${invitationId || "new"}`;
+
   const [publishing, setPublishing] = useState(false);
-  const [openingPreview, setOpeningPreview] = useState(0);
-  const [showOpeningPreview, setShowOpeningPreview] = useState(false);
-  const [showClosingPreview, setShowClosingPreview] = useState(false);
-  const [closingPreviewKey, setClosingPreviewKey] = useState(0);
+
+
   const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
@@ -2108,7 +2097,6 @@ export default function Studio() {
     toast.success("Template applied. Your words, details, guests, and RSVP are untouched.");
   };
 
-  const applyOpening = (opening: OpeningSettings) => {
     apply((current) => ({ ...current, opening }));
   };
 
@@ -2618,50 +2606,7 @@ export default function Studio() {
           ? "Save failed"
           : "All changes saved";
 
-  const openingStagePreview = (
-    <Dialog open={showOpeningPreview} onOpenChange={setShowOpeningPreview}>
-      <DialogContent className="max-w-[640px] overflow-hidden p-0">
-        <div className="relative aspect-[3/2] w-full">
-          <PresentationStage
-            key={openingPreview}
-            opening={{ ...design.opening, autoOpen: false }}
-            page={design.pages.find((candidate) => !candidate.hidden) ?? design.pages[0] ?? null}
-            imageUrls={imageUrls}
-            accent={content.palette.accent}
-            background={
-              (design.pages.find((candidate) => !candidate.hidden) ?? design.pages[0])
-                ?.background ?? content.palette.background
-            }
-            guestName="Amelia"
-            names={namesLabel}
-            reducedMotion={reducedMotion}
-            onDone={() => setShowOpeningPreview(false)}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
 
-  const closingPreview = (
-    <Dialog open={showClosingPreview} onOpenChange={setShowClosingPreview}>
-      <DialogContent className="max-w-[440px] overflow-hidden p-0">
-        <div className="relative aspect-[3/4] w-full">
-          <ClosingStage
-            key={closingPreviewKey}
-            closing={design.closing}
-            accent={content.palette.accent}
-            background={page.background}
-            ink={content.palette.ink}
-            guestName="Amelia"
-            names={namesLabel}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-
-  // The hidden file input lives outside the panel tree, so the picker is
-  // opened from this event handler instead of touching the ref while rendering.
   const pickImageFile = () => imageFileRef.current?.click();
 
   const renderLeftPanel = () => {
@@ -2790,6 +2735,10 @@ export default function Studio() {
       );
     }
 
+    if (leftPanel === "opening") {
+      return null;
+    }
+
     if (leftPanel === "layers") {
       return (
         <LayersPanel
@@ -2821,17 +2770,9 @@ export default function Studio() {
     }
 
     if (leftPanel === "opening") {
-      return (
-        <>
-          <PanelHeading
-            title="Presentation"
-            note="The scene shown once, before the first page. Separate from page transitions."
-          />
-          <div className="space-y-3 p-3">
-            <div>
-              <span className="mb-1 block text-[10px] text-ink/55">Scene</span>
-              <div className="grid grid-cols-3 gap-1.5">
-                {SCENE_IDS.map((sceneId) => (
+      return null;
+    }
+
                   <button
                     key={sceneId}
                     type="button"
@@ -2846,32 +2787,12 @@ export default function Studio() {
                         : "border-ink/15 hover:border-ink/45",
                     )}
                   >
-                    <SceneThumb scene={sceneId} />
-                    <span className="absolute inset-x-0 bottom-0 bg-ink/70 px-1 py-0.5 text-center text-[7px] uppercase tracking-[0.1em] text-[var(--paper-light)]">
+                                <span className="absolute inset-x-0 bottom-0 bg-ink/70 px-1 py-0.5 text-center text-[7px] uppercase tracking-[0.1em] text-[var(--paper-light)]">
                       {SCENES[sceneId].title.replace(/^The /, "")}
                     </span>
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  applyOpening({ ...design.opening, experience: "none" })
-                }
-                className={cn(
-                  "mt-1.5 w-full border px-2 py-1 text-[9px] uppercase tracking-[0.12em] transition-colors",
-                  design.opening.experience === "none"
-                    ? "border-[var(--edge-strong)] text-ink"
-                    : "border-ink/15 text-ink/50 hover:border-ink/40",
-                )}
-              >
-                No presentation
-              </button>
-              <p className="mt-1.5 text-[9px] leading-relaxed text-ink/40">
-                Guests may choose any of the three scenes; the one picked here
-                is highlighted first. The presentation never replays on page
-                navigation.
-              </p>
             </div>
             <label className="block">
               <span className="mb-1 block text-[10px] text-ink/55">Welcome line</span>
@@ -4237,35 +4158,7 @@ export default function Studio() {
         onSetMaterialPreview={setMaterialPreview}
       />
 
-      {guestOpen && (
-        <SequentialGuestPreview
-          design={design}
-          imageUrls={imageUrls}
-          guestName={null}
-          names={namesLabel}
-          rtl={Boolean(content.rtl)}
-          reducedMotion={reducedMotion}
-          palette={content.palette}
-          previewMode={finishPreviewMode}
-          onClose={() => setGuestOpen(false)}
-        />
-      )}
 
-      {timelinePreviewOpen && (
-        <GuestExperience
-          design={design}
-          imageUrls={imageUrls}
-          guestName={null}
-          names={namesLabel}
-          rtl={Boolean(content.rtl)}
-          reducedMotion={reducedMotion}
-          palette={content.palette}
-          previewMode={finishPreviewMode}
-          mode="timeline"
-          startPage={pageIndex}
-          onClose={() => setTimelinePreviewOpen(false)}
-        />
-      )}
 
       <PrintExportDialog
         open={printOpen}
@@ -4277,18 +4170,6 @@ export default function Studio() {
         rtl={Boolean(content.rtl)}
       />
 
-      <DetailPresentationStudio
-        open={presentationOpen}
-        onOpenChange={setPresentationOpen}
-        design={design}
-        designKey={presentationDesignKey}
-        imageUrls={imageUrls}
-        title={content.title}
-        rtl={Boolean(content.rtl)}
-      />
-
-      {openingStagePreview}
-      {closingPreview}
 
       <Dialog open={Boolean(pendingTemplate)} onOpenChange={(open) => !open && setPendingTemplate(null)}>
         <DialogContent className="max-w-[440px]">

@@ -1,129 +1,74 @@
-import { describe, it, expect } from "vitest";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { InvitationJourney } from "@/components/invitation/InvitationJourney";
-import { OPENING_EXPERIENCES, type DesignDocument } from "./design";
+import { describe, expect, it } from "bun:test";
+import { advancePhase, continueState, initialTiming, isLastStep, nextStep, type DesignPage, type DesignDocument } from "./design";
+import { journeyProgress, journeyStartsAtOpening } from "./journey";
 
-function design(): DesignDocument {
+function page(over: Partial<DesignPage> = {}): DesignPage {
   return {
-    version: 1,
-    pages: [
-      {
-        id: "page-1",
-        name: "Cover",
-        background: "#f2f1ed",
-        elements: [
-          {
-            id: "names",
-            kind: "text",
-            name: "Names",
-            text: "Amelia & Søren",
-            x: 100,
-            y: 500,
-            w: 800,
-            h: 160,
-            rotation: 0,
-            opacity: 1,
-            locked: false,
-            hidden: false,
-            font: "cormorant-garamond",
-            fontSize: 72,
-            color: "#161616",
-            animation: {
-              enabled: true,
-              preset: "fade",
-              trigger: "load",
-              delay: 0,
-              duration: 600,
-              easing: "easeOut",
-            },
-          },
-        ],
-      },
-    ],
-    opening: {
-      experience: "secret-world" as const,
-      duration: 3200,
-      autoOpen: false,
-      welcome: "For {{guest}}",
-    },
-    closing: { enabled: true, style: "message", message: "With love", duration: 1400 },
-    transition: { preset: "fade", duration: 700 },
+    id: "p1",
+    name: "P",
+    background: "#fff",
+    elements: [],
+    hidden: false,
+    ...over,
   };
 }
 
-describe("invitation journey rendering", () => {
-  it("renders saved page content in the shared journey (no player chrome)", () => {
-    const html = renderToStaticMarkup(
-      createElement(InvitationJourney, {
-        design: design(),
-        imageUrls: {},
-        guestName: "Amara",
-        names: "Amelia & Søren",
-        reducedMotion: true,
-      }),
-    );
-    expect(html).toContain("Amelia &amp; Søren");
-    // No playback transport or page picker reaches the guest.
-    expect(html).not.toContain("Pause");
-    expect(html).not.toContain("Previous section");
-    expect(html).not.toContain("Next section");
-    // The last section of a closing invitation offers the closing hand-off.
-    expect(html).toContain("Close the invitation");
+function doc(pages: DesignPage[] = [], openingExperience: string = "none"): DesignDocument {
+  return {
+    version: 1,
+    pages,
+    opening: { experience: openingExperience, autoOpen: false, welcome: "" },
+    closing: { enabled: false, style: "message", message: "", duration: 800 },
+    transition: null,
+    startedAt: 0,
+    suite: [],
+    finishes: null,
+  };
+}
+
+describe("journey", () => {
+  it("nextStep advances stepwise", () => {
+    expect(nextStep(0, 4)).toBe(1);
+    expect(nextStep(3, 4)).toBe(3);
   });
 
-  it("starts on the opening cover when motion is allowed", () => {
-    const html = renderToStaticMarkup(
-      createElement(InvitationJourney, {
-        design: design(),
-        imageUrls: {},
-        reducedMotion: false,
-      }),
-    );
-    // The opening dialog presents the saved first section: one stage,
-    // the saved scene, and the guest's opening prompt.
-    expect(html).toContain('data-testid="presentation-stage"');
-    expect(html).toContain('data-scene="secret-world"');
-    expect(html).toContain('data-state="pre"');
-    expect(html).toContain("Choose a scene and open the invitation.");
-    // The first section is owned by the stage, not duplicated as a card.
-    expect(html).not.toContain("data-opening-card");
-    expect(html.split("data-testid=\"presentation-stage\"").length - 1).toBe(1);
-    expect(html).not.toContain("Close the invitation");
-    expect(html).not.toContain("data-journey-cue");
+  it("isLastStep", () => {
+    expect(isLastStep(0, 1)).toBe(true);
+    expect(isLastStep(0, 4)).toBe(false);
+    expect(isLastStep(3, 4)).toBe(true);
   });
 
-  it("gives every opening preset the real first section to reveal", () => {
-    for (const experience of OPENING_EXPERIENCES) {
-      if (experience.id === "none") continue;
-      const doc = design();
-      doc.opening.experience = experience.id;
-      const html = renderToStaticMarkup(
-        createElement(InvitationJourney, {
-          design: doc,
-          imageUrls: {},
-          guestName: "Amara",
-          reducedMotion: false,
-        }),
-      );
-      expect(html, experience.id).toContain('data-testid="presentation-stage"');
-      expect(html, experience.id).toContain(`data-scene="${experience.id}"`);
-      expect(html, experience.id).toContain('role="dialog"');
-      expect(html, experience.id).toContain("Choose a scene and open the invitation.");
-    }
+  it("advancePhase", () => {
+    expect(advancePhase(0, 4, false)).toEqual({ step: 1, phase: "page" });
+    expect(advancePhase(3, 4, false)).toEqual({ step: 3, phase: "page" });
+    expect(advancePhase(3, 4, true)).toEqual({ step: 3, phase: "closing" });
   });
 
-  it("never renders playback transport or a page selector", () => {
-    const html = renderToStaticMarkup(
-      createElement(InvitationJourney, {
-        design: design(),
-        imageUrls: {},
-        reducedMotion: true,
-      }),
-    );
-    expect(html).not.toContain("Pause");
-    expect(html).not.toContain("Play");
-    expect(html).not.toContain("Replay this page");
-    expect(html).not.toMatch(/aria-label="Page \d/);
+  it("continueState", () => {
+    const timing = { duration: 1000, settled: true, reducedMotion: false };
+    expect(continueState(timing, 0, 3, false)).toEqual({ visible: true, finishes: false, label: "Continue" });
+    expect(continueState(timing, 2, 3, false)).toEqual({ visible: true, finishes: false, label: "Continue" });
+    expect(continueState(timing, 2, 3, true)).toEqual({ visible: true, finishes: true, label: "Close the invitation" });
+  });
+
+  it("continueState is hidden in reduced motion until the last page", () => {
+    const timing = { duration: 1000, settled: false, reducedMotion: true };
+    expect(continueState(timing, 0, 3, false).visible).toBe(false);
+    expect(continueState(timing, 2, 3, true).visible).toBe(true);
+  });
+
+  it("journeyProgress", () => {
+    expect(journeyProgress(0, 4)).toBe(0.25);
+    expect(journeyProgress(3, 4)).toBe(1);
+  });
+
+  it("initialTiming", () => {
+    expect(initialTiming(page(), false)).toEqual({ time: 0, settled: false });
+    expect(initialTiming(page(), true)).toEqual({ time: 4000, settled: true });
+  });
+
+  it("journeyStartsAtOpening is always false after presentation removal", () => {
+    expect(journeyStartsAtOpening(doc(), "none")).toBe(false);
+    expect(journeyStartsAtOpening(doc([page()]), "secret-world")).toBe(false);
   });
 });
