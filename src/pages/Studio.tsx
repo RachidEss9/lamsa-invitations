@@ -2095,9 +2095,6 @@ export default function Studio() {
     toast.success("Template applied. Your words, details, guests, and RSVP are untouched.");
   };
 
-    apply((current) => ({ ...current, opening }));
-  };
-
   const applyClosing = (closing: ClosingSettings) => {
     apply((current) => ({ ...current, closing }));
   };
