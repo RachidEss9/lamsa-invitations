@@ -1,3 +1,5 @@
+import { useAutosave } from "@/components/platform/useAutosave";
+import { projectPath } from "@/lib/platform/project";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -37,10 +39,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Textarea } from "@/components/ui/textarea";
 import type { FinishPreviewMode } from "@/lib/finishes";
 import {
-  CLOSING_STYLES,
   PAGE_TRANSITIONS,
   PAGE_TRANSITIONS as TRANSITIONS,
   applyStylePreset,
@@ -62,7 +62,6 @@ import {
   PAGE_RESIZE_MODES,
   SHAPES,
   timelineDuration,
-  type ClosingSettings,
   type DesignDocument,
   type DesignElement,
   type DesignPage,
@@ -164,7 +163,6 @@ import {
   Loader2,
   Lock,
   Magnet,
-  Mail,
   Minus,
   Monitor,
   Palette,
@@ -196,7 +194,6 @@ import {
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
-type SaveState = "saved" | "saving" | "unsaved" | "error";
 type Device = "desktop" | "tablet" | "phone";
 type LeftPanel = "add" | "layers" | "colour" | "pages" | "finishes";
 type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline" | "finishes";
@@ -213,21 +210,6 @@ const DEVICE_WIDTH: Record<Device, string> = {
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong.";
-}
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(query.matches);
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return reduced;
 }
 
 function PanelHeading({ title, note }: { title: string; note?: string }) {
@@ -299,7 +281,6 @@ export default function Studio() {
   const designRef = useRef<DesignDocument | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [saveState, setSaveState] = useState<SaveState>("saved");
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [animating, setAnimating] = useState(false);
@@ -466,7 +447,6 @@ export default function Studio() {
 
   const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
-  const reducedMotion = usePrefersReducedMotion();
   const [historyTick, setHistoryTick] = useState(0);
   const [historyFlags, setHistoryFlags] = useState({ undo: false, redo: false });
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -495,8 +475,6 @@ export default function Studio() {
   const futureRef = useRef<DesignDocument[]>([]);
   const gestureStart = useRef<DesignDocument | null>(null);
   const hydratedRef = useRef<string | null>(null);
-  const saveTimer = useRef<number | null>(null);
-  const saveVersion = useRef(0);
   const timeRef = useRef(0);
   const clipboardRef = useRef<DesignElement[]>([]);
   const imageFileRef = useRef<HTMLInputElement | null>(null);
@@ -514,40 +492,21 @@ export default function Studio() {
     [invitation?.designImageUrls, localImageUrls],
   );
 
-  const persistDesign = useCallback(
+  const saveDesign = useCallback(
     async (next: DesignDocument) => {
-      if (saveTimer.current) {
-        window.clearTimeout(saveTimer.current);
-        saveTimer.current = null;
-      }
-      const version = saveVersion.current + 1;
-      saveVersion.current = version;
-      setSaveState("saving");
-      try {
-        await saveDesignMutation({ id: invitationId, design: next });
-        if (version === saveVersion.current) setSaveState("saved");
-        return true;
-      } catch (error) {
-        if (version === saveVersion.current) {
-          setSaveState("error");
-          toast.error(messageOf(error));
-        }
-        return false;
-      }
+      await saveDesignMutation({ id: invitationId, design: next });
     },
     [invitationId, saveDesignMutation],
   );
 
-  const scheduleSave = useCallback(
-    (next: DesignDocument) => {
-      setSaveState("unsaved");
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
-      saveTimer.current = window.setTimeout(() => {
-        void persistDesign(next);
-      }, 800);
-    },
-    [persistDesign],
-  );
+  const {
+    state: saveState,
+    schedule: scheduleSave,
+    flush: persistDesign,
+    markSaved,
+  } = useAutosave<DesignDocument>(saveDesign, {
+    onError: (error) => toast.error(messageOf(error)),
+  });
 
   /** A named bookmark the host creates from the history dialog. */
   const snapshotVersion = useCallback(async () => {
@@ -585,7 +544,7 @@ export default function Studio() {
         });
         toast.success(`“${palette.name}” variation filed as a new draft.`);
         setVariationsOpen(false);
-        navigate(`/studio/${copyId}`);
+        navigate(projectPath(copyId));
       } catch (error) {
         toast.error(messageOf(error));
       } finally {
@@ -615,11 +574,7 @@ export default function Studio() {
       if (versionBusy || !content) return;
       setVersionBusy(true);
       try {
-        if (saveTimer.current) {
-          window.clearTimeout(saveTimer.current);
-          saveTimer.current = null;
-          if (designRef.current) await persistDesign(designRef.current);
-        }
+        if (designRef.current) await persistDesign(designRef.current);
         const restored = await restoreDesignVersionMutation({
           id: invitationId,
           versionId,
@@ -633,7 +588,7 @@ export default function Studio() {
         futureRef.current = [];
         setHistoryFlags({ undo: false, redo: false });
         setHistoryTick((tick) => tick + 1);
-        setSaveState("saved");
+        markSaved();
         hydratedRef.current = invitationId;
         toast.success("Version restored.");
         setHistoryOpen(false);
@@ -668,7 +623,7 @@ export default function Studio() {
     pastRef.current = [];
     futureRef.current = [];
     setHistoryFlags({ undo: false, redo: false });
-    setSaveState("saved");
+    markSaved();
     if (!invitation.design) {
       // Deferred so hydration never triggers a synchronous cascading update.
       window.setTimeout(() => void persistDesign(next), 0);
@@ -685,16 +640,6 @@ export default function Studio() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [saveState]);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current) {
-        window.clearTimeout(saveTimer.current);
-        saveTimer.current = null;
-        if (designRef.current) void persistDesign(designRef.current);
-      }
-    };
-  }, [persistDesign]);
 
   /* Field edits arrive one keystroke or one slider tick at a time. Without a
      memory of the edit in progress, each tick would become its own undo step:
@@ -2095,10 +2040,6 @@ export default function Studio() {
     toast.success("Template applied. Your words, details, guests, and RSVP are untouched.");
   };
 
-  const applyClosing = (closing: ClosingSettings) => {
-    apply((current) => ({ ...current, closing }));
-  };
-
   const applyAnimation = (animation: ElementAnimation) => {
     if (selectedIds.length === 0) return;
     setPageElements((elements) =>
@@ -2587,10 +2528,6 @@ export default function Studio() {
       </div>
     );
   }
-
-  const namesLabel = content.names.secondary
-    ? `${content.names.primary} & ${content.names.secondary}`
-    : content.names.primary;
 
   const saveLabel =
     saveState === "saving"

@@ -48,7 +48,6 @@ import {
   patchFinishesConfig,
   toggleFinishAnimation,
   type FinishAnimationId,
-  type FinishLighting,
   type FinishPreviewMode,
   type FinishesConfig,
 } from "@/lib/finishes";
@@ -66,7 +65,6 @@ import {
   Save,
   Search,
   Shapes,
-  Sparkle,
   Stamp,
   Star,
   Trash2,
@@ -1213,13 +1211,6 @@ export function LibraryPanel({
 
   /* ------------------------------------------------------------ filtering */
 
-  /** True when the search box is empty or any field of the item matches it. */
-  const matchesQuery = (...fields: string[]) => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return true;
-    return fields.some((field) => field.toLowerCase().includes(needle));
-  };
-
   const filteredSaved = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return savedTemplates.filter((item) => {
@@ -1421,12 +1412,8 @@ export function LibraryPanel({
         return PAGE_LAYOUTS.length;
       case "reveals":
         return REVEAL_PRESETS.length;
-      case "opening":
-        return 0;
     }
   };
-
-  const category = CATEGORIES.find((item) => item.id === tab) ?? CATEGORIES[0];
 
   const footerCount = (() => {
     switch (tab) {
@@ -1452,8 +1439,6 @@ export function LibraryPanel({
         return `${PAGE_LAYOUTS.length} page layouts`;
       case "reveals":
         return `${filteredReveals.length} reveal presets`;
-      case "opening":
-        return "Presentation";
     }
   })();
 

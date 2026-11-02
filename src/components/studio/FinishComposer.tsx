@@ -31,8 +31,6 @@ import {
   ChevronUp,
   ClipboardPaste,
   Copy,
-  Eye,
-  EyeOff,
   Plus,
   RotateCcw,
   Trash2,

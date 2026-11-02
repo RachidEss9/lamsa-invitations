@@ -1,20 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { personalize } from "@/lib/design";
+import { personalize, type ClosingSettings } from "@/lib/design";
 
 interface ClosingStageProps {
-  /** True when the invitation has a closing section. */
-  closing?: { enabled: boolean; when: string };
+  /** The invitation's closing section, when it has one. */
+  closing?: ClosingSettings;
   accent?: string;
-  background?: string;
-  ink?: string;
   guestName?: string | null;
   names?: string;
   /** Replays the forwarding flourish. */
   onReplay?: () => void;
-  /** Motion Preview forces finish animations even while paused. */
-  forceFinishAnimations?: boolean;
-  reducedMotion?: boolean;
-  className?: string;
 }
 
 /**
@@ -26,14 +20,9 @@ interface ClosingStageProps {
 export function ClosingStage({
   closing,
   accent = "#5b4a3a",
-  background,
-  ink = "#161616",
   guestName,
   names,
   onReplay,
-  forceFinishAnimations = false,
-  reducedMotion = false,
-  className,
 }: ClosingStageProps) {
   const [playCount, setPlayCount] = useState(0);
   const lastPlay = useRef(0);
@@ -61,7 +50,7 @@ export function ClosingStage({
         className="mt-2 text-sm tracking-widest uppercase opacity-80"
         style={{ color: accent }}
       >
-        {closing!.when}
+        {closing!.message}
       </p>
 
       {/* Forwards flourish: the invitation materialises on paper behind the

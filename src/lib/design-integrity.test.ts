@@ -100,7 +100,13 @@ describe("saved-design integrity", () => {
     const stored = JSON.parse(JSON.stringify(saved)) as DesignDocument;
     const reloaded = normalizeDesign(stored, content);
 
-    expect(reloaded.opening).toEqual(saved.opening);
+    // The presentation system is retired: an opening is neutralised on load so
+    // no guest is shown a scene the studio cannot edit any more.
+    expect(reloaded.opening).toEqual({
+      experience: "none",
+      autoOpen: false,
+      welcome: "",
+    });
     expect(reloaded.closing).toEqual(saved.closing);
     expect(reloaded.transition).toEqual(saved.transition);
     expect(reloaded.startedAt).toBe(saved.startedAt);
@@ -130,33 +136,32 @@ describe("saved-design integrity", () => {
     expect(reloaded.pages[2].hidden).toBe(true);
     expect(reloaded.closing.style).toBe("seal");
     expect(reloaded.transition.preset).toBe("flip");
-    expect(reloaded.opening.welcome).toBe("For {{guest}}, with love");
-    // The three approved scenes are the only presentations the studio keeps;
-    // a saved value is preserved verbatim, and anything else falls back to the
-    // first scene, which is the renderer a legacy opening lands on.
-    expect(reloaded.opening.experience).toBe("secret-world");
+    expect(reloaded.opening.experience).toBe("none");
+    expect(reloaded.opening.welcome).toBe("");
   });
 
-  it("maps an opening saved under a retired scene onto a style that renders", () => {
-    // Invitations saved before the three-style engine keep opening on a
-    // renderer that exists instead of falling back to nothing.
-    const retired: Record<string, string> = {
-      envelope: "secret-world",
-      curtain: "living-art",
-      typography: "impossible",
-      "wax-seal": "secret-world",
-      personal: "impossible",
-      paper: "living-art",
-      unknownScene: "secret-world",
-    };
-    for (const [legacy, expected] of Object.entries(retired)) {
+  it("retires every opening scene without breaking a saved design", () => {
+    // Invitations saved under any of the old scenes must still load: the scene
+    // is dropped, and the rest of the document is untouched.
+    const retired = [
+      "envelope",
+      "curtain",
+      "typography",
+      "wax-seal",
+      "personal",
+      "paper",
+      "secret-world",
+      "unknownScene",
+    ];
+    for (const legacy of retired) {
       const saved = savedDesign();
       (saved.opening as { experience?: string }).experience = legacy;
       const reloaded = normalizeDesign(
         JSON.parse(JSON.stringify(saved)) as DesignDocument,
         content,
       );
-      expect(reloaded.opening.experience, legacy).toBe(expected);
+      expect(reloaded.opening.experience, legacy).toBe("none");
+      expect(reloaded.pages.length, legacy).toBe(saved.pages.length);
     }
   });
 

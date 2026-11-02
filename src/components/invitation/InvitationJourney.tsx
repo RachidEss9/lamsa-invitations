@@ -7,7 +7,6 @@ import {
   advancePhase,
   continueState,
   journeyPages,
-  journeyStartsAtOpening,
   pageDuration,
   pageEntranceEnd,
   type JourneyPhase,
@@ -26,8 +25,6 @@ interface InvitationJourneyProps {
   active?: boolean;
   accent?: string;
   ink?: string;
-  /** Bumped by the studio's preview to run the whole story again. */
-  restartSignal?: number;
   /** Motion Preview plays enabled finish effects regardless of a pause. */
   forceFinishAnimations?: boolean;
   /** Reports the guest's position for the preview's progress read-out. */
@@ -52,7 +49,6 @@ export function InvitationJourney({
   active = true,
   accent = "#710014",
   ink = "#161616",
-  restartSignal = 0,
   forceFinishAnimations = false,
   onStepChange,
   onPhaseChange,
@@ -62,7 +58,7 @@ export function InvitationJourney({
   const total = pages.length;
   const [step, setStep] = useState(0);
   const [phase, setPhase] = useState<JourneyPhase>(() =>
-    journeyStartsAtOpening(design, reducedMotion) ? "opening" : "page",
+    "page",
   );
   const page = pages[step] ?? null;
   const namesText = useMemo(
@@ -79,46 +75,38 @@ export function InvitationJourney({
   const timeRef = useRef(time);
   const frameRef = useRef(0);
 
+  // The section's clock starts on the first frame, so nothing is written to
+  // state while the effect body is still running.
   useEffect(() => {
     const initial = reducedMotion ? duration : 0;
     timeRef.current = initial;
-    setTime(initial);
-    if (reducedMotion || !active || phase !== "page") return;
-    let last = performance.now();
-    const tick = (now: number) => {
-      const next = Math.min(duration, timeRef.current + (now - last));
-      last = now;
-      timeRef.current = next;
-      setTime(next);
-      if (next < duration) frameRef.current = requestAnimationFrame(tick);
-    };
-    frameRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameRef.current);
+    let frame = requestAnimationFrame(() => {
+      setTime(initial);
+      if (reducedMotion || !active || phase !== "page") return;
+      let last = performance.now();
+      const tick = (now: number) => {
+        const next = Math.min(duration, timeRef.current + (now - last));
+        last = now;
+        timeRef.current = next;
+        setTime(next);
+        if (next < duration) frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
+    });
+    frameRef.current = frame;
+    return () => cancelAnimationFrame(frame);
   }, [phase, step, reducedMotion, active, duration]);
 
   /* The Continue affordance waits for this beat — until the section's own
      entrance has played out, the guest is still reading, not clicking. */
-  const [settled, setSettled] = useState(reducedMotion);
+  const [settledStep, setSettledStep] = useState<number | null>(null);
+  const settled = reducedMotion || settledStep === step;
 
   useEffect(() => {
-    if (reducedMotion) {
-      setSettled(true);
-      return;
-    }
-    if (phase !== "page") return;
-    setSettled(false);
-    const timer = window.setTimeout(() => setSettled(true), entranceEnd);
+    if (reducedMotion || phase !== "page") return;
+    const timer = window.setTimeout(() => setSettledStep(step), entranceEnd);
     return () => window.clearTimeout(timer);
   }, [phase, step, reducedMotion, entranceEnd]);
-
-  /* The studio preview's "Replay opening" runs the whole story again. */
-  useEffect(() => {
-    setStep(0);
-    setPhase(
-      journeyStartsAtOpening(design, reducedMotion) ? "opening" : "page",
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restartSignal]);
 
   useEffect(() => {
     onStepChange?.(step, total);
@@ -141,7 +129,7 @@ export function InvitationJourney({
   const handleReplay = useCallback(() => {
     setStep(0);
     setPhase(
-      journeyStartsAtOpening(design, reducedMotion) ? "opening" : "page",
+      "page",
     );
   }, [design, reducedMotion]);
 
@@ -183,11 +171,8 @@ export function InvitationJourney({
       <ClosingStage
         closing={design.closing}
         accent={accent}
-        background={page?.background ?? "#f2f1ed"}
-        ink={ink}
         guestName={guestName}
         names={namesText}
-        reducedMotion={reducedMotion}
         onReplay={handleReplay}
       />
     );

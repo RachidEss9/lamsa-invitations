@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, RotateCcw, Play, Pause } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface JourneyCueProps {
@@ -30,9 +30,6 @@ export function JourneyCue({
   onAdvance,
   className,
 }: JourneyCueProps) {
-  const [pressed, setPressed] = useState(false);
-  const isActive = !reducedMotion && pressed;
-
   return (
     <div
       className={cn(
@@ -55,32 +52,16 @@ export function JourneyCue({
         <span
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform duration-300",
-            isActive ? "scale-90" : "group-hover:scale-105",
+            !reducedMotion && "group-hover:scale-105",
           )}
           style={{ background: `color-mix(in srgb, ${accent} 12%, transparent)` }}
         >
-          {isActive ? (
-            <Pause className="h-4 w-4" style={{ color: accent }} />
-          ) : (
-            <Play className="h-4 w-4 ml-0.5" style={{ color: accent }} />
-          )}
+          <ArrowRight
+            className={cn("ml-0.5 h-4 w-4", rtl ? "rotate-180" : "rotate-0")}
+            style={{ color: accent }}
+          />
         </span>
-        <span
-          className={cn(
-            "transition-colors duration-200",
-            pressed ? "opacity-0" : "opacity-100 group-hover:opacity-100",
-          )}
-        >
-          {label}
-        </span>
-        <ArrowRight
-          className={cn(
-            "ml-1 h-4 w-4 shrink-0 transition-transform duration-300",
-            rtl ? "rotate-180" : "rotate-0",
-            pressed && "translate-x-1",
-          )}
-          style={{ color: accent }}
-        />
+        <span className="transition-colors duration-200">{label}</span>
       </Button>
     </div>
   );

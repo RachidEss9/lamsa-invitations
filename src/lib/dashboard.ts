@@ -22,7 +22,6 @@ import {
   type DesignOutput,
   type DesignPage,
   type DesignUnit,
-  type OpeningExperienceId,
   type PageTextureId,
 } from "./design";
 import { pageEntranceEnd } from "./journey";
@@ -298,7 +297,6 @@ export interface ScratchDesignInput {
   bleed: number;
   pages: number;
   texture: PageTextureId;
-  opening: OpeningExperienceId;
   accent?: string;
 }
 
@@ -342,7 +340,7 @@ export function scratchInvitation(input: ScratchDesignInput): {
     unit: input.unit,
     physicalWidth: input.width,
     physicalHeight: input.height,
-    opening: { experience: input.opening },
+    opening: { experience: "none" },
   });
   return { content, design };
 }

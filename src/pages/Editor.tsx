@@ -91,6 +91,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { projectPath } from "@/lib/platform/project";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -787,7 +788,7 @@ export default function Editor() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate(`/studio/${invitationId}`)}
+              onClick={() => navigate(projectPath(invitationId))}
               className="h-9 rounded-none px-3 text-[0.6rem] uppercase tracking-[0.16em]"
             >
               <Layout className="size-3.5" />

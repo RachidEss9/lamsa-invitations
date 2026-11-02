@@ -12,26 +12,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   blankInvitationContent,
   scratchInvitation,
   type ScratchDesignInput,
 } from "@/lib/dashboard";
 import {
   DESIGN_UNITS,
-  OPENING_EXPERIENCES,
   PAGE_TEXTURES,
   SIZE_PRESETS,
   toDesignPx,
   type DesignOutput,
   type DesignUnit,
-  type OpeningExperienceId,
   type PageTextureId,
   type SizePreset,
 } from "@/lib/design";
@@ -70,7 +61,6 @@ const QUICK_BLANK: ScratchDesignInput = {
   bleed: 0,
   pages: 1,
   texture: "cotton",
-  opening: "none",
 };
 
 export type CreateTarget =
@@ -207,7 +197,6 @@ export function CreateInvitationDialog({
   const [margin, setMargin] = useState("6");
   const [bleed, setBleed] = useState("3");
   const [pages, setPages] = useState("1");
-  const [opening, setOpening] = useState<OpeningExperienceId>("none");
   const [designName, setDesignName] = useState("");
 
   const [presetLabel, setPresetLabel] = useState("");
@@ -251,7 +240,6 @@ export function CreateInvitationDialog({
       bleed: Math.max(0, Number(bleed) || 0),
       pages: Math.max(1, Math.min(20, Math.round(Number(pages) || 1))),
       texture,
-      opening,
     }),
     [
       bgColor,
@@ -262,7 +250,6 @@ export function CreateInvitationDialog({
       gradientTo,
       height,
       margin,
-      opening,
       output,
       pages,
       texture,
@@ -413,8 +400,6 @@ export function CreateInvitationDialog({
               setBleed={setBleed}
               pages={pages}
               setPages={setPages}
-              opening={opening}
-              setOpening={setOpening}
               designName={designName}
               setDesignName={setDesignName}
               preview={scratchPreview}
@@ -685,8 +670,6 @@ function ScratchSetup({
   setBleed,
   pages,
   setPages,
-  opening,
-  setOpening,
   designName,
   setDesignName,
   preview,
@@ -726,8 +709,6 @@ function ScratchSetup({
   setBleed: (value: string) => void;
   pages: string;
   setPages: (value: string) => void;
-  opening: OpeningExperienceId;
-  setOpening: (opening: OpeningExperienceId) => void;
   designName: string;
   setDesignName: (value: string) => void;
   preview: ReturnType<typeof scratchInvitation>;
@@ -888,25 +869,6 @@ function ScratchSetup({
                 className="h-10 rounded-none border-ink/20 bg-[var(--paper-light)] text-[13px]"
               />
             </Field>
-            <Field label="Opening experience">
-              <Select
-                value={opening}
-                onValueChange={(value) =>
-                  setOpening(value as OpeningExperienceId)
-                }
-              >
-                <SelectTrigger className="h-10 rounded-none border-ink/20 bg-[var(--paper-light)] text-[12px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {OPENING_EXPERIENCES.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
           </div>
         </div>
 
@@ -1022,9 +984,6 @@ function ScratchSetup({
             {Math.round(widthPx)} × {Math.round(heightPx)} canvas units ·{" "}
             {PAGE_TEXTURES.find((item) => item.id === texture)?.label} surface ·{" "}
             {pages} {Number(pages) === 1 ? "page" : "pages"}
-            {opening !== "none"
-              ? ` · opens with ${OPENING_EXPERIENCES.find((item) => item.id === opening)?.label.toLowerCase()}`
-              : ""}
           </p>
           <Button
             type="button"

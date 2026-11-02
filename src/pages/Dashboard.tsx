@@ -43,6 +43,8 @@ import {
   type GalleryItem,
 } from "@/lib/dashboard";
 import { createDefaultDesign } from "@/lib/design";
+import { projectPath } from "@/lib/platform/project";
+import { WORKSPACES, type WorkspaceId } from "@/lib/workspaces";
 import { draftFromTemplate } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
@@ -54,12 +56,16 @@ import {
   LayoutGrid,
   Loader2,
   Lock,
+  Newspaper,
   Plus,
+  Printer,
   Search,
+  Shapes,
   Sparkles,
   Settings2,
   Trash2,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import {
   useDeferredValue,
@@ -76,6 +82,14 @@ const ease = [0.22, 0.61, 0.36, 1] as const;
 const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.075, delayChildren: 0.04 } },
+};
+
+/** One icon per workspace, so the rail reads at a glance. */
+const WORKSPACE_ICONS: Record<WorkspaceId, LucideIcon> = {
+  experiences: Sparkles,
+  print: Printer,
+  shape: Shapes,
+  press: Newspaper,
 };
 
 const rise = {
@@ -215,7 +229,7 @@ export default function Dashboard() {
           ? "Your blank canvas is ready."
           : "Invitation created from the collection.",
       );
-      navigate(`/studio/${id}`);
+      navigate(projectPath(id));
     } catch {
       toast.error("The invitation could not be created. Please try again.");
     } finally {
@@ -294,6 +308,18 @@ export default function Dashboard() {
   };
 
   const railSections: RailSection[] = [
+    {
+      id: "workspaces",
+      label: "Workspaces",
+      entries: WORKSPACES.map((workspace) => ({
+        id: `workspace-${workspace.id}`,
+        label: workspace.name,
+        icon: WORKSPACE_ICONS[workspace.id],
+        ...(workspace.ready && workspace.route
+          ? { to: workspace.route }
+          : { disabled: true, badge: `Phase ${workspace.phase}` }),
+      })),
+    },
     {
       id: "studio",
       label: "Menu",
@@ -387,6 +413,34 @@ export default function Dashboard() {
           <header className="sticky top-0 z-40 border-b border-ink/8 bg-[var(--paper)]/80 backdrop-blur-xl">
             <div className="flex h-[64px] w-full items-center gap-3 px-4 sm:px-7 lg:px-8">
               <BrandLink className="shrink-0 lg:hidden" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Workspaces"
+                    className="ml-1 grid size-8 place-items-center rounded-full border border-[var(--edge)] bg-[var(--surface-card)] text-ink/55 shadow-[var(--shadow-xs)] transition-colors hover:border-[var(--edge-strong)] hover:text-ink lg:hidden"
+                  >
+                    <LayoutGrid className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-60">
+                  <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+                  {WORKSPACES.map((workspace) =>
+                    workspace.ready && workspace.route ? (
+                      <DropdownMenuItem key={workspace.id} asChild>
+                        <Link to={workspace.route}>{workspace.name}</Link>
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem key={workspace.id} disabled>
+                        {workspace.name}
+                        <span className="ml-auto font-meta text-[9px] uppercase tracking-[0.12em]">
+                          Phase {workspace.phase}
+                        </span>
+                      </DropdownMenuItem>
+                    ),
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -497,7 +551,7 @@ export default function Dashboard() {
                 </Button>
                 {latest ? (
                   <Link
-                    to={`/studio/${latest._id}`}
+                    to={projectPath(latest._id)}
                     className="group inline-flex h-12 items-center justify-between gap-3 border border-ink/15 px-5 transition-colors hover:border-ink/40"
                   >
                     <span className="flex min-w-0 items-center gap-2.5">
@@ -575,7 +629,7 @@ export default function Dashboard() {
                   <div className="relative aspect-[5/6]">
                     {second && (
                       <Link
-                        to={`/studio/${second._id}`}
+                        to={projectPath(second._id)}
                         aria-label={`Open ${invitationTitle(second)}`}
                         className="absolute right-0 bottom-0 w-[52%] rotate-[2.4deg] border border-ink/10 bg-[var(--paper-deep)] p-1.5 shadow-[0_18px_45px_rgba(21,21,21,0.13)] transition-transform duration-700 ease-out hover:rotate-0"
                       >
@@ -583,7 +637,7 @@ export default function Dashboard() {
                       </Link>
                     )}
                     <Link
-                      to={`/studio/${latest._id}`}
+                      to={projectPath(latest._id)}
                       aria-label={`Open ${invitationTitle(latest)}`}
                       className="absolute top-0 left-0 w-[62%] -rotate-[2.4deg] border border-ink/10 bg-[var(--paper-deep)] p-1.5 shadow-[0_28px_60px_rgba(21,21,21,0.18)] transition-transform duration-700 ease-out hover:rotate-0"
                     >

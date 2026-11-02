@@ -328,6 +328,24 @@ export interface DesignElement {
   rotation?: number;
 }
 
+/**
+ * The scene an invitation opened with before the presentation system was
+ * retired. New designs always save "none"; the field stays on the document so
+ * invitations created earlier still load and render.
+ */
+export type OpeningExperienceId = string;
+
+export interface OpeningSettings {
+  experience: OpeningExperienceId;
+  autoOpen: boolean;
+  welcome: string;
+  /** Legacy scene timing, tone and cover art kept so older designs load. */
+  duration?: number;
+  tone?: string;
+  palette?: { accent?: string; hull?: string; paper?: string };
+  coverStorageId?: string;
+}
+
 export interface DesignDocument {
   version: number;
   pages: DesignPage[];
@@ -793,13 +811,13 @@ export function normalizeDesign(
       ? rawPages.map((page) => normalizePage(page, content))
       : [normalizePage(null, content)];
   // The invitation used to carry Presentation opening settings. The studio no
-  // longer exposes a scene picker, but these values are kept in the saved
-  // document so a reload never throws and an old invitation still renders.
-  const stored =
-    typeof doc.opening === "object" && doc.opening !== null
-      ? doc.opening
-      : ({} as Partial<{}>);
-  const opening: OpeningSettings = { experience: "none", autoOpen: false, welcome: "", };
+  // longer exposes a scene picker, so every document loads with the opening
+  // retired while the rest of the saved design is preserved.
+  const opening: OpeningSettings = {
+    experience: "none",
+    autoOpen: false,
+    welcome: "",
+  };
   const closing: ClosingSettings = {
     enabled: doc.closing?.enabled ?? false,
     style: doc.closing?.style ?? "message",
@@ -1402,7 +1420,7 @@ export interface BlankDesignOptions {
   unit?: DesignUnit;
   physicalWidth?: number;
   physicalHeight?: number;
-  opening?: Partial<{}>;
+  opening?: Partial<OpeningSettings>;
   closing?: ClosingSettings;
   transition?: PageTransition;
 }

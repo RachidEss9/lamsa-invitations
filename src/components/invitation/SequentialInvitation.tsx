@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { InvitationJourney, type JourneyPhase } from "./InvitationJourney";
-import { useState as createReactState, type DesignDocument } from "@/lib/design";
-import { journeyStartsAtOpening } from "@/lib/journey";
+import { type DesignDocument } from "@/lib/design";
 
 interface SequentialInvitationProps {
   design: DesignDocument;
@@ -13,7 +12,6 @@ interface SequentialInvitationProps {
   active?: boolean;
   accent?: string;
   ink?: string;
-  pubKey: string;
   restartSignal?: number;
   forceFinishAnimations?: boolean;
   onStepChange?: (step: number, total: number) => void;
@@ -24,9 +22,7 @@ interface SequentialInvitationProps {
 /**
  * The public guest experience for an invitation whose pages are sequential.
  * It plays the same journey as the studio's guest rehearsal but refuses any
- * edit, tying the read-only journey to a single deep link. It also guards the
- * opening scene behind a screen so the first real pause of the story lives in
- * the opening rather than at the top of page one.
+ * edit, tying the read-only journey to a single deep link.
  */
 export function SequentialInvitation({
   design,
@@ -38,21 +34,13 @@ export function SequentialInvitation({
   active = true,
   accent = "#710014",
   ink = "#161616",
-  pubKey,
   restartSignal = 0,
   forceFinishAnimations = false,
   onStepChange,
   onPhaseChange,
   className,
 }: SequentialInvitationProps) {
-  const [restartSignalInternal, setRestartSignal] = createReactState(
-    restartSignal,
-    0,
-  );
-  const opening =
-    journeyStartsAtOpening(design, reducedMotion) && design.pages[0].opening;
-  const opened =
-    opening === true || (typeof opening === "object" && opening?.applied);
+  const [restartSignalInternal] = useState(restartSignal);
 
   const handlePhaseChange = (phase: JourneyPhase) => {
     onPhaseChange?.(phase);
@@ -69,6 +57,7 @@ export function SequentialInvitation({
     >
       {active && (
         <InvitationJourney
+          key={restartSignalInternal}
           design={design}
           imageUrls={imageUrls}
           guestName={guestName}
@@ -78,7 +67,6 @@ export function SequentialInvitation({
           active={active}
           accent={accent}
           ink={ink}
-          restartSignal={restartSignalInternal}
           forceFinishAnimations={forceFinishAnimations}
           onStepChange={onStepChange}
           onPhaseChange={handlePhaseChange}

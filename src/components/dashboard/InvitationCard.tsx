@@ -18,6 +18,7 @@ import {
   occasionLabel,
   type Occasion,
 } from "@/lib/invitation";
+import { projectPath } from "@/lib/platform/project";
 import { cn } from "@/lib/utils";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -81,7 +82,7 @@ export function InvitationCard({
   const published = invitation.status === "published";
   const title = invitationTitle(invitation);
   const actions = invitationActions(invitation);
-  const studioPath = `/studio/${invitation._id}`;
+  const studioPath = projectPath(invitation._id);
 
   const run = (id: InvitationActionId) => {
     switch (id) {

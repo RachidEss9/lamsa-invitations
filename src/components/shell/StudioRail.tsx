@@ -27,6 +27,8 @@ export interface RailEntry {
   onSelect?: () => void;
   active?: boolean;
   badge?: number | string;
+  /** A destination the roadmap has not delivered yet: shown, never clickable. */
+  disabled?: boolean;
   children?: RailChild[];
 }
 
@@ -205,7 +207,18 @@ export function StudioRail({
 
               return (
                 <div key={entry.id} className="relative">
-                  {entry.to ? (
+                  {entry.disabled ? (
+                    <div
+                      aria-disabled="true"
+                      className={cn(
+                        itemClass(false, collapsed),
+                        "cursor-default opacity-45 hover:bg-transparent",
+                      )}
+                    >
+                      {content}
+                      {collapsed && <span className="rail-tip">{entry.label}</span>}
+                    </div>
+                  ) : entry.to ? (
                     <Link
                       to={entry.to}
                       onClick={onNavigate}
