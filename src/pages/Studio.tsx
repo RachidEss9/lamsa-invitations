@@ -2733,10 +2733,6 @@ export default function Studio() {
       );
     }
 
-    if (leftPanel === "opening") {
-      return null;
-    }
-
     if (leftPanel === "layers") {
       return (
         <LayersPanel
@@ -2764,117 +2760,6 @@ export default function Studio() {
               : undefined
           }
         />
-      );
-    }
-
-    if (leftPanel === "opening") {
-      return null;
-    }
-
-    if (leftPanel === "layers") {
-      return (
-        <LayersPanel
-          page={page}
-                      "relative overflow-hidden border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/60",
-                      false
-                        ? "border-[var(--edge-strong)] shadow-[0_0_0_1px_var(--edge-strong)]"
-                        : "border-ink/15 hover:border-ink/45",
-                    )}
-                  >
-                  </button>
-                ))}
-              </div>
-            </div>
-            <label className="block">
-              <span className="mb-1 block text-[10px] text-ink/55">Welcome line</span>
-                    <p className="text-[9px] leading-relaxed text-ink/35">
-              The Secret World, Living Art and The Impossible Invitation — three
-              scenes built from real layered artwork, each revealing the actual
-              invitation in its own slot.
-            </p>
-
-            <div className="mt-2 border-t border-ink/12 pt-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="font-meta text-[9px] uppercase tracking-[0.16em] text-ink/45">
-                    Closing
-                  </p>
-                  <p className="mt-0.5 text-[9px] leading-relaxed text-ink/35">
-                    Shown once after the last page finishes.
-                  </p>
-                </div>
-                <Switch
-                  checked={design.closing.enabled}
-                  onCheckedChange={(enabled) =>
-                    applyClosing({ ...design.closing, enabled })
-                  }
-                  className="scale-90"
-                />
-              </div>
-              <div className="mt-2 space-y-2">
-                <Select
-                  value={design.closing.style}
-                  onValueChange={(style) =>
-                    applyClosing({
-                      ...design.closing,
-                      style: style as ClosingSettings["style"],
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-8 rounded-none text-[11px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CLOSING_STYLES.map((style) => (
-                      <SelectItem key={style.id} value={style.id}>
-                        {style.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Textarea
-                  value={design.closing.message}
-                  onChange={(event) =>
-                    applyClosing({ ...design.closing, message: event.target.value })
-                  }
-                  rows={2}
-                  placeholder="With love"
-                  className="rounded-none text-[11px] leading-relaxed"
-                />
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-ink/50">Length</span>
-                  <Input
-                    type="number"
-                    min={500}
-                    step={100}
-                    value={design.closing.duration}
-                    onChange={(event) =>
-                      applyClosing({
-                        ...design.closing,
-                        duration: Number(event.target.value) || 500,
-                      })
-                    }
-                    className="h-8 w-24 rounded-none text-[11px]"
-                  />
-                  <span className="text-[9px] text-ink/35">ms</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="ml-auto h-8 rounded-none text-[10px]"
-                    onClick={() => {
-                      setClosingPreviewKey((key) => key + 1);
-                      setShowClosingPreview(true);
-                    }}
-                  >
-                    <Play className="size-3.5" /> Preview
-                  </Button>
-                </div>
-                <p className="text-[9px] leading-relaxed text-ink/35">
-                  Use {"{{names}}"} and {"{{guest}}"} in the note. The closing is
-                  separate from page transitions and never interrupts navigation.
-                </p>
-              </div>
-            </div>
-          </div>
-        </>
       );
     }
 
@@ -3285,7 +3170,8 @@ export default function Studio() {
   };
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">        <header className="z-40 flex h-[60px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-[var(--edge)] bg-[var(--surface-overlay)]/95 px-2 backdrop-blur-xl sm:gap-2 sm:px-4">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">
+        <header className="z-40 flex h-[60px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-[var(--edge)] bg-[var(--surface-overlay)]/95 px-2 backdrop-blur-xl sm:gap-2 sm:px-4">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
@@ -3400,6 +3286,8 @@ export default function Studio() {
             <Eye className="size-3.5" />
             <span className="hidden sm:inline">Guest preview</span>
           </Button>
+          <Button
+            type="button"
             variant="outline"
             onClick={() => setPrintOpen(true)}
             className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"

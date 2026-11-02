@@ -1427,15 +1427,6 @@ export function LibraryPanel({
   };
 
   const category = CATEGORIES.find((item) => item.id === tab) ?? CATEGORIES[0];
-        return FINISH_PRESETS.length;
-      case "layouts":
-        return PAGE_LAYOUTS.length;
-      case "reveals":
-        return REVEAL_PRESETS.length;
-    case "opening":
-        return 0;
-    }
-  };
 
   const footerCount = (() => {
     switch (tab) {
@@ -1461,8 +1452,8 @@ export function LibraryPanel({
         return `${PAGE_LAYOUTS.length} page layouts`;
       case "reveals":
         return `${filteredReveals.length} reveal presets`;
-    case "opening":
-        return 0;
+      case "opening":
+        return "Presentation";
     }
   })();
 
@@ -2552,29 +2543,6 @@ export function LibraryPanel({
                 </>
               )}
 
-              {tab === "opening" && (
-                <>
-                  <p className="section-label">Scenes</p>
-                  <p className="mb-2.5 -mt-2 font-ui text-[0.63rem] leading-relaxed text-ink/45">
-                    Three presentation scenes built from real layered artwork.
-                    The one picked here is what guests see first; they may
-                    still choose either of the others.
-                  </p>
-                  <p className="section-label">Experiences</p>
-                                        <span className="block truncate font-ui text-[0.72rem] font-medium text-ink">
-                              {experience.label}
-                            </span>
-
-                            <span className="mt-0.5 line-clamp-2 font-ui text-[0.6rem] leading-snug text-ink/45">
-                              {experience.note}
-                            </span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
             </div>
 
             <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--edge)] px-3 py-2 sm:px-4">
