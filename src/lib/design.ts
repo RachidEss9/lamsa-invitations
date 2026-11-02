@@ -10,6 +10,7 @@ import {
 } from "@/lib/finishes";
 import { normalizeImageAdjust, type ImageAdjust } from "@/lib/image-frame";
 import { normalizeCurve } from "@/lib/text-path";
+import { normalizeSections } from "@/lib/sections";
 import {
   type InvitationContent,
   type MotifId,
@@ -349,6 +350,9 @@ export interface OpeningSettings {
 export interface DesignDocument {
   version: number;
   pages: DesignPage[];
+  /** Chapters the pages are grouped into. Optional so documents saved before
+   * sections existed keep loading unchanged. */
+  sections?: DesignSection[];
   opening: OpeningSettings;
   closing: ClosingSettings;
   transition: PageTransition;
@@ -367,8 +371,19 @@ export interface DesignDocument {
   finishes?: FinishesConfig;
 }
 
+export type SectionTone = "opening" | "story" | "details" | "rsvp" | "closing";
+
+export interface DesignSection {
+  id: string;
+  title: string;
+  tone?: SectionTone;
+}
+
 export interface DesignPage {
   id: string;
+  /** The section this page belongs to; unset on documents saved before
+   * sections existed, until the studio assigns one. */
+  section?: string;
   name: string;
   background: string;
   elements: DesignElement[];
@@ -824,9 +839,11 @@ export function normalizeDesign(
     message: doc.closing?.message ?? "",
     duration: doc.closing?.duration ?? 800,
   };
+  const sections = normalizeSections(doc.sections);
   return {
     version: 1,
     pages: pageList,
+    ...(sections.length > 0 ? { sections } : {}),
     opening,
     closing,
     transition: normalizeTransition(doc.transition),
@@ -861,6 +878,7 @@ function normalizePage(
     name: p.name || "Untitled",
     background: p.background || content.palette.background,
     elements,
+    ...(p.section ? { section: p.section } : {}),
     hidden: p.hidden ?? false,
     width: p.width ?? DESIGN_WIDTH,
     height: p.height ?? DESIGN_HEIGHT,

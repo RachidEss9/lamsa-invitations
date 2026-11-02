@@ -72,6 +72,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { filterLibrary } from "@/lib/platform/library";
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -1211,34 +1212,31 @@ export function LibraryPanel({
 
   /* ------------------------------------------------------------ filtering */
 
-  const filteredSaved = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return savedTemplates.filter((item) => {
-      if (onlyFavourites && !favourites.includes(favouriteKey("saved", item._id))) {
-        return false;
-      }
-      if (!needle) return true;
-      return (
-        item.name.toLowerCase().includes(needle) ||
-        (item.description ?? "").toLowerCase().includes(needle)
-      );
-    });
-  }, [savedTemplates, query, onlyFavourites, favourites]);
+  const filteredSaved = useMemo(
+    () =>
+      filterLibrary(savedTemplates, {
+        query,
+        favouritesOnly: onlyFavourites,
+        isFavourite: (item) => favourites.includes(favouriteKey("saved", item._id)),
+        text: (item) => [item.name, item.description ?? ""],
+      }),
+    [savedTemplates, query, onlyFavourites, favourites],
+  );
 
-  const filteredTemplates = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return TEMPLATES.filter((template) => {
-      if (onlyFavourites && !favourites.includes(favouriteKey("template", template.id))) {
-        return false;
-      }
-      if (!needle) return true;
-      return (
-        template.name.toLowerCase().includes(needle) ||
-        template.description.toLowerCase().includes(needle) ||
-        template.occasion.toLowerCase().includes(needle)
-      );
-    });
-  }, [query, onlyFavourites, favourites]);
+  const filteredTemplates = useMemo(
+    () =>
+      filterLibrary(TEMPLATES, {
+        query,
+        favouritesOnly: onlyFavourites,
+        isFavourite: (template) => favourites.includes(favouriteKey("template", template.id)),
+        text: (template) => [
+          template.name,
+          template.description,
+          template.occasion,
+        ],
+      }),
+    [query, onlyFavourites, favourites],
+  );
 
   const templatePreviews = useMemo(() => {
     const map = new Map<string, DesignPage>();
@@ -1258,112 +1256,86 @@ export function LibraryPanel({
     return map;
   }, [content]);
 
-  const filteredStyles = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return BUILTIN_STYLES.filter((style) => {
-      if (onlyFavourites && !favourites.includes(favouriteKey("style", style.name))) {
-        return false;
-      }
-      if (!needle) return true;
-      return (
-        style.name.toLowerCase().includes(needle) ||
-        style.note.toLowerCase().includes(needle)
-      );
-    });
-  }, [query, onlyFavourites, favourites]);
+  const filteredStyles = useMemo(
+    () =>
+      filterLibrary(BUILTIN_STYLES, {
+        query,
+        favouritesOnly: onlyFavourites,
+        isFavourite: (style) => favourites.includes(favouriteKey("style", style.name)),
+        text: (style) => [style.name, style.note],
+      }),
+    [query, onlyFavourites, favourites],
+  );
 
-  const filteredFonts = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return FONT_LIBRARY.filter((font) => {
-      if (
-        fontScript !== "all" &&
-        font.script !== fontScript &&
-        font.script !== "both"
-      ) {
-        return false;
-      }
-      if (onlyFavourites && !favourites.includes(favouriteKey("font", font.id))) {
-        return false;
-      }
-      if (!needle) return true;
-      return (
-        font.name.toLowerCase().includes(needle) ||
-        font.categories.join(" ").toLowerCase().includes(needle) ||
-        (font.note ?? "").toLowerCase().includes(needle)
-      );
-    });
-  }, [query, onlyFavourites, favourites, fontScript]);
+  const filteredFonts = useMemo(
+    () =>
+      filterLibrary(FONT_LIBRARY, {
+        query,
+        matches: (font) =>
+          fontScript === "all" ||
+          font.script === fontScript ||
+          font.script === "both",
+        favouritesOnly: onlyFavourites,
+        isFavourite: (font) => favourites.includes(favouriteKey("font", font.id)),
+        text: (font) => [font.name, font.categories.join(" "), font.note ?? ""],
+      }),
+    [query, onlyFavourites, favourites, fontScript],
+  );
 
-  const filteredAssets = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return BUILTIN_ASSETS.filter((asset) => {
-      if (assetCategory !== "All" && asset.category !== assetCategory) return false;
-      if (onlyFavourites && !favourites.includes(favouriteKey("asset", asset.id))) {
-        return false;
-      }
-      if (!needle) return true;
-      return (
-        asset.name.toLowerCase().includes(needle) ||
-        asset.category.toLowerCase().includes(needle) ||
-        asset.note.toLowerCase().includes(needle)
-      );
-    });
-  }, [query, assetCategory, onlyFavourites, favourites]);
+  const filteredAssets = useMemo(
+    () =>
+      filterLibrary(BUILTIN_ASSETS, {
+        query,
+        matches: (asset) => assetCategory === "All" || asset.category === assetCategory,
+        favouritesOnly: onlyFavourites,
+        isFavourite: (asset) => favourites.includes(favouriteKey("asset", asset.id)),
+        text: (asset) => [asset.name, asset.category, asset.note],
+      }),
+    [query, assetCategory, onlyFavourites, favourites],
+  );
 
-  const filteredFrames = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return FRAMES.filter((frame) => {
-      if (frameGroup !== "All" && frame.group !== frameGroup) return false;
-      if (onlyFavourites && !favourites.includes(favouriteKey("frame", frame.id))) {
-        return false;
-      }
-      if (!needle) return true;
-      return (
-        frame.name.toLowerCase().includes(needle) ||
-        frame.group.toLowerCase().includes(needle) ||
-        frame.note.toLowerCase().includes(needle)
-      );
-    });
-  }, [query, frameGroup, onlyFavourites, favourites]);
+  const filteredFrames = useMemo(
+    () =>
+      filterLibrary(FRAMES, {
+        query,
+        matches: (frame) => frameGroup === "All" || frame.group === frameGroup,
+        favouritesOnly: onlyFavourites,
+        isFavourite: (frame) => favourites.includes(favouriteKey("frame", frame.id)),
+        text: (frame) => [frame.name, frame.group, frame.note],
+      }),
+    [query, frameGroup, onlyFavourites, favourites],
+  );
 
-  const filteredReveals = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return REVEAL_PRESETS;
-    return REVEAL_PRESETS.filter(
-      (preset) =>
-        preset.name.toLowerCase().includes(needle) ||
-        preset.note.toLowerCase().includes(needle) ||
-        preset.category.toLowerCase().includes(needle),
-    );
-  }, [query]);
+  const filteredReveals = useMemo(
+    () =>
+      filterLibrary(REVEAL_PRESETS, {
+        query,
+        text: (preset) => [preset.name, preset.note, preset.category],
+      }),
+    [query],
+  );
 
-  const filteredPalettes = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return PALETTES.filter((palette) => {
-      if (paletteGroup !== "All" && palette.group !== paletteGroup) return false;
-      if (!needle) return true;
-      return (
-        palette.name.toLowerCase().includes(needle) ||
-        palette.group.toLowerCase().includes(needle)
-      );
-    });
-  }, [query, paletteGroup]);
+  const filteredPalettes = useMemo(
+    () =>
+      filterLibrary(PALETTES, {
+        query,
+        matches: (palette) => paletteGroup === "All" || palette.group === paletteGroup,
+        text: (palette) => [palette.name, palette.group],
+      }),
+    [query, paletteGroup],
+  );
 
-  const filteredMaterials = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return MATERIAL_PRESETS.filter((preset) => {
-      if (materialGroup !== "All" && preset.category !== materialGroup) return false;
-      if (onlyFavourites && !favourites.includes(favouriteKey("material", preset.id))) {
-        return false;
-      }
-      if (!needle) return true;
-      return (
-        preset.label.toLowerCase().includes(needle) ||
-        preset.category.toLowerCase().includes(needle) ||
-        preset.note.toLowerCase().includes(needle)
-      );
-    });
-  }, [query, materialGroup, onlyFavourites, favourites]);
+  const filteredMaterials = useMemo(
+    () =>
+      filterLibrary(MATERIAL_PRESETS, {
+        query,
+        matches: (preset) => materialGroup === "All" || preset.category === materialGroup,
+        favouritesOnly: onlyFavourites,
+        isFavourite: (preset) => favourites.includes(favouriteKey("material", preset.id)),
+        text: (preset) => [preset.label, preset.category, preset.note],
+      }),
+    [query, materialGroup, onlyFavourites, favourites],
+  );
 
   /** The distinct colours of the curated palettes, as single swatches. */
   const paletteSwatches = useMemo(
@@ -1379,12 +1351,10 @@ export function LibraryPanel({
       : undefined;
 
   const finishLighting = finishConfig?.lighting ?? defaultFinishesConfig().lighting;
-  const finishNeedle = query.trim().toLowerCase();
-  const filteredFinishPresets = FINISH_PRESETS.filter(
-    (preset) =>
-      !finishNeedle ||
-      `${preset.label} ${preset.note}`.toLowerCase().includes(finishNeedle),
-  );
+  const filteredFinishPresets = filterLibrary(FINISH_PRESETS, {
+    query,
+    text: (preset) => [preset.label, preset.note],
+  });
 
   const category = CATEGORIES.find((item) => item.id === tab) ?? CATEGORIES[0];
 

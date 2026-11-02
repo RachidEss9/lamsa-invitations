@@ -1,5 +1,13 @@
 import { useAutosave } from "@/components/platform/useAutosave";
 import { projectPath } from "@/lib/platform/project";
+import {
+  appendSection,
+  assignPageToSection,
+  ensureSections,
+  removeSection,
+  reorderSections,
+  updateSection,
+} from "@/lib/sections";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -65,6 +73,7 @@ import {
   type DesignDocument,
   type DesignElement,
   type DesignPage,
+  type DesignSection,
   type ElementAnimation,
   type PageResizeMode,
   type StylePreset,
@@ -156,6 +165,7 @@ import {
   Heart,
   History,
   Image as ImageIcon,
+  BookOpen,
   Layers,
   Layout,
   Library,
@@ -194,9 +204,8 @@ import {
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
-type Device = "desktop" | "tablet" | "phone";
-type LeftPanel = "add" | "layers" | "colour" | "pages" | "finishes";
-type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline" | "finishes";
+type Device = "desktop" | "tablet" | "phone";  type LeftPanel = "add" | "layers" | "colour" | "pages" | "finishes" | "sections";
+  type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline" | "finishes" | "sections";
 
 /** Shared empty guides, so the canvas never sees a fresh object each render. */
 const NO_GUIDES: PageGuides = { x: [], y: [] };
@@ -647,6 +656,81 @@ export default function Studio() {
      whole 60-step history. Consecutive patches to the same layer and the same
      set of properties inside a short window share the snapshot the first one
      pushed, so one field edit is one undo step. */
+  const commitDesign = useCallback(
+    (next: DesignDocument) => {
+      if (designRef.current) pastRef.current.push(designRef.current);
+      futureRef.current = [];
+      designRef.current = next;
+      setDesignState(next);
+      setHistoryFlags({
+        undo: pastRef.current.length > 0,
+        redo: futureRef.current.length > 0,
+      });
+      setHistoryTick((tick) => tick + 1);
+      scheduleSave(next);
+    },
+    [scheduleSave],
+  );
+
+  const updateCurrentSection = useCallback(
+    (patch: Partial<Pick<DesignSection, "title" | "tone">>) => {
+      if (!designRef.current) return;
+      const base = ensureSections(designRef.current);
+      const sectionId =
+        base.pages[pageIndex]?.section ?? base.sections?.[0]?.id;
+      if (!sectionId) return;
+      commitDesign(updateSection(base, sectionId, patch));
+    },
+    [commitDesign, pageIndex],
+  );
+
+  const addSection = useCallback(() => {
+    if (!designRef.current) return;
+    const base = ensureSections(designRef.current);
+    const { design: next, id } = appendSection(base, "New section");
+    const previous = next.pages[next.pages.length - 1];
+    const nextPage: DesignPage = {
+      id: makeId("page"),
+      name: `Page ${next.pages.length + 1}`,
+      background: previous?.background ?? "#fbfaf7",
+      elements: [],
+      section: id,
+    };
+    const withPage: DesignDocument = { ...next, pages: [...next.pages, nextPage] };
+    commitDesign(withPage);
+    setPageIndex(withPage.pages.length - 1);
+    setSelectedIds([]);
+  }, [commitDesign]);
+
+  const moveSection = useCallback(
+    (direction: -1 | 1) => {
+      if (!designRef.current) return;
+      const base = ensureSections(designRef.current);
+      const sectionId =
+        base.pages[pageIndex]?.section ?? base.sections?.[0]?.id;
+      if (!sectionId) return;
+      const current = base.sections?.findIndex(
+        (section) => section.id === sectionId,
+      );
+      if (current === undefined || current < 0) return;
+      commitDesign(reorderSections(base, sectionId, current + direction));
+    },
+    [commitDesign, pageIndex],
+  );
+
+  const deleteSection = useCallback(() => {
+    if (!designRef.current) return;
+    const base = ensureSections(designRef.current);
+    if ((base.sections?.length ?? 0) < 2) {
+      toast.error("A document keeps at least one section.");
+      return;
+    }
+    const sectionId =
+      base.pages[pageIndex]?.section ?? base.sections?.[0]?.id;
+    if (!sectionId) return;
+    commitDesign(removeSection(base, sectionId));
+  }, [commitDesign, pageIndex]);
+
   const coalescing = useRef<{ key: string | null; at: number }>({
     key: null,
     at: 0,
@@ -2655,6 +2739,95 @@ export default function Studio() {
       );
     }
 
+    if (leftPanel === "sections") {
+      const designSections = design.sections ?? [];
+      return (
+        <>
+          <PanelHeading
+            title="Sections"
+            note="Chapters of the document. Pages belong to exactly one section."
+          />
+          <div className="space-y-1.5 p-3">
+          {designSections.map((section, index) => {
+            const pageCount = design.pages.filter(
+              (candidate) =>
+                candidate.section === section.id ||
+                (!candidate.section && index === 0),
+            ).length;
+            const active =
+              design.pages[pageIndex]?.section === section.id ||
+              (!design.pages[pageIndex]?.section && index === 0);
+            return (
+              <div
+                key={section.id}
+                className={cn(
+                  "rounded-lg border px-2.5 py-2 transition-colors duration-150",
+                  active
+                    ? "border-ink/35 bg-[var(--paper-light)]"
+                    : "border-ink/12 hover:border-ink/25",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    value={section.title}
+                    onChange={(event) =>
+                      updateCurrentSection({ title: event.target.value })
+                    }
+                    aria-label={`Title of section ${index + 1}`}
+                    className="min-w-0 flex-1 bg-transparent font-ui text-[12px] font-medium text-ink outline-none"
+                  />
+                  <span className="font-meta text-[9px] uppercase tracking-[0.12em] text-ink/40">
+                    {pageCount} {pageCount === 1 ? "page" : "pages"}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={index === 0}
+                    onClick={() => moveSection(-1)}
+                    className="h-6 px-2 text-[9px] uppercase tracking-[0.1em]"
+                  >
+                    Up
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={index === designSections.length - 1}
+                    onClick={() => moveSection(1)}
+                    className="h-6 px-2 text-[9px] uppercase tracking-[0.1em]"
+                  >
+                    Down
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={designSections.length < 2}
+                    onClick={deleteSection}
+                    className="h-6 px-2 text-[9px] uppercase tracking-[0.1em] text-[var(--red)] hover:text-[var(--red)]"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addSection}
+            className="h-8 w-full rounded-full text-[10px] uppercase tracking-[0.12em]"
+          >
+            <Plus className="size-3.5" /> New section
+          </Button>
+          </div>
+        </>
+      );
+    }
+
     if (leftPanel === "colour") {
       return (
         <ColourPanel
@@ -3283,6 +3456,7 @@ export default function Studio() {
               { id: "layers" as LeftPanel, icon: Layers, label: "Layers" },
               { id: "colour" as LeftPanel, icon: Palette, label: "Colour" },
               { id: "pages" as LeftPanel, icon: Layout, label: "Pages" },
+              { id: "sections" as LeftPanel, icon: BookOpen, label: "Sections" },
             ]).map(({ id, icon: Icon, label }) => (
               <button
                 key={id}
@@ -3765,6 +3939,7 @@ export default function Studio() {
           { id: "libraries" as const, label: "Library", icon: Library },
           { id: "layers" as const, label: "Layers", icon: Layers },
           { id: "colour" as const, label: "Colour", icon: Palette },
+          { id: "sections" as const, label: "Sections", icon: BookOpen },
           { id: "properties" as const, label: "Props", icon: PanelRight },
           { id: "pages" as const, label: "Pages", icon: Layout },
           { id: "timeline" as const, label: "Motion", icon: Play },
@@ -3783,7 +3958,7 @@ export default function Studio() {
                 return;
               }
               setMobileSheet((current) => (current === sheet ? null : sheet));
-              if (sheet === "add" || sheet === "layers" || sheet === "colour" || sheet === "pages") {
+              if (sheet === "add" || sheet === "layers" || sheet === "colour" || sheet === "pages" || sheet === "sections") {
                 setLeftPanel(sheet);
               }
             }}
