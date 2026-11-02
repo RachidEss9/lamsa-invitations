@@ -1,7 +1,6 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Wordmark } from "@/components/brand/Wordmark";
-import { ClosingStage } from "@/components/invitation/ClosingStage";
 import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
 import { ColourPanel } from "@/components/studio/ColourPanel";
 import { Inspector } from "@/components/studio/Inspector";
@@ -172,7 +171,6 @@ import {
   PanelLeft,
   PanelRight,
   Play,
-  Presentation,
   Plus,
   Redo2,
   Ruler,
@@ -2773,56 +2771,23 @@ export default function Studio() {
       return null;
     }
 
-                  <button
-                    key={sceneId}
-                    type="button"
-                    onClick={() =>
-                      applyOpening({ ...design.opening, experience: sceneId })
-                    }
-                    aria-pressed={design.opening.experience === sceneId}
-                    className={cn(
+    if (leftPanel === "layers") {
+      return (
+        <LayersPanel
+          page={page}
                       "relative overflow-hidden border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/60",
-                      design.opening.experience === sceneId
+                      false
                         ? "border-[var(--edge-strong)] shadow-[0_0_0_1px_var(--edge-strong)]"
                         : "border-ink/15 hover:border-ink/45",
                     )}
                   >
-                                <span className="absolute inset-x-0 bottom-0 bg-ink/70 px-1 py-0.5 text-center text-[7px] uppercase tracking-[0.1em] text-[var(--paper-light)]">
-                      {SCENES[sceneId].title.replace(/^The /, "")}
-                    </span>
                   </button>
                 ))}
               </div>
             </div>
             <label className="block">
               <span className="mb-1 block text-[10px] text-ink/55">Welcome line</span>
-              <Input
-                value={design.opening.welcome}
-                onChange={(event) => applyOpening({ ...design.opening, welcome: event.target.value })}
-                className="h-8 rounded-none text-[11px]"
-              />
-              <span className="mt-1 block text-[9px] text-ink/35">Use {"{{guest}}"} for the guest's name.</span>
-            </label>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-ink/55">Start automatically</span>
-              <Switch
-                checked={design.opening.autoOpen}
-                onCheckedChange={(autoOpen) => applyOpening({ ...design.opening, autoOpen })}
-                className="scale-90"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 w-full rounded-none text-[10px]"
-              onClick={() => {
-                setOpeningPreview((value) => value + 1);
-                setShowOpeningPreview(true);
-              }}
-            >
-              <Play className="size-3.5" /> Preview
-            </Button>
-            <p className="text-[9px] leading-relaxed text-ink/35">
+                    <p className="text-[9px] leading-relaxed text-ink/35">
               The Secret World, Living Art and The Impossible Invitation — three
               scenes built from real layered artwork, each revealing the actual
               invitation in its own slot.
@@ -3435,19 +3400,6 @@ export default function Studio() {
             <Eye className="size-3.5" />
             <span className="hidden sm:inline">Guest preview</span>
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setPresentationOpen(true)}
-            className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
-            aria-label="Open the detail presentation studio"
-            title="Detail presentation — close-up views of your invitation"
-          >
-            <Presentation className="size-3.5" />
-            <span className="hidden sm:inline">Detail</span>
-          </Button>
-          <Button
-            type="button"
             variant="outline"
             onClick={() => setPrintOpen(true)}
             className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
@@ -3508,7 +3460,6 @@ export default function Studio() {
               { id: "add" as LeftPanel, icon: Plus, label: "Add" },
               { id: "layers" as LeftPanel, icon: Layers, label: "Layers" },
               { id: "colour" as LeftPanel, icon: Palette, label: "Colour" },
-              { id: "opening" as LeftPanel, icon: Mail, label: "Presentation" },
               { id: "pages" as LeftPanel, icon: Layout, label: "Pages" },
             ]).map(({ id, icon: Icon, label }) => (
               <button
@@ -4137,7 +4088,6 @@ export default function Studio() {
         selectedIds={selectedIds}
         selectedAnimations={selectedAnimations}
         onApplyTemplate={applyTemplate}
-        onApplyOpening={applyOpening}
         onApplyAnimation={applyAnimation}
         onApplyFont={applyFont}
         onApplyStyle={applyStyle}
