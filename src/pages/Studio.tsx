@@ -1,13 +1,6 @@
 import { useAutosave } from "@/components/platform/useAutosave";
 import { projectPath } from "@/lib/platform/project";
-import {
-  appendSection,
-  assignPageToSection,
-  ensureSections,
-  removeSection,
-  reorderSections,
-  updateSection,
-} from "@/lib/sections";
+import { updateCurrentSection, addSection, moveSection, deleteSection } from "@/lib/sections";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -71,8 +64,6 @@ import {
   SHAPES,
   timelineDuration,
   type DesignDocument,
-  type DesignElement,
-  type DesignPage,
   type DesignSection,
   type ElementAnimation,
   type PageResizeMode,
@@ -203,6 +194,7 @@ import {
 } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
+
 
 type Device = "desktop" | "tablet" | "phone";  type LeftPanel = "add" | "layers" | "colour" | "pages" | "finishes" | "sections";
   type MobileSheet = null | "add" | "layers" | "colour" | "properties" | "pages" | "timeline" | "finishes" | "sections";
@@ -689,7 +681,7 @@ export default function Studio() {
     const base = ensureSections(designRef.current);
     const { design: next, id } = appendSection(base, "New section");
     const previous = next.pages[next.pages.length - 1];
-    const nextPage: DesignPage = {
+    const nextPage: { id: string; name: string; background: string; elements: import("@/lib/design").DesignElement[]; } = {
       id: makeId("page"),
       name: `Page ${next.pages.length + 1}`,
       background: previous?.background ?? "#fbfaf7",
@@ -856,9 +848,7 @@ export default function Studio() {
     });
     coalescing.current = { key: null, at: 0 };
     setHistoryTick((tick) => tick + 1);
-  }, [scheduleSave]);
-
-  const page: DesignPage | null = design?.pages[Math.min(pageIndex, design.pages.length - 1)] ?? null;
+  }, [scheduleSave]);        const page: { id: string; name: string; background: string; elements: import("@/lib/design").DesignElement[]; } | null = design?.pages[Math.min(pageIndex, design.pages.length - 1)] ?? null;
   const duration = page ? timelineDuration(page) : 4000;
   const clips = page ? clipsForPage(page) : [];
   const selected = page
@@ -2310,7 +2300,7 @@ export default function Studio() {
   ) => {
     if (!design) return;
     const current = design.pages[pageIndex];
-    const nextPage: DesignPage = duplicate
+    const nextPage: { id: string; name: string; background: string; elements: import("@/lib/design").DesignElement[]; } = duplicate
       ? {
           ...current,
           id: makeId("page"),
