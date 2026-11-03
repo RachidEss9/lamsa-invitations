@@ -29,11 +29,17 @@ describe("the workspace registry", () => {
     }
   });
 
-  it("only opens Digital Experiences today", () => {
+  it("opens the workspaces the roadmap has delivered", () => {
     expect(READY_WORKSPACES.map((workspace) => workspace.id)).toEqual([
       "experiences",
+      "print",
+      "shape",
+      "press",
     ]);
     expect(READY_WORKSPACES[0].route).toBe("/dashboard");
+    expect(READY_WORKSPACES[1].route).toBe("/print");
+    expect(READY_WORKSPACES[2].route).toBe("/shapes");
+    expect(READY_WORKSPACES[3].route).toBe("/press");
   });
 
   it("finds a workspace by id and rejects an unknown one", () => {

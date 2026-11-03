@@ -1,6 +1,8 @@
 # LAMSA — Phase 2 plan: Digital Experiences document
 
-Status: **planning only**. Nothing in this document is implemented yet.
+Status: **shipped**. The section model, the sections panel and the section-scoped
+canvas are in the studio; the exit gates below pass. See
+`PHASE_3_5_WORKSPACES.md` for the workspaces this unblocked.
 
 ## What Phase 2 must deliver
 

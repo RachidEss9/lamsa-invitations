@@ -32,6 +32,9 @@ const Landing = lazy(() => import("./pages/Landing.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Editor = lazy(() => import("./pages/Editor.tsx"));
 const Studio = lazy(() => import("./pages/Studio.tsx"));
+const PrintLab = lazy(() => import("./pages/PrintLab.tsx"));
+const ShapeMaker = lazy(() => import("./pages/ShapeMaker.tsx"));
+const Press = lazy(() => import("./pages/Press.tsx"));
 const InvitationPage = lazy(() => import("./pages/InvitationPage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -173,6 +176,54 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <StudioGate>
                     <Studio />
+                  </StudioGate>
+                }
+              />
+              <Route
+                path="/print"
+                element={
+                  <StudioGate>
+                    <PrintLab />
+                  </StudioGate>
+                }
+              />
+              <Route
+                path="/print/:id"
+                element={
+                  <StudioGate>
+                    <PrintLab />
+                  </StudioGate>
+                }
+              />
+              <Route
+                path="/shapes"
+                element={
+                  <StudioGate>
+                    <ShapeMaker />
+                  </StudioGate>
+                }
+              />
+              <Route
+                path="/shapes/:id"
+                element={
+                  <StudioGate>
+                    <ShapeMaker />
+                  </StudioGate>
+                }
+              />
+              <Route
+                path="/press"
+                element={
+                  <StudioGate>
+                    <Press />
+                  </StudioGate>
+                }
+              />
+              <Route
+                path="/press/:id"
+                element={
+                  <StudioGate>
+                    <Press />
                   </StudioGate>
                 }
               />

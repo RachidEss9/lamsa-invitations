@@ -7,7 +7,7 @@ import {
   sectionForPage,
   updateSection,
 } from "@/lib/sections";
-import type { DesignDocument, DesignPage, DesignSection } from "@/lib/design";
+import type { DesignDocument, DesignSection } from "@/lib/design";
 
 const DOC = (): DesignDocument =>
   ({

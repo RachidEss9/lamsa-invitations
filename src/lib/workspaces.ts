@@ -37,7 +37,8 @@ export const WORKSPACES: Workspace[] = [
     shortName: "Print Lab",
     tagline: "Press-ready cards, menus and tags with bleed, marks and sheets.",
     phase: 3,
-    ready: false,
+    route: "/print",
+    ready: true,
   },
   {
     id: "shape",
@@ -45,7 +46,8 @@ export const WORKSPACES: Workspace[] = [
     shortName: "Shapes",
     tagline: "Vector cut and fold lines measured in millimetres.",
     phase: 4,
-    ready: false,
+    route: "/shapes",
+    ready: true,
   },
   {
     id: "press",
@@ -53,7 +55,8 @@ export const WORKSPACES: Workspace[] = [
     shortName: "Press",
     tagline: "Newspapers and magazines laid out page by page.",
     phase: 5,
-    ready: false,
+    route: "/press",
+    ready: true,
   },
 ];
 

@@ -1,7 +1,8 @@
 
 
+import { useAutosave } from "@/components/platform/useAutosave";
+import { projectPath } from "@/lib/platform/project";
 import { reorderSections, updateSection, ensureSections, appendSection, removeSection } from "@/lib/sections";
-
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -66,6 +67,8 @@ import {
   SHAPES,
   timelineDuration,
   type DesignDocument,
+  type DesignElement,
+  type DesignPage,
   type DesignSection,
   type ElementAnimation,
   type PageResizeMode,
@@ -683,12 +686,20 @@ export default function Studio() {
     const base = ensureSections(designRef.current);
     const { design: next, id } = appendSection(base, "New section");
     const previous = next.pages[next.pages.length - 1];
-    const nextPage: { id: string; name: string; background: string; elements: import("@/lib/design").DesignElement[]; } = {
+    const nextPage: DesignPage = {
       id: makeId("page"),
+      section: id,
       name: `Page ${next.pages.length + 1}`,
       background: previous?.background ?? "#fbfaf7",
       elements: [],
-      section: id,
+      // The new sheet matches the page it follows, but never inherits its
+      // hidden state — a section's first page should be visible.
+      width: previous?.width,
+      height: previous?.height,
+      margin: previous?.margin,
+      bleed: previous?.bleed,
+      texture: previous?.texture,
+      edge: previous?.edge,
     };
     const withPage: DesignDocument = { ...next, pages: [...next.pages, nextPage] };
     commitDesign(withPage);
@@ -850,7 +861,10 @@ export default function Studio() {
     });
     coalescing.current = { key: null, at: 0 };
     setHistoryTick((tick) => tick + 1);
-  }, [scheduleSave]);        const page: { id: string; name: string; background: string; elements: import("@/lib/design").DesignElement[]; } | null = design?.pages[Math.min(pageIndex, design.pages.length - 1)] ?? null;
+  }, [scheduleSave]);
+
+  const page =
+    design?.pages[Math.min(pageIndex, design.pages.length - 1)] ?? null;
   const duration = page ? timelineDuration(page) : 4000;
   const clips = page ? clipsForPage(page) : [];
   const selected = page
