@@ -16,6 +16,8 @@ interface SequentialInvitationProps {
   forceFinishAnimations?: boolean;
   onStepChange?: (step: number, total: number) => void;
   onPhaseChange?: (phase: JourneyPhase) => void;
+  /** Height budget the whole card may use; defaults to 82% of the viewport. */
+  fitHeight?: string;
   className?: string;
 }
 
@@ -38,6 +40,7 @@ export function SequentialInvitation({
   forceFinishAnimations = false,
   onStepChange,
   onPhaseChange,
+  fitHeight,
   className,
 }: SequentialInvitationProps) {
   const [restartSignalInternal] = useState(restartSignal);
@@ -70,6 +73,7 @@ export function SequentialInvitation({
           forceFinishAnimations={forceFinishAnimations}
           onStepChange={onStepChange}
           onPhaseChange={handlePhaseChange}
+          fitHeight={fitHeight}
           className={className}
         />
       )}

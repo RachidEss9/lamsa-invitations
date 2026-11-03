@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClosingStage } from "@/components/invitation/ClosingStage";
-import { DesignPageView } from "@/components/invitation/DesignPageView";
+import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
 import { JourneyCue } from "@/components/invitation/JourneyCue";
-import { personalize, type DesignDocument } from "@/lib/design";
+import { pageSizeOf, personalize, type DesignDocument } from "@/lib/design";
 import {
   advancePhase,
   continueState,
@@ -30,6 +30,12 @@ interface InvitationJourneyProps {
   /** Reports the guest's position for the preview's progress read-out. */
   onStepChange?: (step: number, total: number) => void;
   onPhaseChange?: (phase: JourneyPhase) => void;
+  /**
+   * The height budget the whole card may occupy. The card is sized from the
+   * page's own aspect ratio against this budget and the caller's width, so the
+   * complete page is always visible: never cropped, never stretched.
+   */
+  fitHeight?: string;
   className?: string;
 }
 
@@ -52,6 +58,7 @@ export function InvitationJourney({
   forceFinishAnimations = false,
   onStepChange,
   onPhaseChange,
+  fitHeight = "82dvh",
   className,
 }: InvitationJourneyProps) {
   const pages = useMemo(() => journeyPages(design), [design]);
@@ -193,6 +200,12 @@ export function InvitationJourney({
     );
   }
 
+  /* The card is the page's own shape. A guest never sees a 3:4 window with a
+     taller sheet cropped inside it: the stage scales the whole page to the
+     card, and the card is capped by the height budget so it always fits. */
+  const pageSize = pageSizeOf(page);
+  const pageRatio = pageSize.width / pageSize.height;
+
   const journeyCue =
     phase === "page" && progress.visible ? (
       <JourneyCue
@@ -216,15 +229,25 @@ export function InvitationJourney({
       tabIndex={0}
     >
       <div
-        className="relative w-full overflow-hidden bg-[var(--paper-light)] shadow-[0_24px_70px_rgba(22,22,22,0.16)]"
-        style={{ aspectRatio: "1000 / 1333.33" }}
+        className="relative mx-auto w-full overflow-hidden bg-[var(--paper-light)] shadow-[0_24px_70px_rgba(22,22,22,0.16)]"
+        style={{
+          aspectRatio: `${pageSize.width} / ${pageSize.height}`,
+          maxWidth: `min(100%, calc(${fitHeight} * ${pageRatio}))`,
+        }}
+        data-journey-card={pageSize.width + "x" + Math.round(pageSize.height)}
       >
         <div className="sr-only" aria-live="polite">
           {phase === "opening"
             ? "Choose a scene and open the invitation."
             : announcement}
         </div>
-        {stage}
+        <DesignStage
+          width={pageSize.width}
+          height={pageSize.height}
+          className="absolute inset-0"
+        >
+          {() => stage}
+        </DesignStage>
         {journeyCue}
       </div>
     </div>
