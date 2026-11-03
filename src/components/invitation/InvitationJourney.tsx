@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClosingStage } from "@/components/invitation/ClosingStage";
-import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
+import { DesignPageView } from "@/components/invitation/DesignPageView";
 import { JourneyCue } from "@/components/invitation/JourneyCue";
-import { pageSizeOf, personalize, type DesignDocument } from "@/lib/design";
+import { PreviewFrame } from "@/components/invitation/PreviewFrame";
+import { personalize, type DesignDocument } from "@/lib/design";
 import {
   advancePhase,
   continueState,
@@ -200,12 +201,6 @@ export function InvitationJourney({
     );
   }
 
-  /* The card is the page's own shape. A guest never sees a 3:4 window with a
-     taller sheet cropped inside it: the stage scales the whole page to the
-     card, and the card is capped by the height budget so it always fits. */
-  const pageSize = pageSizeOf(page);
-  const pageRatio = pageSize.width / pageSize.height;
-
   const journeyCue =
     phase === "page" && progress.visible ? (
       <JourneyCue
@@ -228,28 +223,19 @@ export function InvitationJourney({
       aria-label={`Invitation for ${namesText}`}
       tabIndex={0}
     >
-      <div
+      <PreviewFrame
+        page={page ? { width: page.width!, height: page.height! } : null}
+        fitHeight={fitHeight}
         className="relative mx-auto w-full overflow-hidden bg-[var(--paper-light)] shadow-[0_24px_70px_rgba(22,22,22,0.16)]"
-        style={{
-          aspectRatio: `${pageSize.width} / ${pageSize.height}`,
-          maxWidth: `min(100%, calc(${fitHeight} * ${pageRatio}))`,
-        }}
-        data-journey-card={pageSize.width + "x" + Math.round(pageSize.height)}
+        reset
       >
         <div className="sr-only" aria-live="polite">
           {phase === "opening"
             ? "Choose a scene and open the invitation."
             : announcement}
         </div>
-        <DesignStage
-          width={pageSize.width}
-          height={pageSize.height}
-          className="absolute inset-0"
-        >
-          {() => stage}
-        </DesignStage>
         {journeyCue}
-      </div>
+      </PreviewFrame>
     </div>
   );
 }

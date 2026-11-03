@@ -458,6 +458,7 @@ export default function InvitationPage() {
               active
               accent={data.palette.accent}
               ink={data.palette.ink}
+              fitHeight="min(82dvh, 720px)"
             />
           ) : (
             <div className="editorial-shadow">
