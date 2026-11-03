@@ -1,18 +1,19 @@
-/**
- * TEMPORARY QA HARNESS — not part of the product.
- *
- * The Studio route is behind an emailed one-time code plus a PIN, so browser
- * automation cannot sign in. This harness mounts the real, unmodified
- * StudioCanvas / LibraryPanel (finishes tab) / FinishComposer / guest
- * SequentialInvitation against a fixture invitation, so the finish rendering
- * and the finish controls can be driven by a real browser.
- *
- * It also runs data-integrity checks with the real library functions
- * (normalizeDesign, applyFinishPresetToDesign, pushHistory/undoHistory/…).
- */
-import "../index.css";
-import { createRoot } from "react-dom/client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+
+
+import type { LayerMaterial, MaterialBlend } from "@/lib/materials";
+import type { FinishSurface } from "@/lib/finishes";
+
+import { LibraryPanel } from "@/components/studio/LibraryPanel";
+import { StudioCanvas } from "@/components/studio/StudioCanvas";
+import { SequentialInvitation } from "@/components/invitation/SequentialInvitation";
+import {
+  applyFinishPresetToDesign,
+  clearFinishesFromDesign,
+  normalizeDesign,
+  type DesignDocument,
+  type DesignElement,
+} from "@/lib/design";import { createRoot } from "react-dom/client";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FinishComposer } from "@/components/studio/FinishComposer";
 import { LibraryPanel } from "@/components/studio/LibraryPanel";
@@ -36,15 +37,12 @@ import {
   type FinishPreviewMode,
   type FinishesConfig,
 } from "@/lib/finishes";
-import {
-  TEMPLATES,
-  displayTitle,
-  draftFromTemplate,
-  type InvitationContent,
-} from "@/lib/invitation";
-import { pushHistory, redoHistory, undoHistory, type HistoryStacks } from "@/lib/studio-edit";
 
-const ANIMATION = {
+
+import { pushHistory, redoHistory, undoHistory, type HistoryStacks } from "@/lib/studio-edit";
+import { TEMPLATES, displayTitle, draftFromTemplate, type InvitationContent } from "@/lib/invitation";
+
+const ANIMATION: any = {
   enabled: true,
   preset: "fade",
   trigger: "load",
@@ -142,7 +140,7 @@ const BASE_DESIGN: DesignDocument = {
   ],
   closing: { enabled: false, style: "message", message: "", duration: 800 },
   transition: { preset: "fade", duration: 600 },
-} as DesignDocument;
+};
 
 export interface QaCheck {
   name: string;
@@ -188,35 +186,31 @@ function runChecks(design: DesignDocument, content: InvitationContent): QaCheck[
   // 4. A preset application is a single undo step that restores exactly.
   const before = design;
   const after = applyFinishPresetToDesign(before, "royal-gold");
-  let stacks: HistoryStacks = { past: pushHistory([], before), future: [] };
-  const undone = undoHistory(stacks, after);
-  stacks = undone?.stacks ?? stacks;
+  const _stacks: HistoryStacks = { past: pushHistory([], before), future: [] };
+  const undone = undoHistory(_stacks, after);
   const back = undone?.snapshot ?? after;
-  const redone = redoHistory(stacks, back);
+  const redone = redoHistory(undone!.stacks, back as DesignDocument);
   push(
     "preset-undo-redo",
-    Boolean(undone) &&
-      Boolean(redone) &&
-      JSON.stringify(back) === JSON.stringify(before) &&
-      JSON.stringify(redone?.snapshot) === JSON.stringify(after),
+    Boolean(undone) && Boolean(redone) && JSON.stringify(back) === JSON.stringify(before) && JSON.stringify(redone.snapshot) === JSON.stringify(after),
     undone && redone
       ? `undo restored ${back.pages[0]?.finishes?.length ?? 0} page layers, redo restored ${redone.snapshot.pages[0]?.finishes?.length ?? 0}`
       : "history returned null",
   );
 
   // 5. Applying a preset supersedes the older material preset on every surface.
-  const withMaterial: DesignDocument = {
-    ...before,
-    pages: before.pages.map((page) => ({
-      ...page,
-      material: { id: "linen" },
-      elements: page.elements.map((element) => ({
-        ...element,
-        material: { id: "gold-foil" },
+  const linen: LayerMaterial = { preset: "linen", enabled: true, intensity: 0.6, scale: 1, opacity: 1, blend: "normal", foil: "#00000000", foilStrength: 0.5, relief: 0, softness: 0, finish: "matte" } as LayerMaterial;
+  const foilPatch: LayerMaterial = { preset: "wax", enabled: true, intensity: 0.7, scale: 1, opacity: 1, blend: "normal", foil: "#710014ff", foilStrength: 0.5, relief: 0, softness: 0, finish: "matte" } as LayerMaterial;
+  const withMaterial = (before: DesignDocument): DesignDocument =>
+    ({
+      ...before,
+      pages: before.pages.map((page) => ({
+        ...page,
+        material: linen,
+        elements: page.elements.map((element) => ({ ...element, material: foilPatch })),
       })),
-    })),
-  } as DesignDocument;
-  const dressed = applyFinishPresetToDesign(withMaterial, "pearl");
+    });
+  const dressed = applyFinishPresetToDesign(withMaterial(before), "pearl");
   const materialLeft = [
     ...dressed.pages.map((page) => page.material),
     ...dressed.pages.flatMap((page) => page.elements.map((element) => element.material)),
@@ -233,7 +227,8 @@ function runChecks(design: DesignDocument, content: InvitationContent): QaCheck[
   const curved = BASE_DESIGN.pages[0]!.elements.find((element) => element.id === "names")!;
   const surface = finishSurfaceOf(curved);
   const curvedOptions = finishesFor(curved, "element");
-  const textures = curvedOptions.filter((option) => option.surface === "surface");
+  const isTexture = (option: { surfaces: FinishSurface[] }) => option.surfaces.includes("surface" as FinishSurface);
+  const textures = curvedOptions.filter(isTexture);
   push(
     "curved-text-finishes",
     surface === "outline" && textures.length === 0 && curvedOptions.length > 0,
@@ -273,7 +268,7 @@ function App() {
     const template = TEMPLATES.find((entry) => entry.rtl) ?? TEMPLATES[0]!;
     return {
       ...draftFromTemplate(template.id),
-      names: "ليلى وعمر",
+      names: { primary: "ليلى وعمر", secondary: "ليلى وعمر" } satisfies InvitationContent["names"],
       rtl: true,
     } satisfies InvitationContent;
   }, []);
@@ -295,31 +290,31 @@ function App() {
 
   const changeConfig = useCallback((next: FinishesConfig | undefined) => {
     const normalized = normalizeFinishesConfig(next);
-    setDesign((current) => ({ ...current, finishes: normalized }));
+    setDesign((current: DesignDocument) => ({ ...current, finishes: normalized }));
   }, []);
 
   const applyPreset = useCallback((presetId: string) => {
-    setDesign((current) => applyFinishPresetToDesign(current, presetId));
+    setDesign((current: DesignDocument) => applyFinishPresetToDesign(current, presetId));
     setMaterialPreview(true);
   }, []);
 
   const resetFinishes = useCallback(() => {
-    setDesign((current) => clearFinishesFromDesign(current));
+    setDesign((current: DesignDocument) => clearFinishesFromDesign(current));
   }, []);
 
   const writeLayers = useCallback(
     (next: FinishLayer[]) => {
-      setDesign((current) => ({
+      setDesign((current: DesignDocument) => ({
         ...current,
-        pages: current.pages.map((entry, index) =>
+        pages: current.pages.map((entry: any, index: number) =>
           index !== 0
             ? entry
             : {
                 ...entry,
                 finishes: selectedElement ? entry.finishes : next.length ? next : undefined,
                 elements: selectedElement
-                  ? entry.elements.map((element) =>
-                      element.id === selectedElement.id
+                  ? entry.elements.map((element: any) =>
+                      element.id === selectedElement!.id
                         ? { ...element, finishes: next.length ? next : undefined }
                         : element,
                     )
