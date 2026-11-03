@@ -244,11 +244,6 @@ describe("document compatibility", () => {
         ],
       },
     ],
-    opening: {
-      experience: "none",
-      autoOpen: false,
-      welcome: "",
-    },
     closing: { enabled: false, style: "message", message: "", duration: 1800 },
     transition: { preset: "fade", duration: 700 },
     startedAt: 0,

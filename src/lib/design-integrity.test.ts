@@ -76,13 +76,6 @@ function savedDesign(): DesignDocument {
         elements: [text("draft")],
       },
     ],
-    opening: {
-      experience: "secret-world" as const,
-      duration: 1700,
-      autoOpen: false,
-      welcome: "For {{guest}}, with love",
-      coverStorageId: "cover-image",
-    },
     closing: {
       enabled: true,
       style: "seal",
@@ -95,18 +88,14 @@ function savedDesign(): DesignDocument {
 }
 
 describe("saved-design integrity", () => {
-  it("keeps every custom opening, closing, transition and page setting", () => {
+  it("keeps every custom closing, transition and page setting", () => {
     const saved = savedDesign();
     const stored = JSON.parse(JSON.stringify(saved)) as DesignDocument;
     const reloaded = normalizeDesign(stored, content);
 
-    // The presentation system is retired: an opening is neutralised on load so
-    // no guest is shown a scene the studio cannot edit any more.
-    expect(reloaded.opening).toEqual({
-      experience: "none",
-      autoOpen: false,
-      welcome: "",
-    });
+    // The presentation system is retired: documents no longer carry opening
+    // settings at all, so nothing can smuggle a scene back onto a guest page.
+    expect("opening" in reloaded).toBe(false);
     expect(reloaded.closing).toEqual(saved.closing);
     expect(reloaded.transition).toEqual(saved.transition);
     expect(reloaded.startedAt).toBe(saved.startedAt);
@@ -136,13 +125,14 @@ describe("saved-design integrity", () => {
     expect(reloaded.pages[2].hidden).toBe(true);
     expect(reloaded.closing.style).toBe("seal");
     expect(reloaded.transition.preset).toBe("flip");
-    expect(reloaded.opening.experience).toBe("none");
-    expect(reloaded.opening.welcome).toBe("");
+    expect("opening" in reloaded).toBe(false);
   });
 
-  it("retires every opening scene without breaking a saved design", () => {
-    // Invitations saved under any of the old scenes must still load: the scene
-    // is dropped, and the rest of the document is untouched.
+  it("drops every legacy opening scene without breaking a saved design", () => {
+    // Invitations stored under any of the old scenes must still load: the
+    // retired settings are dropped on load and the rest of the document —
+    // pages, layers, closing, transition — is untouched. This is the whole of
+    // the migration; no database rewrite is needed.
     const retired = [
       "envelope",
       "curtain",
@@ -151,17 +141,30 @@ describe("saved-design integrity", () => {
       "personal",
       "paper",
       "secret-world",
+      "living-art",
+      "impossible",
       "unknownScene",
     ];
     for (const legacy of retired) {
       const saved = savedDesign();
-      (saved.opening as { experience?: string }).experience = legacy;
+      const stored = {
+        ...saved,
+        opening: {
+          experience: legacy,
+          duration: 2400,
+          autoOpen: true,
+          welcome: "For {{guest}}",
+          coverStorageId: "cover-image",
+        },
+      } as unknown as DesignDocument;
       const reloaded = normalizeDesign(
-        JSON.parse(JSON.stringify(saved)) as DesignDocument,
+        JSON.parse(JSON.stringify(stored)) as DesignDocument,
         content,
       );
-      expect(reloaded.opening.experience, legacy).toBe("none");
+      expect("opening" in reloaded, legacy).toBe(false);
       expect(reloaded.pages.length, legacy).toBe(saved.pages.length);
+      expect(reloaded.closing.style, legacy).toBe(saved.closing.style);
+      expect(reloaded.pages[0].elements[0].font, legacy).toBe("great-vibes");
     }
   });
 

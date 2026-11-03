@@ -38,7 +38,7 @@ import {
   finishStackIsActive,
   finishSurfaceOf,
   pageEdgeFinish,
-  pageSurfaceFinishes,
+  pageBodyFinishes,
   signatureAnimationClass,
   type FinishAnimationState,
   type FinishSurface,
@@ -1035,7 +1035,11 @@ export function DesignPageView({
   };
 
   const size = pageSizeOf(page);
-  const pageOverlay = materialPreview ? materialOverlayStyle(page.material) : undefined;
+  /* One finish system per sheet: a page finish stack supersedes the older
+     material preset, so a sheet can never be dressed twice at once. */
+  const pageHasFinishes = finishStackIsActive(page.finishes);
+  const pageOverlay =
+    materialPreview && !pageHasFinishes ? materialOverlayStyle(page.material) : undefined;
 
   /* One lighting rig for the whole sheet: every metal ramp, relief shadow and
      specular pass reads the same direction, so moving the light moves them
@@ -1053,13 +1057,11 @@ export function DesignPageView({
     ? finishLightStyle(finishes.lighting)
     : undefined;
 
-  const effectiveSurface = (element: DesignElement): FinishSurface | null => {
-    const surface = finishSurfaceOf(element);
-    // Curved wording is drawn as SVG paths and its fill lives inside the SVG,
-    // so a curved layer takes its finishes through the filter pass instead.
-    if (surface === "text" && curveIsActive(element.curve)) return "outline";
-    return surface;
-  };
+  // `finishSurfaceOf` is the one place that decides which surface a layer
+  // offers, including the curved-text case, so the composer and the renderer
+  // can never disagree about which finishes a layer can carry.
+  const effectiveSurface = (element: DesignElement): FinishSurface | null =>
+    finishSurfaceOf(element);
 
   // Every filter recipe this page needs, deduped: identical reliefs on a
   // hundred small layers share one <filter> element.
@@ -1076,7 +1078,7 @@ export function DesignPageView({
     }
   }
   const pageFinishOverlays = materialPreview
-    ? finishOverlays(pageSurfaceFinishes(page.finishes), lighting)
+    ? finishOverlays(pageBodyFinishes(page.finishes), lighting)
     : [];
   const gildedEdge = materialPreview
     ? finishEdgeStyle(pageEdgeFinish(page.finishes), lighting)
@@ -1198,7 +1200,10 @@ export function DesignPageView({
         // A material is one overlay layer above the artwork — in Material
         // Preview mode only. Nothing is ever written into the artwork itself,
         // so switching back to Artwork / Print restores the untouched card.
-        const finishTarget = materialPreview ? materialTargetOf(element) : null;
+        const finishTarget =
+          materialPreview && !finishStackIsActive(element.finishes)
+            ? materialTargetOf(element)
+            : null;
         const finish = finishTarget ? materialOverlayStyle(element.material) : undefined;
 
         // The luxury finish stack for this layer: overlays clipped to its own

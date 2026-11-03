@@ -6,7 +6,7 @@ import {
   occasionValidator,
   scheduleItemValidator,
 } from "@/convex/validators";
-import type { OpeningSettings, PageEdgeId } from "./design";
+import type { PageEdgeId } from "./design";
 
 /**
  * Client-side mirror of the invitation validators in src/convex/validators.ts.
@@ -337,8 +337,6 @@ export interface InvitationTemplate {
    * every template saved before cut edges existed keeps its trim.
    */
   edge?: PageEdgeId;
-  /** The opening this template sets when it is applied. */
-  opening?: Partial<OpeningSettings>;
   /** Optional fx overlay recipe rendered over the backdrop image. */
   fx?: InvitationFxSpec;
   sample: {
@@ -917,7 +915,7 @@ export const TEMPLATES: InvitationTemplate[] = [
 
   /* ----------------------------------------------------------------------- */
   /* The reference set: cards drawn from the supplied studio images, one      */
-  /* group per occasion, each with its own cut edge and opening.              */
+  /* group per occasion, each with its own cut edge and type treatment.      */
   /* ----------------------------------------------------------------------- */
   {
     id: "oxblood-ivory",
@@ -931,13 +929,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "wreath",
     cornerMotif: "flourish",
     edge: "deckle",
-    opening: {
-      experience: "secret-world" as const,
-      duration: 3200,
-      tone: "crimson",
-      palette: { accent: "#d8bd97", hull: "#5c1214", paper: "#f4e7d4" },
-      welcome: "",
-    },
     sample: {
       primary: "Amelia",
       secondary: "Søren",
@@ -959,13 +950,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "branch",
     cornerMotif: "blossom",
     edge: "deckle",
-    opening: {
-      experience: "living-art" as const,
-      duration: 3000,
-      tone: "ivory",
-      palette: { accent: "#8fa088", hull: "#eef1ea", paper: "#ffffff" },
-      welcome: "",
-    },
     sample: {
       primary: "Noor",
       secondary: "Elias",
@@ -987,13 +971,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "frame",
     cornerMotif: "flourish",
     edge: "scallop",
-    opening: {
-      experience: "secret-world" as const,
-      duration: 3000,
-      tone: "ivory",
-      palette: { accent: "#b38f6f", hull: "#e7dcc7", paper: "#fbf6ec" },
-      welcome: "",
-    },
     sample: {
       primary: "Beatriz",
       secondary: "Tomás",
@@ -1015,13 +992,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "sunburst",
     cornerMotif: "star",
     edge: "arch",
-    opening: {
-      experience: "living-art" as const,
-      duration: 3400,
-      tone: "ink",
-      palette: { accent: "#c9a76a", hull: "#0f1a33", paper: "#efe7d6" },
-      welcome: "",
-    },
     sample: {
       primary: "Yasmine",
       secondary: "Karim",
@@ -1045,13 +1015,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "blossom",
     cornerMotif: "branch",
     edge: "petal",
-    opening: {
-      experience: "living-art" as const,
-      duration: 3000,
-      tone: "ivory",
-      palette: { accent: "#c0857f", hull: "#eedad3", paper: "#fffaf7" },
-      welcome: "",
-    },
     sample: {
       primary: "Lina",
       secondary: "Adam",
@@ -1073,13 +1036,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "paisley",
     cornerMotif: "paisley",
     edge: "wave",
-    opening: {
-      experience: "secret-world" as const,
-      duration: 3000,
-      tone: "ivory",
-      palette: { accent: "#b4674a", hull: "#dcbfa6", paper: "#fbf1e7" },
-      welcome: "",
-    },
     sample: {
       primary: "Salma",
       secondary: "Youssef",
@@ -1103,13 +1059,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "confetti",
     cornerMotif: "star",
     edge: "notch",
-    opening: {
-      experience: "secret-world" as const,
-      duration: 2800,
-      tone: "ink",
-      palette: { accent: "#d98aa3", hull: "#241014", paper: "#f8ece7" },
-      welcome: "",
-    },
     sample: {
       primary: "Turning 30",
       secondary: "Hana",
@@ -1131,13 +1080,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "bow",
     cornerMotif: "blossom",
     edge: "scallop",
-    opening: {
-      experience: "secret-world" as const,
-      duration: 2800,
-      tone: "ivory",
-      palette: { accent: "#e0a9ad", hull: "#f6e8e4", paper: "#fffdfb" },
-      welcome: "",
-    },
     sample: {
       primary: "Layla",
       secondary: "is seven",
@@ -1161,13 +1103,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "star",
     cornerMotif: "sunburst",
     edge: "straight",
-    opening: {
-      experience: "impossible" as const,
-      duration: 3000,
-      tone: "ink",
-      palette: { accent: "#c9a76a", hull: "#101c3c", paper: "#f1ecdc" },
-      welcome: "",
-    },
     sample: {
       primary: "Class of 2027",
       secondary: "Adam El Fassi",
@@ -1189,13 +1124,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "flourish",
     cornerMotif: "none",
     edge: "deckle",
-    opening: {
-      experience: "living-art" as const,
-      duration: 3000,
-      tone: "ivory",
-      palette: { accent: "#8a7b52", hull: "#e9e1d0", paper: "#fbf7ee" },
-      welcome: "",
-    },
     sample: {
       primary: "Nadia",
       secondary: "graduated",
@@ -1220,13 +1148,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "star",
     edge: "arch",
     rtl: true,
-    opening: {
-      experience: "living-art" as const,
-      duration: 3200,
-      tone: "ink",
-      palette: { accent: "#cda96c", hull: "#123026", paper: "#f3eddc" },
-      welcome: "",
-    },
     sample: {
       primary: "عيد مبارك",
       secondary: "عائلة المنصوري",
@@ -1249,13 +1170,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     cornerMotif: "zellige",
     edge: "scallop",
     rtl: true,
-    opening: {
-      experience: "living-art" as const,
-      duration: 3000,
-      tone: "ivory",
-      palette: { accent: "#a9803f", hull: "#e5d5b8", paper: "#fbf5e9" },
-      welcome: "",
-    },
     sample: {
       primary: "أهلاً بالعيد",
       secondary: "آل بنسعيد",
@@ -1279,13 +1193,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "rattle",
     cornerMotif: "blossom",
     edge: "petal",
-    opening: {
-      experience: "impossible" as const,
-      duration: 2800,
-      tone: "ivory",
-      palette: { accent: "#9db3a4", hull: "#eee9df", paper: "#fffdf8" },
-      welcome: "For {{guest}}",
-    },
     sample: {
       primary: "Baby Rayan",
       secondary: "is here",
@@ -1309,13 +1216,6 @@ export const TEMPLATES: InvitationTemplate[] = [
     motif: "flourish",
     cornerMotif: "gem",
     edge: "wave",
-    opening: {
-      experience: "living-art" as const,
-      duration: 3200,
-      tone: "ink",
-      palette: { accent: "#c98f63", hull: "#3a2018", paper: "#f2e6d6" },
-      welcome: "",
-    },
     sample: {
       primary: "A Winter Supper",
       secondary: "Ten Years of LAMSA",

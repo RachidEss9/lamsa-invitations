@@ -3,9 +3,17 @@ import { normalizeEffects, type LayerEffects } from "@/lib/effects";
 import { guestVisiblePageIds, normalizeSuite, type DesignSuite } from "@/lib/suite";
 import { normalizeMaterial, type LayerMaterial } from "@/lib/materials";
 import {
+  DEFAULT_FINISH_LIGHTING,
+  finishDef,
+  finishFits,
+  finishPresetById,
+  finishSurfaceOf,
   normalizeFinishesConfig,
   normalizeFinishLayersOn,
+  presetStack,
   type FinishLayer,
+  type FinishPreset,
+  type FinishSurface,
   type FinishesConfig,
 } from "@/lib/finishes";
 import { normalizeImageAdjust, type ImageAdjust } from "@/lib/image-frame";
@@ -329,31 +337,12 @@ export interface DesignElement {
   rotation?: number;
 }
 
-/**
- * The scene an invitation opened with before the presentation system was
- * retired. New designs always save "none"; the field stays on the document so
- * invitations created earlier still load and render.
- */
-export type OpeningExperienceId = string;
-
-export interface OpeningSettings {
-  experience: OpeningExperienceId;
-  autoOpen: boolean;
-  welcome: string;
-  /** Legacy scene timing, tone and cover art kept so older designs load. */
-  duration?: number;
-  tone?: string;
-  palette?: { accent?: string; hull?: string; paper?: string };
-  coverStorageId?: string;
-}
-
 export interface DesignDocument {
   version: number;
   pages: DesignPage[];
   /** Chapters the pages are grouped into. Optional so documents saved before
    * sections existed keep loading unchanged. */
   sections?: DesignSection[];
-  opening: OpeningSettings;
   closing: ClosingSettings;
   transition: PageTransition;
   startedAt?: number;
@@ -825,14 +814,9 @@ export function normalizeDesign(
     rawPages.length > 0
       ? rawPages.map((page) => normalizePage(page, content))
       : [normalizePage(null, content)];
-  // The invitation used to carry Presentation opening settings. The studio no
-  // longer exposes a scene picker, so every document loads with the opening
-  // retired while the rest of the saved design is preserved.
-  const opening: OpeningSettings = {
-    experience: "none",
-    autoOpen: false,
-    welcome: "",
-  };
+  // The retired Presentation opening (scene id, timing, cover art) is simply
+  // not carried forward: the field is dropped on load, which is the whole of
+  // its migration. Every other saved setting is preserved untouched.
   const closing: ClosingSettings = {
     enabled: doc.closing?.enabled ?? false,
     style: doc.closing?.style ?? "message",
@@ -844,7 +828,6 @@ export function normalizeDesign(
     version: 1,
     pages: pageList,
     ...(sections.length > 0 ? { sections } : {}),
-    opening,
     closing,
     transition: normalizeTransition(doc.transition),
     startedAt: doc.startedAt ?? 0,
@@ -1438,7 +1421,6 @@ export interface BlankDesignOptions {
   unit?: DesignUnit;
   physicalWidth?: number;
   physicalHeight?: number;
-  opening?: Partial<OpeningSettings>;
   closing?: ClosingSettings;
   transition?: PageTransition;
 }
@@ -1467,7 +1449,6 @@ export function createBlankDesign(options: BlankDesignOptions = {}): DesignDocum
   return {
     version: 1,
     pages,
-    opening: { experience: "none", autoOpen: false, welcome: "", ...options.opening },
     closing: options.closing ?? {
       enabled: false,
       style: "message",
@@ -1574,7 +1555,6 @@ export function createDefaultDesign(
         edge: "straight",
       },
     ],
-    opening: { experience: "none", autoOpen: false, welcome: "" },
     closing: { enabled: false, style: "message", message: "", duration: 800 },
     transition: { preset: "fade", duration: 700 },
   });
@@ -1587,4 +1567,95 @@ export function createDefaultDesign(
 /** Fill in the words of a guest-facing snippet. */
 export function personalize(text: string, guestName: string): string {
   return text.replace(/{{name}}/g, guestName);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Finishes at document level                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The editable stack a luxury preset prescribes for one surface. Only the
+ * finishes that honestly suit that surface are kept, so a wax seal is never
+ * pasted across a sheet and relief is never put on a photograph. Every call
+ * returns fresh layers with their own ids, because the same preset is written
+ * onto many layers.
+ */
+function presetLayers(
+  preset: FinishPreset,
+  surface: FinishSurface | null,
+): FinishLayer[] {
+  const target =
+    surface === "text"
+      ? "text"
+      : surface === "outline"
+        ? "motif"
+        : surface === "solid"
+          ? "solid"
+          : "page";
+  const scope = surface === null ? "page" : "element";
+  return presetStack(preset, target).filter((layer) =>
+    finishFits(finishDef(layer.finish), surface, scope),
+  );
+}
+
+/**
+ * Applies a luxury preset to the whole invitation: one studio light, and a real
+ * editable finish stack on every page and every layer that can carry one. A
+ * layer with no finishable surface is left bare rather than dressed with the
+ * sheet's own stack. Unknown ids leave the document untouched.
+ */
+export function applyFinishPresetToDesign(
+  design: DesignDocument,
+  presetId: string,
+): DesignDocument {
+  const preset = finishPresetById(presetId);
+  if (!preset) return design;
+  const finishes = normalizeFinishesConfig({
+    version: 1,
+    lighting: preset.lighting ?? DEFAULT_FINISH_LIGHTING,
+    animations: design.finishes?.animations ?? [],
+    preset: presetId,
+  });
+  return {
+    ...design,
+    finishes,
+    pages: design.pages.map((page) => ({
+      ...page,
+      // The preset supersedes the older material preset on the same surface,
+      // so only one system is ever stored on a page or a layer.
+      material: undefined,
+      finishes: presetLayers(preset, null),
+      elements: page.elements.map((element) => {
+        const surface = finishSurfaceOf(element);
+        if (!surface) {
+          return element.finishes ? { ...element, finishes: undefined } : element;
+        }
+        const stack = presetLayers(preset, surface);
+        return {
+          ...element,
+          material: stack.length > 0 ? undefined : element.material,
+          finishes: stack.length > 0 ? stack : undefined,
+        };
+      }),
+    })),
+  };
+}
+
+/**
+ * Clears every finish — the rig, each page's sheet and each layer's stack —
+ * while leaving the artwork itself untouched. A new finish stack supersedes a
+ * page's older material preset for the same reason it does on a layer.
+ */
+export function clearFinishesFromDesign(design: DesignDocument): DesignDocument {
+  return {
+    ...design,
+    finishes: undefined,
+    pages: design.pages.map((page) => ({
+      ...page,
+      finishes: undefined,
+      elements: page.elements.map((element) =>
+        element.finishes ? { ...element, finishes: undefined } : element,
+      ),
+    })),
+  };
 }

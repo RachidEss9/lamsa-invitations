@@ -25,6 +25,7 @@ import {
   type FinishId,
   type FinishLayer,
 } from "@/lib/finishes";
+import { curveIsActive } from "@/lib/text-path";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -161,7 +162,7 @@ interface FinishComposerProps {
   /** The sheet, or a single selected layer. */
   scope: "element" | "page";
   /** The selected layer, when the scope is a layer. */
-  element?: { kind: string; frameArt?: string; shape?: string } | null;
+  element?: { kind: string; frameArt?: string; shape?: string; curve?: number } | null;
   layers?: FinishLayer[];
   onChange: (next: FinishLayer[]) => void;
   /** False in Artwork / Print mode, where finishes are hidden. */
@@ -169,7 +170,8 @@ interface FinishComposerProps {
   /** Turns the finish preview back on from the composer. */
   onShowFinishes?: () => void;
   /** Hold to compare: show the original design instead of the finished one. */
-  onCompare?: () => void;
+  /** Shows the artwork without finishes while held, and restores it on release. */
+  onCompare?: (comparing: boolean) => void;
 }
 
 export function FinishComposer({
@@ -186,6 +188,9 @@ export function FinishComposer({
 
   const surface = scope === "page" ? null : finishSurfaceOf(element);
   const options = finishesFor(scope === "page" ? null : element, scope);
+  // Curved wording is drawn as outlined paths: metal and relief follow the
+  // letters, but surface textures cannot, so they are not offered at all.
+  const curved = scope === "element" && element?.kind === "text" && curveIsActive(element.curve);
   const selected =
     layers.find((layer) => layer.id === selectedId) ??
     layers[layers.length - 1] ??
@@ -213,6 +218,17 @@ export function FinishComposer({
       <p className="text-[10px] leading-relaxed text-ink/45">
         {FINISH_SCOPE_NOTE} Prints export the clean artwork.
       </p>
+
+      {curved && (
+        <p
+          data-finish-note="curved"
+          className="border-l-2 border-[var(--gold)]/50 bg-[var(--surface-sunk)]/60 px-2 py-1.5 text-[10px] leading-relaxed text-ink/55"
+        >
+          This wording is curved, so it is drawn as outlined paths. Foils and
+          relief follow the letters; paper and surface textures need straight
+          type.
+        </p>
+      )}
 
       {!previewMode && (
         <div className="flex items-center justify-between gap-2 border border-[var(--edge)] bg-ink/[0.03] px-2.5 py-2">
@@ -477,9 +493,21 @@ export function FinishComposer({
             type="button"
             variant="outline"
             className="h-8 rounded-none text-[10px]"
-            onClick={() => onCompare?.()}
+            title="Hold to see the artwork without any finish"
+            aria-label="Hold to compare with the original artwork"
+            onPointerDown={() => onCompare?.(true)}
+            onPointerUp={() => onCompare?.(false)}
+            onPointerLeave={() => onCompare?.(false)}
+            onPointerCancel={() => onCompare?.(false)}
+            onKeyDown={(event) => {
+              if (event.key === " " || event.key === "Enter") onCompare?.(true);
+            }}
+            onKeyUp={(event) => {
+              if (event.key === " " || event.key === "Enter") onCompare?.(false);
+            }}
+            onBlur={() => onCompare?.(false)}
           >
-            Compare original
+            Hold to compare
           </Button>
           <Button
             type="button"

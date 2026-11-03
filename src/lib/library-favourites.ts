@@ -14,7 +14,6 @@ export type FavouriteKind =
   | "asset"
   | "frame"
   | "material"
-  | "opening"
   | "saved"
   | "palette";
 

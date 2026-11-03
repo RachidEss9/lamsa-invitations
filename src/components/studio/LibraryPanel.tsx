@@ -2304,9 +2304,14 @@ export function LibraryPanel({
                       />
                       <FinishLightSlider
                         label="Warmth"
-                        min={0}
+                        min={-1}
                         max={1}
                         value={finishLighting.temperature}
+                        display={(value) =>
+                          value === 0
+                            ? "Neutral"
+                            : `${value > 0 ? "+" : "−"}${Math.round(Math.abs(value) * 100)}`
+                        }
                         onChange={(temperature) =>
                           onFinishConfigChange?.(
                             patchFinishesConfig(finishConfig, {
@@ -2654,13 +2659,6 @@ function buildFullDesign(
   return {
     version: 1,
     pages: [page],
-    opening: {
-      experience: "none",
-      duration: 1200,
-      autoOpen: false,
-      welcome: "",
-      ...template.opening,
-    },
     closing: {
       enabled: false,
       style: "message",

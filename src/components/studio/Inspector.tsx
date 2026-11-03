@@ -115,8 +115,8 @@ interface InspectorProps {
   materialPreview?: boolean;
   /** Switches the canvas back to Material Preview from the panel. */
   onShowMaterials?: () => void;
-  /** Shows the original design instead of the finished one, to compare. */
-  onCompare?: () => void;
+  /** Shows the original design instead of the finished one while held. */
+  onCompare?: (comparing: boolean) => void;
 }
 
 type SectionProps = {

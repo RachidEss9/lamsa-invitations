@@ -11,8 +11,9 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 /**
  * Walks a stored design document and collects every storage id it references:
- * page element images, reveal cover images, opening cover images, and the
- * per-layer artwork of a guest-driven opening (images or clips). The studio
+ * page element images, reveal cover images and layer artwork. Older documents
+ * may still carry retired opening artwork; the walk is generic, so those ids
+ * are simply resolved like any other rather than failing the page. The studio
  * and the public invitation both render from these resolved URLs, so guests
  * never need storage access beyond what the design already exposes.
  */

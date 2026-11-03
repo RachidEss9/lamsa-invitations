@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { hexToRgba, isHexColour } from "@/lib/effects";
+import { curveIsActive } from "@/lib/text-path";
 
 /**
  * Luxury finishes: metallic foils, physical depth and surface materials.
@@ -433,9 +434,14 @@ export function finishSurfaceOf(element: {
   kind: string;
   frameArt?: string;
   shape?: string;
+  curve?: number;
 } | null | undefined): FinishSurface | null {
   if (!element) return null;
-  if (element.kind === "text") return "text";
+  // Curved wording is drawn as outlined SVG paths, so it takes finishes the
+  // way an ornament does: a metal tone and relief through the filter pass.
+  // Surface textures (paper, vellum, wax) cannot follow a path fill, so they
+  // are simply not offered on a curved layer rather than silently dropped.
+  if (element.kind === "text") return curveIsActive(element.curve) ? "outline" : "text";
   if (element.kind === "motif") return "outline";
   if (element.kind === "image") return "solid";
   if (element.kind !== "shape") return null;
@@ -455,11 +461,16 @@ export function finishFits(
   surface: FinishSurface | null,
   scope: "element" | "page",
 ): boolean {
-  if (scope === "page" || surface === null) {
+  if (scope === "page") {
     if (def.pageOnly) return true;
-    return def.kind === "surface" && def.id !== "wax-seal";
+    // A sheet can be a metal card as readily as a cotton one, so foils are
+    // allowed here; depth and wax still need a layer to sit on.
+    return (
+      (def.kind === "surface" || def.kind === "metallic") && def.id !== "wax-seal"
+    );
   }
-  if (def.pageOnly) return false;
+  // Gilding is the cut edge of a sheet, never a property of a layer.
+  if (def.pageOnly || surface === null) return false;
   return def.surfaces.includes(surface);
 }
 
@@ -1830,11 +1841,13 @@ export function pageEdgeFinish(layers: FinishLayer[] | undefined): FinishLayer |
   );
 }
 
-/** Page-scope surface layers (the sheet's own material). */
-export function pageSurfaceFinishes(layers: FinishLayer[] | undefined): FinishLayer[] {
-  return (layers ?? []).filter(
-    (layer) => finishLayerIsActive(layer) && finishKindOf(layer.finish) === "surface",
-  );
+/** Page-scope body layers: the sheet's own material, paper or metal. */
+export function pageBodyFinishes(layers: FinishLayer[] | undefined): FinishLayer[] {
+  return (layers ?? []).filter((layer) => {
+    if (!finishLayerIsActive(layer)) return false;
+    const kind = finishKindOf(layer.finish);
+    return kind === "surface" || kind === "metallic";
+  });
 }
 
 /* -------------------------------------------------------------------------- */

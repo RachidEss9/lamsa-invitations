@@ -43,11 +43,22 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import type { FinishPreviewMode } from "@/lib/finishes";
+import {
+  FINISH_PREVIEW_MODES,
+  finishPresetById,
+  finishStackIsActive,
+  normalizeFinishesConfig,
+  previewForcesAnimation,
+  previewSurfaceStyle,
+  type FinishPreviewMode,
+  type FinishesConfig,
+} from "@/lib/finishes";
 import {
   PAGE_TRANSITIONS,
   PAGE_TRANSITIONS as TRANSITIONS,
+  applyFinishPresetToDesign,
   applyStylePreset,
+  clearFinishesFromDesign,
   clipsForPage,
   defaultAnimation,
   DESIGN_HEIGHT,
@@ -77,8 +88,10 @@ import {
 import {
   MOTIFS,
   contentFromInvitation,
+  displayTitle,
   type InvitationContent,
 } from "@/lib/invitation";
+import { SequentialInvitation } from "@/components/invitation/SequentialInvitation";
 import { FRAMES, frameBounds, frameLayerIndex, type FrameSpec } from "@/lib/frames";
 import { pageLayoutById } from "@/lib/layouts";
 import { containsArabic, ensureFontForText, fontById } from "@/lib/fonts";
@@ -438,6 +451,12 @@ export default function Studio() {
   const [guestOpen, setGuestOpen] = useState(false);
   const [finishPreviewMode, setFinishPreviewMode] =
     useState<FinishPreviewMode>("studio");
+  /**
+   * Momentary comparison: while the host holds Compare original in the Finish
+   * Composer the canvas drops every finish, and releasing restores them. It is
+   * never saved and never changes the material-preview preference.
+   */
+  const [comparing, setComparing] = useState(false);
   const [timelinePreviewOpen, setTimelinePreviewOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
   const [pendingTemplate, setPendingTemplate] = useState<{
@@ -940,9 +959,20 @@ export default function Studio() {
             index === pageIndex
               ? {
                   ...candidate,
-                  elements: candidate.elements.map((element) =>
-                    element.id === elementId ? { ...element, ...patch } : element,
-                  ),
+                  elements: candidate.elements.map((element) => {
+                    if (element.id !== elementId) return element;
+                    const merged: DesignElement = { ...element, ...patch };
+                    // A finish stack and the older material preset dress the
+                    // same surface. Writing one clears the other, so a layer
+                    // is never textured twice.
+                    if ("finishes" in patch && finishStackIsActive(merged.finishes)) {
+                      merged.material = undefined;
+                    }
+                    if ("material" in patch && merged.material) {
+                      merged.finishes = undefined;
+                    }
+                    return merged;
+                  }),
                 }
               : candidate,
           ),
@@ -959,9 +989,18 @@ export default function Studio() {
       apply(
         (current) => ({
           ...current,
-          pages: current.pages.map((candidate, index) =>
-            index === pageIndex ? { ...candidate, ...patch } : candidate,
-          ),
+          pages: current.pages.map((candidate, index) => {
+            if (index !== pageIndex) return candidate;
+            const merged: DesignPage = { ...candidate, ...patch };
+            // One finish system per sheet, exactly as for a layer.
+            if ("finishes" in patch && finishStackIsActive(merged.finishes)) {
+              merged.material = undefined;
+            }
+            if ("material" in patch && merged.material) {
+              merged.finishes = undefined;
+            }
+            return merged;
+          }),
         }),
         `page:${Object.keys(patch).sort().join(",")}`,
       );
@@ -2112,16 +2151,7 @@ export default function Studio() {
     // page, element, animation, and reveal objects before it becomes this
     // invitation's design.
     const fresh = normalizeDesign(pendingTemplate.design, content);
-    apply((current) => ({
-      ...fresh,
-      opening: {
-        ...fresh.opening,
-        experience:
-          fresh.opening.experience === "none"
-            ? current.opening.experience
-            : fresh.opening.experience,
-      },
-    }));
+    apply(() => fresh);
     setPageIndex(0);
     setSelectedIds([]);
     setAnimating(false);
@@ -2260,7 +2290,9 @@ export default function Studio() {
           ? {
               ...candidate,
               elements: candidate.elements.map((element) =>
-                ids.has(element.id) ? { ...element, material: { ...material } } : element,
+                ids.has(element.id)
+                  ? { ...element, material: { ...material }, finishes: undefined }
+                  : element,
               ),
             }
           : candidate,
@@ -2283,6 +2315,52 @@ export default function Studio() {
       : selected.length === 1
         ? selected[0].material?.preset
         : undefined;
+
+  /* ---------------------------------------------------------------------- */
+  /* Finishes: one invitation-wide light, optional motion and luxury presets */
+  /* ---------------------------------------------------------------------- */
+
+  /** The saved finish configuration. Absent on designs made before it existed. */
+  const finishConfig: FinishesConfig | undefined = design?.finishes;
+
+  const sameMotion = (
+    a: FinishesConfig | undefined,
+    b: FinishesConfig | undefined,
+  ) => (a?.animations ?? []).join() === (b?.animations ?? []).join();
+
+  /**
+   * Writes the invitation-wide finish configuration: light direction, warmth,
+   * softness and strength, plus the optional motions. Normalising on the way in
+   * keeps an untouched rig out of the document entirely, and the shared `apply`
+   * path gives the light sliders one undo step per drag and the ordinary
+   * autosave, so the setting survives a refresh without its own persistence.
+   */
+  const changeFinishConfig = (next: FinishesConfig | undefined) => {
+    const normalized = normalizeFinishesConfig(next);
+    const current = designRef.current;
+    // A light drag is one edit; switching a motion on or off is its own step.
+    const coalesce = sameMotion(current?.finishes, normalized) ? "finish-light" : undefined;
+    apply((draft) => ({ ...draft, finishes: normalized }), coalesce);
+  };
+
+  /**
+   * A luxury preset writes real, editable finish layers onto every page and
+   * layer of the invitation, and brings its own studio light.
+   */
+  const applyFinishPreset = (presetId: string) => {
+    const preset = finishPresetById(presetId);
+    if (!preset) return;
+    apply((current) => applyFinishPresetToDesign(current, presetId));
+    // A preset applied while the canvas shows clean artwork would look inert.
+    if (!materialPreview) setMaterialMode(true);
+    toast.success(`${preset.label} applied to the invitation.`);
+  };
+
+  /** Clears every finish, page and layer, without touching the artwork itself. */
+  const resetFinishes = () => {
+    apply(clearFinishesFromDesign);
+    toast.success("Every finish cleared. The artwork is untouched.");
+  };
 
   const clipChange = (elementId: string, value: { start?: number; duration?: number }) => {
     setPageElements((elements) =>
@@ -3452,6 +3530,52 @@ export default function Studio() {
         onApply={applySharedStyle}
       />
 
+      {/* Guest preview: the public invitation's own journey, played from the
+          unsaved working document under the chosen preview environment. The
+          retired presentation system is not involved — this is the standard
+          guest experience, read-only. */}
+      <Dialog open={guestOpen} onOpenChange={setGuestOpen}>
+        <DialogContent className="max-w-[min(680px,calc(100%-1.5rem))] gap-0 p-0">
+          <DialogHeader className="border-b border-[var(--edge)] px-5 py-4">
+            <DialogTitle>Guest preview</DialogTitle>
+            <DialogDescription>
+              The journey the public link plays, with this invitation's saved
+              finishes and studio light. Nothing here can be edited.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[70dvh] overflow-auto bg-[var(--paper-deep)] p-4">
+            <div
+              data-guest-preview={finishPreviewMode}
+              className="relative mx-auto w-full max-w-[540px] overflow-hidden"
+              style={previewSurfaceStyle(finishPreviewMode)}
+            >
+              {content && (
+                <SequentialInvitation
+                  design={design}
+                  imageUrls={imageUrls}
+                  guestName={null}
+                  names={displayTitle(content)}
+                  rtl={Boolean(content.rtl)}
+                  active
+                  accent={content.palette.accent}
+                  ink={content.palette.ink}
+                  forceFinishAnimations={previewForcesAnimation(finishPreviewMode)}
+                />
+              )}
+            </div>
+          </div>
+          <DialogFooter className="items-center gap-2 border-t border-[var(--edge)] px-5 py-3">
+            <span className="mr-auto font-ui text-[0.62rem] uppercase tracking-[0.1em] text-ink/45">
+              {FINISH_PREVIEW_MODES.find((mode) => mode.id === finishPreviewMode)?.label ??
+                "Studio Light"}
+            </span>
+            <Button variant="outline" onClick={() => setGuestOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex min-h-0 flex-1">
         <aside className="relative z-20 hidden shrink-0 border-r border-[var(--edge)] bg-[var(--surface-card)] lg:flex">
           {/* Panel rail: one icon per panel, with a paper-white tooltip so the
@@ -3530,7 +3654,9 @@ export default function Studio() {
                 userGuides={guidesByPage[page.id] ?? NO_GUIDES}
                 onUserGuidesChange={(next) => updatePageGuides(page.id, next)}
                 onTextOverflow={handleTextOverflow}
-                materialPreview={materialPreview}
+                materialPreview={materialPreview && !comparing}
+                finishes={design.finishes}
+                finishPreviewMode={finishPreviewMode}
                 envelope={envelopeGuide}
                 resetViewToken={resetViewToken}
                 editRequest={editTextRequest}
@@ -3931,6 +4057,7 @@ export default function Studio() {
             onPreviewAnimation={previewAnimation}
             materialPreview={materialPreview}
             onShowMaterials={() => setMaterialMode(true)}
+            onCompare={setComparing}
             onEditText={(elementId) =>
               setEditTextRequest({ id: elementId, token: Date.now() })
             }
@@ -4034,6 +4161,7 @@ export default function Studio() {
                   onPreviewAnimation={previewAnimation}
             materialPreview={materialPreview}
             onShowMaterials={() => setMaterialMode(true)}
+                  onCompare={setComparing}
                   onEditText={(elementId) => {
                     setEditTextRequest({ id: elementId, token: Date.now() });
                     setMobileSheet(null);
@@ -4105,10 +4233,16 @@ export default function Studio() {
         activeMaterialId={activeMaterialId}
         tab={libraryTab}
         onTabChange={setLibraryTab}
+        finishConfig={finishConfig}
+        onFinishConfigChange={changeFinishConfig}
+        onApplyFinishPreset={applyFinishPreset}
+        activeFinishPreset={finishConfig?.preset}
         finishPreviewMode={finishPreviewMode}
         onFinishPreviewMode={setFinishPreviewMode}
         onOpenFinishPreview={() => setGuestOpen(true)}
-        onSetMaterialPreview={setMaterialPreview}
+        materialPreview={materialPreview}
+        onSetMaterialPreview={setMaterialMode}
+        onResetFinishes={resetFinishes}
       />
 
 

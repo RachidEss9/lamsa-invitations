@@ -15,13 +15,15 @@ import {
 /**
  * The private creative library of the single studio owner. Everything here is
  * owner-scoped: a signed-in owner sees only their own saved templates,
- * openings, animation presets, assets, and style presets. Built-in items live
- * in the client model and are never written to this table, so a saved record
- * can always be distinguished from a built-in one.
+ * animation presets, assets, and style presets. Built-in items live in the
+ * client model and are never written to this table, so a saved record can
+ * always be distinguished from a built-in one.
  */
 
 const kindValidator = v.union(
   v.literal("template"),
+  // Retired with the presentation system. Kept so existing rows stay valid;
+  // no current code creates or reads an opening item.
   v.literal("opening"),
   v.literal("animation"),
   v.literal("asset"),

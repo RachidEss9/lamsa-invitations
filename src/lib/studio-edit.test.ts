@@ -47,7 +47,6 @@ function design(): DesignDocument {
   return {
     version: 1,
     pages: [{ id: "page-1", name: "Page 1", background: "#f2f1ed", elements: [] }],
-    opening: { experience: "none", autoOpen: false, welcome: "" },
     closing: { enabled: true, style: "message", message: "", duration: 1400 },
     transition: { preset: "fade", duration: 700 },
   };

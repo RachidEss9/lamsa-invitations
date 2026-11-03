@@ -65,7 +65,6 @@ const legacy = {
       ],
     },
   ],
-  opening: { experience: "none", autoOpen: false, welcome: "" },
   closing: { enabled: false, style: "message", message: "" },
   transition: { preset: "fade", duration: 700 },
 };
@@ -256,7 +255,7 @@ describe("normalizeDesign save/reload consistency", () => {
     const stored: DesignDocument = JSON.parse(JSON.stringify(saved));
     expect(stored.version).toBe(saved.version);
     expect(stored.pages).toEqual(saved.pages);
-    expect(stored.opening).toEqual(saved.opening);
+    expect("opening" in stored).toBe(false);
     expect(stored.closing).toEqual(saved.closing);
     expect(stored.transition).toEqual(saved.transition);
   });

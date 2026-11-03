@@ -19,7 +19,12 @@ import { createPortal } from "react-dom";
 import { DesignPageView } from "@/components/invitation/DesignPageView";
 import { EnvelopeGuides } from "@/components/studio/EnvelopeGuides";
 import { geometryForPage, type EnvelopeGeometry } from "@/lib/envelope";
-import type { FinishesConfig } from "@/lib/finishes";
+import {
+  previewForcesAnimation,
+  previewSurfaceStyle,
+  type FinishPreviewMode,
+  type FinishesConfig,
+} from "@/lib/finishes";
 import { equalSpacingGuides, type SpacingSegments } from "@/lib/smart-guides";
 import { textOverflows, type TextOverflow } from "@/lib/text-fit";
 import { effectFilter, gradientCss, outlineWidth } from "@/lib/effects";
@@ -78,6 +83,12 @@ interface StudioCanvasProps {
   materialPreview?: boolean;
   /** The invitation's finish configuration: studio lighting and effects. */
   finishes?: FinishesConfig;
+  /**
+   * The preview environment: a presentation treatment laid over the sheet.
+   * It changes only how the card is lit on screen — never the artwork, never
+   * the exported file.
+   */
+  finishPreviewMode?: FinishPreviewMode;
   /**
    * Envelope drafting guides for the piece being edited: flap, address
    * windows, postage-safe zone and liner fit. Screen only — the overlay sits
@@ -352,6 +363,7 @@ export function StudioCanvas({
   onUserGuidesChange,
   materialPreview = true,
   finishes,
+  finishPreviewMode = "studio",
   envelope = null,
   resetViewToken = 0,
   editRequest,
@@ -1243,6 +1255,10 @@ export function StudioCanvas({
     return () => node.removeEventListener("wheel", onWheel);
   }, [onZoom, zoom]);
 
+  /* Preview environments are presentation, not artwork: the sheet keeps its
+     geometry and the treatment is laid over it, so switching back is exact. */
+  const previewStyle = previewSurfaceStyle(finishPreviewMode);
+
   const handleTouches = (event: ReactTouchEvent) => {
     if (event.touches.length !== 2) {
       pinch.current = null;
@@ -1317,12 +1333,26 @@ export function StudioCanvas({
         cursor: panning ? "grabbing" : spaceHeld ? "grab" : "default",
       }}
     >
+      {/* The preview environment's ambient light. It sits behind the sheet, so
+          the room the card is viewed in changes without a single pixel of the
+          artwork, the selection or the exported file changing. */}
+      {previewStyle.background && (
+        <div
+          aria-hidden
+          data-finish-preview-ambient={finishPreviewMode}
+          className="pointer-events-none absolute inset-0"
+          style={{ background: previewStyle.background }}
+        />
+      )}
       <div
+        data-finish-preview={finishPreviewMode}
         className="relative shrink-0 shadow-[0_30px_80px_rgba(22,22,22,0.18)]"
         style={{
           width: size.width * scale,
           height: size.height * scale,
-          transform: `translate(${pan.x}px, ${pan.y}px)`,
+          transform: `translate(${pan.x}px, ${pan.y}px) ${previewStyle.transform ?? ""}`.trim(),
+          transformOrigin: previewStyle.transformOrigin,
+          filter: previewStyle.filter,
         }}
       >
         <div
@@ -1350,6 +1380,7 @@ export function StudioCanvas({
             hideElementId={editing?.id}
             materialPreview={materialPreview}
             finishes={finishes}
+            forceFinishAnimations={previewForcesAnimation(finishPreviewMode)}
             className="shadow-none"
           />
 

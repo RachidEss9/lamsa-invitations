@@ -52,7 +52,7 @@ const schema = defineSchema(
     invitations: defineTable({
       ownerId: v.id("users"),
       ...invitationContent,
-      // Canvas studio document: pages, elements, opening experience, timeline.
+      // Canvas studio document: pages, elements, finishes, timeline.
       // Optional so every existing invitation keeps working unchanged.
       design: v.optional(v.any()),
       designUpdatedAt: v.optional(v.number()),
@@ -106,8 +106,14 @@ const schema = defineSchema(
       .index("by_token", ["token"]),
 
     // Reusable creative library for the single studio owner: saved templates,
-    // opening experiences, animation presets, design assets, and style
-    // presets. Built-in items live in code and are never written here.
+    // animation presets, design assets, and style presets. Built-in items live
+    // in code and are never written here.
+    //
+    // `"opening"` is retired: the presentation system no longer exists and
+    // nothing writes that kind. The literal stays in the union because Convex
+    // validates existing rows against the schema, so dropping it would fail a
+    // deploy on any library item a host saved under the old system. It costs
+    // nothing and can never be read by current code.
     libraryItems: defineTable({
       ownerId: v.id("users"),
       kind: v.union(

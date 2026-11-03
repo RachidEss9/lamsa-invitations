@@ -340,7 +340,6 @@ export function scratchInvitation(input: ScratchDesignInput): {
     unit: input.unit,
     physicalWidth: input.width,
     physicalHeight: input.height,
-    opening: { experience: "none" },
   });
   return { content, design };
 }

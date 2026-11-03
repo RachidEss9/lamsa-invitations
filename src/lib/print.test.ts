@@ -30,11 +30,6 @@ function makeDesign(pages: DesignPage[]): DesignDocument {
   return {
     version: 1,
     pages,
-    opening: {
-      experience: "none",
-      autoOpen: false,
-      welcome: "",
-    },
     closing: {
       enabled: false,
       style: "message",

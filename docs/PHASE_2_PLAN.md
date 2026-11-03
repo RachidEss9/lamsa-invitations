@@ -40,7 +40,9 @@ document rather than creating a parallel model.
 
 - No new database, no new Convex tables; sections live inside `design`.
 - No new export path; PDF export (`lib/print.ts`) stays page-based.
-- No presentation/opening revival: `OpeningSettings` stays neutralized.
+- No presentation/opening revival. The retired opening is now removed from
+  the document model outright; saved designs are migrated on load by dropping
+  the field (see `normalizeDesign`).
 
 ## Exit gates (all must pass before Phase 3)
 
