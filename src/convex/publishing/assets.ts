@@ -255,9 +255,15 @@ export const associateAsset = mutation({
       await requireOwnedPublication(ctx, args.publicationId, userId);
     }
     if (asset.publicationId && asset.publicationId !== args.publicationId) {
-      // Moving an asset out of a publication is only safe when no page,
-      // master or named version still needs it.
-      await assertAssetUnused(ctx, asset);
+      // Don't let an owner silently swap an asset into a version from another
+      // publication while that other publication still normalizes against the
+      // asset's current publicationId.
+      if (
+        args.publicationId &&
+        asset.publicationId &&
+        asset.publicationId !== args.publicationId
+      ) {
+        await normalizeDocumentForAssetMovement(ctx, asset, {
     }
     await ctx.db.patch(asset._id, {
       publicationId: args.publicationId ?? undefined,
