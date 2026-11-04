@@ -3,6 +3,7 @@ import { mutation } from "../_generated/server";
 import { loadDocument, requireOwnedPublication, requireUserId, saveDocumentState } from "./lib";
 import { storyValidator } from "./validators";
 
+
 /**
  * Stories hold the text and the thread order; a text frame only names its
  * story. Creating or updating a story therefore verifies every frame in the
@@ -110,3 +111,4 @@ export const deleteStory = mutation({
     return { updatedAt: now };
   },
 });
+
