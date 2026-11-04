@@ -530,7 +530,8 @@ export default function InvitationPage() {
               >
                 <CalendarDays className="size-3.5" />
                 Add to calendar
-              </a>          </Button>
+              </a>
+            </Button>
         </div>
 
           {/* Event details */}
