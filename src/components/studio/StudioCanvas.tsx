@@ -30,6 +30,7 @@ import { textOverflows, type TextOverflow } from "@/lib/text-fit";
 import { effectFilter, gradientCss, outlineWidth } from "@/lib/effects";
 import { fontFamilyFor } from "@/lib/fonts";
 import { cleanEditedText, shouldCommitText } from "@/lib/studio-edit";
+import { clampZoom, fitScaleFor, scaleForZoom } from "@/lib/canvas-zoom";
 
 type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -102,6 +103,12 @@ interface StudioCanvasProps {
   resetViewToken?: number;
   editRequest?: { id: string; token: number } | null;
   onZoom: (value: number) => void;
+  /**
+   * Reports the effective magnification back to the studio, so the toolbar can
+   * show the true percentage (and the true-size button can ask for it).
+   * `fit` is the scale at which the whole page would just fit the workspace.
+   */
+  onScaleChange?: (info: { scale: number; fit: number }) => void;
   onSelect: (ids: string[]) => void;
   onMove: (updates: { id: string; x: number; y: number }[]) => void;
   onResize: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
@@ -368,6 +375,7 @@ export function StudioCanvas({
   resetViewToken = 0,
   editRequest,
   onZoom,
+  onScaleChange,
   onSelect,
   onMove,
   onResize,
@@ -391,6 +399,12 @@ export function StudioCanvas({
   // Equal-gap guides, drawn as short dashes across the two matching gaps.
   const [spacing, setSpacing] = useState<SpacingSegments[]>([]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  /* Zoom applied from the toolbar or the keyboard has no pointer to centre on,
+     so it centres on the workspace: scaling the pan by the same ratio keeps the
+     point under the middle of the canvas still. Wheel and pinch already place
+     their own pan, so they record the zoom they handled and this effect skips
+     it once. */
+  const panHandledAtZoom = useRef(zoom);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panning, setPanning] = useState(false);
   const panOrigin = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
@@ -404,7 +418,10 @@ export function StudioCanvas({
     centerY: number;
   } | null>(null);
 
-  const scale = Math.max(0.05, fit * zoom);
+  /* Before the workspace has been measured (first paint, or a test harness
+     with no layout) the canvas still needs a sane scale for the interaction
+     maths; the toolbar shows “—” until a real fit exists. */
+  const scale = fit > 0 ? scaleForZoom(zoom, fit) : 0.05;
   const size = pageSizeOf(page);
   const selected = page.elements.filter((element) => selectedIds.includes(element.id));
 
@@ -469,7 +486,7 @@ export function StudioCanvas({
     const measure = () => {
       const width = node.clientWidth;
       const height = node.clientHeight;
-      setFit(Math.min((width - 56) / size.width, (height - 56) / size.height));
+      setFit(fitScaleFor(width, height, size.width, size.height));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -521,6 +538,23 @@ export function StudioCanvas({
     const frame = requestAnimationFrame(() => setPan({ x: 0, y: 0 }));
     return () => cancelAnimationFrame(frame);
   }, [resetViewToken]);
+
+  useEffect(() => {
+    const previous = panHandledAtZoom.current;
+    panHandledAtZoom.current = zoom;
+    if (previous === zoom || previous <= 0 || zoom <= 0) return;
+    const ratio = zoom / previous;
+    setPan((current) => ({ x: current.x * ratio, y: current.y * ratio }));
+  }, [zoom]);
+
+  /* The studio's toolbar shows the real magnification, so the canvas is the
+     single source of truth for it. Reporting from here means the number stays
+     right after a window resize (the fit changes, the percentage follows),
+     after a pinch, and after a page with a different trim size loads. */
+  useEffect(() => {
+    if (!onScaleChange || fit <= 0) return;
+    onScaleChange({ scale, fit });
+  }, [fit, onScaleChange, scale]);
 
   const selectOnlyIfNeeded = useCallback(
     (element: DesignElement, additive: boolean) => {
@@ -1234,7 +1268,8 @@ export function StudioCanvas({
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       if (event.ctrlKey || event.metaKey) {
-        const next = clamp(zoom * (1 - event.deltaY * 0.0015), 0.4, 2.4);
+        const next = clampZoom(zoom * (1 - event.deltaY * 0.0015), fit);
+        panHandledAtZoom.current = next;
         const rect = node.getBoundingClientRect();
         const offsetX = event.clientX - (rect.left + rect.width / 2);
         const offsetY = event.clientY - (rect.top + rect.height / 2);
@@ -1253,7 +1288,7 @@ export function StudioCanvas({
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
-  }, [onZoom, zoom]);
+  }, [fit, onZoom, zoom]);
 
   /* Preview environments are presentation, not artwork: the sheet keeps its
      geometry and the treatment is laid over it, so switching back is exact. */
@@ -1275,7 +1310,8 @@ export function StudioCanvas({
     const previous = pinch.current;
     const host = hostRef.current?.getBoundingClientRect();
     const ratio = distance / Math.max(1, previous.distance);
-    const next = clamp(previous.zoom * ratio, 0.4, 2.4);
+    const next = clampZoom(previous.zoom * ratio, fit);
+    panHandledAtZoom.current = next;
     if (host) {
       const offsetX = centerX - (host.left + host.width / 2);
       const offsetY = centerY - (host.top + host.height / 2);

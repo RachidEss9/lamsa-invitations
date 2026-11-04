@@ -954,9 +954,10 @@ export interface DesignPageViewProps {
   /** Studio inline editing: the text editor replaces this layer visually. */
   hideElementId?: string | null;
   /**
-   * Studio: whether a layer the host hid is still drawn (dimmed) on the card.
-   * Guests never see a hidden layer either way; the studio toggle only decides
-   * whether its ghost stays findable on the canvas.
+   * Studio: whether a layer the host hid is still drawn (as a 25% ghost, with
+   * a Hidden tag) on the card. Defaults to false, so pressing the eye really
+   * removes the layer from the canvas. Guests and exports never see a hidden
+   * layer; this only decides whether its ghost stays findable while editing.
    */
   showHidden?: boolean;
   /**
@@ -999,7 +1000,7 @@ export function DesignPageView({
   revealPreview,
   ignoreExit,
   hideElementId,
-  showHidden = true,
+  showHidden = false,
   scrollActivationTime = 0,
   materialPreview = true,
   finishes,
@@ -1276,7 +1277,6 @@ export function DesignPageView({
             data-element-kind={element.kind}
             className={cn(
               "absolute",
-              element.hidden && "opacity-40",
               selected && "outline-1 outline-offset-4 outline-dashed outline-[var(--red)]",
               signature,
             )}
@@ -1294,6 +1294,10 @@ export function DesignPageView({
                 [animated.style.filter, effectFilter(element.effects), finishFilterRef]
                   .filter(Boolean)
                   .join(" ") || undefined,
+              /* A layer the host hid is never rendered for a guest or an
+                 export. In the studio the host can opt in to ghosting, and a
+                 ghost is always 25% — an inline opacity from the entrance
+                 animation must not make it look un-hidden. */
               opacity: dimmed ? 0.25 : animated.style.opacity,
               pointerEvents: interactive ? "auto" : "none",
               outline: dimmed ? "1px dashed rgba(113,0,20,0.55)" : undefined,
@@ -1317,7 +1321,7 @@ export function DesignPageView({
             />
             {dimmed && (
               <span className="absolute -top-4 left-0 bg-[#710014] px-1.5 py-0.5 text-[11px] uppercase tracking-[0.16em] text-white">
-                Covered
+                Hidden
               </span>
             )}
           </div>

@@ -149,6 +149,14 @@ import {
   selectionAfterDelete,
   undoHistory,
 } from "@/lib/studio-edit";
+import { allHidden, setVisibility, toggleVisibility } from "@/lib/visibility";
+import { CanvasControls } from "@/components/studio/CanvasControls";
+import {
+  pageStep,
+  zoomByStep,
+  zoomForActualSize,
+  zoomPercent,
+} from "@/lib/canvas-zoom";
 import { applyTypeStyle, type TypeStyle } from "@/lib/type-styles";
 import {
   alignPositions,
@@ -182,7 +190,6 @@ import {
   Loader2,
   Lock,
   Magnet,
-  Minus,
   Monitor,
   Palette,
   PanelLeft,
@@ -303,7 +310,14 @@ export default function Studio() {
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [animating, setAnimating] = useState(false);
+  /** Magnification relative to the fitted page — a view, never artwork. */
   const [zoom, setZoom] = useState(1);
+  /** The canvas measures the workspace and reports back, so the toolbar can
+      show a true percentage instead of the internal zoom multiplier. */
+  const [canvasScale, setCanvasScale] = useState(0);
+  const [canvasFit, setCanvasFit] = useState(0);
+  // Read by the zoom buttons and the keyboard, always the latest measurement.
+  const canvasFitRef = useRef(0);
   const [device, setDevice] = useState<Device>("desktop");
   // Drawing aids are per-browser preferences, not part of the invitation, so
   // they live here and never touch the saved design.
@@ -439,7 +453,10 @@ export default function Studio() {
       // Losing a viewing preference is harmless.
     }
   }, []);
-  const [showHidden, setShowHidden] = useState(true);
+  /* Hidden means hidden. The canvas used to default to showing hidden layers
+     as ghosts, so pressing the eye appeared to do nothing; the host now opts
+     in to ghosting with the eye toggle beside the zoom controls. */
+  const [showHidden, setShowHidden] = useState(false);
   const [revealPreview, setRevealPreview] = useState<Set<string>>(new Set());
   const [leftPanel, setLeftPanel] = useState<LeftPanel>("add");
   const [leftOpen, setLeftOpen] = useState(true);
@@ -952,6 +969,23 @@ export default function Studio() {
 
   const patchElement = useCallback(
     (elementId: string, patch: Partial<DesignElement>) => {
+      // The Inspector's eye follows the same group rule as the Layers panel:
+      // visibility is never half-applied to a group.
+      if (typeof patch.hidden === "boolean") {
+        const hidden = patch.hidden;
+        apply((current) => ({
+          ...current,
+          pages: current.pages.map((candidate, index) =>
+            index === pageIndex
+              ? {
+                  ...candidate,
+                  elements: setVisibility(candidate.elements, [elementId], hidden),
+                }
+              : candidate,
+          ),
+        }));
+        return;
+      }
       apply(
         (current) => ({
           ...current,
@@ -1548,11 +1582,9 @@ export default function Studio() {
   };
 
   const toggleLayerHidden = (layerId: string) => {
-    setPageElements((elements) =>
-      elements.map((element) =>
-        element.id === layerId ? { ...element, hidden: !element.hidden } : element,
-      ),
-    );
+    // Visibility follows the group rule: one member toggles its whole group,
+    // and layers outside that group are left exactly as they were.
+    setPageElements((elements) => toggleVisibility(elements, layerId));
   };
 
   const toggleLayerLocked = (layerId: string) => {
@@ -1626,14 +1658,12 @@ export default function Studio() {
   };
 
   const toggleSelectionHidden = () => {
-    if (selectedIds.length === 0) return;
-    const hidden = !selected.every((element) => element.hidden);
-    setPageElements((elements) =>
-      elements.map((element) =>
-        selectedIds.includes(element.id) ? { ...element, hidden } : element,
-      ),
-    );
-    toast.success(hidden ? "Selection hidden." : "Selection shown.");
+    if (selectedIds.length === 0 || !page) return;
+    const hide = !allHidden(page.elements, selectedIds);
+    // Hidden layers stay selected and stay listed, so they can be shown again
+    // from the canvas controls or the Layers panel.
+    setPageElements((elements) => setVisibility(elements, selectedIds, hide));
+    toast.success(hide ? "Selection hidden." : "Selection shown.");
   };
 
   /** Mirrors every unlocked selected layer in its own axes. */
@@ -1663,10 +1693,51 @@ export default function Studio() {
     });
   };
 
-  const fitCanvas = () => {
+  /**
+   * Fit to Screen: the whole page, centred. `zoom` is relative to the fit, so
+   * resetting it to 1 always means "as large as the workspace allows" — and
+   * the canvas recomputes what that is whenever the window or panel width
+   * changes, which keeps the page fitted after a rotation or a resize.
+   */
+  const fitCanvas = useCallback(() => {
     setZoom(1);
     setResetViewToken((token) => token + 1);
-  };
+  }, []);
+
+  /** Actual Size: one design pixel to one screen pixel, whatever the fit is. */
+  const zoomToActualSize = useCallback(() => {
+    setZoom(zoomForActualSize(canvasFitRef.current));
+    setResetViewToken((token) => token + 1);
+  }, []);
+
+  /** Zoom in/out steps the *scale*, so 100% is reachable on every screen. */
+  const zoomSteps = useCallback((steps: number) => {
+    setZoom((value) => zoomByStep(value, canvasFitRef.current, steps));
+  }, []);
+
+  const handleCanvasScale = useCallback(
+    (info: { scale: number; fit: number }) => {
+      canvasFitRef.current = info.fit;
+      setCanvasFit(info.fit);
+      setCanvasScale(info.scale);
+    },
+    [],
+  );
+
+  /** Previous/next page, clamped at both ends of the document. */
+  const stepPage = useCallback((direction: -1 | 1) => {
+    setPageIndex((current) => {
+      const target = pageStep(
+        current,
+        designRef.current?.pages.length ?? 0,
+        direction,
+      );
+      if (target === null) return current;
+      setSelectedIds([]);
+      setAnimating(false);
+      return target;
+    });
+  }, []);
 
   const duplicateForDrag = () => {
     if (selectedIds.length === 0) return;
@@ -1949,18 +2020,11 @@ export default function Studio() {
         );
         break;
       case "hide":
-        setPageElements((elements) =>
-          elements.map((element) =>
-            selectedIds.includes(element.id) ? { ...element, hidden: true } : element,
-          ),
-        );
+        // The canvas menu obeys the same group rule as every other control.
+        setPageElements((elements) => setVisibility(elements, selectedIds, true));
         break;
       case "show":
-        setPageElements((elements) =>
-          elements.map((element) =>
-            selectedIds.includes(element.id) ? { ...element, hidden: false } : element,
-          ),
-        );
+        setPageElements((elements) => setVisibility(elements, selectedIds, false));
         break;
       case "front":
         moveSelectionToEdge("front");
@@ -2606,17 +2670,28 @@ export default function Studio() {
       }
       if (mod && (event.key === "=" || event.key === "+")) {
         event.preventDefault();
-        setZoom((value) => Math.min(2.4, value * 1.2));
+        zoomSteps(1);
         return;
       }
       if (mod && (event.key === "-" || event.key === "_")) {
         event.preventDefault();
-        setZoom((value) => Math.max(0.4, value / 1.2));
+        zoomSteps(-1);
         return;
       }
       if (mod && event.key === "0") {
         event.preventDefault();
         fitCanvas();
+        return;
+      }
+      if (mod && event.key === "1") {
+        event.preventDefault();
+        zoomToActualSize();
+        return;
+      }
+      // Page navigation, matching the arrows in the canvas controls.
+      if (event.key === "PageUp" || event.key === "PageDown") {
+        event.preventDefault();
+        stepPage(event.key === "PageUp" ? -1 : 1);
         return;
       }
       if (!mod && event.shiftKey && key === "h") {
@@ -3661,6 +3736,7 @@ export default function Studio() {
                 resetViewToken={resetViewToken}
                 editRequest={editTextRequest}
                 onZoom={setZoom}
+                onScaleChange={handleCanvasScale}
                 onSelect={(ids) => {
                   setSelectedIds(ids);
                   setAnimating(false);
@@ -3886,43 +3962,20 @@ export default function Studio() {
                   <Magnet className="size-3.5" />
                 </IconButton>
               </div>
-              <div className="pointer-events-auto flex items-center gap-0.5 overflow-hidden rounded-full border border-ink/8 bg-white/85 p-0.5 shadow-[var(--shadow-soft)] backdrop-blur">
-                <button
-                  type="button"
-                  onClick={() => setZoom((value) => Math.max(0.4, value / 1.2))}
-                  aria-label="Zoom out"
-                  className="pressable grid size-7 place-items-center rounded-full text-ink/55 hover:bg-ink/5 hover:text-ink"
-                >
-                  <Minus className="size-3.5" />
-                </button>
-                <span className="px-1 font-meta text-[9px] tabular-nums text-ink/45">
-                  {Math.round(zoom * 100)}%
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setZoom((value) => Math.min(2.4, value * 1.2))}
-                  aria-label="Zoom in"
-                  className="pressable grid size-7 place-items-center rounded-full text-ink/55 hover:bg-ink/5 hover:text-ink"
-                >
-                  <Plus className="size-3.5" />
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowHidden((value) => !value)}
-                className="pointer-events-auto grid size-8 place-items-center rounded-full border border-ink/8 bg-white/85 text-ink/50 shadow-[var(--shadow-soft)] backdrop-blur transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
-                title={showHidden ? "Hide hidden layers" : "Show hidden layers"}
-              >
-                {showHidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-              </button>
-              <button
-                type="button"
-                onClick={fitCanvas}
-                className="pointer-events-auto rounded-md border border-ink/15 bg-[var(--paper-light)]/90 px-1.5 py-1 font-meta text-[8px] text-ink/50 backdrop-blur transition-[background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
-                title="Fit canvas (⌘/Ctrl + 0)"
-              >
-                {Math.round(zoom * 100)}%
-              </button>
+              <CanvasControls
+                percent={canvasFit > 0 ? zoomPercent(canvasScale) : null}
+                pageIndex={pageIndex}
+                pageCount={design.pages.length}
+                showHidden={showHidden}
+                onZoomIn={() => zoomSteps(1)}
+                onZoomOut={() => zoomSteps(-1)}
+                onFit={fitCanvas}
+                onActualSize={zoomToActualSize}
+                onReset={fitCanvas}
+                onPrevPage={() => stepPage(-1)}
+                onNextPage={() => stepPage(1)}
+                onToggleShowHidden={() => setShowHidden((value) => !value)}
+              />
             </div>
           </div>
 
