@@ -81,6 +81,24 @@ describe("valid documents", () => {
     }
   });
 
+  it("accepts a page whose master exists", () => {
+    const raw = clone();
+    const pages = raw.pages as Record<string, unknown>[];
+    raw.masters = [
+      {
+        version: 1,
+        id: "master_head",
+        name: "Running head",
+        appliesTo: "both",
+        background: { color: "#ffffff" },
+        layers: pages[0]!.layers,
+        objects: [],
+      },
+    ];
+    pages[0]!.masterId = "master_head";
+    expect(errorsOf(raw)).toEqual([]);
+  });
+
   it("warns rather than errors for a missing schema version", () => {
     const raw = clone();
     delete raw.version;

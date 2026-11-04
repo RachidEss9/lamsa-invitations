@@ -5,6 +5,22 @@ import {
   invitationContent,
   invitationStatusValidator,
 } from "./validators";
+import {
+  backgroundValidator,
+  docTypeValidator,
+  documentMetadataValidator,
+  gridValidator,
+  guideValidator,
+  layerValidator,
+  lengthUnitValidator,
+  objectValidator,
+  pageSpecValidator,
+  presetPayloadValidator,
+  publicationStatusValidator,
+  spreadGutterValidator,
+  styleSetValidator,
+  versionSettingsValidator,
+} from "./publishing/validators";
 
 // default user roles. can add / remove based on the project as needed
 export const ROLES = {
@@ -148,6 +164,224 @@ const schema = defineSchema(
     })
       .index("by_invitation", ["invitationId"])
       .index("by_guest", ["guestId"]),
+
+    /* ------------------------------------------------------------------ */
+    /* LAMSA Publishing Studio — Phase 2 persistence                       */
+    /* ------------------------------------------------------------------ */
+
+    // Publication header. Geometry is always in PDF points; displayUnit only
+    // affects what the future interface prints beside a field. Ownership is
+    // enforced by every function, never accepted from a client argument.
+    publications: defineTable({
+      ownerId: v.id("users"),
+      title: v.string(),
+      docType: docTypeValidator,
+      presetId: v.string(),
+      status: publicationStatusValidator,
+      documentVersion: v.number(),
+      displayUnit: lengthUnitValidator,
+      spec: pageSpecValidator,
+      facingPages: v.boolean(),
+      defaultGutter: v.number(),
+      spreadGutters: v.array(spreadGutterValidator),
+      grid: gridValidator,
+      styles: styleSetValidator,
+      guides: v.array(guideValidator),
+      metadata: documentMetadataValidator,
+      extensions: v.optional(v.any()),
+      pageCount: v.number(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      archivedAt: v.optional(v.number()),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_owner_updated", ["ownerId", "updatedAt"])
+      .index("by_owner_status", ["ownerId", "status"]),
+
+    // One row per page. Stable pageId is the id used by stories and masters;
+    // Convex _id is deliberately not exposed as a document reference.
+    publicationPages: defineTable({
+      publicationId: v.id("publications"),
+      ownerId: v.id("users"),
+      pageId: v.string(),
+      index: v.number(),
+      side: v.union(v.literal("left"), v.literal("right"), v.literal("single")),
+      masterId: v.optional(v.string()),
+      pageVersion: v.number(),
+      name: v.string(),
+      spec: pageSpecValidator,
+      background: backgroundValidator,
+      layers: v.array(layerValidator),
+      objects: v.array(objectValidator),
+      hidden: v.boolean(),
+      updatedAt: v.number(),
+    })
+      .index("by_publication", ["publicationId"])
+      .index("by_publication_index", ["publicationId", "index"])
+      .index("by_publication_page", ["publicationId", "pageId"])
+      .index("by_owner", ["ownerId"]),
+
+    publicationMasters: defineTable({
+      publicationId: v.id("publications"),
+      ownerId: v.id("users"),
+      masterId: v.string(),
+      name: v.string(),
+      appliesTo: v.union(v.literal("left"), v.literal("right"), v.literal("both")),
+      spec: v.optional(pageSpecValidator),
+      background: backgroundValidator,
+      layers: v.array(layerValidator),
+      objects: v.array(objectValidator),
+      version: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_publication", ["publicationId"])
+      .index("by_publication_master", ["publicationId", "masterId"])
+      .index("by_owner", ["ownerId"]),
+
+    publicationStories: defineTable({
+      publicationId: v.id("publications"),
+      ownerId: v.id("users"),
+      storyId: v.string(),
+      name: v.string(),
+      paragraphs: v.array(
+        v.object({
+          id: v.string(),
+          styleId: v.optional(v.string()),
+          runs: v.array(
+            v.object({ text: v.string(), styleId: v.optional(v.string()) }),
+          ),
+        }),
+      ),
+      frames: v.array(
+        v.object({ pageId: v.string(), objectId: v.string() }),
+      ),
+      overflow: v.union(v.literal("thread"), v.literal("stop")),
+      styles: styleSetValidator,
+      version: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_publication", ["publicationId"])
+      .index("by_publication_story", ["publicationId", "storyId"])
+      .index("by_owner", ["ownerId"]),
+
+    // The print original is always retained. Proxy and thumbnail ids are
+    // optional and only point at browser-generated previews.
+    publicationAssets: defineTable({
+      ownerId: v.id("users"),
+      publicationId: v.optional(v.id("publications")),
+      assetId: v.string(),
+      originalStorageId: v.id("_storage"),
+      proxyStorageId: v.optional(v.id("_storage")),
+      thumbnailStorageId: v.optional(v.id("_storage")),
+      filename: v.string(),
+      mimeType: v.string(),
+      width: v.number(),
+      height: v.number(),
+      fileSize: v.number(),
+      checksum: v.optional(v.string()),
+      tags: v.array(v.string()),
+      metadata: v.object({
+        caption: v.optional(v.string()),
+        alt: v.optional(v.string()),
+        license: v.optional(v.string()),
+        notes: v.optional(v.string()),
+      }),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_owner_created", ["ownerId", "createdAt"])
+      .index("by_publication", ["publicationId"])
+      .index("by_publication_asset", ["publicationId", "assetId"])
+      .index("by_original_storage", ["originalStorageId"]),
+
+    // A named version stores its settings here and its pages/masters/stories
+    // in child rows. Never one giant blob; restore is all-or-nothing.
+    publicationVersions: defineTable({
+      publicationId: v.id("publications"),
+      ownerId: v.id("users"),
+      label: v.string(),
+      documentVersion: v.number(),
+      versionNumber: v.number(),
+      pageCount: v.number(),
+      assetIds: v.array(v.id("publicationAssets")),
+      settings: versionSettingsValidator,
+      createdAt: v.number(),
+      createdBy: v.id("users"),
+    })
+      .index("by_publication", ["publicationId"])
+      .index("by_publication_number", ["publicationId", "versionNumber"])
+      .index("by_owner", ["ownerId"]),
+
+    publicationVersionPages: defineTable({
+      versionId: v.id("publicationVersions"),
+      publicationId: v.id("publications"),
+      ownerId: v.id("users"),
+      pageId: v.string(),
+      index: v.number(),
+      side: v.union(v.literal("left"), v.literal("right"), v.literal("single")),
+      masterId: v.optional(v.string()),
+      pageVersion: v.number(),
+      name: v.string(),
+      spec: pageSpecValidator,
+      background: backgroundValidator,
+      layers: v.array(layerValidator),
+      objects: v.array(objectValidator),
+      hidden: v.boolean(),
+    })
+      .index("by_version", ["versionId"])
+      .index("by_version_index", ["versionId", "index"]),
+
+    publicationVersionMasters: defineTable({
+      versionId: v.id("publicationVersions"),
+      publicationId: v.id("publications"),
+      ownerId: v.id("users"),
+      masterId: v.string(),
+      name: v.string(),
+      appliesTo: v.union(v.literal("left"), v.literal("right"), v.literal("both")),
+      spec: v.optional(pageSpecValidator),
+      background: backgroundValidator,
+      layers: v.array(layerValidator),
+      objects: v.array(objectValidator),
+      version: v.number(),
+    }).index("by_version", ["versionId"]),
+
+    publicationVersionStories: defineTable({
+      versionId: v.id("publicationVersions"),
+      publicationId: v.id("publications"),
+      ownerId: v.id("users"),
+      storyId: v.string(),
+      name: v.string(),
+      paragraphs: v.array(
+        v.object({
+          id: v.string(),
+          styleId: v.optional(v.string()),
+          runs: v.array(
+            v.object({ text: v.string(), styleId: v.optional(v.string()) }),
+          ),
+        }),
+      ),
+      frames: v.array(
+        v.object({ pageId: v.string(), objectId: v.string() }),
+      ),
+      overflow: v.union(v.literal("thread"), v.literal("stop")),
+      styles: styleSetValidator,
+      version: v.number(),
+    }).index("by_version", ["versionId"]),
+
+    // Custom presets saved by an owner. Built-in presets live in the client
+    // foundation and are never duplicated here.
+    publicationPresets: defineTable({
+      ownerId: v.optional(v.id("users")),
+      name: v.string(),
+      docType: docTypeValidator,
+      payload: presetPayloadValidator,
+      archived: v.boolean(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_owner_archived", ["ownerId", "archived"]),
   },
   {
     schemaValidation: false,

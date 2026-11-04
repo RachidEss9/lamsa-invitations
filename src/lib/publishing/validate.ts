@@ -670,10 +670,8 @@ export function validatePublicationDocument(input: unknown): ValidationIssue[] {
 
   const facing = input.facingPages === true;
   const masterIds = new Set<string>();
-  if (isRecord(input.masters)) {
-    for (const entry of listOf(input.masters)) {
-      if (isRecord(entry) && typeof entry.id === "string") masterIds.add(entry.id);
-    }
+  for (const entry of listOf(input.masters)) {
+    if (isRecord(entry) && typeof entry.id === "string") masterIds.add(entry.id);
   }
 
   pages.forEach((page, index) => {
