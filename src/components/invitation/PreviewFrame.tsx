@@ -1,30 +1,25 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { DesignStage } from "./DesignPageView";
-import { pageSizeOf } from "@/lib/design";
 import { cn } from "@/lib/utils";
 
 /**
- * A frame that keeps a fixed-size design page completely visible inside an
- * arbitrary preview container. The frame follows the page's own aspect ratio:
- * it is sized from the height budget first (so the card always fits the
- * viewport) and scaled to the width, which guarantees both the whole width and
- * the whole height of the invitation are visible — never cropped, stretched or
- * enlarged. The page itself is rendered by DesignStage, which measures the
- * frame and applies a single transform scale with its origin top-left, so all
- * artwork, finishes, animations and reveal hit areas scale together and stay
- * anchored to their design coordinates.
+ * A frame that keeps a whole design page visible inside a preview container.
+ *
+ * The frame takes the page's own aspect ratio and never grows past the height
+ * budget it is given, so the browser lays it out to `min(container width,
+ * budget)` with the correct proportion. The page itself is then drawn at its
+ * real design size and scaled by one transform, which guarantees the complete
+ * page is visible — never cropped, stretched or enlarged — and keeps every
+ * element, finish and reveal hit area anchored to its design coordinates.
  */
 export interface PreviewFrameProps {
-  /** The page the frame renders, or a record of its dimensions. */
+  /** The page being previewed, or a record of its dimensions. */
   page?: { width: number; height: number } | null;
-  /** Children rendered inside the scaled stage (the journey stage, closing etc). */
+  /** The page artwork rendered inside the scaled stage. */
   children: React.ReactNode;
   /** Height budget the card may occupy, defaults to 82% of the viewport. */
   fitHeight?: string;
   /** Extra className on the card. */
   className?: string;
-  /** Reset pan to the top-left of the page after the scale settles. */
-  reset?: boolean;
 }
 
 export function PreviewFrame({
@@ -32,32 +27,35 @@ export function PreviewFrame({
   children,
   fitHeight = "82dvh",
   className,
-  reset,
 }: PreviewFrameProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0);
-  const [currentPage, setCurrentPage] = useState<{ width: number; height: number } | null>(null);
-
-  useLayoutEffect(() => {
-    setCurrentPage(page ?? null);
-  }, [page]);
+  const [box, setBox] = useState({ scale: 0, width: 0, height: 0 });
 
   useLayoutEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host || !page) return;
     const measure = () => {
       const width = host.clientWidth;
       const height = host.clientHeight;
       if (!width || !height) return;
-      if (!currentPage) return;
-      const fit = Math.min(width / currentPage.width, height / currentPage.height);
-      setScale(fit);
+      const scale = Math.min(width / page.width, height / page.height);
+      const next = {
+        scale,
+        width: Math.round(scale * page.width),
+        height: Math.round(scale * page.height),
+      };
+      setBox((current) =>
+        Math.abs(current.scale - next.scale) < 0.001 &&
+        Math.abs(current.height - next.height) < 1
+          ? current
+          : next,
+      );
     };
     measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(host);
-    return () => ro.disconnect();
-  }, [fitHeight, currentPage]);
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [page, fitHeight]);
 
   if (!page) {
     return (
@@ -74,19 +72,32 @@ export function PreviewFrame({
   return (
     <div
       ref={hostRef}
-      className={cn("relative w-full overflow-hidden", className)}
+      className={cn("relative mx-auto w-full overflow-hidden", className)}
       data-preview-frame
+      style={{
+        aspectRatio: `${page.width} / ${page.height}`,
+        maxHeight: fitHeight,
+        width: box.width || undefined,
+        height: box.height || undefined,
+      }}
     >
-      {scale > 0 && currentPage && (
-        <DesignStage
-          width={currentPage.width}
-          height={currentPage.height}
-          className="absolute inset-0"
+      {box.scale > 0 && (
+        <div
+          className="absolute left-0 top-0"
+          style={{ width: box.width, height: box.height }}
         >
-          {() => children}
-        </DesignStage>
+          <div
+            className="origin-top-left"
+            style={{
+              width: page.width,
+              height: page.height,
+              transform: `scale(${box.scale})`,
+            }}
+          >
+            {children}
+          </div>
+        </div>
       )}
     </div>
   );
 }
-

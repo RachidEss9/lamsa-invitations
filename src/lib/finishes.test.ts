@@ -204,9 +204,9 @@ describe("finish catalogue", () => {
 });
 
 describe("luxury presets", () => {
-  it("ships eight presets, each of editable layers that fit their surface", () => {
-    expect(FINISH_PRESETS).toHaveLength(8);
-    expect(new Set(FINISH_PRESETS.map((preset) => preset.id)).size).toBe(8);
+  it("ships twelve presets, each of editable layers that fit their surface", () => {
+    expect(FINISH_PRESETS).toHaveLength(12);
+    expect(new Set(FINISH_PRESETS.map((preset) => preset.id)).size).toBe(12);
 
     for (const preset of FINISH_PRESETS) {
       expect(preset.label.length, preset.id).toBeGreaterThan(0);

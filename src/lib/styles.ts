@@ -106,4 +106,59 @@ export const BUILTIN_STYLES: BuiltinStyle[] = [
       "linear-gradient(182deg, #23262b 0%, #1d2024 44%, #131518 100%)",
     fontPair: "cormorant-garamond",
   },
+  /* ------------------------------------------------- atelier expansion */
+  {
+    name: "Instrument bone",
+    note: "Instrument Serif · bone and graphite",
+    palette: { background: "#f4f1e8", ink: "#1c1b18", accent: "#7a7466" },
+    fontPair: "instrument-serif",
+  },
+  {
+    name: "Literata oat",
+    note: "Literata · oat paper, long reading",
+    palette: { background: "#f6f1e2", ink: "#2a2620", accent: "#8d6a3f" },
+    background:
+      "linear-gradient(160deg, #faf5e7 0%, #f4eddb 58%, #ece2cd 100%)",
+    fontPair: "literata",
+  },
+  {
+    name: "Space concrete",
+    note: "Space Grotesk · concrete gallery",
+    palette: { background: "#ececea", ink: "#17181a", accent: "#5b6068" },
+    fontPair: "space-grotesk",
+  },
+  {
+    name: "Alegreya press",
+    note: "Alegreya · warm private press",
+    palette: { background: "#f7f1e4", ink: "#33291f", accent: "#a4553a" },
+    background:
+      "radial-gradient(96% 74% at 50% 6%, #fbf6ea 0%, #f5eedf 62%, #eee3cf 100%)",
+    fontPair: "alegreya",
+  },
+  {
+    name: "Vollkorn olive",
+    note: "Vollkorn · deep olive grove",
+    palette: { background: "#e9ecdd", ink: "#2b3524", accent: "#7c8b56" },
+    fontPair: "vollkorn",
+  },
+  {
+    name: "Ephesis powder",
+    note: "Ephesis · powder rose, silver rule",
+    palette: { background: "#f7ecef", ink: "#402f34", accent: "#b18a92" },
+    background:
+      "radial-gradient(88% 68% at 50% 0%, #fdf4f5 0%, #f6e8ec 60%, #efdde3 100%)",
+    fontPair: "ephesis",
+  },
+  {
+    name: "Tajawal mint",
+    note: "Tajawal · modern Arabic mint",
+    palette: { background: "#f1f6f2", ink: "#1d2c26", accent: "#5c8a74" },
+    fontPair: "tajawal",
+  },
+  {
+    name: "Reem ink",
+    note: "Reem Kufi Ink · sand and brush",
+    palette: { background: "#f6eee0", ink: "#241f19", accent: "#9a6b3c" },
+    fontPair: "reem-kufi-ink",
+  },
 ];

@@ -227,8 +227,8 @@ export function InvitationJourney({
         page={page ? { width: page.width!, height: page.height! } : null}
         fitHeight={fitHeight}
         className="relative mx-auto w-full overflow-hidden bg-[var(--paper-light)] shadow-[0_24px_70px_rgba(22,22,22,0.16)]"
-        reset
       >
+        <div className="absolute inset-0">{stage}</div>
         <div className="sr-only" aria-live="polite">
           {phase === "opening"
             ? "Choose a scene and open the invitation."

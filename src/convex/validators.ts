@@ -79,6 +79,11 @@ export const fontPairValidator = v.union(
   v.literal("handwritten"),
   v.literal("ruqaa"),
   v.literal("kufi"),
+  // Atelier expansion: book display, grotesque, reading serif, modern Arabic.
+  v.literal("jacobean"),
+  v.literal("grotesk"),
+  v.literal("literary"),
+  v.literal("arabic-modern"),
 );
 
 export const paletteValidator = v.object({

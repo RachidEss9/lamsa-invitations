@@ -799,6 +799,131 @@ export const BUILTIN_ASSETS: BuiltinAsset[] = [
     ],
     preview: { type: "layers" },
   },
+
+  /* -------------------------------------------- atelier expansion */
+  {
+    id: "botanical-fern-corner",
+    name: "Fern corner",
+    category: "Botanical",
+    note: "Fine fronds trailing from the lower corner.",
+    elements: [motif("Fern corner", "vine", { x: 60, y: 1000, w: 300, h: 230, rotation: -14, opacity: 0.45 })],
+    preview: { type: "motif", motif: "vine" },
+  },
+  {
+    id: "botanical-blossom-spray",
+    name: "Blossom spray",
+    category: "Botanical",
+    note: "Three blooms gathered into a single spray.",
+    elements: [
+      motif("Blossom spray", "blossom", { x: 690, y: 120, w: 160, h: 160, fillToken: "accent", opacity: 0.7 }),
+      motif("Blossom spray", "blossom", { x: 760, y: 235, w: 110, h: 110, fillToken: "accent", opacity: 0.55 }),
+      motif("Blossom spray", "blossom", { x: 650, y: 240, w: 90, h: 90, fillToken: "accent", opacity: 0.45 }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "ornament-paisley-pair",
+    name: "Paisley pair",
+    category: "Ornaments",
+    note: "Two facing paisleys, mirrored for a henna card.",
+    elements: [
+      motif("Paisley", "paisley", { x: 330, y: 500, w: 150, h: 210, opacity: 0.8 }),
+      motif("Paisley", "paisley", { x: 520, y: 500, w: 150, h: 210, rotation: 180, opacity: 0.8 }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "ornament-zellige-band",
+    name: "Zellige band",
+    category: "Ornaments",
+    note: "Tiled stars running along the head of the card.",
+    elements: [motif("Zellige band", "zellige", { x: 250, y: 90, w: 500, h: 120, opacity: 0.5 })],
+    preview: { type: "motif", motif: "zellige" },
+  },
+  {
+    id: "ornament-flourish-rule",
+    name: "Flourish rule",
+    category: "Ornaments",
+    note: "A centred flourish sitting on a fine rule.",
+    elements: [
+      rule("Rule", 420),
+      motif("Flourish", "flourish", { x: 420, y: 630, w: 160, h: 60, fillToken: "accent" }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "divider-double-zellige",
+    name: "Double zellige rule",
+    category: "Dividers",
+    note: "Two hairlines with a small star between them.",
+    elements: [
+      rule("Upper rule", 380, { y: 620 }),
+      rule("Lower rule", 380, { y: 676 }),
+      motif("Star", "star", { x: 470, y: 625, w: 60, h: 60, fillToken: "accent" }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "divider-paisley-line",
+    name: "Paisley divider",
+    category: "Dividers",
+    note: "A rule that opens into a paisley at each end.",
+    elements: [
+      rule("Rule", 300, { y: 650 }),
+      motif("Paisley", "paisley", { x: 330, y: 610, w: 70, h: 90, opacity: 0.8 }),
+      motif("Paisley", "paisley", { x: 600, y: 610, w: 70, h: 90, rotation: 180, opacity: 0.8 }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "seal-khatim",
+    name: "Khatim seal",
+    category: "Seals",
+    note: "A ringed eight-point star seal for Moroccan cards.",
+    elements: [
+      { kind: "shape", shape: "ellipse", name: "Seal ring", x: 410, y: 550, w: 180, h: 180, fill: "transparent", strokeToken: "accent", strokeWidth: 2 },
+      motif("Khatim star", "zellige", { x: 455, y: 595, w: 90, h: 90, fillToken: "accent" }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "seal-crescent",
+    name: "Crescent seal",
+    category: "Seals",
+    note: "A wax disc carrying a crescent.",
+    elements: [
+      { kind: "shape", shape: "ellipse", name: "Wax disc", x: 420, y: 560, w: 160, h: 160, fillToken: "accent" },
+      motif("Crescent", "crescent", { x: 455, y: 595, w: 90, h: 90, fill: "#f7f2e7" }),
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "keyline-double-inset",
+    name: "Double inset keyline",
+    category: "Keylines",
+    note: "Two rectangles with a generous 18-unit gap.",
+    elements: [
+      { kind: "shape", shape: "rect", name: "Outer keyline", x: 60, y: 60, w: 880, h: 1180, fill: "transparent", strokeToken: "accent", strokeWidth: 2 },
+      { kind: "shape", shape: "rect", name: "Inner keyline", x: 96, y: 96, w: 808, h: 1108, fill: "transparent", strokeToken: "accent", strokeWidth: 1 },
+    ],
+    preview: { type: "layers" },
+  },
+  {
+    id: "mask-khatim",
+    name: "Khatim cover",
+    category: "Masks",
+    note: "A star cover that lifts away to reveal a note.",
+    elements: [{ kind: "shape", shape: "burst", name: "Khatim reveal cover", x: 320, y: 430, w: 360, h: 360, fillToken: "accent" }],
+    preview: { type: "shape", shape: "burst" },
+  },
+  {
+    id: "icon-confetti-burst",
+    name: "Confetti burst",
+    category: "Celebration icons",
+    note: "A wider confetti field for a full-width head.",
+    elements: [motif("Confetti burst", "confetti", { x: 180, y: 110, w: 640, h: 260, fillToken: "accent", opacity: 0.7 })],
+    preview: { type: "motif", motif: "confetti" },
+  },
 ];
 
 export const BUILTIN_ASSET_CATEGORIES = [

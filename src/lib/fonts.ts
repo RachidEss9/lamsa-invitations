@@ -414,6 +414,64 @@ export const FONT_LIBRARY: FontDef[] = [
     italic: true,
     note: "Friendly, modern sans",
   }),
+
+  /* ---------------------------------------------------- Atelier expansion */
+  latin("literata", "Literata", ["serif"], {
+    italic: true,
+    note: "Sturdy book serif for long schedules",
+  }),
+  latin("sorts-mill-goudy", "Sorts Mill Goudy", ["serif"], {
+    italic: true,
+    note: "Warm American private-press serif",
+  }),
+  latin("cormorant-unicase", "Cormorant Unicase", ["serif", "display"], {
+    note: "Cormorant with a quiet, even cap height",
+  }),
+  latin("petrona", "Petrona", ["serif"], {
+    italic: true,
+    note: "Soft low-contrast serif for details",
+  }),
+  latin("alegreya", "Alegreya", ["serif"], {
+    italic: true,
+    note: "Calligraphic old style with lively rhythm",
+  }),
+  latin("vollkorn", "Vollkorn", ["serif"], {
+    italic: true,
+    note: "German book face, generous and calm",
+  }),
+  latin("besley", "Besley", ["serif", "display"], {
+    italic: true,
+    note: "Slab-tinged Victorian display serif",
+  }),
+  latin("instrument-sans", "Instrument Sans", ["sans"], {
+    italic: true,
+    note: "Swiss-leaning sans for modern cards",
+  }),
+  latin("ephesis", "Ephesis", ["calligraphy"], {
+    weights: [400],
+    fallback: SCRIPT_FALLBACK,
+    note: "Flowing copperplate for names",
+  }),
+  latin("monsieur-la-doulaise", "Monsieur La Doulaise", ["calligraphy"], {
+    weights: [400],
+    fallback: SCRIPT_FALLBACK,
+    note: "Fine French script, engraver's hand",
+  }),
+  arabic("reem-kufi-ink", "Reem Kufi Ink", ["display", "sans"], {
+    note: "Kufi drawn with an ink-brush edge",
+  }),
+  arabic("amiri-quran", "Amiri Quran", ["serif"], {
+    weights: [400],
+    note: "Quranic Naskh with full vocalisation",
+  }),
+  arabic("lalezar", "Lalezar", ["display"], {
+    weights: [400],
+    note: "Bold festive Arabic headline",
+  }),
+  arabic("jomhuria", "Jomhuria", ["display"], {
+    weights: [400],
+    note: "Very heavy Arabic poster face",
+  }),
 ];
 
 export const FONT_CATEGORIES: { id: FontCategory; label: string }[] = [
@@ -443,6 +501,10 @@ export const LEGACY_FONT_IDS: Record<string, string> = {
   handwritten: "sacramento",
   ruqaa: "aref-ruqaa",
   kufi: "reem-kufi",
+  jacobean: "instrument-serif",
+  grotesk: "space-grotesk",
+  literary: "literata",
+  "arabic-modern": "tajawal",
 };
 
 const FONT_MAP = new Map(FONT_LIBRARY.map((font) => [font.id, font]));

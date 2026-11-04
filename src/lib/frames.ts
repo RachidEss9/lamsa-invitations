@@ -132,6 +132,39 @@ const ANDALUSIAN_KNOT = [
 /** Bare corner ticks: the quietest frame in the collection. */
 const CORNER_TICKS = ["M2 16 V2 H16", "M6 10 V6 H10"];
 
+/** A fern frond curling in from the corner, drawn as tapered pinnae. */
+const FERN_FROND = [
+  "M2 2 H34 M2 2 V34",
+  "M6 30 C12 22 16 14 22 4",
+  "M10 26 C6 22 4 18 4 12",
+  "M14 20 C18 18 22 14 24 8",
+  "M6 22 C12 20 16 16 18 10",
+];
+
+/** A pressed flower: four petals on a stem, quietly botanical. */
+const PRESSED_FLOWER = [
+  "M4 4 H26 M4 4 V26",
+  "M14 10 C20 10 24 14 24 20 C18 20 14 16 14 10 Z",
+  "M14 10 C8 10 4 14 4 20 C10 20 14 16 14 10 Z",
+  "M14 20 V32",
+  "M10 26 C12 28 16 28 18 26",
+];
+
+/** Stepped chevrons stacked into the corner, Art Deco 1925. */
+const CHEVRON = [
+  "M2 2 H30 M2 2 V30",
+  "M2 14 L14 2",
+  "M8 26 L26 8",
+  "M14 30 L30 14",
+];
+
+/** An eight-point khatim star built from two overlapping squares. */
+const KHATIM_STAR = [
+  "M8 14 H22 V28 H8 Z",
+  "M15 7 L22 14 L15 21 L8 14 Z",
+  "M2 2 H30 M2 2 V30",
+];
+
 /* -------------------------------------------------------------------------- */
 /* The collection                                                             */
 /* -------------------------------------------------------------------------- */
@@ -269,6 +302,78 @@ export const FRAMES: FrameSpec[] = [
     note: "One hairline and four corner ticks. Nothing more.",
     outline: ["M8 8 H92 V92 H8 Z"],
     corner: { art: CORNER_TICKS, size: 9 },
+  },
+  /* ------------------------------------------------- atelier expansion */
+  {
+    id: "fern-frieze",
+    name: "Fern frieze",
+    group: "Botanical",
+    note: "Tapered fern fronds curling in from every corner.",
+    outline: ["M7 7 H93 V93 H7 Z"],
+    corner: { art: FERN_FROND, size: 27 },
+  },
+  {
+    id: "pressed-flora",
+    name: "Pressed flora",
+    group: "Botanical",
+    note: "Four pressed flowers on a single fine rule.",
+    outline: [KEYLINE, KEYLINE_INNER],
+    corner: { art: PRESSED_FLOWER, size: 20 },
+  },
+  {
+    id: "cameo-oval",
+    name: "Cameo oval",
+    group: "Classic",
+    note: "A double oval cameo inside a squared keyline.",
+    outline: [
+      "M6 6 H94 V94 H6 Z",
+      "M50 16 C68 16 78 30 78 50 C78 70 68 84 50 84 C32 84 22 70 22 50 C22 30 32 16 50 16",
+      "M50 21 C65 21 73 33 73 50 C73 67 65 79 50 79 C35 79 27 67 27 50 C27 33 35 21 50 21",
+    ],
+  },
+  {
+    id: "guilloche",
+    name: "Guilloche band",
+    group: "Vintage",
+    note: "An interlaced wave band above and below the wording.",
+    outline: [
+      "M6 6 H94 V94 H6 Z",
+      "M6 14 C 12 6, 18 6, 24 14 C 30 22, 36 22, 42 14 C 48 6, 54 6, 60 14 C 66 22, 72 22, 78 14 C 84 6, 90 6, 94 12",
+      "M6 86 C 12 94, 18 94, 24 86 C 30 78, 36 78, 42 86 C 48 94, 54 94, 60 86 C 66 78, 72 78, 78 86 C 84 94, 90 94, 94 88",
+      "M6 20 H94",
+      "M6 80 H94",
+    ],
+  },
+  {
+    id: "chevron-deco",
+    name: "Chevron deco",
+    group: "Art Deco",
+    note: "Stacked chevrons stepping out of each corner.",
+    outline: ["M6 6 H94 V94 H6 Z", "M10 10 H90 V90 H10 Z"],
+    corner: { art: CHEVRON, size: 22 },
+  },
+  {
+    id: "ribbon-bow",
+    name: "Ribbon bow",
+    group: "Romantic",
+    note: "A satin bow tied at the head of the card.",
+    outline: ["M7 7 H93 V93 H7 Z"],
+    corner: { art: ROSE_CLUSTER, size: 16 },
+  },
+  {
+    id: "khatim-star",
+    name: "Khatim star",
+    group: "Moroccan",
+    note: "Eight-point khatim stars set into a double keyline.",
+    outline: ["M5 5 H95 V95 H5 Z", "M9 9 H91 V91 H9 Z"],
+    corner: { art: KHATIM_STAR, size: 21 },
+  },
+  {
+    id: "single-hairline",
+    name: "Single hairline",
+    group: "Minimal",
+    note: "One hairline rule, set wider than the rest of the collection.",
+    outline: ["M12 12 H88 V88 H12 Z"],
   },
 ];
 

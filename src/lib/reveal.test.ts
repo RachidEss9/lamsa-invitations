@@ -4,8 +4,8 @@ import { REVEAL_EFFECTS } from "./design";
 import type { DesignElement, RevealEffect } from "./design";
 
 describe("reveal presets", () => {
-  it("contains 8 presets across 4 categories", () => {
-    expect(REVEAL_PRESETS).toHaveLength(8);
+  it("contains 12 presets across 4 categories", () => {
+    expect(REVEAL_PRESETS).toHaveLength(12);
     const categories = new Set(REVEAL_PRESETS.map((p) => p.category));
     expect(categories).toEqual(
       new Set(["Romantic", "Playful", "Photographic", "Classic"]),

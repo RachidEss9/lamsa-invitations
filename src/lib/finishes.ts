@@ -959,6 +959,59 @@ export const FINISH_PRESETS: FinishPreset[] = [
       { finish: "spot-uv", patch: { gloss: 0.9 } },
     ],
   },
+  /* --------------------------------------------------- atelier expansion */
+  {
+    id: "copper-atelier",
+    label: "Copper Atelier",
+    note: "Warm copper foil on soft cotton, lit from the left",
+    lighting: { direction: 132, intensity: 0.62, softness: 0.55, temperature: 0.55 },
+    page: [{ finish: "soft-touch", patch: { intensity: 0.5 } }],
+    text: [
+      { finish: "copper-foil", patch: { colour: "#b4703c", gloss: 0.55 } },
+      { finish: "letterpress", patch: { depth: -0.3 } },
+    ],
+    motif: [{ finish: "copper-foil", patch: { colour: "#a96733" } }],
+    solid: [{ finish: "brushed-gold", patch: { colour: "#b8875a", roughness: 0.6 } }],
+  },
+  {
+    id: "velvet-noir",
+    label: "Velvet Noir",
+    note: "Black velvet page, pearl type, one hard light",
+    lighting: { direction: 288, intensity: 0.72, softness: 0.3, temperature: -0.1 },
+    page: [{ finish: "velvet", patch: { intensity: 0.7, colour: "#141416" } }],
+    text: [{ finish: "pearlescent", patch: { colour: "#efe7dc", gloss: 0.5 } }],
+    motif: [{ finish: "blind-emboss", patch: { depth: 0.4 } }],
+    solid: [{ finish: "mother-of-pearl", patch: { intensity: 0.55 } }],
+  },
+  {
+    id: "linen-editorial",
+    label: "Linen Editorial",
+    note: "Linen stock, blind deboss, no metal at all",
+    lighting: { direction: 24, intensity: 0.5, softness: 0.8, temperature: 0.1 },
+    page: [
+      { finish: "linen-texture", patch: { intensity: 0.7, colour: "#f1ece1" } },
+      { finish: "fine-grain", patch: { intensity: 0.4 } },
+    ],
+    text: [{ finish: "deboss", patch: { depth: -0.45, intensity: 0.65 } }],
+    motif: [{ finish: "blind-emboss", patch: { depth: 0.3 } }],
+    solid: [{ finish: "matte-seal", patch: { intensity: 0.4 } }],
+  },
+  {
+    id: "champagne-shimmer",
+    label: "Champagne Shimmer",
+    note: "Champagne gold with a soft iridescent wash",
+    lighting: { direction: 72, intensity: 0.6, softness: 0.65, temperature: 0.35 },
+    page: [{ finish: "satin-sheen", patch: { intensity: 0.55 } }],
+    text: [
+      { finish: "champagne-gold", patch: { colour: "#d9c08d", reflectivity: 0.7 } },
+      { finish: "emboss", patch: { depth: 0.4 } },
+    ],
+    motif: [{ finish: "champagne-gold", patch: { reflectivity: 0.55 } }],
+    solid: [
+      { finish: "champagne-gold", patch: { reflectivity: 0.65 } },
+      { finish: "spot-uv", patch: { gloss: 0.85 } },
+    ],
+  },
 ];
 
 export function finishPresetById(id: string): FinishPreset | undefined {
