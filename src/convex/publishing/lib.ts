@@ -12,7 +12,6 @@ import {
   masterRecordFromDocument,
   pageRecordFromDocument,
   prepareDocumentForPersistence,
-  recordsFromDocument,
   storyRecordFromDocument,
   versionSettingsFromDocument,
   type AssetRecord,
