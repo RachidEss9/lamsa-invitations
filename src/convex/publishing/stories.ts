@@ -99,13 +99,16 @@ export const deleteStory = mutation({
     if (!document.stories.some((story) => story.id === args.storyId)) {
       throw new Error("Story not found.");
     }
-    // The frames keep their content; only the thread and the back-reference
-    // to the deleted story go away. Normalisation at the save boundary clears
-    // `storyId` on those frames.
     const next = {
       ...document,
       stories: document.stories.filter((story) => story.id !== args.storyId),
     };
+    for (const page of next.pages) {
+      for (const object of page.objects) {
+        if (object.kind !== "text-frame") continue;
+        object.storyId = object.storyId === args.storyId ? undefined : object.storyId;
+      }
+    }
     const now = Date.now();
     await saveDocumentState(ctx, publication, next, now);
     return { updatedAt: now };
