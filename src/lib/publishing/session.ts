@@ -26,7 +26,13 @@ import type {
   Story,
 } from "./model";
 import { defaultIds } from "./ids";
-import { createLayer } from "./layers";
+import {
+  addLayer,
+  createLayer,
+  lowerObject,
+  raiseObject,
+  reorderLayer,
+} from "./layers";
 import { movePage, pageIndexOf, removePage } from "./operations";
 
 const HISTORY_LIMIT = 60;
@@ -465,13 +471,7 @@ export function moveLayer(
 ): EditorSession {
   return editLayers(session, pageId, (page) => {
     const from = page.layers.findIndex((layer) => layer.id === layerId);
-    if (from < 0) return page;
-    const target = from + direction;
-    if (target < 0 || target >= page.layers.length) return page;
-    const layers = [...page.layers];
-    const [moved] = layers.splice(from, 1);
-    layers.splice(target, 0, moved!);
-    return { ...page, layers };
+    return from < 0 ? page : reorderLayer(page, layerId, from + direction);
   });
 }
 
@@ -486,10 +486,7 @@ export function addLayerToPage(
     ids: defaultIds,
     color: "#9a8f7c",
   });
-  const next = editLayers(session, pageId, (current) => ({
-    ...current,
-    layers: [...current.layers, layer],
-  }));
+  const next = editLayers(session, pageId, (current) => addLayer(current, layer));
   return setActiveLayer(next, layer.id);
 }
 
@@ -514,25 +511,9 @@ export function restackObject(
   objectId: string,
   direction: 1 | -1,
 ): EditorSession {
-  return editPage(session, pageId, (page) => {
-    const object = page.objects.find((entry) => entry.id === objectId);
-    if (!object) return page;
-    const peers = page.objects.filter((entry) => entry.layerId === object.layerId);
-    const index = peers.findIndex((entry) => entry.id === objectId);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= peers.length) return page;
-    const reordered = [...peers];
-    const [moved] = reordered.splice(index, 1);
-    reordered.splice(target, 0, moved!);
-    let cursor = 0;
-    const objects = page.objects.map((entry) => {
-      if (entry.layerId !== object.layerId) return entry;
-      const next = reordered[cursor];
-      cursor += 1;
-      return next ?? entry;
-    });
-    return { ...page, objects };
-  });
+  return editPage(session, pageId, (page) =>
+    direction > 0 ? raiseObject(page, objectId) : lowerObject(page, objectId),
+  );
 }
 
 /* -------------------------------------------------------------------------- */

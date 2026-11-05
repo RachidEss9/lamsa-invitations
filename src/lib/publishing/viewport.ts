@@ -186,18 +186,20 @@ export function pagePointFromClient(
   });
 }
 
-/** The page whose bleed box contains a stage position, topmost page first. */
+/** The page whose trim contains a stage position, topmost page first. */
 export function pageAtStagePoint(
   layout: StageLayout,
   point: Point,
 ): string | null {
   for (let index = layout.pages.length - 1; index >= 0; index -= 1) {
     const box = layout.pages[index]!;
+    const trimLeft = box.left + box.trimLeft;
+    const trimTop = box.top + box.trimTop;
     if (
-      point.x >= box.left &&
-      point.x <= box.left + box.width &&
-      point.y >= box.top &&
-      point.y <= box.top + box.height
+      point.x >= trimLeft &&
+      point.x < trimLeft + (box.width - box.trimLeft * 2) &&
+      point.y >= trimTop &&
+      point.y < trimTop + (box.height - box.trimTop * 2)
     ) {
       return box.pageId;
     }
