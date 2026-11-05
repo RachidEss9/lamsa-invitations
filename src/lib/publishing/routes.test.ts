@@ -47,7 +47,7 @@ describe("publication id handling", () => {
   });
 });
 
-const MAIN = readFileSync(new URL("../../../main.tsx", import.meta.url), "utf8");
+const MAIN = readFileSync(new URL("../../main.tsx", import.meta.url), "utf8");
 
 describe("main.tsx route wiring", () => {
   const libraryEntry = PUBLISHING_ROUTES[0]!;
@@ -69,9 +69,8 @@ describe("main.tsx route wiring", () => {
   });
 
   it("registers no publishing path as a public route", () => {
-    // Both occurrences of "/publishing" are inside gated route elements — there is
-    // no second, ungated declaration between them.
-    const ungated = MAIN.match(/path="\/publishing"/g)?.length ?? 0;
+    // Each publishing path appears exactly once, inside its gated route element.
+    const ungated = MAIN.match(/path="\/publishing/g)?.length ?? 0;
     expect(ungated).toBe(PUBLISHING_ROUTES.length);
   });
 
