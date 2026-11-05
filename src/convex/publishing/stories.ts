@@ -66,6 +66,7 @@ export const updateStory = mutation({
   args: {
     publicationId: v.id("publications"),
     story: storyValidator,
+    expectedVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -73,6 +74,15 @@ export const updateStory = mutation({
     const document = await loadDocument(ctx, publication);
     const existing = document.stories.find((story) => story.id === args.story.id);
     if (!existing) throw new Error("Story not found.");
+
+    // Read, compare and increment inside one mutation: a second writer that
+    // still holds the old version is refused instead of overwriting.
+    if (
+      args.expectedVersion !== undefined &&
+      args.expectedVersion !== existing.version
+    ) {
+      throw new Error("This story changed elsewhere. Reload it and try again.");
+    }
     assertFramesResolve(document, args.story);
     const story = { ...args.story, version: existing.version + 1 };
     const next = {

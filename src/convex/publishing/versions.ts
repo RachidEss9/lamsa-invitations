@@ -254,7 +254,9 @@ export const restoreVersion = mutation({
     }
 
     // Every asset the snapshot needs must still exist and still belong here.
-    // This runs before any write; Convex applies the later writes atomically.
+    // A row that a previous restore detached is still valid for this
+    // publication; a row attached to a different publication is not. This
+    // runs before any write; Convex applies the later writes atomically.
     const assetRows = await Promise.all(
       version.assetIds.map((assetId) => ctx.db.get(assetId)),
     );
@@ -263,7 +265,8 @@ export const restoreVersion = mutation({
         (asset) =>
           !asset ||
           asset.ownerId !== userId ||
-          asset.publicationId !== publication._id,
+          (asset.publicationId !== undefined &&
+            asset.publicationId !== publication._id),
       )
     ) {
       throw new Error(
@@ -291,9 +294,10 @@ export const restoreVersion = mutation({
     prepareDocumentForPersistence(restored);
     await saveDocumentState(ctx, publication, restored, now);
 
-    // Assets added after this version stay in the owner's library but are
-    // detached from this publication, so the restored project reads exactly
-    // the asset set it was saved with.
+    // The restored project reads exactly the asset set it was saved with:
+    // assets added later are detached (never deleted, so their files and any
+    // newer version that needs them survive), and rows this version needs are
+    // re-attached so a later version can still be restored.
     const currentAssets = await ctx.db
       .query("publicationAssets")
       .withIndex("by_publication", (q) => q.eq("publicationId", publication._id))
@@ -301,6 +305,14 @@ export const restoreVersion = mutation({
     for (const asset of currentAssets) {
       if (!version.assetIds.includes(asset._id)) {
         await ctx.db.patch(asset._id, { publicationId: undefined, updatedAt: now });
+      }
+    }
+    for (const asset of assetRows) {
+      if (asset && asset.publicationId !== publication._id) {
+        await ctx.db.patch(asset._id, {
+          publicationId: publication._id,
+          updatedAt: now,
+        });
       }
     }
 

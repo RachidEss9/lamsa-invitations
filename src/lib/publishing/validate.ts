@@ -66,8 +66,31 @@ interface Context {
   objectIds: Set<string>;
   storyIds: Set<string>;
   styleIds: Set<string>;
+  /** Stable asset ids this document declares; frame references must resolve. */
+  assetIds: Set<string>;
   claimedFrames: Set<string>;
   spreadPageIds: Set<string>;
+}
+
+/**
+ * A frame or background may name an asset; when it does, the asset has to be
+ * part of this document, otherwise deleting a row could never be proven safe
+ * and a restored version could point at a file nobody owns.
+ */
+function validateAssetRef(
+  value: unknown,
+  path: string,
+  c: Collector,
+  context: Context,
+): void {
+  if (value === undefined) return;
+  if (typeof value !== "string" || !context.assetIds.has(value)) {
+    c.error(
+      "asset/ref-missing",
+      path,
+      "The reference points at an asset that is not in this publication",
+    );
+  }
 }
 
 function validateEdges(
@@ -256,6 +279,7 @@ function validateObjects(
       }
     }
     if (kind === "image-frame") {
+      validateAssetRef(entry.assetId, `${objectPath}.assetId`, c, context);
       if (
         entry.crop !== undefined &&
         (!isRecord(entry.crop) || !isFiniteNumber(entry.crop.scale) || (entry.crop.scale as number) <= 0)
@@ -338,6 +362,13 @@ function validatePage(
 
   if (value.background !== undefined && !isRecord(value.background)) {
     c.error("page/background", `${path}.background`, "A page background must be an object");
+  } else if (isRecord(value.background)) {
+    validateAssetRef(
+      value.background.assetId,
+      `${path}.background.assetId`,
+      c,
+      context,
+    );
   }
 
   const layerIds = validateLayers(value.layers, `${path}.layers`, c);
@@ -374,6 +405,16 @@ function validateMasters(value: unknown, c: Collector, context: Context): void {
       c.error("master/applies-to", `${path}.appliesTo`, "A master applies to left, right or both");
     }
     validateSpec(entry.spec, `${path}.spec`, c, { requireTrim: false });
+    if (entry.background !== undefined && !isRecord(entry.background)) {
+      c.error("master/background", `${path}.background`, "A master background must be an object");
+    } else if (isRecord(entry.background)) {
+      validateAssetRef(
+        entry.background.assetId,
+        `${path}.background.assetId`,
+        c,
+        context,
+      );
+    }
     const layerIds = validateLayers(entry.layers, `${path}.layers`, c);
     validateObjects(entry.objects, `${path}.objects`, layerIds, c, context, "");
   });
@@ -648,9 +689,16 @@ export function validatePublicationDocument(input: unknown): ValidationIssue[] {
     objectIds: new Set(),
     storyIds: new Set(),
     styleIds: new Set(),
+    assetIds: new Set(),
     claimedFrames: new Set(),
     spreadPageIds: new Set(),
   };
+
+  for (const entry of listOf(input.assets)) {
+    if (isRecord(entry) && typeof entry.id === "string") {
+      context.assetIds.add(entry.id);
+    }
+  }
 
   if (isRecord(input.styles)) {
     for (const entry of listOf(input.styles.paragraph)) {

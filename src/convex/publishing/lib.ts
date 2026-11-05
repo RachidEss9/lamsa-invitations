@@ -529,30 +529,46 @@ export async function requireOwnedAsset(
 }
 
 /**
- * Deletes a storage object only when no asset row of this owner still points
- * at it. Duplicated publications share print originals, and deleting one copy
- * must never blank the other.
+ * True when a saved version of one of this owner's publications still needs
+ * the asset row. Versions keep resolving their assets after the row is
+ * detached from its publication, so this check cannot depend on attachment.
+ */
+export async function isAssetNeededByVersion(
+  ctx: PublishingCtx,
+  ownerId: Id<"users">,
+  assetRowId: Id<"publicationAssets">,
+): Promise<boolean> {
+  const versions = await ctx.db
+    .query("publicationVersions")
+    .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+    .collect();
+  return versions.some((version) => version.assetIds.includes(assetRowId));
+}
+
+/**
+ * Deletes a storage object only when no asset row anywhere still points at it.
+ * Duplicated publications share print originals, and deleting one copy must
+ * never blank the other, so the scan deliberately crosses publications and
+ * owners instead of trusting the caller's scope.
  */
 export async function deleteStorageIfUnshared(
   ctx: MutationCtx,
-  userId: Id<"users">,
   storageId: Id<"_storage">,
-): Promise<void> {
-  const assets = await ctx.db
-    .query("publicationAssets")
-    .withIndex("by_owner", (q) => q.eq("ownerId", userId))
-    .collect();
+): Promise<boolean> {
+  const assets = await ctx.db.query("publicationAssets").collect();
   const shared = assets.some(
     (asset) =>
       asset.originalStorageId === storageId ||
       asset.proxyStorageId === storageId ||
       asset.thumbnailStorageId === storageId,
   );
-  if (shared) return;
+  if (shared) return false;
   try {
     await ctx.storage.delete(storageId);
+    return true;
   } catch {
     // The object may already be gone; removing the row still completes.
+    return false;
   }
 }
 

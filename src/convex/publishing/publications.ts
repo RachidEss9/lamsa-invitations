@@ -156,10 +156,18 @@ export const updatePublication = mutation({
   args: {
     publicationId: v.id("publications"),
     settings: publicationSettingsValidator,
+    /** `publication.updatedAt` from the state the client edited. */
+    expectedUpdatedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    if (
+      args.expectedUpdatedAt !== undefined &&
+      args.expectedUpdatedAt !== publication.updatedAt
+    ) {
+      throw new Error("This publication changed elsewhere. Reload it and try again.");
+    }
     const document = await loadDocument(ctx, publication);
     let next = applySettings(document, args.settings);
 
@@ -267,11 +275,10 @@ export const unarchivePublication = mutation({
 
 async function deleteStorageIds(
   ctx: Parameters<typeof deleteStorageIfUnshared>[0],
-  userId: Id<"users">,
   ids: Id<"_storage">[],
 ): Promise<void> {
   for (const storageId of new Set(ids)) {
-    await deleteStorageIfUnshared(ctx, userId, storageId);
+    await deleteStorageIfUnshared(ctx, storageId);
   }
 }
 
@@ -320,8 +327,9 @@ export const deletePublication = mutation({
     }
 
     await ctx.db.delete(publication._id);
-    // Rows are gone first, so only files this owner still references survive.
-    await deleteStorageIds(ctx, userId, storageIds);
+    // Rows are gone first, so only files no remaining asset row references
+    // (in any publication, including duplicates) are deleted.
+    await deleteStorageIds(ctx, storageIds);
     return null;
   },
 });

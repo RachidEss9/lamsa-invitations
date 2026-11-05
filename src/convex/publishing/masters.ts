@@ -40,6 +40,7 @@ export const updateMaster = mutation({
   args: {
     publicationId: v.id("publications"),
     master: masterPageValidator,
+    expectedVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -47,6 +48,15 @@ export const updateMaster = mutation({
     const document = await loadDocument(ctx, publication);
     const existing = document.masters.find((master) => master.id === args.master.id);
     if (!existing) throw new Error("Master not found.");
+
+    // The version read and the increment happen in one transaction, so a
+    // stale client either matches the stored version or is refused.
+    if (
+      args.expectedVersion !== undefined &&
+      args.expectedVersion !== existing.version
+    ) {
+      throw new Error("This master changed elsewhere. Reload it and try again.");
+    }
 
     const master = {
       ...args.master,
