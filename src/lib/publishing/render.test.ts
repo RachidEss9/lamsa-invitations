@@ -5,8 +5,8 @@ import {
   createParagraph,
   createStory,
   createTextFrame,
-  type PublicationDocument,
 } from "./factory";
+import type { PublicationDocument } from "./model";
 import {
   fontFamilyFor,
   frameThreadLength,
@@ -119,6 +119,7 @@ describe("stories", () => {
   it("previews frame text without inventing content", () => {
     const document = documentWithStory();
     const object = document.pages[0]!.objects[0]!;
+    if (object.kind !== "text-frame") throw new Error("fixture is expected to hold a text frame");
     expect(textFramePreview(document, object)).toBe("مرحبا بالعالم\nSecond line");
     expect(textFramePreview(document, { ...object, storyId: undefined })).toBe("");
   });

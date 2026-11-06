@@ -31,6 +31,7 @@ import { ObjectArt } from "./ObjectArt";
 export interface PageChrome {
   bleed: boolean;
   margins: boolean;
+  grid: boolean;
   columns: boolean;
   baseline: boolean;
   guides: boolean;
@@ -39,6 +40,7 @@ export interface PageChrome {
 export const DEFAULT_CHROME: PageChrome = {
   bleed: true,
   margins: true,
+  grid: false,
   columns: false,
   baseline: false,
   guides: true,
@@ -138,7 +140,7 @@ function LayerChrome({ page, document, chrome }: {
         })()
       ) : null}
 
-      {/* Paper edge (trim) and cut line (bleed edge), the serious publishing combina. */}
+      {/* Paper edge (trim) always, and the cut line around the bleed on demand. */}
       <rect
         x={trim.x}
         y={trim.y}
@@ -149,16 +151,19 @@ function LayerChrome({ page, document, chrome }: {
         strokeWidth={HAIRLINE}
         vectorEffect="non-scaling-stroke"
       />
-      <rect
-        x={bleed.x}
-        y={bleed.y}
-        width={bleed.width}
-        height={bleed.height}
-        fill="none"
-        stroke="color-mix(in oklab, var(--ink) 30%, transparent)"
-        strokeWidth={HAIRLINE}
-        vectorEffect="non-scaling-stroke"
-      />
+      {chrome.bleed ? (
+        <rect
+          x={bleed.x}
+          y={bleed.y}
+          width={bleed.width}
+          height={bleed.height}
+          fill="none"
+          stroke="color-mix(in oklab, var(--ink) 30%, transparent)"
+          strokeWidth={HAIRLINE}
+          strokeDasharray="6 4"
+          vectorEffect="non-scaling-stroke"
+        />
+      ) : null}
 
       {chrome.guides ? <GuideRuler page={page} document={document} /> : null}
     </g>
@@ -341,6 +346,11 @@ function SelectionBox({
   // Handles stay ~7px on the glass: size shrinks as the view zooms in.
   const size = Math.max(4, 7 / Math.max(0.05, scale));
   const half = size / 2;
+  const grip = rotatePoint(
+    { x: frame.x + frame.width / 2, y: frame.y - 16 / Math.max(0.05, scale) },
+    center,
+    rotation,
+  );
   return (
     <g>
       <rect
@@ -392,21 +402,14 @@ function SelectionBox({
           })}
           <circle
             data-handle="rotate"
-            cx={rotatePoint(
-              { x: frame.x + frame.width / 2, y: frame.y - 16 / Math.max(0.05, scale) },
-              center,
-              rotation,
-            ).x}
-            cy={rotatePoint(
-              { x: frame.x + frame.width / 2, y: frame.y - 16 / Math.max(0.05, scale) },
-              center,
-              rotation,
-            ).y}
+            cx={grip.x}
+            cy={grip.y}
             r={half}
             fill="#ffffff"
             stroke={stroke}
+            strokeWidth={HAIRLINE}
+            vectorEffect="non-scaling-stroke"
             style={{ cursor: "grab", pointerEvents: "auto" }}
-            transform={undefined}
           />
         </g>
       ) : null}

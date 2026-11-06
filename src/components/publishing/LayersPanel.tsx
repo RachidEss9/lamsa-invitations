@@ -16,14 +16,12 @@ import { memo } from "react";
 
 import type { PublicationPage } from "@/lib/publishing/model";
 import { objectTitle, objectKindLabel } from "@/lib/publishing/render";
-import { drawOrderOnPage } from "@/lib/publishing/operations";
 import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -275,20 +273,11 @@ const RowStepper = memo(function RowStepper({
   );
 });
 
-/** A compact read-only strip used when a page has no layers at all. */
+/** A compact note used when a page has no layers at all. */
 export function LayersEmptyNote() {
   return (
     <div className="px-3 py-4 text-[0.72rem] text-[var(--ink-soft)]">
       This page has no layers yet.
     </div>
   );
-}
-
-export function DrawOrderBadge({
-  page,
-}: {
-  page: PublicationPage;
-}) {
-  const order = drawOrderOnPage(page);
-  return <span>{order.length}</span>;
 }

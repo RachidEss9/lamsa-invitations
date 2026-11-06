@@ -45,7 +45,7 @@ export const PageThumb = memo(function PageThumb({
           {page.objects
             .filter((object) => !object.hidden)
             .map((object) => (
-              <ObjectArt key={object.id} object={object} document={document} lowFidelity />
+              <ObjectArt key={object.id} object={object} document={document} />
             ))}
         </g>
       )}

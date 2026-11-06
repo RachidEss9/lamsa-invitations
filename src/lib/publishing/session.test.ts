@@ -4,8 +4,8 @@ import {
   createParagraph,
   createShape,
   createStory,
-  type PublicationDocument,
 } from "./factory";
+import type { PublicationDocument } from "./model";
 import {
   activeLayerId,
   activePage,
@@ -217,8 +217,9 @@ describe("layers", () => {
     session = setActiveLayer(session, contentLayerId(document));
     expect(activeLayerId(session)).toBe(contentLayerId(document));
     session = addLayerToPage(session, page.id, "Overprint");
-    expect(activePage(session)!.layers.at(-1)!.name).toBe("Overprint");
-    expect(activeLayerId(session)).toBe(activePage(session)!.layers.at(-1)!.id);
+    const layersAfterAdd = activePage(session)!.layers;
+    expect(layersAfterAdd[layersAfterAdd.length - 1]!.name).toBe("Overprint");
+    expect(activeLayerId(session)).toBe(layersAfterAdd[layersAfterAdd.length - 1]!.id);
   });
 
   it("restacks objects within their layer", () => {

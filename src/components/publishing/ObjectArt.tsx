@@ -32,12 +32,10 @@ export type AssetResolver = (assetId: string | undefined) => ResolvedAsset | und
 interface ObjectArtProps {
   document: PublicationDocument;
   object: PublicationObject;
-  /** Draw the editable shell only (thumbnails skip asset fetches). */
-  lowFidelity?: boolean;
   resolveAsset?: AssetResolver;
 }
 
-export function ObjectArt({ document, object, lowFidelity, resolveAsset }: ObjectArtProps) {
+export function ObjectArt({ document, object, resolveAsset }: ObjectArtProps) {
   const width = Math.max(0, object.frame.width);
   const height = Math.max(0, object.frame.height);
   if (width <= 0 && height <= 0) return null;
@@ -53,7 +51,7 @@ export function ObjectArt({ document, object, lowFidelity, resolveAsset }: Objec
       case "text-frame":
         return <TextContent document={document} object={object} />;
       case "image-frame":
-        return <ImageContent object={object} lowFidelity={lowFidelity} resolveAsset={resolveAsset} />;
+        return <ImageContent object={object} resolveAsset={resolveAsset} />;
       case "shape":
         return <ShapeContent object={object} />;
       case "line":
@@ -206,11 +204,9 @@ function insetCss(inset: { top: number; right: number; bottom: number; left: num
 
 function ImageContent({
   object,
-  lowFidelity,
   resolveAsset,
 }: {
   object: ImageFrameObject;
-  lowFidelity?: boolean;
   resolveAsset?: AssetResolver;
 }) {
   const asset = resolveAsset?.(object.assetId);

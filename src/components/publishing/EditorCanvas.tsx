@@ -10,13 +10,17 @@ import type {
 import type { SpreadGeometry } from "@/lib/publishing/spreads";
 import { frameCenter } from "@/lib/publishing/object-transform";
 import {
+  frameRotatePoint,
+  handlePoint,
   hitTestPage,
   objectsInRect,
+  RESIZE_HANDLES,
   resizeFrameByHandle,
   rotationForPointer,
   snapMove,
   type ResizeHandle,
 } from "@/lib/publishing/canvas";
+import { rotatePoint } from "@/lib/publishing/object-transform";
 import { trimBox } from "@/lib/publishing/geometry";
 import {
   pageAtStagePoint,
@@ -121,11 +125,17 @@ export function EditorCanvas({
     Record<string, PublicationObject["frame"]>
   >({});
   const previewFramesRef = useRef(previewFrames);
-  previewFramesRef.current = previewFrames;
-
-  // Gesture handlers must read current props, not the ones from first render.
+  // Gesture handlers must read current props, not the ones from first render;
+  // the refs are synchronised after commit, before any pointer can arrive.
   const live = useRef({ document, selection, zoom, editable, spaceHeld });
-  live.current = { document, selection, zoom, editable, spaceHeld };
+
+  useEffect(() => {
+    previewFramesRef.current = previewFrames;
+  }, [previewFrames]);
+
+  useEffect(() => {
+    live.current = { document, selection, zoom, editable, spaceHeld };
+  }, [document, selection, zoom, editable, spaceHeld]);
 
   const layout = useMemo(() => stageLayout(geometry, zoom), [geometry, zoom]);
 
@@ -180,7 +190,8 @@ export function EditorCanvas({
     });
   }, [geometry.bleed.height, geometry.bleed.width, onZoom]);
 
-  // Re-centre when the spread changes; plain zoom keeps the eye anchored.
+  // Re-centre when the *spread* changes. Zoom deliberately does not re-centre:
+  // zooming is anchored to the pointer or the viewport, never to the stage.
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -188,12 +199,20 @@ export function EditorCanvas({
       left: Math.max(0, (layout.width + FIT_PADDING * 2 - scroller.clientWidth) / 2),
       top: Math.max(0, (layout.height + FIT_PADDING * 2 - scroller.clientHeight) / 2),
     });
-  }, [layout.width, layout.height]);
+  }, [geometry.spreadId, geometry.bleed.width, geometry.bleed.height]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The toolbar's "fit" arrives as an imperative edge.
   useEffect(() => {
     if (fitSignal > 0) fitToView();
   }, [fitSignal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // First paint fits the spread; later page switches keep the designer's zoom.
+  const didInitialFit = useRef(false);
+  useEffect(() => {
+    if (didInitialFit.current) return;
+    didInitialFit.current = true;
+    fitToView();
+  }, [fitToView]);
 
   /* ------------------------------------------------------------- utilities */
 
@@ -236,6 +255,39 @@ export function EditorCanvas({
     return applyPreviewFrames(page, frames) as PublicationPage;
   };
 
+  /** The resize/rotate grip within reach of the pointer, in screen pixels. */
+  function handleAtPointer(
+    page: PublicationPage,
+    pointer: Point,
+    stagePoint: Point,
+  ): HandleId | null {
+    const ids = live.current.selection;
+    if (ids.length !== 1) return null;
+    const object = page.objects.find((entry) => entry.id === ids[0]);
+    if (!object || object.locked) return null;
+    const tolerance = 8;
+    const frame = object.frame;
+    const centre = frameCenter(frame);
+    const grips: Array<{ handle: HandleId; point: Point }> = [
+      ...RESIZE_HANDLES.map((handle) => ({
+        handle: handle as HandleId,
+        point: rotatePoint(handlePoint(frame, handle), centre, frame.rotation),
+      })),
+      {
+        handle: "rotate",
+        point: frameRotatePoint(frame, 16 / live.current.zoom),
+      },
+    ];
+    for (const grip of grips) {
+      const stageGrip = pagePointToStage(layout, page.id, grip.point);
+      if (!stageGrip) continue;
+      if (Math.hypot(stageGrip.x - stagePoint.x, stageGrip.y - stagePoint.y) <= tolerance) {
+        return grip.handle;
+      }
+    }
+    return null;
+  }
+
   const clearGesture = () => {
     dragRef.current = null;
     setMarquee(null);
@@ -261,13 +313,13 @@ export function EditorCanvas({
     axis: "x" | "y",
     position: number,
   ): { x1: number; y1: number; x2: number; y2: number } | null {
-    const page = live.current.document.pages.find((entry) => entry.id === pageId);
+    const page = document.pages.find((entry) => entry.id === pageId);
     if (!page) return null;
     const trim = trimBox(page.spec);
     const a =
       axis === "x"
-        ? pagePointToStage(layout, pageId, { x: position, y: trimBox(page.spec).y })
-        : pagePointToStage(layout, pageId, { x: trimBox(page.spec).x, y: position });
+        ? pagePointToStage(layout, pageId, { x: position, y: trim.y })
+        : pagePointToStage(layout, pageId, { x: trim.x, y: position });
     const b =
       axis === "x"
         ? pagePointToStage(layout, pageId, {
@@ -284,23 +336,26 @@ export function EditorCanvas({
 
   /*------------------------------------------------------------------ wheel */
 
-  const onWheel = useCallback(
-    (event: React.WheelEvent<HTMLDivElement>) => {
+  // A native, non-passive listener: React's synthetic wheel handler is passive
+  // at the root, so preventDefault there would not stop the browser zoom.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const handler = (event: WheelEvent) => {
       if (!(event.ctrlKey || event.metaKey)) return; // everything else scrolls
       event.preventDefault();
-      const scroller = scrollerRef.current;
-      if (!scroller) return;
       const rect = scroller.getBoundingClientRect();
       // "pan" here is the stage's offset inside the scroll container —
       // padding minus scroll — exactly the shape `zoomAtPoint` expects.
       const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      const current = live.current.zoom;
       const next = zoomAtPoint(
         {
-          zoom: live.current.zoom,
+          zoom: current,
           panX: FIT_PADDING - scroller.scrollLeft,
           panY: FIT_PADDING - scroller.scrollTop,
         },
-        live.current.zoom * Math.pow(1.0018, event.deltaY),
+        current * Math.pow(1.0018, event.deltaY),
         anchor,
       );
       onZoom(Math.round(next.zoom * 1000) / 1000);
@@ -308,9 +363,10 @@ export function EditorCanvas({
         left: Math.max(0, FIT_PADDING - next.panX),
         top: Math.max(0, FIT_PADDING - next.panY),
       });
-    },
-    [onZoom],
-  );
+    };
+    scroller.addEventListener("wheel", handler, { passive: false });
+    return () => scroller.removeEventListener("wheel", handler);
+  }, [onZoom]);
 
   /*-------------------------------------------------------------- gestures */
 
@@ -356,13 +412,16 @@ export function EditorCanvas({
       if (!page || !pointer) return;
 
       const originStage = stagePointFromClient(event.clientX, event.clientY);
+      // Handles sit in an SVG owned by the page, but the scroller captures the
+      // pointer, so the grip is found geometrically instead of by DOM hit.
+      const activeHandle = handle ?? handleAtPointer(page, pointer, originStage);
 
-      if (handle && selection.length > 0) {
+      if (activeHandle && selection.length > 0) {
         const subject = selection[0]!;
         const subjectObject = page.objects.find((object) => object.id === subject);
         if (subjectObject) {
           dragRef.current = {
-            kind: handle === "rotate" ? "rotate" : "resize",
+            kind: activeHandle === "rotate" ? "rotate" : "resize",
             pageId,
             originPage: pointer,
             originStage,
@@ -370,7 +429,7 @@ export function EditorCanvas({
             ids: [subject],
             baseFrames: { [subject]: subjectObject.frame },
             baseSelection: selection,
-            resizeHandle: handle,
+            resizeHandle: activeHandle,
             moved: false,
           };
           scroller.setPointerCapture(event.pointerId);
@@ -599,7 +658,6 @@ export function EditorCanvas({
         "relative flex-1 overflow-auto scroll-slim bg-[var(--paper-deep)]",
         spaceHeld && "cursor-grab",
       )}
-      onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
