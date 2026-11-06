@@ -323,7 +323,7 @@ describe("saving", () => {
 
   it("an undo keeps the newest server document as the base", () => {
     const document = editorDocument();
-    let session = createEditorSession(document);
+    const session = createEditorSession(document);
     const page = activePage(session)!;
     const edited = editPage(session, page.id, (current) => ({ ...current, name: "Edited" }));
     const refreshed = { ...document, title: "New title" };
@@ -350,6 +350,39 @@ describe("history", () => {
     expect(activePage(session)!.name).toBe("Two");
     // Nothing left to redo.
     expect(redo(session)).toBe(session);
+  });
+});
+
+describe("typing history", () => {
+  it("groups continuous typing into one undo transaction", () => {
+    const document = editorDocument();
+    const story = createStory("Body", {
+      id: "story_typing",
+      paragraphs: [createParagraph("a", { id: "p1" })],
+    });
+    let session = createEditorSession({ ...document, stories: [story] });
+    const type = (text: string, now: number) =>
+      editStory(
+        session,
+        story.id,
+        (current) => ({
+          ...current,
+          paragraphs: [{ ...current.paragraphs[0]!, runs: [{ text }] }],
+        }),
+        { coalesceKey: `story:${story.id}`, now },
+      );
+
+    session = type("ab", 1000);
+    session = type("abc", 1100);
+    expect(session.undoStack).toHaveLength(1);
+    session = undo(session);
+    expect(sessionDocument(session).stories[0]!.paragraphs[0]!.runs[0]!.text).toBe("a");
+
+    session = redo(session);
+    session = type("abcd", 3000);
+    expect(session.undoStack).toHaveLength(2);
+    session = undo(session);
+    expect(sessionDocument(session).stories[0]!.paragraphs[0]!.runs[0]!.text).toBe("abc");
   });
 });
 

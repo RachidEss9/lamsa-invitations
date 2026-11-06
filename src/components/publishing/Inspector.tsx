@@ -11,14 +11,9 @@ import {
   toPoints,
   type LengthUnit,
 } from "@/lib/publishing/units";
-import {
-  storyForFrame,
-  storyText,
-  objectKindLabel,
-} from "@/lib/publishing/render";
+import { storyForFrame, objectKindLabel } from "@/lib/publishing/render";
 import type { StudioAsset } from "./AssetsPanel";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -31,6 +26,11 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import {
+  TypographyPanel,
+  type TextSelection,
+  type TypographyEditor,
+} from "./TypographyPanel";
 
 /**
  * The inspector. Selection first, then page.
@@ -48,6 +48,8 @@ export interface InspectorProps {
   selection: readonly string[];
   assets: readonly StudioAsset[];
   displayUnit: LengthUnit;
+  typography: TypographyEditor;
+  textSelection: TextSelection | null;
   onPatchPage: (patch: Partial<PublicationPage>) => void;
   onPatchObject: (
     objectId: string,
@@ -57,7 +59,6 @@ export interface InspectorProps {
     objectId: string,
     frame: Partial<{ x: number; y: number; width: number; height: number; rotation: number }>,
   ) => void;
-  onPatchStoryText: (storyId: string, text: string) => void;
   onDeleteSelected: () => void;
   onRestack: (objectId: string, direction: 1 | -1) => void;
   onOpenAssetsPanel: () => void;
@@ -165,10 +166,11 @@ export function Inspector(props: InspectorProps) {
     selection,
     assets,
     displayUnit,
+    typography,
+    textSelection,
     onPatchPage,
     onPatchObject,
     onSetFrame,
-    onPatchStoryText,
     onDeleteSelected,
     onRestack,
     onOpenAssetsPanel,
@@ -180,13 +182,6 @@ export function Inspector(props: InspectorProps) {
   }, [page, selection]);
   const single = selected.length === 1 ? selected[0]! : null;
   const story = single ? storyForFrame(document, single) : undefined;
-  const textValue = story ? storyText(story) : "";
-  const [storyDraft, setStoryDraft] = useState(textValue);
-  const [storySynced, setStorySynced] = useState({ id: single?.id, text: textValue });
-  if (storySynced.id !== single?.id || storySynced.text !== textValue) {
-    setStorySynced({ id: single?.id, text: textValue });
-    setStoryDraft(textValue);
-  }
 
   const unitLabel = displayUnit;
   const display = (points: number) => roundTo(fromPoints(points, displayUnit), 2);
@@ -422,35 +417,22 @@ export function Inspector(props: InspectorProps) {
               </FieldRow>
             </Section>
 
-            {single.kind === "text-frame" ? (
+            {single.kind === "text-frame" && story ? (
+              <TypographyPanel
+                document={document}
+                frame={single}
+                story={story}
+                editor={typography}
+                selection={textSelection}
+              />
+            ) : null}
+
+            {single.kind === "text-frame" && !story ? (
               <Section title="Text">
-                {story ? (
-                  <>
-                    <FieldRow label="Story">
-                      <span className="truncate text-[0.7rem] text-[var(--ink)]">{story.name}</span>
-                    </FieldRow>
-                    <Textarea
-                      value={storyDraft}
-                      onChange={(event) => setStoryDraft(event.target.value)}
-                      onBlur={() => {
-                        if (storyDraft !== textValue) onPatchStoryText(story.id, storyDraft);
-                      }}
-                      rows={7}
-                      dir="auto"
-                      className="min-h-[130px] rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.76rem] leading-5 shadow-none"
-                      aria-label="Story text"
-                    />
-                    <p className="font-meta text-[0.55rem] uppercase tracking-[0.08em] text-[color-mix(in_oklab,var(--ink-soft)_80%,transparent)]">
-                      {textValue.split("\n").length} paragraph
-                      {textValue.split("\n").length === 1 ? "" : "s"} · saved with the story
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-[0.7rem] leading-5 text-[var(--ink-soft)]">
-                    This frame has no story. Text frames created here carry one; a frame that
-                    arrived without a story cannot be typed into yet.
-                  </p>
-                )}
+                <p className="text-[0.7rem] leading-5 text-[var(--ink-soft)]">
+                  This frame has no story. Text frames created here carry one; a frame that
+                  arrived without a story cannot be typed into yet.
+                </p>
               </Section>
             ) : null}
 

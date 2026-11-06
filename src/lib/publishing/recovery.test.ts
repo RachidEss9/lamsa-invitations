@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDocument, createPage, createShape, createStory } from "./factory";
+import { createDocument, createShape, createStory } from "./factory";
 import {
   RECOVERY_PREFIX,
   clearRecoveryDraft,
@@ -56,7 +56,7 @@ function draftFixtures() {
       { id: "para_1", runs: [{ text: "Recovering…" }] },
     ],
   });
-  return { document, editedPage, story };
+  return { editedPage, story };
 }
 
 describe("recovery drafts", () => {
@@ -65,7 +65,7 @@ describe("recovery drafts", () => {
   });
 
   it("round-trips dirty pages and stories", () => {
-    const { document, editedPage, story } = draftFixtures();
+    const { editedPage, story } = draftFixtures();
     const store = fakeStorage();
     expect(
       saveRecoveryDraft(PUBLICATION_ID, { pages: [editedPage], stories: [story] }, store),
@@ -82,7 +82,7 @@ describe("recovery drafts", () => {
   });
 
   it("clears, replacing a draft with nothing", () => {
-    const { document, editedPage } = draftFixtures();
+    const { editedPage } = draftFixtures();
     const store = fakeStorage();
     saveRecoveryDraft(PUBLICATION_ID, { pages: [editedPage], stories: [] }, store);
     expect(hasRecoveryDraft(PUBLICATION_ID, store)).toBe(true);
@@ -132,7 +132,7 @@ describe("recovery drafts", () => {
   });
 
   it("works without storage at all", () => {
-    const { document, editedPage, story } = draftFixtures();
+    const { editedPage, story } = draftFixtures();
     expect(saveRecoveryDraft(PUBLICATION_ID, { pages: [editedPage], stories: [story] }, null)).toBe(false);
     expect(readRecoveryDraft(PUBLICATION_ID, null)).toBeNull();
     expect(hasRecoveryDraft(PUBLICATION_ID, null)).toBe(false);

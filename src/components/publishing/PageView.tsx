@@ -18,6 +18,7 @@ import {
 } from "@/lib/publishing/canvas";
 import type { AssetResolver } from "./ObjectArt";
 import { ObjectArt } from "./ObjectArt";
+import { estimateOverflow, resolveThread } from "@/lib/publishing/typography";
 
 /**
  * One page of the active spread, authored in page points.
@@ -75,6 +76,11 @@ interface PageViewProps {
   resolveAsset?: AssetResolver;
   /** Editing surface: false in preview mode, so overlays never show handles. */
   editable: boolean;
+  /** The frame with an open native text editor, if any. */
+  editingObjectId?: string;
+  onTextDraft?: (objectId: string, text: string) => void;
+  onTextEnd?: () => void;
+  onTextSelection?: (objectId: string, start: number, end: number) => void;
 }
 
 const HANDLE_CURSOR: Record<ResizeHandle, string> = {
@@ -244,11 +250,19 @@ const PageSurface = memo(function PageSurface({
   document,
   chrome,
   resolveAsset,
+  editingObjectId,
+  onTextDraft,
+  onTextEnd,
+  onTextSelection,
 }: {
   page: PublicationPage;
   document: PublicationDocument;
   chrome: PageChrome;
   resolveAsset?: AssetResolver;
+  editingObjectId?: string;
+  onTextDraft?: (objectId: string, text: string) => void;
+  onTextEnd?: () => void;
+  onTextSelection?: (objectId: string, start: number, end: number) => void;
 }) {
   const bleed = bleedBox(page.spec);
   return (
@@ -284,9 +298,76 @@ const PageSurface = memo(function PageSurface({
             object={object}
             document={document}
             resolveAsset={resolveAsset}
+            editing={editingObjectId === object.id}
+            onTextDraft={
+              onTextDraft
+                ? (text) => onTextDraft(object.id, text)
+                : undefined
+            }
+            onTextEnd={onTextEnd}
+            onTextSelection={
+              onTextSelection
+                ? (start, end) => onTextSelection(object.id, start, end)
+                : undefined
+            }
           />
         ))}
+      <TextOverflowMarkers page={page} document={document} />
       <LayerChrome page={page} document={document} chrome={chrome} />
+    </g>
+  );
+});
+
+/**
+ * Overflow is marked on the frame that runs out of room, not on every frame
+ * in the thread. The inspector reports the exact estimate; this badge keeps
+ * the problem visible at any zoom without covering the text.
+ */
+const TextOverflowMarkers = memo(function TextOverflowMarkers({
+  page,
+  document,
+}: {
+  page: PublicationPage;
+  document: PublicationDocument;
+}) {
+  const markers = page.objects.flatMap((object) => {
+    if (object.kind !== "text-frame" || !object.storyId) return [];
+    const story = document.stories.find((entry) => entry.id === object.storyId);
+    if (!story) return [];
+    const thread = resolveThread(document, story);
+    const estimate = estimateOverflow(
+      document,
+      story,
+      thread.map((entry) => entry.frame),
+    );
+    if (!estimate.overflowing || estimate.hiddenCharacters <= 0) return [];
+    if (estimate.overflowFrame === null) return [];
+    if (thread[estimate.overflowFrame]?.objectId !== object.id) return [];
+    return [{ object, estimate }];
+  });
+  return (
+    <g pointerEvents="none">
+      {markers.map(({ object, estimate }) => {
+        const x = object.frame.x + object.frame.width - 2;
+        const y = object.frame.y + 2;
+        return (
+          <g
+            key={`overflow-${object.id}`}
+            data-overflow-frame={object.id}
+            transform={`rotate(${object.frame.rotation} ${object.frame.x + object.frame.width / 2} ${object.frame.y + object.frame.height / 2})`}
+          >
+            <title>
+              {`${estimate.hiddenCharacters} characters do not fit in this thread`}
+            </title>
+            <path
+              d={`M ${x} ${y} h -10 l 10 10 z`}
+              fill="var(--red, #710014)"
+              stroke="#ffffff"
+              strokeWidth={1.5}
+            />
+          </g>
+        );
+      })}
     </g>
   );
 });
@@ -430,6 +511,10 @@ export const PageView = memo(function PageView({
   activeHandleSubject,
   resolveAsset,
   editable,
+  editingObjectId,
+  onTextDraft,
+  onTextEnd,
+  onTextSelection,
 }: PageViewProps) {
   const bleed = bleedBox(page.spec);
   return (
@@ -454,6 +539,10 @@ export const PageView = memo(function PageView({
           document={document}
           chrome={chrome}
           resolveAsset={resolveAsset}
+          editingObjectId={editingObjectId}
+          onTextDraft={onTextDraft}
+          onTextEnd={onTextEnd}
+          onTextSelection={onTextSelection}
         />
       ) : null}
       {selectedIds.length > 0 ? (

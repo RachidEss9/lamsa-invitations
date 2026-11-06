@@ -401,6 +401,118 @@ describe("stories", () => {
   });
 });
 
+describe("typography persistence", () => {
+  it("saves publication-level styles behind their own version guard", async () => {
+    const t = setup();
+    const { owner, stranger } = await seedUsers(t);
+    const { publicationId } = await createPublication(t, owner, 1);
+    const asOwner = t.withIdentity({ subject: owner });
+    let result = await asOwner.query(api.publishing.publications.getMine, {
+      publicationId,
+    });
+    const styles = {
+      ...result.document.styles,
+      paragraph: [
+        {
+          ...result.document.styles.paragraph[0]!,
+          name: "Arabic body",
+          fontId: "arabic",
+          size: 14,
+          leading: 22,
+          direction: "rtl" as const,
+          alignment: "justify" as const,
+          leftIndent: 8,
+          rightIndent: 8,
+        },
+      ],
+      character: [
+        {
+          id: "style_emphasis",
+          name: "Emphasis",
+          fontWeight: 700,
+          color: "#8a1020",
+        },
+      ],
+    };
+    const saved = await asOwner.mutation(api.publishing.publications.saveStyles, {
+      publicationId,
+      styles,
+      expectedStylesVersion: 1,
+    });
+    expect(saved.stylesVersion).toBe(2);
+    result = await asOwner.query(api.publishing.publications.getMine, { publicationId });
+    expect(result.document.styles.paragraph[0]!.fontId).toBe("arabic");
+    expect(result.document.styles.paragraph[0]!.direction).toBe("rtl");
+    expect(result.document.styles.character[0]!.fontWeight).toBe(700);
+
+    await expect(
+      asOwner.mutation(api.publishing.publications.saveStyles, {
+        publicationId,
+        styles,
+        expectedStylesVersion: 1,
+      }),
+    ).rejects.toThrow(/changed elsewhere/i);
+    await expect(
+      t.withIdentity({ subject: stranger }).mutation(
+        api.publishing.publications.saveStyles,
+        { publicationId, styles },
+      ),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it("keeps run formats and paragraph direction through a story save", async () => {
+    const t = setup();
+    const { owner } = await seedUsers(t);
+    const { publicationId } = await createPublication(t, owner, 1);
+    const asOwner = t.withIdentity({ subject: owner });
+    let result = await asOwner.query(api.publishing.publications.getMine, {
+      publicationId,
+    });
+    const page = result.document.pages[0]!;
+    const frame = textFrame(page.layers[1]!.id);
+    await asOwner.mutation(api.publishing.pages.savePage, {
+      publicationId,
+      pageId: page.id,
+      page: asPage({ ...page, objects: [frame] }),
+    });
+    const story: Story = {
+      version: 1,
+      id: "story_arabic",
+      name: "Arabic body",
+      paragraphs: [
+        {
+          id: "p1",
+          format: { alignment: "right", direction: "rtl" },
+          runs: [
+            {
+              text: "مرحبا بالعالم ١٢٣",
+              format: { fontWeight: 700, underline: true },
+            },
+          ],
+        },
+      ],
+      frames: [{ pageId: page.id, objectId: frame.id }],
+      overflow: "thread",
+    };
+    await asOwner.mutation(api.publishing.stories.createStory, {
+      publicationId,
+      story: asStory(story),
+    });
+    result = await asOwner.query(api.publishing.publications.getMine, { publicationId });
+    expect(result.document.stories[0]!.paragraphs[0]!.format).toMatchObject({
+      alignment: "right",
+      direction: "rtl",
+    });
+    expect(result.document.stories[0]!.paragraphs[0]!.runs[0]!.text).toBe(
+      "مرحبا بالعالم ١٢٣",
+    );
+    expect(result.document.stories[0]!.paragraphs[0]!.runs[0]!.format).toMatchObject({
+      fontWeight: 700,
+      underline: true,
+    });
+  });
+});
+
 describe("versions", () => {
   it("creates a named version and restores it consistently", async () => {
     const t = setup();

@@ -1,5 +1,5 @@
 /**
- * The four workspaces the platform is built around.
+ * The workspaces the platform is built around.
  *
  * Navigation renders this list, so a workspace appears in the interface from
  * the moment it is described here. `phase` records the roadmap phase that

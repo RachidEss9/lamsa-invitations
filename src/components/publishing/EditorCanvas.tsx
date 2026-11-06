@@ -95,8 +95,14 @@ export interface EditorCanvasProps {
   onZoom: (zoom: number) => void;
   /** Bumping this value makes the canvas re-fit the spread. */
   fitSignal: number;
-  /** Double-clicking an object (e.g. opening a story in the inspector). */
+  /** Double-clicking a non-text object (opens it in the inspector). */
   onActivateObject?: (objectId: string) => void;
+  /** Double-clicking a text frame enters direct text editing. */
+  editingObjectId?: string;
+  onEditText?: (objectId: string) => void;
+  onTextDraft?: (objectId: string, text: string) => void;
+  onTextEnd?: () => void;
+  onTextSelection?: (objectId: string, start: number, end: number) => void;
 }
 
 export function EditorCanvas({
@@ -113,6 +119,11 @@ export function EditorCanvas({
   onZoom,
   fitSignal,
   onActivateObject,
+  editingObjectId,
+  onEditText,
+  onTextDraft,
+  onTextEnd,
+  onTextSelection,
 }: EditorCanvasProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -643,10 +654,15 @@ export function EditorCanvas({
       const pointer = pagePointFromClient(event.clientX, event.clientY, pageId);
       if (!page || !pointer) return;
       const hit = hitTestPage(page, pointer);
-      if (hit && isInteractive(hit, page)) onActivateObject(hit.id);
+      if (!hit || !isInteractive(hit, page)) return;
+      if (hit.kind === "text-frame" && onEditText) {
+        onEditText(hit.id);
+        return;
+      }
+      onActivateObject?.(hit.id);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editable, onActivateObject],
+    [editable, onActivateObject, onEditText],
   );
 
   const cursor: string = spaceHeld || !editable ? "grab" : "default";
@@ -700,6 +716,10 @@ export function EditorCanvas({
               activeHandleSubject={selection.length === 1 ? selection[0] : undefined}
               resolveAsset={assetResolver}
               editable={editable}
+              editingObjectId={editingObjectId}
+              onTextDraft={onTextDraft}
+              onTextEnd={onTextEnd}
+              onTextSelection={onTextSelection}
             />
           ))}
 

@@ -93,9 +93,34 @@ function EditorWorkspace({
   const [chromeBeforePreview, setChromeBeforePreview] = useState<PageChrome>(DEFAULT_CHROME);
   const [panel, setPanel] = useState<"pages" | "layers" | "assets">("pages");
   const [fitSignal, setFitSignal] = useState(0);
+  const [editing, setEditing] = useState<{
+    pageId: string;
+    objectId: string;
+  } | null>(null);
+  const [textSelectionState, setTextSelectionState] = useState<{
+    pageId: string;
+    storyId: string;
+    start: number;
+    end: number;
+  } | null>(null);
 
   const document = editor.document;
   const page = editor.page;
+
+  // Editing is scoped to the page and the current selection. No effect is
+  // needed: leaving the page or selecting elsewhere simply makes it inactive,
+  // while the text stays in the session and autosaves.
+  const editingObjectId =
+    editing &&
+    page &&
+    editing.pageId === page.id &&
+    editor.selection.includes(editing.objectId)
+      ? editing.objectId
+      : null;
+  const textSelection =
+    textSelectionState && page && textSelectionState.pageId === page.id
+      ? textSelectionState
+      : null;
 
   const geometry = useMemo(() => {
     if (!document || !page) return null;
@@ -270,6 +295,38 @@ function EditorWorkspace({
             onEditPage={editor.editPageObjects}
             onZoom={editor.setZoom}
             fitSignal={fitSignal}
+            editingObjectId={editingObjectId ?? undefined}
+            onEditText={(objectId) => {
+              const frame = page.objects.find((object) => object.id === objectId);
+              if (frame?.kind !== "text-frame" || !frame.storyId) return;
+              editor.setSelection([objectId]);
+              setEditing({ pageId: page.id, objectId });
+              setTextSelectionState({
+                pageId: page.id,
+                storyId: frame.storyId,
+                start: 0,
+                end: 0,
+              });
+            }}
+            onTextDraft={(objectId, text) => {
+              const frame = page.objects.find((object) => object.id === objectId);
+              if (frame?.kind !== "text-frame" || !frame.storyId) return;
+              editor.patchStoryText(frame.storyId, text, `story:${frame.storyId}`);
+            }}
+            onTextSelection={(objectId, start, end) => {
+              const frame = page.objects.find((object) => object.id === objectId);
+              if (frame?.kind !== "text-frame" || !frame.storyId) return;
+              setTextSelectionState({
+                pageId: page.id,
+                storyId: frame.storyId,
+                start,
+                end,
+              });
+            }}
+            onTextEnd={() => {
+              editor.endTextEdit();
+              setEditing(null);
+            }}
             onActivateObject={(objectId) => {
               editor.setSelection([objectId]);
               setPanel("layers");
@@ -281,6 +338,9 @@ function EditorWorkspace({
               {document.facingPages ? "facing pages" : "single pages"}
             </span>
             <span className="flex items-center gap-3">
+              {editingObjectId ? (
+                <span className="text-[var(--red)]">Editing text · Esc finishes</span>
+              ) : null}
               <span>{editor.selection.length} selected</span>
               <span>{page.objects.length} objects</span>
               <span>{page.layers.length} layers</span>
@@ -308,7 +368,8 @@ function EditorWorkspace({
             onPatchPage={editor.patchPage}
             onPatchObject={editor.patchObject}
             onSetFrame={editor.setFrame}
-            onPatchStoryText={editor.patchStoryText}
+            typography={editor}
+            textSelection={textSelection}
             onDeleteSelected={editor.deleteSelection}
             onRestack={editor.restack}
             onOpenAssetsPanel={() => setPanel("assets")}

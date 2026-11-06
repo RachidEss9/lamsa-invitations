@@ -41,6 +41,7 @@ interface ObjectArtProps {
   editing?: boolean;
   onTextDraft?: (text: string) => void;
   onTextEnd?: () => void;
+  onTextSelection?: (start: number, end: number) => void;
 }
 
 export function ObjectArt({
@@ -50,6 +51,7 @@ export function ObjectArt({
   editing,
   onTextDraft,
   onTextEnd,
+  onTextSelection,
 }: ObjectArtProps) {
   const width = Math.max(0, object.frame.width);
   const height = Math.max(0, object.frame.height);
@@ -71,6 +73,7 @@ export function ObjectArt({
             editing={editing}
             onTextDraft={onTextDraft}
             onTextEnd={onTextEnd}
+            onTextSelection={onTextSelection}
           />
         );
       case "image-frame":
@@ -108,12 +111,14 @@ function TextContent({
   editing,
   onTextDraft,
   onTextEnd,
+  onTextSelection,
 }: {
   document: PublicationDocument;
   object: TextFrameObject;
   editing?: boolean;
   onTextDraft?: (text: string) => void;
   onTextEnd?: () => void;
+  onTextSelection?: (start: number, end: number) => void;
 }) {
   const story = document.stories.find((entry) => entry.id === object.storyId);
   const text = story?.paragraphs ?? [];
@@ -171,7 +176,31 @@ function TextContent({
           defaultValue={text
             .map((paragraph) => paragraph.runs.map((run) => run.text).join(""))
             .join("\n")}
-          onInput={(event) => onTextDraft?.(event.currentTarget.value)}
+          onInput={(event) => {
+            onTextDraft?.(event.currentTarget.value);
+            onTextSelection?.(
+              event.currentTarget.selectionStart,
+              event.currentTarget.selectionEnd,
+            );
+          }}
+          onSelect={(event) =>
+            onTextSelection?.(
+              event.currentTarget.selectionStart,
+              event.currentTarget.selectionEnd,
+            )
+          }
+          onKeyUp={(event) =>
+            onTextSelection?.(
+              event.currentTarget.selectionStart,
+              event.currentTarget.selectionEnd,
+            )
+          }
+          onMouseUp={(event) =>
+            onTextSelection?.(
+              event.currentTarget.selectionStart,
+              event.currentTarget.selectionEnd,
+            )
+          }
           onPointerDown={(event) => event.stopPropagation()}
           onDoubleClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => {
@@ -183,12 +212,18 @@ function TextContent({
           onBlur={() => onTextEnd?.()}
           aria-label={`Edit text in ${object.name || "text frame"}`}
           style={{
+            pointerEvents: "auto",
+            // The canvas disables text selection for object gestures; the
+            // editing surface must explicitly re-enable it for the caret and
+            // native text selection (including Arabic).
+            userSelect: "text",
+            WebkitUserSelect: "text",
             boxSizing: "border-box",
             width: "100%",
             height: "100%",
             margin: 0,
             resize: "none",
-            overflow: "hidden",
+            overflow: "auto",
             border: "1px solid var(--red, #710014)",
             outline: "none",
             borderRadius: 1,
@@ -222,13 +257,19 @@ function TextContent({
         className="box-border h-full w-full overflow-hidden"
         style={{
           padding: insetCss(object.inset),
-          columns: Math.max(1, object.columns),
-          columnGap: object.gutter,
           display: "flex",
           flexDirection: "column",
           justifyContent: justify,
         }}
       >
+        <div
+          style={{
+            width: "100%",
+            columns: Math.max(1, object.columns),
+            columnGap: object.gutter,
+            columnFill: "auto",
+          }}
+        >
         {text.map((paragraph) => {
           const style = resolveParagraph(document, paragraph);
           const direction = resolvedDirection(document, paragraph);
@@ -270,6 +311,7 @@ function TextContent({
             </p>
           );
         })}
+        </div>
       </div>
     </foreignObject>
   );

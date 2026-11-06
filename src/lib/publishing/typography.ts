@@ -366,10 +366,14 @@ export interface StoryOffset {
   offset: number;
 }
 
+/** Offsets count the plain-text newline between paragraphs, like a textarea. */
 export function storyLength(story: Story): number {
-  return story.paragraphs.reduce(
-    (total, paragraph) => total + paragraph.runs.reduce((n, run) => n + run.text.length, 0),
-    0,
+  return (
+    story.paragraphs.reduce(
+      (total, paragraph) =>
+        total + paragraph.runs.reduce((n, run) => n + run.text.length, 0),
+      0,
+    ) + Math.max(0, story.paragraphs.length - 1)
   );
 }
 
@@ -378,7 +382,7 @@ export function offsetToParagraph(story: Story, offset: number): StoryOffset {
   for (let index = 0; index < story.paragraphs.length; index += 1) {
     const length = story.paragraphs[index]!.runs.reduce((n, run) => n + run.text.length, 0);
     if (remaining <= length) return { paragraphIndex: index, offset: remaining };
-    remaining -= length;
+    remaining -= length + 1;
   }
   const last = Math.max(0, story.paragraphs.length - 1);
   return {
@@ -407,11 +411,15 @@ export function applyFormatToRange(
     ...story,
     paragraphs: story.paragraphs.map((paragraph) => {
       const paragraphStart = cursor;
+      const length = paragraph.runs.reduce((n, run) => n + run.text.length, 0);
+      cursor += length + 1;
+      if (to <= paragraphStart || from >= paragraphStart + length) return paragraph;
       const runs: TextRun[] = [];
+      let runCursor = paragraphStart;
       for (const run of paragraph.runs) {
-        const runStart = cursor;
-        const runEnd = cursor + run.text.length;
-        cursor = runEnd;
+        const runStart = runCursor;
+        const runEnd = runCursor + run.text.length;
+        runCursor = runEnd;
         const localFrom = Math.max(from, runStart) - runStart;
         const localTo = Math.min(to, runEnd) - runStart;
         if (localTo <= localFrom) {
@@ -429,9 +437,7 @@ export function applyFormatToRange(
         });
         if (after) runs.push({ ...run, text: after });
       }
-      // Keep the paragraph reachable even if the range starts after its text.
-      if (runs.length === 0) runs.push({ text: "" });
-      return { ...paragraph, runs, ...(paragraphStart < 0 ? {} : {}) };
+      return { ...paragraph, runs };
     }),
   };
 }
@@ -531,14 +537,19 @@ export function removeParagraphStyle(
   const fallback = remaining[0]?.id;
   return {
     styles: remaining,
-    stories: stories.map((story) => ({
-      ...story,
-      paragraphs: story.paragraphs.map((paragraph) =>
-        paragraph.styleId === styleId
-          ? { ...paragraph, styleId: fallback }
-          : paragraph,
-      ),
-    })),
+    stories: stories.map((story) => {
+      if (!story.paragraphs.some((paragraph) => paragraph.styleId === styleId)) {
+        return story;
+      }
+      return {
+        ...story,
+        paragraphs: story.paragraphs.map((paragraph) =>
+          paragraph.styleId === styleId
+            ? { ...paragraph, styleId: fallback }
+            : paragraph,
+        ),
+      };
+    }),
   };
 }
 
@@ -550,13 +561,18 @@ export function removeCharacterStyle(
 ): { styles: CharacterStyle[]; stories: Story[] } {
   return {
     styles: styles.filter((style) => style.id !== styleId),
-    stories: stories.map((story) =>
-      forEachRun(story, (run) => {
+    stories: stories.map((story) => {
+      const uses = story.paragraphs.some((paragraph) =>
+        paragraph.runs.some((run) => run.styleId === styleId),
+      );
+      if (!uses) return story;
+      return forEachRun(story, (run) => {
         if (run.styleId !== styleId) return run;
-        const { styleId: _removed, ...rest } = run;
-        return rest;
-      }),
-    ),
+        const next = { ...run };
+        delete next.styleId;
+        return next;
+      });
+    }),
   };
 }
 
@@ -565,7 +581,13 @@ export function removeCharacterStyle(
 /* -------------------------------------------------------------------------- */
 
 export interface ThreadIssue {
-  kind: "missing-frame" | "missing-page" | "wrong-kind" | "duplicate" | "shared";
+  kind:
+    | "missing-frame"
+    | "missing-page"
+    | "wrong-kind"
+    | "duplicate"
+    | "shared"
+    | "circular";
   storyId: string;
   pageId?: string;
   objectId?: string;
@@ -660,6 +682,16 @@ export function threadIssues(document: PublicationDocument): ThreadIssue[] {
           message: "Only text frames can belong to a story.",
         });
         continue;
+      }
+      if (object.storyId && object.storyId !== story.id) {
+        issues.push({
+          kind: "circular",
+          storyId: story.id,
+          pageId: ref.pageId,
+          objectId: ref.objectId,
+          message:
+            "The frame points at a different story while this story claims it — a circular link.",
+        });
       }
       if (seen.has(object.id)) {
         issues.push({
@@ -783,6 +815,63 @@ export function reorderThread(
   const [entry] = frames.splice(index, 1);
   frames.splice(target, 0, entry!);
   return { ...story, frames };
+}
+
+/**
+ * Moves a threaded frame to another page without touching its story, text,
+ * geometry or order. The object keeps its id and layer when that layer exists
+ * on the destination page, otherwise it joins the destination content layer.
+ */
+export function moveThreadFrame(
+  document: PublicationDocument,
+  storyId: string,
+  objectId: string,
+  toPageId: string,
+): PublicationDocument {
+  const story = document.stories.find((entry) => entry.id === storyId);
+  if (!story) throw new Error("Story not found.");
+  const ref = story.frames.find((frame) => frame.objectId === objectId);
+  if (!ref) throw new Error("That frame is not in this story.");
+  if (ref.pageId === toPageId) return document;
+  const fromPage = document.pages.find((page) => page.id === ref.pageId);
+  const toPage = document.pages.find((page) => page.id === toPageId);
+  if (!fromPage || !toPage) throw new Error("Page not found.");
+  const object = fromPage.objects.find((entry) => entry.id === objectId);
+  if (!object || object.kind !== "text-frame") {
+    throw new Error("Only a text frame can be moved between pages.");
+  }
+  const fallbackLayer =
+    toPage.layers.find((layer) => layer.id === object.layerId) ??
+    toPage.layers.find((layer) => layer.name === "Content") ??
+    toPage.layers[toPage.layers.length - 1] ??
+    toPage.layers[0];
+  if (!fallbackLayer) throw new Error("The destination page has no layer.");
+  const moved = { ...object, layerId: fallbackLayer.id } as TextFrameObject;
+  return {
+    ...document,
+    stories: document.stories.map((entry) =>
+      entry.id === storyId
+        ? {
+            ...entry,
+            frames: entry.frames.map((frame) =>
+              frame.objectId === objectId ? { ...frame, pageId: toPageId } : frame,
+            ),
+          }
+        : entry,
+    ),
+    pages: document.pages.map((page) => {
+      if (page.id === fromPage.id) {
+        return {
+          ...page,
+          objects: page.objects.filter((entry) => entry.id !== objectId),
+        };
+      }
+      if (page.id === toPage.id) {
+        return { ...page, objects: [...page.objects, moved] };
+      }
+      return page;
+    }),
+  };
 }
 
 /* -------------------------------------------------------------------------- */

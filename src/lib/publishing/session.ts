@@ -57,6 +57,12 @@ export interface SessionState {
   selection: string[];
   /** The layer new objects are added to. */
   activeLayerId: string;
+  /**
+   * Continuous typing is one history transaction. The key names the edited
+   * story/paragraph; edits arriving inside the window replace the current
+   * history state instead of pushing another one.
+   */
+  editGroup?: { key: string; at: number };
 }
 
 export interface EditorSession {
@@ -239,7 +245,11 @@ export function setSelection(
   if (next.length === current.length && next.every((id, i) => id === current[i])) {
     return session;
   }
-  return withState(session, { ...session.state, selection: next }, false);
+  return withState(
+    session,
+    { ...session.state, selection: next, editGroup: undefined },
+    false,
+  );
 }
 
 export function toggleSelection(
@@ -290,16 +300,25 @@ export function editPage(
   );
 }
 
+const TYPING_GROUP_MS = 1200;
+
 export function editStory(
   session: EditorSession,
   storyId: string,
   updater: (story: Story) => Story,
+  options: { coalesceKey?: string; now?: number } = {},
 ): EditorSession {
   const document = sessionDocument(session);
   const story = document.stories.find((entry) => entry.id === storyId);
   if (!story) return session;
   const next = updater(story);
   if (next === story) return session;
+  const now = options.now ?? Date.now();
+  const currentGroup = session.state.editGroup;
+  const continuing =
+    options.coalesceKey !== undefined &&
+    currentGroup?.key === options.coalesceKey &&
+    now - currentGroup.at <= TYPING_GROUP_MS;
   return withState(
     session,
     {
@@ -308,7 +327,52 @@ export function editStory(
         ...session.state.stories,
         [storyId]: { story: next, dirty: true },
       },
+      editGroup:
+        options.coalesceKey === undefined
+          ? undefined
+          : { key: options.coalesceKey, at: now },
     },
+    !continuing,
+  );
+}
+
+/** Ends the current typing transaction, e.g. on blur or a page switch. */
+export function breakEditGroup(session: EditorSession): EditorSession {
+  if (!session.state.editGroup) return session;
+  return { ...session, state: { ...session.state, editGroup: undefined } };
+}
+
+/**
+ * Adopts every changed page/story from a derived document as one local edit.
+ * Threading and cross-page moves touch two records; this keeps them in one
+ * history entry and lets the autosave queue write both with their own guards.
+ */
+export function applyDocumentChanges(
+  session: EditorSession,
+  next: PublicationDocument,
+): EditorSession {
+  const current = sessionDocument(session);
+  const pages = { ...session.state.pages };
+  const stories = { ...session.state.stories };
+  let changed = false;
+  for (const page of next.pages) {
+    const before = current.pages.find((entry) => entry.id === page.id);
+    if (before && before !== page) {
+      pages[page.id] = { page, dirty: true };
+      changed = true;
+    }
+  }
+  for (const story of next.stories) {
+    const before = current.stories.find((entry) => entry.id === story.id);
+    if (before && before !== story) {
+      stories[story.id] = { story, dirty: true };
+      changed = true;
+    }
+  }
+  if (!changed) return session;
+  return withState(
+    session,
+    { ...session.state, pages, stories, editGroup: undefined },
     true,
   );
 }
@@ -653,9 +717,9 @@ export function undo(session: EditorSession): EditorSession {
   return {
     // The base stays the latest server copy: history is about edits, not the
     // document that happened to be open when they were made.
-    state: { ...previous, base: session.state.base },
+    state: { ...previous, base: session.state.base, editGroup: undefined },
     undoStack: session.undoStack.slice(0, -1),
-    redoStack: [...session.redoStack, session.state],
+    redoStack: [...session.redoStack, { ...session.state, editGroup: undefined }],
   };
 }
 
@@ -663,8 +727,11 @@ export function redo(session: EditorSession): EditorSession {
   const next = session.redoStack[session.redoStack.length - 1];
   if (!next) return session;
   return {
-    state: { ...next, base: session.state.base },
-    undoStack: [...session.undoStack, session.state],
+    state: { ...next, base: session.state.base, editGroup: undefined },
+    undoStack: [
+      ...session.undoStack,
+      { ...session.state, editGroup: undefined },
+    ],
     redoStack: session.redoStack.slice(0, -1),
   };
 }

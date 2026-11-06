@@ -49,11 +49,6 @@ function square(
   return createShape({ layerId, x, y, width, height, ...options });
 }
 
-function contentLayerPage(objects: ReturnType<typeof square>[]) {
-  const page = createPage(SPEC);
-  return { ...page, objects };
-}
-
 describe("selection bounds", () => {
   it("is the union of the selected frames", () => {
     const page = createPage(SPEC);

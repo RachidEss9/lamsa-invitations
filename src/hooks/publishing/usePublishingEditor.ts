@@ -1,13 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type {
+  CharacterFormat,
+  CharacterStyle,
+  ParagraphFormat,
+  ParagraphStyle,
   PublicationDocument,
   PublicationObject,
   PublicationPage,
+  StyleSet,
   TextFrameObject,
 } from "@/lib/publishing/model";
 import { safeBox } from "@/lib/publishing/geometry";
@@ -25,6 +30,8 @@ import {
   addLayerToPage,
   addObjectToPage,
   adoptStory,
+  applyDocumentChanges,
+  breakEditGroup,
   canRedo,
   canUndo,
   clearHistory,
@@ -57,6 +64,26 @@ import {
 } from "@/lib/publishing/session";
 import { pageIndexOf } from "@/lib/publishing/operations";
 import { paragraphsFromText } from "@/lib/publishing/render";
+import {
+  applyCharacterFormat,
+  applyCharacterStyle as applyCharacterStyleToStory,
+  applyFormatToRange,
+  applyParagraphFormat,
+  applyParagraphStyle as applyParagraphStyleToStory,
+  connectThread,
+  createCharacterStyle,
+  createParagraphStyle,
+  disconnectThread,
+  duplicateCharacterStyle,
+  duplicateParagraphStyle,
+  moveThreadFrame,
+  removeCharacterStyle,
+  removeParagraphStyle,
+  renameStyle,
+  reorderThread,
+  resolveCharacter,
+  resolveParagraph,
+} from "@/lib/publishing/typography";
 import {
   PublishingSaver,
   type PublishingSaveStatus,
@@ -121,7 +148,39 @@ export interface UsePublishingEditorResult {
     frame: Partial<{ x: number; y: number; width: number; height: number; rotation: number }>,
   ) => void;
   patchPage: (patch: Partial<PublicationPage>) => void;
-  patchStoryText: (storyId: string, text: string) => void;
+  patchStoryText: (storyId: string, text: string, coalesceKey?: string) => void;
+  endTextEdit: () => void;
+  applyCharacterFormat: (
+    storyId: string,
+    patch: CharacterFormat,
+    paragraphId?: string,
+  ) => void;
+  applyCharacterRange: (
+    storyId: string,
+    start: number,
+    end: number,
+    patch: CharacterFormat,
+  ) => void;
+  applyParagraphFormat: (
+    storyId: string,
+    patch: ParagraphFormat,
+    paragraphId?: string,
+  ) => void;
+  applyParagraphStyle: (storyId: string, styleId: string | undefined) => void;
+  applyCharacterStyle: (storyId: string, styleId: string) => void;
+  createStyle: (kind: "paragraph" | "character", storyId?: string) => void;
+  updateParagraphStyle: (styleId: string, patch: Partial<ParagraphStyle>) => void;
+  updateCharacterStyle: (styleId: string, patch: Partial<CharacterStyle>) => void;
+  duplicateStyle: (kind: "paragraph" | "character", styleId: string) => void;
+  deleteStyle: (kind: "paragraph" | "character", styleId: string) => void;
+  renameStyle: (kind: "paragraph" | "character", styleId: string, name: string) => void;
+  stylesStatus: "saved" | "saving" | "error";
+  stylesMessage?: string;
+  retryStyles: () => void;
+  connectStoryFrame: (storyId: string, pageId: string, objectId: string) => void;
+  disconnectStoryFrame: (storyId: string, objectId: string) => void;
+  reorderStoryFrame: (storyId: string, objectId: string, direction: 1 | -1) => void;
+  moveStoryFrameToPage: (storyId: string, objectId: string, pageId: string) => Promise<void>;
   deleteSelection: () => void;
   restack: (objectId: string, direction: 1 | -1) => void;
   toggleLayerVisible: (layerId: string) => void;
@@ -182,6 +241,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const updatePublicationMutation = useMutation(
     api.publishing.publications.updatePublication,
   );
+  const saveStylesMutation = useMutation(api.publishing.publications.saveStyles);
 
   const mutationsRef = useRef({
     savePage: savePageMutation,
@@ -192,6 +252,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     deletePage: deletePageMutation,
     movePage: movePageMutation,
     updatePublication: updatePublicationMutation,
+    saveStyles: saveStylesMutation,
   });
   useEffect(() => {
     loadedRef.current = loaded;
@@ -207,6 +268,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       deletePage: deletePageMutation,
       movePage: movePageMutation,
       updatePublication: updatePublicationMutation,
+      saveStyles: saveStylesMutation,
     };
   }, [
     savePageMutation,
@@ -217,6 +279,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     deletePageMutation,
     movePageMutation,
     updatePublicationMutation,
+    saveStylesMutation,
   ]);
 
   const sessionRef = useRef<EditorSession | null>(null);
@@ -228,6 +291,15 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const [preview, setPreview] = useState(false);
   const [title, setTitleState] = useState("");
   const [recovery, setRecovery] = useState<RecoveryDraft | null>(null);
+  const [stylesOverride, setStylesOverride] = useState<StyleSet | null>(null);
+  const [stylesStatus, setStylesStatus] = useState<"saved" | "saving" | "error">(
+    "saved",
+  );
+  const [stylesMessage, setStylesMessage] = useState<string | undefined>();
+  const stylesVersionRef = useRef(1);
+  const stylesDirtyRef = useRef(false);
+  const stylesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stylesRef = useRef<StyleSet | null>(null);
   const recoveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushedEmpty = useRef(true);
   const loadedRef = useRef(loaded);
@@ -236,6 +308,68 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   /* -------------------------------------------------------------- the saver */
 
   const saverRef = useRef<PublishingSaver | null>(null);
+  const stylesInFlight = useRef(false);
+  const stylesPending = useRef<StyleSet | null>(null);
+
+  /**
+   * Styles are publication-level, so they have their own version guard and
+   * write. A short debounce collapses a slider drag into one style save; an
+   * in-flight save is never overlapped, and the newest pending list follows.
+   */
+  const persistStyles = useCallback(
+    async (initial: StyleSet) => {
+      if (stylesInFlight.current) {
+        stylesPending.current = initial;
+        return;
+      }
+      stylesInFlight.current = true;
+      let target: StyleSet | null = initial;
+      while (target) {
+        setStylesStatus("saving");
+        setStylesMessage(undefined);
+        try {
+          const result = await mutationsRef.current.saveStyles({
+            publicationId: publicationId as Id<"publications">,
+            styles: target,
+            expectedStylesVersion: stylesVersionRef.current,
+          });
+          stylesVersionRef.current = result.stylesVersion;
+          if (stylesRef.current === target) {
+            stylesDirtyRef.current = false;
+            setStylesStatus("saved");
+          }
+        } catch (error) {
+          stylesDirtyRef.current = true;
+          setStylesStatus("error");
+          setStylesMessage(messageOf(error) || "The style list could not be saved.");
+          break;
+        }
+        target = stylesPending.current;
+        stylesPending.current = null;
+      }
+      stylesInFlight.current = false;
+    },
+    [publicationId],
+  );
+
+  const storeStyles = useCallback(
+    (next: StyleSet) => {
+      setStylesOverride(next);
+      stylesRef.current = next;
+      stylesDirtyRef.current = true;
+      setStylesStatus("saving");
+      if (stylesTimer.current) clearTimeout(stylesTimer.current);
+      stylesTimer.current = setTimeout(() => {
+        stylesTimer.current = null;
+        void persistStyles(next);
+      }, 450);
+    },
+    [persistStyles],
+  );
+
+  useEffect(() => () => {
+    if (stylesTimer.current) clearTimeout(stylesTimer.current);
+  }, []);
 
   /* ------------------------------------------------------------ state plumbing */
 
@@ -332,6 +466,17 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     if (structureVersion > structureVersionRef.current) {
       structureVersionRef.current = structureVersion;
     }
+    const stylesVersion =
+      (loaded.publication as { stylesVersion?: number }).stylesVersion ?? 1;
+    if (stylesVersion > stylesVersionRef.current) {
+      stylesVersionRef.current = stylesVersion;
+      // Another tab changed the list: show it unless this editor still has an
+      // unsaved style edit of its own.
+      if (!stylesDirtyRef.current && !stylesInFlight.current) {
+        stylesRef.current = null;
+        setStylesOverride(null);
+      }
+    }
     if (!current) {
       const draft = readRecoveryDraft(publicationId);
       if (draft && (draft.pages.length > 0 || draft.stories.length > 0)) {
@@ -342,7 +487,11 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
 
   /* ------------------------------------------------------------- projections */
 
-  const document = session ? sessionDocument(session) : null;
+  const document = useMemo(() => {
+    if (!session) return null;
+    const base = sessionDocument(session);
+    return stylesOverride ? { ...base, styles: stylesOverride } : base;
+  }, [session, stylesOverride]);
   const page = session ? activePage(session) : null;
   const pageIndex = session && page ? pageIndexOf(document!, page.id) : -1;
   const spread = page && document ? document.spreads.find((entry) => entry.pageIds.includes(page.id)) : undefined;
@@ -498,15 +647,360 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   );
 
   const patchStoryText = useCallback<UsePublishingEditorResult["patchStoryText"]>(
-    (storyId, text) => {
+    (storyId, text, coalesceKey) => {
       const current = sessionRef.current;
       if (!current) return;
       apply(
-        editStory(current, storyId, (story) => ({
-          ...story,
-          paragraphs: paragraphsFromText(text, story.paragraphs),
-        })),
+        editStory(
+          current,
+          storyId,
+          (story) => ({
+            ...story,
+            paragraphs: paragraphsFromText(text, story.paragraphs),
+          }),
+          coalesceKey ? { coalesceKey } : {},
+        ),
       );
+    },
+    [apply],
+  );
+
+  const endTextEdit = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    apply(breakEditGroup(current));
+  }, [apply]);
+
+  const applyCharacter = useCallback<UsePublishingEditorResult["applyCharacterFormat"]>(
+    (storyId, patch, paragraphId) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(
+        editStory(current, storyId, (story) =>
+          applyCharacterFormat(story, patch, paragraphId),
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const applyCharacterRangeAction = useCallback<
+    UsePublishingEditorResult["applyCharacterRange"]
+  >(
+    (storyId, start, end, patch) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(
+        editStory(current, storyId, (story) =>
+          applyFormatToRange(story, start, end, patch),
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const applyParagraph = useCallback<UsePublishingEditorResult["applyParagraphFormat"]>(
+    (storyId, patch, paragraphId) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(
+        editStory(current, storyId, (story) =>
+          applyParagraphFormat(story, patch, paragraphId),
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const applyParagraphNamed = useCallback<
+    UsePublishingEditorResult["applyParagraphStyle"]
+  >(
+    (storyId, styleId) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(
+        editStory(current, storyId, (story) =>
+          applyParagraphStyleToStory(story, styleId),
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const applyCharacterNamed = useCallback<
+    UsePublishingEditorResult["applyCharacterStyle"]
+  >(
+    (storyId, styleId) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(
+        editStory(current, storyId, (story) =>
+          applyCharacterStyleToStory(story, styleId),
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const createStyle = useCallback<UsePublishingEditorResult["createStyle"]>(
+    (kind, storyId) => {
+      const current = sessionRef.current;
+      if (!current || !document) return;
+      const story = storyId
+        ? document.stories.find((entry) => entry.id === storyId)
+        : undefined;
+      if (kind === "paragraph") {
+        const paragraph = story?.paragraphs[0];
+        const format = paragraph
+          ? resolveParagraph(document, paragraph)
+          : document.styles.paragraph[0];
+        if (!format) return;
+        const style = createParagraphStyle(
+          { ...format, name: "Paragraph style" },
+          document.styles.paragraph,
+        );
+        storeStyles({
+          ...document.styles,
+          paragraph: [...document.styles.paragraph, style],
+        });
+        if (story) {
+          apply(
+            editStory(current, story.id, (entry) => ({
+              ...entry,
+              paragraphs: entry.paragraphs.map((item) => ({
+                ...item,
+                styleId: style.id,
+                format: undefined,
+              })),
+            })),
+          );
+        }
+        return;
+      }
+      const run = story?.paragraphs[0]?.runs[0];
+      const paragraph = story?.paragraphs[0];
+      const format =
+        run && paragraph ? resolveCharacter(document, paragraph, run) : {};
+      const style = createCharacterStyle(
+        { ...format, name: "Character style" },
+        document.styles.character,
+      );
+      storeStyles({
+        ...document.styles,
+        character: [...document.styles.character, style],
+      });
+      if (story) {
+        apply(
+          editStory(current, story.id, (entry) =>
+            applyCharacterStyleToStory(entry, style.id),
+          ),
+        );
+      }
+    },
+    [apply, document, storeStyles],
+  );
+
+  const updateParagraphStyleAction = useCallback<
+    UsePublishingEditorResult["updateParagraphStyle"]
+  >(
+    (styleId, patch) => {
+      if (!document) return;
+      storeStyles({
+        ...document.styles,
+        paragraph: document.styles.paragraph.map((style) =>
+          style.id === styleId ? { ...style, ...patch } : style,
+        ),
+      });
+    },
+    [document, storeStyles],
+  );
+
+  const updateCharacterStyleAction = useCallback<
+    UsePublishingEditorResult["updateCharacterStyle"]
+  >(
+    (styleId, patch) => {
+      if (!document) return;
+      storeStyles({
+        ...document.styles,
+        character: document.styles.character.map((style) =>
+          style.id === styleId ? { ...style, ...patch } : style,
+        ),
+      });
+    },
+    [document, storeStyles],
+  );
+
+  const duplicateStyleAction = useCallback<
+    UsePublishingEditorResult["duplicateStyle"]
+  >(
+    (kind, styleId) => {
+      if (!document) return;
+      if (kind === "paragraph") {
+        const source = document.styles.paragraph.find(
+          (style) => style.id === styleId,
+        );
+        if (!source) return;
+        storeStyles({
+          ...document.styles,
+          paragraph: [
+            ...document.styles.paragraph,
+            duplicateParagraphStyle(source, document.styles.paragraph),
+          ],
+        });
+        return;
+      }
+      const source = document.styles.character.find((style) => style.id === styleId);
+      if (!source) return;
+      storeStyles({
+        ...document.styles,
+        character: [
+          ...document.styles.character,
+          duplicateCharacterStyle(source, document.styles.character),
+        ],
+      });
+    },
+    [document, storeStyles],
+  );
+
+  const deleteStyleAction = useCallback<UsePublishingEditorResult["deleteStyle"]>(
+    (kind, styleId) => {
+      const current = sessionRef.current;
+      if (!current || !document) return;
+      if (kind === "paragraph") {
+        if (document.styles.paragraph.length <= 1) {
+          toast.error("Keep at least one paragraph style.");
+          return;
+        }
+        const result = removeParagraphStyle(
+          document.styles.paragraph,
+          styleId,
+          document.stories,
+        );
+        storeStyles({ ...document.styles, paragraph: result.styles });
+        let next = current;
+        for (const story of result.stories) {
+          if (story === document.stories.find((entry) => entry.id === story.id)) {
+            continue;
+          }
+          next = editStory(next, story.id, () => story);
+        }
+        apply(next);
+        return;
+      }
+      const result = removeCharacterStyle(
+        document.styles.character,
+        styleId,
+        document.stories,
+      );
+      storeStyles({ ...document.styles, character: result.styles });
+      let next = current;
+      for (const story of result.stories) {
+        if (story === document.stories.find((entry) => entry.id === story.id)) {
+          continue;
+        }
+        next = editStory(next, story.id, () => story);
+      }
+      apply(next);
+    },
+    [apply, document, storeStyles],
+  );
+
+  const renameStyleAction = useCallback<
+    UsePublishingEditorResult["renameStyle"]
+  >(
+    (kind, styleId, name) => {
+      if (!document) return;
+      if (kind === "paragraph") {
+        storeStyles({
+          ...document.styles,
+          paragraph: document.styles.paragraph.map((style) =>
+            style.id === styleId ? renameStyle(style, name) : style,
+          ),
+        });
+        return;
+      }
+      storeStyles({
+        ...document.styles,
+        character: document.styles.character.map((style) =>
+          style.id === styleId ? renameStyle(style, name) : style,
+        ),
+      });
+    },
+    [document, storeStyles],
+  );
+
+  const connectStoryFrame = useCallback<
+    UsePublishingEditorResult["connectStoryFrame"]
+  >(
+    (storyId, pageId, objectId) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      try {
+        const result = connectThread(
+          sessionDocument(current),
+          storyId,
+          pageId,
+          objectId,
+        );
+        apply(applyDocumentChanges(current, result.document));
+        toast.success("Frame threaded. Text now flows into it.", IDLE_TOAST);
+      } catch (error) {
+        toast.error(messageOf(error) || "The frame could not be threaded.");
+      }
+    },
+    [apply],
+  );
+
+  const disconnectStoryFrame = useCallback<
+    UsePublishingEditorResult["disconnectStoryFrame"]
+  >(
+    (storyId, objectId) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      try {
+        const result = disconnectThread(sessionDocument(current), storyId, objectId);
+        apply(applyDocumentChanges(current, result.document));
+        toast.success("Frame removed from the thread. The text is intact.", IDLE_TOAST);
+      } catch (error) {
+        toast.error(messageOf(error) || "The frame could not be removed.");
+      }
+    },
+    [apply],
+  );
+
+  const reorderStoryFrame = useCallback<
+    UsePublishingEditorResult["reorderStoryFrame"]
+  >(
+    (storyId, objectId, direction) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(
+        editStory(current, storyId, (story) =>
+          reorderThread(story, objectId, direction),
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const moveStoryFrameToPage = useCallback<
+    UsePublishingEditorResult["moveStoryFrameToPage"]
+  >(
+    async (storyId, objectId, pageId) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      try {
+        const next = moveThreadFrame(
+          sessionDocument(current),
+          storyId,
+          objectId,
+          pageId,
+        );
+        apply(applyDocumentChanges(current, next));
+        toast.success("Frame moved. Its story order is unchanged.", IDLE_TOAST);
+      } catch (error) {
+        toast.error(messageOf(error) || "The frame could not be moved.");
+      }
     },
     [apply],
   );
@@ -1067,6 +1561,27 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     setFrame,
     patchPage,
     patchStoryText,
+    endTextEdit,
+    applyCharacterFormat: applyCharacter,
+    applyCharacterRange: applyCharacterRangeAction,
+    applyParagraphFormat: applyParagraph,
+    applyParagraphStyle: applyParagraphNamed,
+    applyCharacterStyle: applyCharacterNamed,
+    createStyle,
+    updateParagraphStyle: updateParagraphStyleAction,
+    updateCharacterStyle: updateCharacterStyleAction,
+    duplicateStyle: duplicateStyleAction,
+    deleteStyle: deleteStyleAction,
+    renameStyle: renameStyleAction,
+    stylesStatus,
+    stylesMessage,
+    retryStyles: () => {
+      if (stylesRef.current) void persistStyles(stylesRef.current);
+    },
+    connectStoryFrame,
+    disconnectStoryFrame,
+    reorderStoryFrame,
+    moveStoryFrameToPage,
     deleteSelection,
     restack,
     toggleLayerVisible,
