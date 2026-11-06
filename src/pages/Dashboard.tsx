@@ -44,6 +44,7 @@ import {
 } from "@/lib/dashboard";
 import { createDefaultDesign } from "@/lib/design";
 import { projectPath } from "@/lib/platform/project";
+import { isPublishingPath } from "@/lib/publishing/routes";
 import { WORKSPACES, type WorkspaceId } from "@/lib/workspaces";
 import { draftFromTemplate } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   ArrowUpRight,
+  BookOpen,
   LayoutGrid,
   Loader2,
   Lock,
@@ -74,7 +76,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 const ease = [0.22, 0.61, 0.36, 1] as const;
@@ -90,6 +92,7 @@ const WORKSPACE_ICONS: Record<WorkspaceId, LucideIcon> = {
   print: Printer,
   shape: Shapes,
   press: Newspaper,
+  publishing: BookOpen,
 };
 
 const rise = {
@@ -124,6 +127,8 @@ function invitationOrigin() {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const publishingActive = isPublishingPath(pathname);
   const [searchParams, setSearchParams] = useSearchParams();
   const { email, lock } = useStudio();
   const reduced = useReducedMotion();
@@ -316,7 +321,11 @@ export default function Dashboard() {
         label: workspace.name,
         icon: WORKSPACE_ICONS[workspace.id],
         ...(workspace.ready && workspace.route
-          ? { to: workspace.route }
+          ? {
+              to: workspace.route,
+              active:
+                workspace.id === "publishing" ? publishingActive : undefined,
+            }
           : { disabled: true, badge: `Phase ${workspace.phase}` }),
       })),
     },
@@ -428,7 +437,21 @@ export default function Dashboard() {
                   {WORKSPACES.map((workspace) =>
                     workspace.ready && workspace.route ? (
                       <DropdownMenuItem key={workspace.id} asChild>
-                        <Link to={workspace.route}>{workspace.name}</Link>
+                        <Link
+                          to={workspace.route}
+                          aria-current={
+                            workspace.id === "publishing" && publishingActive
+                              ? "page"
+                              : undefined
+                          }
+                          className={
+                            workspace.id === "publishing" && publishingActive
+                              ? "font-semibold text-[var(--red)]"
+                              : undefined
+                          }
+                        >
+                          {workspace.name}
+                        </Link>
                       </DropdownMenuItem>
                     ) : (
                       <DropdownMenuItem key={workspace.id} disabled>

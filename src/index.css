@@ -57,7 +57,7 @@
   /* The brand display face is licensed and loaded by src/lib/sorgena.ts when the
      licensed webfonts are present; until then it falls back to the open display
      stacks above. Invitation design fonts are configured separately (invitation). */
-  --font-display: "Sorgena", "Bodoni Moda", "Instrument Serif", "Cormorant Garamond", "Times New Roman", serif;
+  --font-display: "Sorgena", "Bodoni Moda", "Instrument Serif", "Cormorant Garamond", "Amiri", "Noto Naskh Arabic", "Times New Roman", serif;
   /* Montserrat is the application interface face: navigation, buttons,
      dialogs, panels, labels, menus and dashboard headings. Arabic interface
      text falls through to a readable Arabic stack; no fallback is blank. */

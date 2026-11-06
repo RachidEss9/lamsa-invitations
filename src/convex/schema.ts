@@ -18,6 +18,7 @@ import {
   presetPayloadValidator,
   publicationStatusValidator,
   spreadGutterValidator,
+  storyParagraphValidator,
   styleSetValidator,
   versionSettingsValidator,
 } from "./publishing/validators";
@@ -183,6 +184,8 @@ const schema = defineSchema(
       // never by content saves, so two editors can compare page structure
       // without every autosave looking like a structural change.
       structureVersion: v.optional(v.number()),
+      // Bumped only by publication-level typography style writes.
+      stylesVersion: v.optional(v.number()),
       displayUnit: lengthUnitValidator,
       spec: pageSpecValidator,
       facingPages: v.boolean(),
@@ -247,15 +250,7 @@ const schema = defineSchema(
       ownerId: v.id("users"),
       storyId: v.string(),
       name: v.string(),
-      paragraphs: v.array(
-        v.object({
-          id: v.string(),
-          styleId: v.optional(v.string()),
-          runs: v.array(
-            v.object({ text: v.string(), styleId: v.optional(v.string()) }),
-          ),
-        }),
-      ),
+      paragraphs: v.array(storyParagraphValidator),
       frames: v.array(
         v.object({ pageId: v.string(), objectId: v.string() }),
       ),
@@ -356,15 +351,7 @@ const schema = defineSchema(
       ownerId: v.id("users"),
       storyId: v.string(),
       name: v.string(),
-      paragraphs: v.array(
-        v.object({
-          id: v.string(),
-          styleId: v.optional(v.string()),
-          runs: v.array(
-            v.object({ text: v.string(), styleId: v.optional(v.string()) }),
-          ),
-        }),
-      ),
+      paragraphs: v.array(storyParagraphValidator),
       frames: v.array(
         v.object({ pageId: v.string(), objectId: v.string() }),
       ),

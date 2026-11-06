@@ -7,14 +7,15 @@ import {
 } from "./workspaces";
 
 describe("the workspace registry", () => {
-  it("lists the four workspaces in roadmap order", () => {
+  it("lists the workspaces in roadmap order", () => {
     expect(WORKSPACES.map((workspace) => workspace.id)).toEqual([
       "experiences",
       "print",
       "shape",
       "press",
+      "publishing",
     ]);
-    expect(WORKSPACES.map((workspace) => workspace.phase)).toEqual([2, 3, 4, 5]);
+    expect(WORKSPACES.map((workspace) => workspace.phase)).toEqual([2, 3, 4, 5, 6]);
   });
 
   it("gives every workspace a unique id", () => {
@@ -35,11 +36,13 @@ describe("the workspace registry", () => {
       "print",
       "shape",
       "press",
+      "publishing",
     ]);
     expect(READY_WORKSPACES[0].route).toBe("/dashboard");
     expect(READY_WORKSPACES[1].route).toBe("/print");
     expect(READY_WORKSPACES[2].route).toBe("/shapes");
     expect(READY_WORKSPACES[3].route).toBe("/press");
+    expect(READY_WORKSPACES[4].route).toBe("/publishing");
   });
 
   it("finds a workspace by id and rejects an unknown one", () => {

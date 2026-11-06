@@ -26,6 +26,7 @@ import {
   publicationSettingsValidator,
   publicationStatusValidator,
   sizeValidator,
+  styleSetValidator,
 } from "./validators";
 
 /**
@@ -190,6 +191,37 @@ export const updatePublication = mutation({
     const now = Date.now();
     await saveDocumentState(ctx, publication, next, now);
     return { updatedAt: now };
+  },
+});
+
+/**
+ * Publication-level typography styles. The designer's style list is shared by
+ * every story, so it lives on the publication rather than being copied into
+ * each story. `stylesVersion` guards two editors saving style definitions at
+ * the same time; ordinary text saves never touch it.
+ */
+export const saveStyles = mutation({
+  args: {
+    publicationId: v.id("publications"),
+    styles: styleSetValidator,
+    expectedStylesVersion: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    const current = publication.stylesVersion ?? 1;
+    if (
+      args.expectedStylesVersion !== undefined &&
+      args.expectedStylesVersion !== current
+    ) {
+      throw new Error("The style list changed elsewhere. Reload it and try again.");
+    }
+    const document = await loadDocument(ctx, publication);
+    const next = { ...document, styles: args.styles };
+    const now = Date.now();
+    await saveDocumentState(ctx, publication, next, now);
+    await ctx.db.patch(publication._id, { stylesVersion: current + 1 });
+    return { stylesVersion: current + 1, updatedAt: now };
   },
 });
 

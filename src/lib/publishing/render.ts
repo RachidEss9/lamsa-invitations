@@ -97,13 +97,22 @@ export function paragraphsFromText(
   const lines = text.split("\n");
   return lines.map((line, index) => {
     const previous = existing[index];
-    const runs = [{ text: line, ...(previous?.runs[0]?.styleId ? { styleId: previous.runs[0].styleId } : {}) }];
-    if (previous && runsText(previous) === line && previous.runs.length === 1) {
-      return previous;
-    }
+    if (previous && runsText(previous) === line) return previous;
+    // A changed line keeps its paragraph formatting and the style of its first
+    // run. Rich runs inside the edited line collapse only because the plain
+    // text no longer maps to them; nothing is silently restyled globally.
+    const first = previous?.runs[0];
+    const runs = [
+      {
+        text: line,
+        ...(first?.styleId ? { styleId: first.styleId } : {}),
+        ...(first?.format ? { format: first.format } : {}),
+      },
+    ];
     return {
       id: previous?.id ?? ids("paragraph"),
       ...(previous?.styleId ? { styleId: previous.styleId } : {}),
+      ...(previous?.format ? { format: previous.format } : {}),
       runs,
     };
   });

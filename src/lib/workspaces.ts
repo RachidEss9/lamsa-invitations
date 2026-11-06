@@ -6,7 +6,12 @@
  * delivers the workspace, and `ready` keeps a planned tool honestly marked
  * instead of offering a button that leads nowhere.
  */
-export type WorkspaceId = "experiences" | "print" | "shape" | "press";
+export type WorkspaceId =
+  | "experiences"
+  | "print"
+  | "shape"
+  | "press"
+  | "publishing";
 
 export interface Workspace {
   id: WorkspaceId;
@@ -56,6 +61,15 @@ export const WORKSPACES: Workspace[] = [
     tagline: "Newspapers and magazines laid out page by page.",
     phase: 5,
     route: "/press",
+    ready: true,
+  },
+  {
+    id: "publishing",
+    name: "Publishing Studio",
+    shortName: "Publishing",
+    tagline: "Create photo albums, magazines, books, catalogues and more.",
+    phase: 6,
+    route: "/publishing",
     ready: true,
   },
 ];

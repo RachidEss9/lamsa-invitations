@@ -199,6 +199,55 @@ export type TextAlignment = "left" | "center" | "right" | "justify";
 
 export type VerticalAlignment = "top" | "middle" | "bottom";
 
+export type TextDirection = "ltr" | "rtl" | "auto";
+
+export type FontStyle = "normal" | "italic";
+
+/**
+ * Character-level formatting. Every field is optional so an old document, a
+ * named character style and a one-off run override all speak the same shape:
+ * a resolver fills the gaps from the paragraph and the document defaults.
+ */
+export interface CharacterFormat {
+  fontId?: string;
+  /** Type size in points. */
+  size?: number;
+  /** CSS weight (400 regular, 700 bold). */
+  fontWeight?: number;
+  fontStyle?: FontStyle;
+  /** Any CSS colour. */
+  color?: string;
+  /** 0–1. */
+  opacity?: number;
+  /** Letter spacing in 1/1000 em. */
+  tracking?: number;
+  /** Line height in points. */
+  leading?: number;
+  underline?: boolean;
+  strikethrough?: boolean;
+  /** Raised or lowered type; never a manual baseline shift. */
+  baseline?: "normal" | "super" | "sub";
+}
+
+/** Paragraph-level formatting that may be overridden per paragraph. */
+export interface ParagraphFormat {
+  fontId?: string;
+  size?: number;
+  fontWeight?: number;
+  fontStyle?: FontStyle;
+  color?: string;
+  leading?: number;
+  tracking?: number;
+  alignment?: TextAlignment;
+  direction?: TextDirection;
+  spaceBefore?: number;
+  spaceAfter?: number;
+  firstLineIndent?: number;
+  leftIndent?: number;
+  rightIndent?: number;
+  hyphenate?: boolean;
+}
+
 /** What happens when a story outgrows its frame. */
 export type OverflowMode = "clip" | "thread" | "shrink";
 
@@ -286,7 +335,7 @@ export type PublicationObject =
 /* Stories and typography                                                     */
 /* -------------------------------------------------------------------------- */
 
-export interface ParagraphStyle {
+export interface ParagraphStyle extends ParagraphFormat {
   id: string;
   name: string;
   /** Family token resolved by the font library (never a CSS font stack). */
@@ -298,19 +347,22 @@ export interface ParagraphStyle {
   /** Letter spacing in 1/1000 em. */
   tracking: number;
   alignment: TextAlignment;
+  direction?: TextDirection;
   spaceBefore: number;
   spaceAfter: number;
   firstLineIndent: number;
+  leftIndent?: number;
+  rightIndent?: number;
   hyphenate: boolean;
 }
 
-export interface CharacterStyle {
+export interface CharacterStyle extends CharacterFormat {
   id: string;
   name: string;
-  fontId?: string;
-  size?: number;
-  tracking?: number;
-  color?: string;
+}
+
+export function isTextDirection(value: unknown): value is TextDirection {
+  return value === "ltr" || value === "rtl" || value === "auto";
 }
 
 export interface StyleSet {
@@ -320,13 +372,17 @@ export interface StyleSet {
 
 export interface TextRun {
   text: string;
-  /** Character style id, when the run overrides the paragraph style. */
+  /** Character style id, when the run uses a reusable style. */
   styleId?: string;
+  /** One-off character formatting on this run (selection-level edits). */
+  format?: CharacterFormat;
 }
 
 export interface StoryParagraph {
   id: string;
   styleId?: string;
+  /** One-off paragraph formatting, layered over the named style. */
+  format?: ParagraphFormat;
   runs: TextRun[];
 }
 

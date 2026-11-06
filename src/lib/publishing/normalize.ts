@@ -28,6 +28,7 @@ import {
   isObjectKind,
   type AssetRef,
   type Background,
+  type CharacterFormat,
   type CharacterStyle,
   type DocType,
   type Edges,
@@ -38,6 +39,7 @@ import {
   type MasterPage,
   type ObjectKind,
   type OverflowMode,
+  type ParagraphFormat,
   type PageSide,
   type PageSpec,
   type ParagraphStyle,
@@ -467,6 +469,66 @@ function normalizeMaster(value: unknown, context: MasterContext): MasterPage | n
 /* Stories                                                                    */
 /* -------------------------------------------------------------------------- */
 
+function normalizeCharacterFormat(value: unknown): CharacterFormat | undefined {
+  const raw = record(value);
+  if (!raw) return undefined;
+  const format: CharacterFormat = {};
+  const fontId = optionalText(raw.fontId, 120);
+  if (fontId) format.fontId = fontId;
+  if (typeof raw.size === "number") format.size = positive(raw.size, 11);
+  if (typeof raw.fontWeight === "number") {
+    format.fontWeight = clampInt(raw.fontWeight, 400, 100, 900);
+  }
+  if (raw.fontStyle === "normal" || raw.fontStyle === "italic") {
+    format.fontStyle = raw.fontStyle;
+  }
+  const color = optionalText(raw.color, 120);
+  if (color) format.color = color;
+  if (typeof raw.opacity === "number") {
+    format.opacity = Math.max(0, Math.min(1, num(raw.opacity, 1)));
+  }
+  if (typeof raw.tracking === "number") format.tracking = num(raw.tracking, 0);
+  if (typeof raw.leading === "number") format.leading = positive(raw.leading, 14);
+  if (raw.underline === true) format.underline = true;
+  if (raw.strikethrough === true) format.strikethrough = true;
+  if (raw.baseline === "normal" || raw.baseline === "super" || raw.baseline === "sub") {
+    format.baseline = raw.baseline;
+  }
+  return Object.keys(format).length > 0 ? format : undefined;
+}
+
+function normalizeParagraphFormat(value: unknown): ParagraphFormat | undefined {
+  const raw = record(value);
+  if (!raw) return undefined;
+  const format: ParagraphFormat = {};
+  const fontId = optionalText(raw.fontId, 120);
+  if (fontId) format.fontId = fontId;
+  if (typeof raw.size === "number") format.size = positive(raw.size, 11);
+  if (typeof raw.fontWeight === "number") {
+    format.fontWeight = clampInt(raw.fontWeight, 400, 100, 900);
+  }
+  if (raw.fontStyle === "normal" || raw.fontStyle === "italic") {
+    format.fontStyle = raw.fontStyle;
+  }
+  const color = optionalText(raw.color, 120);
+  if (color) format.color = color;
+  if (typeof raw.leading === "number") format.leading = positive(raw.leading, 14);
+  if (typeof raw.tracking === "number") format.tracking = num(raw.tracking, 0);
+  if (raw.alignment !== undefined) {
+    format.alignment = oneOf(raw.alignment, ALIGNMENTS, "left");
+  }
+  if (raw.direction !== undefined) {
+    format.direction = oneOf(raw.direction, ["ltr", "rtl", "auto"] as const, "auto");
+  }
+  if (typeof raw.spaceBefore === "number") format.spaceBefore = nonNegative(raw.spaceBefore, 0);
+  if (typeof raw.spaceAfter === "number") format.spaceAfter = nonNegative(raw.spaceAfter, 0);
+  if (typeof raw.firstLineIndent === "number") format.firstLineIndent = num(raw.firstLineIndent, 0);
+  if (typeof raw.leftIndent === "number") format.leftIndent = num(raw.leftIndent, 0);
+  if (typeof raw.rightIndent === "number") format.rightIndent = num(raw.rightIndent, 0);
+  if (typeof raw.hyphenate === "boolean") format.hyphenate = raw.hyphenate;
+  return Object.keys(format).length > 0 ? format : undefined;
+}
+
 function normalizeParagraph(value: unknown, ids: IdFactory, used: Set<string>): StoryParagraph | null {
   const raw = record(value);
   if (!raw) return null;
@@ -479,11 +541,20 @@ function normalizeParagraph(value: unknown, ids: IdFactory, used: Set<string>): 
     const run = record(entry);
     if (!run) continue;
     if (typeof run.text !== "string") continue;
-    runs.push({ text: run.text, styleId: optionalText(run.styleId, 120) });
+    const styleId = optionalText(run.styleId, 120);
+    const format = normalizeCharacterFormat(run.format);
+    runs.push({
+      text: run.text,
+      ...(styleId ? { styleId } : {}),
+      ...(format ? { format } : {}),
+    });
   }
+  const styleId = optionalText(raw.styleId, 120);
+  const format = normalizeParagraphFormat(raw.format);
   return {
     id,
-    styleId: optionalText(raw.styleId, 120),
+    ...(styleId ? { styleId } : {}),
+    ...(format ? { format } : {}),
     runs: runs.length > 0 ? runs : [{ text: "" }],
   };
 }
@@ -550,7 +621,16 @@ function normalizeParagraphStyles(value: unknown, ids: IdFactory): ParagraphStyl
       spaceBefore: nonNegative(raw.spaceBefore, 0),
       spaceAfter: nonNegative(raw.spaceAfter, 0),
       firstLineIndent: num(raw.firstLineIndent, 0),
+      leftIndent: nonNegative(raw.leftIndent, 0),
+      rightIndent: nonNegative(raw.rightIndent, 0),
+      direction: oneOf(raw.direction, ["ltr", "rtl", "auto"] as const, "auto"),
       hyphenate: bool(raw.hyphenate, false),
+      fontWeight:
+        typeof raw.fontWeight === "number"
+          ? clampInt(raw.fontWeight, 400, 100, 900)
+          : undefined,
+      fontStyle: raw.fontStyle === "italic" ? "italic" : undefined,
+      color: optionalText(raw.color, 120),
     });
   }
   return styles;
@@ -565,12 +645,9 @@ function normalizeCharacterStyles(value: unknown, ids: IdFactory, used: Set<stri
     while (used.has(id)) id = ids("style");
     used.add(id);
     styles.push({
+      ...(normalizeCharacterFormat(raw) ?? {}),
       id,
       name: text(raw.name, "Character style", 80),
-      fontId: optionalText(raw.fontId, 120),
-      size: typeof raw.size === "number" ? positive(raw.size, 11) : undefined,
-      tracking: typeof raw.tracking === "number" ? num(raw.tracking, 0) : undefined,
-      color: optionalText(raw.color, 120),
     });
   }
   return styles;

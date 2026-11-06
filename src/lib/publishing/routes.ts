@@ -19,6 +19,18 @@ export interface PublishingRouteEntry {
 export const PUBLISHING_LIBRARY_PATH = "/publishing";
 export const PUBLISHING_EDITOR_PATH = "/publishing/:publicationId";
 
+/**
+ * True on the library and any publication inside it. The application shell
+ * uses this for the rail's active state; a bare prefix check would also light
+ * up unrelated future paths such as `/publishing-tools`.
+ */
+export function isPublishingPath(pathname: string): boolean {
+  return (
+    pathname === PUBLISHING_LIBRARY_PATH ||
+    /^\/publishing\/[a-zA-Z0-9]{16,64}\/?$/.test(pathname)
+  );
+}
+
 export const PUBLISHING_ROUTES: readonly PublishingRouteEntry[] = [
   {
     path: PUBLISHING_LIBRARY_PATH,

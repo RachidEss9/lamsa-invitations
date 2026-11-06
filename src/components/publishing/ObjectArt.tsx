@@ -9,10 +9,14 @@ import type {
 import {
   fontFamilyFor,
   imagePreserveAspectRatio,
-  paragraphStyleFor,
   polygonPoints,
-  textDirection,
 } from "@/lib/publishing/render";
+import {
+  characterCss,
+  resolveCharacter,
+  resolveParagraph,
+  resolvedDirection,
+} from "@/lib/publishing/typography";
 
 /**
  * One page object, drawn in page points. The renderer is SVG: image, shape and
@@ -33,9 +37,20 @@ interface ObjectArtProps {
   document: PublicationDocument;
   object: PublicationObject;
   resolveAsset?: AssetResolver;
+  /** Double-clicked text frame: show the browser editing surface. */
+  editing?: boolean;
+  onTextDraft?: (text: string) => void;
+  onTextEnd?: () => void;
 }
 
-export function ObjectArt({ document, object, resolveAsset }: ObjectArtProps) {
+export function ObjectArt({
+  document,
+  object,
+  resolveAsset,
+  editing,
+  onTextDraft,
+  onTextEnd,
+}: ObjectArtProps) {
   const width = Math.max(0, object.frame.width);
   const height = Math.max(0, object.frame.height);
   if (width <= 0 && height <= 0) return null;
@@ -49,7 +64,15 @@ export function ObjectArt({ document, object, resolveAsset }: ObjectArtProps) {
   const content = (() => {
     switch (object.kind) {
       case "text-frame":
-        return <TextContent document={document} object={object} />;
+        return (
+          <TextContent
+            document={document}
+            object={object}
+            editing={editing}
+            onTextDraft={onTextDraft}
+            onTextEnd={onTextEnd}
+          />
+        );
       case "image-frame":
         return <ImageContent object={object} resolveAsset={resolveAsset} />;
       case "shape":
@@ -82,15 +105,24 @@ const ALIGN: Record<string, "left" | "center" | "right" | "justify"> = {
 function TextContent({
   document,
   object,
+  editing,
+  onTextDraft,
+  onTextEnd,
 }: {
   document: PublicationDocument;
   object: TextFrameObject;
+  editing?: boolean;
+  onTextDraft?: (text: string) => void;
+  onTextEnd?: () => void;
 }) {
   const story = document.stories.find((entry) => entry.id === object.storyId);
   const text = story?.paragraphs ?? [];
   const language = document.metadata.language;
+  const vertical = object.verticalAlign;
+  const justify =
+    vertical === "middle" ? "center" : vertical === "bottom" ? "flex-end" : "flex-start";
 
-  if (text.length === 0) {
+  if (text.length === 0 && !editing) {
     return (
       <foreignObject
         x={object.frame.x}
@@ -99,11 +131,15 @@ function TextContent({
         height={Math.max(1, object.frame.height)}
       >
         <div
-          className="flex h-full w-full items-start"
           style={{
+            boxSizing: "border-box",
+            display: "flex",
+            height: "100%",
+            width: "100%",
+            alignItems: "flex-start",
             padding: insetCss(object.inset),
             color: "color-mix(in oklab, var(--ink) 34%, transparent)",
-            fontFamily: fontFamilyFor(undefined),
+            fontFamily: "var(--font-display, serif)",
             fontSize: 10,
           }}
         >
@@ -113,9 +149,66 @@ function TextContent({
     );
   }
 
-  const vertical = object.verticalAlign;
-  const justify =
-    vertical === "middle" ? "center" : vertical === "bottom" ? "flex-end" : "flex-start";
+  if (editing) {
+    const first = text[0];
+    const draftFormat = first
+      ? resolveParagraph(document, first)
+      : undefined;
+    const direction = first ? resolvedDirection(document, first) : "ltr";
+    return (
+      <foreignObject
+        x={object.frame.x}
+        y={object.frame.y}
+        width={Math.max(1, object.frame.width)}
+        height={Math.max(1, object.frame.height)}
+      >
+        {/* A native textarea gives selection, caret, IME and Arabic shaping for
+            free. Multi-column flow returns as soon as editing ends. */}
+        <textarea
+          autoFocus
+          dir={direction}
+          lang={language || undefined}
+          defaultValue={text
+            .map((paragraph) => paragraph.runs.map((run) => run.text).join(""))
+            .join("\n")}
+          onInput={(event) => onTextDraft?.(event.currentTarget.value)}
+          onPointerDown={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+          }}
+          onBlur={() => onTextEnd?.()}
+          aria-label={`Edit text in ${object.name || "text frame"}`}
+          style={{
+            boxSizing: "border-box",
+            width: "100%",
+            height: "100%",
+            margin: 0,
+            resize: "none",
+            overflow: "hidden",
+            border: "1px solid var(--red, #710014)",
+            outline: "none",
+            borderRadius: 1,
+            padding: insetCss(object.inset),
+            background: "color-mix(in oklab, #ffffff 94%, transparent)",
+            color: draftFormat?.color ?? "var(--ink)",
+            fontFamily: fontFamilyFor(draftFormat?.fontId),
+            fontSize: draftFormat?.size ?? 12,
+            lineHeight: `${(draftFormat?.leading ?? 14)}px`,
+            fontWeight: draftFormat?.fontWeight ?? 400,
+            fontStyle: draftFormat?.fontStyle ?? "normal",
+            letterSpacing: `${(draftFormat?.tracking ?? 0) / 1000}em`,
+            textAlign: ALIGN[draftFormat?.alignment ?? "left"] ?? "left",
+            direction,
+            whiteSpace: "pre-wrap",
+          }}
+        />
+      </foreignObject>
+    );
+  }
 
   return (
     <foreignObject
@@ -125,7 +218,6 @@ function TextContent({
       height={Math.max(1, object.frame.height)}
     >
       <div
-        dir={textDirection(language)}
         lang={language || undefined}
         className="box-border h-full w-full overflow-hidden"
         style={{
@@ -138,50 +230,43 @@ function TextContent({
         }}
       >
         {text.map((paragraph) => {
-          const style = paragraphStyleFor(document, paragraph);
+          const style = resolveParagraph(document, paragraph);
+          const direction = resolvedDirection(document, paragraph);
           return (
             <p
               key={paragraph.id}
+              dir={direction}
               style={{
                 margin: 0,
-                // Space before/after in points reads directly as CSS pixels.
-                marginTop: (style?.spaceBefore ?? 0),
-                marginBottom: (style?.spaceAfter ?? 0),
-                fontFamily: fontFamilyFor(style?.fontId),
-                fontSize: (style?.size ?? 12),
-                lineHeight: `${(style?.leading ?? style?.size ?? 12) / (style?.size ?? 12)}`,
-                letterSpacing: ((style?.tracking ?? 0) / 1000) + "em",
-                textAlign: ALIGN[style?.alignment ?? "left"] ?? "left",
-                textIndent: style?.firstLineIndent
-                  ? style.firstLineIndent
-                  : undefined,
-                hyphens: style?.hyphenate ? "auto" : "manual",
-                color: "var(--ink)",
+                // Space before/after and indents are points, which equal CSS
+                // pixels inside the page's SVG user space.
+                marginTop: style.spaceBefore,
+                marginBottom: style.spaceAfter,
+                marginLeft: style.leftIndent,
+                marginRight: style.rightIndent,
+                fontFamily: fontFamilyFor(style.fontId),
+                fontSize: style.size,
+                fontWeight: style.fontWeight,
+                fontStyle: style.fontStyle,
+                lineHeight: `${style.leading / Math.max(1, style.size)}`,
+                letterSpacing: `${style.tracking / 1000}em`,
+                textAlign: ALIGN[style.alignment] ?? "left",
+                textIndent: style.firstLineIndent || undefined,
+                hyphens: style.hyphenate ? "auto" : "manual",
+                color: style.color,
               }}
             >
-              {paragraph.runs.map((run) => {
-                const character = document.styles.character.find(
-                  (entry) => entry.id === run.styleId,
-                );
-                return (
-                  <span
-                    key={character?.id ?? ""}
-                    style={{
-                      ...(character?.fontId
-                        ? { fontFamily: fontFamilyFor(character.fontId) }
-                        : {}),
-                      ...(character?.size ? { fontSize: character.size } : {}),
-                      ...(character?.tracking
-                        ? { letterSpacing: `${character.tracking / 1000}em` }
-                        : {}),
-                      ...(character?.color ? { color: character.color } : {}),
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {run.text}
-                  </span>
-                );
-              })}
+              {paragraph.runs.map((run, index) => (
+                <span
+                  key={`${paragraph.id}-${index}`}
+                  style={{
+                    ...characterCss(resolveCharacter(document, paragraph, run)),
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {run.text}
+                </span>
+              ))}
             </p>
           );
         })}

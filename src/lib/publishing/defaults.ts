@@ -22,10 +22,16 @@ export function createParagraphStyle(
     leading: rest.leading ?? 14,
     tracking: rest.tracking ?? 0,
     alignment: rest.alignment ?? "left",
+    direction: rest.direction ?? "auto",
     spaceBefore: rest.spaceBefore ?? 0,
     spaceAfter: rest.spaceAfter ?? 0,
     firstLineIndent: rest.firstLineIndent ?? 0,
+    leftIndent: rest.leftIndent ?? 0,
+    rightIndent: rest.rightIndent ?? 0,
     hyphenate: rest.hyphenate ?? false,
+    fontWeight: rest.fontWeight,
+    fontStyle: rest.fontStyle,
+    color: rest.color,
   };
 }
 
@@ -38,8 +44,15 @@ export function createCharacterStyle(
     name: rest.name ?? "Emphasis",
     fontId: rest.fontId,
     size: rest.size,
+    fontWeight: rest.fontWeight,
+    fontStyle: rest.fontStyle,
     tracking: rest.tracking,
+    leading: rest.leading,
     color: rest.color,
+    opacity: rest.opacity,
+    underline: rest.underline,
+    strikethrough: rest.strikethrough,
+    baseline: rest.baseline,
   };
 }
 

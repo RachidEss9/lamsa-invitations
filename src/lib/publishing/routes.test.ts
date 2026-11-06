@@ -5,6 +5,7 @@ import {
   PUBLISHING_LIBRARY_PATH,
   PUBLISHING_ROUTES,
   editorHref,
+  isPublishingPath,
   isValidPublicationId,
 } from "./routes";
 
@@ -36,6 +37,15 @@ describe("publication id handling", () => {
 
   it("builds editor hrefs from the publication id", () => {
     expect(editorHref("jd7abcd1234defgh")).toBe("/publishing/jd7abcd1234defgh");
+  });
+
+  it("lights the navigation on the library and every publication route", () => {
+    expect(isPublishingPath("/publishing")).toBe(true);
+    expect(isPublishingPath("/publishing/jd7abcd1234defgh")).toBe(true);
+    expect(isPublishingPath("/publishing/jd7abcd1234defgh/")).toBe(true);
+    expect(isPublishingPath("/publishing-tools")).toBe(false);
+    expect(isPublishingPath("/publishing/not-an-id")).toBe(false);
+    expect(isPublishingPath("/dashboard")).toBe(false);
   });
 
   it("declares exactly the two approved publishing routes", () => {

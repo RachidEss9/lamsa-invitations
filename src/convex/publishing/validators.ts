@@ -171,6 +171,58 @@ export const guideValidator = v.object({
   pageId: v.optional(v.string()),
 });
 
+const textAlignValidator = v.union(
+  v.literal("left"),
+  v.literal("center"),
+  v.literal("right"),
+  v.literal("justify"),
+);
+
+const textDirectionValidator = v.union(
+  v.literal("ltr"),
+  v.literal("rtl"),
+  v.literal("auto"),
+);
+
+const fontWeightValidator = v.optional(v.number());
+const fontStyleValidator = v.optional(
+  v.union(v.literal("normal"), v.literal("italic")),
+);
+
+export const characterFormatValidator = v.object({
+  fontId: v.optional(v.string()),
+  size: v.optional(v.number()),
+  fontWeight: fontWeightValidator,
+  fontStyle: fontStyleValidator,
+  color: v.optional(v.string()),
+  opacity: v.optional(v.number()),
+  tracking: v.optional(v.number()),
+  leading: v.optional(v.number()),
+  underline: v.optional(v.boolean()),
+  strikethrough: v.optional(v.boolean()),
+  baseline: v.optional(
+    v.union(v.literal("normal"), v.literal("super"), v.literal("sub")),
+  ),
+});
+
+export const paragraphFormatValidator = v.object({
+  fontId: v.optional(v.string()),
+  size: v.optional(v.number()),
+  fontWeight: fontWeightValidator,
+  fontStyle: fontStyleValidator,
+  color: v.optional(v.string()),
+  leading: v.optional(v.number()),
+  tracking: v.optional(v.number()),
+  alignment: v.optional(textAlignValidator),
+  direction: v.optional(textDirectionValidator),
+  spaceBefore: v.optional(v.number()),
+  spaceAfter: v.optional(v.number()),
+  firstLineIndent: v.optional(v.number()),
+  leftIndent: v.optional(v.number()),
+  rightIndent: v.optional(v.number()),
+  hyphenate: v.optional(v.boolean()),
+});
+
 export const paragraphStyleValidator = v.object({
   id: v.string(),
   name: v.string(),
@@ -178,25 +230,23 @@ export const paragraphStyleValidator = v.object({
   size: v.number(),
   leading: v.number(),
   tracking: v.number(),
-  alignment: v.union(
-    v.literal("left"),
-    v.literal("center"),
-    v.literal("right"),
-    v.literal("justify"),
-  ),
+  alignment: textAlignValidator,
+  direction: v.optional(textDirectionValidator),
   spaceBefore: v.number(),
   spaceAfter: v.number(),
   firstLineIndent: v.number(),
+  leftIndent: v.optional(v.number()),
+  rightIndent: v.optional(v.number()),
+  fontWeight: fontWeightValidator,
+  fontStyle: fontStyleValidator,
+  color: v.optional(v.string()),
   hyphenate: v.boolean(),
 });
 
 export const characterStyleValidator = v.object({
   id: v.string(),
   name: v.string(),
-  fontId: v.optional(v.string()),
-  size: v.optional(v.number()),
-  tracking: v.optional(v.number()),
-  color: v.optional(v.string()),
+  ...characterFormatValidator.fields,
 });
 
 export const styleSetValidator = v.object({
@@ -207,11 +257,13 @@ export const styleSetValidator = v.object({
 export const textRunValidator = v.object({
   text: v.string(),
   styleId: v.optional(v.string()),
+  format: v.optional(characterFormatValidator),
 });
 
 export const storyParagraphValidator = v.object({
   id: v.string(),
   styleId: v.optional(v.string()),
+  format: v.optional(paragraphFormatValidator),
   runs: v.array(textRunValidator),
 });
 

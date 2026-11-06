@@ -173,7 +173,7 @@ export default function PublishingLibrary() {
             </Link>
             <span className="h-3 w-px bg-[var(--rule)]" />
             <h1 className="font-display text-[1.35rem] leading-none tracking-[0.01em]">
-              Publishing
+              Publishing Studio
             </h1>
           </div>
           <Dialog open={open} onOpenChange={(next) => (setOpen(next), next || resetForm())}>
