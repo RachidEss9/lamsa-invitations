@@ -513,6 +513,93 @@ describe("typography persistence", () => {
   });
 });
 
+describe("image crop persistence", () => {
+  it("keeps frame geometry, crop and versions through an asset replacement", async () => {
+    const t = setup();
+    const { owner } = await seedUsers(t);
+    const { publicationId } = await createPublication(t, owner, 1);
+    const asOwner = t.withIdentity({ subject: owner });
+    const first = await registerAsset(t, owner, publicationId, { filename: "first.jpg" });
+    const second = await registerAsset(t, owner, publicationId, { filename: "second.jpg" });
+    const base = await asOwner.query(api.publishing.publications.getMine, {
+      publicationId,
+    });
+    const page = base.document.pages[0]!;
+    const crop = {
+      scale: 1.6,
+      offsetX: 0.12,
+      offsetY: -0.08,
+      normalized: true,
+      rotation: 23,
+    };
+    const focal = { x: 0.35, y: 0.6 };
+    const image = {
+      ...imageFrame(page.layers[1]!.id, first.stableId),
+      crop,
+      focal,
+    };
+    const frame = { ...image.frame };
+
+    await asOwner.mutation(api.publishing.pages.savePage, {
+      publicationId,
+      pageId: page.id,
+      page: asPage({ ...page, objects: [image] }),
+    });
+    const saved = await asOwner.query(api.publishing.publications.getMine, {
+      publicationId,
+    });
+    expect(saved.document.pages[0]!.objects[0]).toMatchObject({
+      kind: "image-frame",
+      crop,
+      focal,
+      frame,
+    });
+
+    const version = await asOwner.mutation(api.publishing.versions.createVersion, {
+      publicationId,
+      label: "First crop",
+    });
+    await asOwner.mutation(api.publishing.pages.savePage, {
+      publicationId,
+      pageId: page.id,
+      page: asPage({
+        ...saved.document.pages[0]!,
+        objects: [{ ...image, assetId: second.stableId }],
+      }),
+    });
+    const replaced = await asOwner.query(api.publishing.publications.getMine, {
+      publicationId,
+    });
+    expect(replaced.document.pages[0]!.objects[0]).toMatchObject({
+      kind: "image-frame",
+      assetId: second.stableId,
+      crop,
+      focal,
+      frame,
+    });
+
+    // The previous asset is still required by the saved version.
+    await expect(
+      asOwner.mutation(api.publishing.assets.deleteAsset, { assetId: first.assetId }),
+    ).rejects.toThrow(/saved version/i);
+
+    await asOwner.mutation(api.publishing.versions.restoreVersion, {
+      publicationId,
+      versionId: version.versionId,
+    });
+    const restored = await asOwner.query(api.publishing.publications.getMine, {
+      publicationId,
+    });
+    expect(restored.document.pages[0]!.objects[0]).toMatchObject({
+      kind: "image-frame",
+      assetId: first.stableId,
+      crop,
+      focal,
+      frame,
+    });
+  });
+});
+
 describe("versions", () => {
   it("creates a named version and restores it consistently", async () => {
     const t = setup();

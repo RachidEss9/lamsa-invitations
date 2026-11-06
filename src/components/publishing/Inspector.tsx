@@ -1,10 +1,14 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import type {
+  ImageCrop,
+  ImageFit,
+  Point,
   PublicationDocument,
   PublicationObject,
   PublicationPage,
 } from "@/lib/publishing/model";
+import type { ImageCropDraft } from "@/lib/publishing/image";
 import {
   fromPoints,
   roundTo,
@@ -31,6 +35,7 @@ import {
   type TextSelection,
   type TypographyEditor,
 } from "./TypographyPanel";
+import { ImagePanel } from "./ImagePanel";
 
 /**
  * The inspector. Selection first, then page.
@@ -62,6 +67,13 @@ export interface InspectorProps {
   onDeleteSelected: () => void;
   onRestack: (objectId: string, direction: 1 | -1) => void;
   onOpenAssetsPanel: () => void;
+  imageCropDraft?: ImageCropDraft;
+  onChangeImagePlacement: (
+    objectId: string,
+    change: { fit?: ImageFit; crop?: ImageCrop; focal?: Point },
+  ) => void;
+  onEnterImageCrop: (objectId: string) => void;
+  onResetImageCrop: (objectId: string) => void;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -173,7 +185,10 @@ export function Inspector(props: InspectorProps) {
     onSetFrame,
     onDeleteSelected,
     onRestack,
-    onOpenAssetsPanel,
+    imageCropDraft,
+    onChangeImagePlacement,
+    onEnterImageCrop,
+    onResetImageCrop,
   } = props;
 
   const selected = useMemo(() => {
@@ -437,71 +452,17 @@ export function Inspector(props: InspectorProps) {
             ) : null}
 
             {single.kind === "image-frame" ? (
-              <Section title="Image">
-                <FieldRow label="Artwork">
-                  <Select
-                    value={single.assetId ?? "none"}
-                    onValueChange={(value) =>
-                      onPatchObject(single.id, {
-                        assetId: value === "none" ? undefined : value,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-7 flex-1 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.72rem] shadow-none">
-                      <SelectValue placeholder="Choose artwork" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No artwork</SelectItem>
-                      {assets.map((asset) => (
-                        <SelectItem key={asset._id} value={asset.assetId}>
-                          {asset.filename}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FieldRow>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 w-full rounded-[3px] font-meta text-[0.55rem] uppercase tracking-[0.08em]"
-                  onClick={onOpenAssetsPanel}
-                >
-                  Open the assets panel
-                </Button>
-                <FieldRow label="Fit">
-                  <Select
-                    value={single.fit}
-                    onValueChange={(value) =>
-                      onPatchObject(single.id, { fit: value as typeof single.fit })
-                    }
-                  >
-                    <SelectTrigger className="h-7 flex-1 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.72rem] shadow-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fill">Fill frame</SelectItem>
-                      <SelectItem value="fit">Fit inside</SelectItem>
-                      <SelectItem value="stretch">Stretch</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FieldRow>
-                <FieldRow label="Mask">
-                  <Select
-                    value={single.mask}
-                    onValueChange={(value) =>
-                      onPatchObject(single.id, { mask: value as typeof single.mask })
-                    }
-                  >
-                    <SelectTrigger className="h-7 flex-1 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.72rem] shadow-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="rect">Rectangle</SelectItem>
-                      <SelectItem value="ellipse">Ellipse</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FieldRow>
-              </Section>
+              <ImagePanel
+                object={single}
+                assets={assets}
+                displayUnit={displayUnit}
+                cropActive={Boolean(imageCropDraft)}
+                draft={imageCropDraft}
+                onPatchObject={(patch) => onPatchObject(single.id, patch)}
+                onChangePlacement={(change) => onChangeImagePlacement(single.id, change)}
+                onEnterCrop={() => onEnterImageCrop(single.id)}
+                onResetCrop={() => onResetImageCrop(single.id)}
+              />
             ) : null}
 
             {single.kind === "shape" ? (

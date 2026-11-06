@@ -7,8 +7,11 @@ import type { Id } from "@/convex/_generated/dataModel";
 import type {
   CharacterFormat,
   CharacterStyle,
+  ImageCrop,
+  ImageFit,
   ParagraphFormat,
   ParagraphStyle,
+  Point,
   PublicationDocument,
   PublicationObject,
   PublicationPage,
@@ -95,6 +98,10 @@ import {
   type RecoveryDraft,
 } from "@/lib/publishing/recovery";
 import { isValidPublicationId } from "@/lib/publishing/routes";
+import {
+  createImageDerivatives,
+  validateAssetFile,
+} from "@/lib/publishing/image-derivatives";
 
 /**
  * The publishing editor's state machine, above the React tree.
@@ -199,6 +206,15 @@ export interface UsePublishingEditorResult {
   insertShape: (shape: "rectangle" | "ellipse") => Promise<void>;
   insertLine: () => Promise<void>;
   insertImage: (asset: StudioAssetRecord) => Promise<void>;
+  replaceImage: (objectId: string, asset: StudioAssetRecord) => void;
+  setImagePlacement: (
+    objectId: string,
+    change: { fit?: ImageFit; crop?: ImageCrop; focal?: Point },
+  ) => void;
+  placeAsset: (asset: StudioAssetRecord, targetObjectId?: string) => void;
+  uploadAsset: (file: File) => Promise<void>;
+  uploadingAsset: boolean;
+  assetError?: string;
   restoreRecovery: () => void;
   discardRecovery: () => void;
   keepLocalOnConflict: () => Promise<void>;
@@ -218,6 +234,7 @@ export interface StudioAssetRecord {
   originalUrl: string | null;
   proxyUrl: string | null;
   thumbnailUrl: string | null;
+  metadata?: Record<string, unknown>;
   createdAt: number;
 }
 
@@ -242,6 +259,11 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     api.publishing.publications.updatePublication,
   );
   const saveStylesMutation = useMutation(api.publishing.publications.saveStyles);
+  const generateAssetUploadUrl = useMutation(api.publishing.assets.generateUploadUrl);
+  const registerAssetMutation = useMutation(api.publishing.assets.registerAsset);
+  const setAssetDerivativesMutation = useMutation(
+    api.publishing.assets.setAssetDerivatives,
+  );
 
   const mutationsRef = useRef({
     savePage: savePageMutation,
@@ -253,6 +275,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     movePage: movePageMutation,
     updatePublication: updatePublicationMutation,
     saveStyles: saveStylesMutation,
+    generateAssetUploadUrl,
+    registerAsset: registerAssetMutation,
+    setAssetDerivatives: setAssetDerivativesMutation,
   });
   useEffect(() => {
     loadedRef.current = loaded;
@@ -269,6 +294,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       movePage: movePageMutation,
       updatePublication: updatePublicationMutation,
       saveStyles: saveStylesMutation,
+      generateAssetUploadUrl,
+      registerAsset: registerAssetMutation,
+      setAssetDerivatives: setAssetDerivativesMutation,
     };
   }, [
     savePageMutation,
@@ -280,6 +308,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     movePageMutation,
     updatePublicationMutation,
     saveStylesMutation,
+    generateAssetUploadUrl,
+    registerAssetMutation,
+    setAssetDerivativesMutation,
   ]);
 
   const sessionRef = useRef<EditorSession | null>(null);
@@ -287,6 +318,8 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const [saveStatus, setSaveStatus] = useState<PublishingSaveStatus>("saved");
   const [saveMessage, setSaveMessage] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  const [uploadingAsset, setUploadingAsset] = useState(false);
+  const [assetError, setAssetError] = useState<string | undefined>();
   const [zoom, setZoomState] = useState(0.5);
   const [preview, setPreview] = useState(false);
   const [title, setTitleState] = useState("");
@@ -1425,6 +1458,149 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     [apply],
   );
 
+  /**
+   * Replace only the asset reference. The frame, page position, mask and crop
+   * stay where the designer put them, and the previous asset row is never
+   * touched: it may be shared or needed by a saved version.
+   */
+  const replaceImage = useCallback(
+    (objectId: string, asset: StudioAssetRecord) => {
+      const current = sessionRef.current;
+      const pageNow = current ? activePage(current) : null;
+      if (!current || !pageNow) return;
+      apply(
+        editPage(current, pageNow.id, (pageUpdate) => ({
+          ...pageUpdate,
+          objects: pageUpdate.objects.map((object) =>
+            object.id === objectId && object.kind === "image-frame"
+              ? { ...object, assetId: asset.assetId }
+              : object,
+          ),
+        })),
+      );
+    },
+    [apply],
+  );
+
+  const setImagePlacement = useCallback<UsePublishingEditorResult["setImagePlacement"]>(
+    (objectId, change) => {
+      const current = sessionRef.current;
+      const pageNow = current ? activePage(current) : null;
+      if (!current || !pageNow) return;
+      apply(
+        editPage(current, pageNow.id, (pageUpdate) => ({
+          ...pageUpdate,
+          objects: pageUpdate.objects.map((object) =>
+            object.id === objectId && object.kind === "image-frame"
+              ? {
+                  ...object,
+                  ...(change.fit ? { fit: change.fit } : {}),
+                  ...(change.crop ? { crop: change.crop } : {}),
+                  ...(change.focal ? { focal: change.focal } : {}),
+                }
+              : object,
+          ),
+        })),
+      );
+    },
+    [apply],
+  );
+
+  const placeAsset = useCallback(
+    (asset: StudioAssetRecord, targetObjectId?: string) => {
+      const current = sessionRef.current;
+      const pageNow = current ? activePage(current) : null;
+      if (!current || !pageNow) return;
+      const target =
+        targetObjectId ??
+        (current.state.selection.length === 1 ? current.state.selection[0] : undefined);
+      const object = target
+        ? pageNow.objects.find((entry) => entry.id === target)
+        : undefined;
+      if (object?.kind === "image-frame") {
+        replaceImage(object.id, asset);
+      } else {
+        void insertImage(asset);
+      }
+    },
+    [insertImage, replaceImage],
+  );
+
+  const uploadAsset = useCallback(
+    async (file: File) => {
+      const issues = validateAssetFile({
+        mimeType: file.type,
+        fileSize: file.size,
+      });
+      if (issues.length > 0) {
+        toast.error(issues.map((issue) => issue.message).join(" "));
+        return;
+      }
+
+      setUploadingAsset(true);
+      setAssetError(undefined);
+      try {
+        const derivatives = await createImageDerivatives(file);
+        if (derivatives.width <= 0 || derivatives.height <= 0) {
+          throw new Error(
+            derivatives.warnings[0] ?? "This image could not be read in the browser.",
+          );
+        }
+
+        const uploadBlob = async (blob: Blob): Promise<Id<"_storage">> => {
+          const uploadUrl = await mutationsRef.current.generateAssetUploadUrl({});
+          const response = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": blob.type || "application/octet-stream" },
+            body: blob,
+          });
+          if (!response.ok) {
+            throw new Error(`The upload failed (${response.status}).`);
+          }
+          const result = (await response.json()) as { storageId: Id<"_storage"> };
+          return result.storageId;
+        };
+
+        const originalStorageId = await uploadBlob(file);
+        const registered = await mutationsRef.current.registerAsset({
+          publicationId: publicationId as Id<"publications">,
+          storageId: originalStorageId,
+          filename: file.name,
+          mimeType: file.type,
+          width: derivatives.width,
+          height: derivatives.height,
+        });
+
+        if (derivatives.proxy || derivatives.thumbnail) {
+          try {
+            const [proxyStorageId, thumbnailStorageId] = await Promise.all([
+              derivatives.proxy ? uploadBlob(derivatives.proxy) : undefined,
+              derivatives.thumbnail ? uploadBlob(derivatives.thumbnail) : undefined,
+            ]);
+            await mutationsRef.current.setAssetDerivatives({
+              assetId: registered.assetId,
+              ...(proxyStorageId ? { proxyStorageId } : {}),
+              ...(thumbnailStorageId ? { thumbnailStorageId } : {}),
+            });
+          } catch {
+            // The original is already registered and safe. A missing preview
+            // only costs screen quality; it must not fail the upload.
+            toast.warning("The original was saved, but its preview could not be.");
+          }
+        }
+
+        toast.success(`${file.name} added to the asset library.`);
+      } catch (error) {
+        const message = messageOf(error) || "The image could not be uploaded.";
+        setAssetError(message);
+        toast.error(message);
+      } finally {
+        setUploadingAsset(false);
+      }
+    },
+    [publicationId],
+  );
+
   /* ---------------------------------------------------------------- recovery */
 
   const restoreRecovery = useCallback(() => {
@@ -1600,6 +1776,12 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     insertShape,
     insertLine,
     insertImage,
+    replaceImage,
+    setImagePlacement,
+    placeAsset,
+    uploadAsset,
+    uploadingAsset,
+    assetError,
     restoreRecovery,
     discardRecovery,
     keepLocalOnConflict,

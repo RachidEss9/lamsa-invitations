@@ -31,6 +31,7 @@ import {
 } from "@/lib/publishing/viewport";
 import { PageView, type PageChrome } from "./PageView";
 import type { AssetResolver } from "./ObjectArt";
+import type { ImageCropDraft } from "@/lib/publishing/image";
 import { cn } from "@/lib/utils";
 
 /**
@@ -54,7 +55,7 @@ const MIN_SIZE = 2;
 type HandleId = ResizeHandle | "rotate";
 
 interface DragState {
-  kind: "move" | "resize" | "rotate" | "marquee" | "pan";
+  kind: "move" | "resize" | "rotate" | "marquee" | "pan" | "crop";
   pageId: string;
   /** Page-local pointer position where the gesture began. */
   originPage: Point;
@@ -68,6 +69,8 @@ interface DragState {
   baseSelection: readonly string[];
   resizeHandle?: HandleId;
   moved: boolean;
+  /** Previous page point for incremental crop panning. */
+  lastPage?: Point;
   scroll?: { left: number; top: number };
 }
 
@@ -89,6 +92,10 @@ export interface EditorCanvasProps {
   editable: boolean;
   spaceHeld: boolean;
   assetResolver?: AssetResolver;
+  /** Uncommitted crop shown while the crop tool is active. */
+  cropPreview?: (ImageCropDraft & { objectId: string }) | null;
+  onCropPan?: (dx: number, dy: number) => void;
+  onDropAsset?: (objectId: string, assetId: string) => void;
   onSelect: (ids: readonly string[]) => void;
   /** Commit a finished gesture as a single page edit (history + autosave). */
   onEditPage: (pageId: string, page: PublicationPage) => void;
@@ -100,6 +107,8 @@ export interface EditorCanvasProps {
   /** Double-clicking a text frame enters direct text editing. */
   editingObjectId?: string;
   onEditText?: (objectId: string) => void;
+  /** Double-clicking an image frame enters the crop tool. */
+  onEditImage?: (objectId: string) => void;
   onTextDraft?: (objectId: string, text: string) => void;
   onTextEnd?: () => void;
   onTextSelection?: (objectId: string, start: number, end: number) => void;
@@ -114,6 +123,9 @@ export function EditorCanvas({
   editable,
   spaceHeld,
   assetResolver,
+  cropPreview,
+  onCropPan,
+  onDropAsset,
   onSelect,
   onEditPage,
   onZoom,
@@ -121,6 +133,7 @@ export function EditorCanvas({
   onActivateObject,
   editingObjectId,
   onEditText,
+  onEditImage,
   onTextDraft,
   onTextEnd,
   onTextSelection,
@@ -135,27 +148,49 @@ export function EditorCanvas({
   const [previewFrames, setPreviewFrames] = useState<
     Record<string, PublicationObject["frame"]>
   >({});
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const previewFramesRef = useRef(previewFrames);
   // Gesture handlers must read current props, not the ones from first render;
   // the refs are synchronised after commit, before any pointer can arrive.
-  const live = useRef({ document, selection, zoom, editable, spaceHeld });
+  const live = useRef({ document, selection, zoom, editable, spaceHeld, onCropPan });
 
   useEffect(() => {
     previewFramesRef.current = previewFrames;
   }, [previewFrames]);
 
   useEffect(() => {
-    live.current = { document, selection, zoom, editable, spaceHeld };
-  }, [document, selection, zoom, editable, spaceHeld]);
+    live.current = { document, selection, zoom, editable, spaceHeld, onCropPan };
+  }, [document, selection, zoom, editable, spaceHeld, onCropPan]);
 
   const layout = useMemo(() => stageLayout(geometry, zoom), [geometry, zoom]);
 
   /* --------------------------------------------------------------- renders */
 
   const displayDocument = useMemo(() => {
-    if (Object.keys(previewFrames).length === 0) return document;
-    return applyPreviewFrames(document, previewFrames);
-  }, [document, previewFrames]);
+    let next = document;
+    if (Object.keys(previewFrames).length > 0) {
+      next = applyPreviewFrames(next, previewFrames);
+    }
+    if (cropPreview) {
+      next = {
+        ...next,
+        pages: next.pages.map((page) => ({
+          ...page,
+          objects: page.objects.map((object) =>
+            object.id === cropPreview.objectId && object.kind === "image-frame"
+              ? {
+                  ...object,
+                  fit: cropPreview.fit,
+                  crop: cropPreview.crop,
+                  focal: cropPreview.focal,
+                }
+              : object,
+          ),
+        })),
+      };
+    }
+    return next;
+  }, [document, previewFrames, cropPreview]);
 
   const pagesToRender = useMemo(
     () =>
@@ -423,6 +458,32 @@ export function EditorCanvas({
       if (!page || !pointer) return;
 
       const originStage = stagePointFromClient(event.clientX, event.clientY);
+
+      // Crop mode owns the image frame. A click elsewhere does nothing rather
+      // than leaving the tool or selecting another object by accident.
+      if (cropPreview) {
+        const hit = hitTestPage(page, pointer);
+        const cropObject = page.objects.find(
+          (object) => object.id === cropPreview.objectId,
+        );
+        if (!cropObject || hit?.id !== cropPreview.objectId) return;
+        dragRef.current = {
+          kind: "crop",
+          pageId,
+          originPage: pointer,
+          originStage,
+          pointerId: event.pointerId,
+          ids: [cropPreview.objectId],
+          baseFrames: { [cropPreview.objectId]: cropObject.frame },
+          baseSelection: [cropPreview.objectId],
+          moved: false,
+          lastPage: pointer,
+        };
+        scroller.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        return;
+      }
+
       // Handles sit in an SVG owned by the page, but the scroller captures the
       // pointer, so the grip is found geometrically instead of by DOM hit.
       const activeHandle = handle ?? handleAtPointer(page, pointer, originStage);
@@ -496,7 +557,7 @@ export function EditorCanvas({
       setMarquee({ x1: originStage.x, y1: originStage.y, x2: originStage.x, y2: originStage.y });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selection, spaceHeld, editable],
+    [selection, spaceHeld, editable, cropPreview],
   );
 
   const onPointerMove = useCallback(
@@ -527,6 +588,13 @@ export function EditorCanvas({
         return; // still a click, as the eye can tell
       }
       drag.moved = true;
+
+      if (drag.kind === "crop") {
+        const previous = drag.lastPage ?? drag.originPage;
+        live.current.onCropPan?.(pagePoint.x - previous.x, pagePoint.y - previous.y);
+        drag.lastPage = pagePoint;
+        return;
+      }
 
       const documentNow = live.current.document;
       const pageNow = documentNow.pages.find((entry) => entry.id === drag.pageId);
@@ -595,7 +663,7 @@ export function EditorCanvas({
       const drag = dragRef.current;
       if (!drag || event.pointerId !== drag.pointerId) return;
 
-      if (drag.kind === "pan") {
+      if (drag.kind === "pan" || drag.kind === "crop") {
         dragRef.current = null;
         return;
       }
@@ -655,17 +723,68 @@ export function EditorCanvas({
       if (!page || !pointer) return;
       const hit = hitTestPage(page, pointer);
       if (!hit || !isInteractive(hit, page)) return;
+      if (cropPreview) return;
       if (hit.kind === "text-frame" && onEditText) {
         onEditText(hit.id);
+        return;
+      }
+      if (hit.kind === "image-frame" && onEditImage) {
+        onEditImage(hit.id);
         return;
       }
       onActivateObject?.(hit.id);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editable, onActivateObject, onEditText],
+    [editable, onActivateObject, onEditText, onEditImage, cropPreview],
   );
 
-  const cursor: string = spaceHeld || !editable ? "grab" : "default";
+  const onDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!onDropAsset || !event.dataTransfer.types.includes("application/x-lamsa-asset")) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      const pageId = pageIdAtClient(event.clientX, event.clientY);
+      const page = live.current.document.pages.find((entry) => entry.id === pageId);
+      const pointer = pageId
+        ? pagePointFromClient(event.clientX, event.clientY, pageId)
+        : null;
+      if (!page || !pointer) {
+        setDropTargetId(null);
+        return;
+      }
+      const hit = hitTestPage(page, pointer);
+      setDropTargetId(hit?.kind === "image-frame" ? hit.id : null);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onDropAsset],
+  );
+
+  const onDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!onDropAsset) return;
+      event.preventDefault();
+      setDropTargetId(null);
+      const assetId = event.dataTransfer.getData("application/x-lamsa-asset");
+      const pageId = pageIdAtClient(event.clientX, event.clientY);
+      const page = live.current.document.pages.find((entry) => entry.id === pageId);
+      const pointer = pageId
+        ? pagePointFromClient(event.clientX, event.clientY, pageId)
+        : null;
+      if (!assetId || !page || !pointer) return;
+      const hit = hitTestPage(page, pointer);
+      if (hit?.kind === "image-frame") onDropAsset(hit.id, assetId);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onDropAsset],
+  );
+
+  const cursor: string = cropPreview
+    ? "move"
+    : spaceHeld || !editable
+      ? "grab"
+      : "default";
 
   return (
     <div
@@ -679,10 +798,14 @@ export function EditorCanvas({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       onDoubleClick={onDoubleClick}
+      onDragOver={onDragOver}
+      onDragLeave={() => setDropTargetId(null)}
+      onDrop={onDrop}
       style={{
         backgroundImage:
           "radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--ink) 8%, transparent) 1px, transparent 0)",
         backgroundSize: "18px 18px",
+        touchAction: cropPreview ? "none" : undefined,
       }}
     >
       <div style={{ padding: FIT_PADDING, width: "max-content", height: "max-content" }}>
@@ -713,10 +836,14 @@ export function EditorCanvas({
               }}
               chrome={chrome}
               selectedIds={selection}
-              activeHandleSubject={selection.length === 1 ? selection[0] : undefined}
+              activeHandleSubject={
+                !cropPreview && selection.length === 1 ? selection[0] : undefined
+              }
               resolveAsset={assetResolver}
               editable={editable}
               editingObjectId={editingObjectId}
+              cropObjectId={cropPreview?.objectId}
+              dropTargetId={dropTargetId ?? undefined}
               onTextDraft={onTextDraft}
               onTextEnd={onTextEnd}
               onTextSelection={onTextSelection}

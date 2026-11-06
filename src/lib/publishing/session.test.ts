@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createDocument,
+  createImageFrame,
   createParagraph,
   createShape,
   createStory,
@@ -350,6 +351,53 @@ describe("history", () => {
     expect(activePage(session)!.name).toBe("Two");
     // Nothing left to redo.
     expect(redo(session)).toBe(session);
+  });
+});
+
+describe("image crop history", () => {
+  it("commits a crop as one undoable image edit without moving the frame", () => {
+    const document = editorDocument();
+    let session = createEditorSession(document);
+    const page = activePage(session)!;
+    const image = createImageFrame({
+      layerId: contentLayerId(document),
+      x: 20,
+      y: 30,
+      width: 200,
+      height: 120,
+      assetId: "asset_photo",
+    });
+    session = addObjectToPage(session, page.id, image);
+    const beforeFrame = { ...activePage(session)!.objects[0]!.frame };
+    const beforeUndo = session.undoStack.length;
+    session = patchObjects(session, page.id, [image.id], (object) => {
+      if (object.kind !== "image-frame") return object;
+      return {
+        ...object,
+        crop: {
+          scale: 1.75,
+          offsetX: 0.12,
+          offsetY: -0.08,
+          normalized: true,
+          rotation: 14,
+        },
+        focal: { x: 0.35, y: 0.62 },
+      };
+    });
+    expect(session.undoStack.length).toBe(beforeUndo + 1);
+    const cropped = activePage(session)!.objects[0]!;
+    expect(cropped.kind === "image-frame" ? cropped.crop.scale : 0).toBe(1.75);
+    expect(cropped.frame).toEqual(beforeFrame);
+
+    session = undo(session);
+    const undone = activePage(session)!.objects[0]!;
+    expect(undone.kind === "image-frame" ? undone.crop.scale : 0).toBe(1);
+    expect(undone.frame).toEqual(beforeFrame);
+
+    session = redo(session);
+    const redone = activePage(session)!.objects[0]!;
+    expect(redone.kind === "image-frame" ? redone.crop.rotation : 0).toBe(14);
+    expect(redone.frame).toEqual(beforeFrame);
   });
 });
 

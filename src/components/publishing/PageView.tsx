@@ -78,6 +78,10 @@ interface PageViewProps {
   editable: boolean;
   /** The frame with an open native text editor, if any. */
   editingObjectId?: string;
+  /** The image frame whose crop draft is being edited. */
+  cropObjectId?: string;
+  /** An image frame currently under an artwork drag. */
+  dropTargetId?: string;
   onTextDraft?: (objectId: string, text: string) => void;
   onTextEnd?: () => void;
   onTextSelection?: (objectId: string, start: number, end: number) => void;
@@ -512,6 +516,8 @@ export const PageView = memo(function PageView({
   resolveAsset,
   editable,
   editingObjectId,
+  cropObjectId,
+  dropTargetId,
   onTextDraft,
   onTextEnd,
   onTextSelection,
@@ -554,6 +560,132 @@ export const PageView = memo(function PageView({
           editable={editable}
         />
       ) : null}
+      {cropObjectId ? (
+        <CropArt page={page} objectId={cropObjectId} scale={box.scale} />
+      ) : null}
+      {dropTargetId ? (
+        <DropTargetArt page={page} objectId={dropTargetId} />
+      ) : null}
     </svg>
+  );
+});
+
+/** Crop boundaries stay visually distinct from selection: rule-of-thirds
+ * guides, corner brackets and a red/white dashed frame. */
+const CropArt = memo(function CropArt({
+  page,
+  objectId,
+  scale,
+}: {
+  page: PublicationPage;
+  objectId: string;
+  scale: number;
+}) {
+  const object = page.objects.find((entry) => entry.id === objectId);
+  if (!object || object.kind !== "image-frame") return null;
+  const { frame } = object;
+  const center = frameCenter(frame);
+  const thirdX = frame.width / 3;
+  const thirdY = frame.height / 3;
+  const grip = Math.min(18, 11 / Math.max(0.08, scale));
+  const inset = Math.min(grip, frame.width / 3, frame.height / 3);
+  const corners = [
+    `M ${frame.x} ${frame.y + inset} v ${-inset} h ${inset}`,
+    `M ${frame.x + frame.width - inset} ${frame.y} h ${inset} v ${inset}`,
+    `M ${frame.x + frame.width} ${frame.y + frame.height - inset} v ${inset} h ${-inset}`,
+    `M ${frame.x + inset} ${frame.y + frame.height} h ${-inset} v ${-inset}`,
+  ];
+  return (
+    <g
+      pointerEvents="none"
+      transform={
+        frame.rotation === 0
+          ? undefined
+          : `rotate(${frame.rotation} ${center.x} ${center.y})`
+      }
+    >
+      <rect
+        x={frame.x}
+        y={frame.y}
+        width={frame.width}
+        height={frame.height}
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth={2.5}
+        vectorEffect="non-scaling-stroke"
+      />
+      <rect
+        x={frame.x}
+        y={frame.y}
+        width={frame.width}
+        height={frame.height}
+        fill="none"
+        stroke="var(--red, #710014)"
+        strokeWidth={1.25}
+        strokeDasharray="5 4"
+        vectorEffect="non-scaling-stroke"
+      />
+      <g stroke="#ffffff" strokeOpacity={0.72} strokeWidth={1} vectorEffect="non-scaling-stroke">
+        <line x1={frame.x + thirdX} y1={frame.y} x2={frame.x + thirdX} y2={frame.y + frame.height} />
+        <line
+          x1={frame.x + thirdX * 2}
+          y1={frame.y}
+          x2={frame.x + thirdX * 2}
+          y2={frame.y + frame.height}
+        />
+        <line x1={frame.x} y1={frame.y + thirdY} x2={frame.x + frame.width} y2={frame.y + thirdY} />
+        <line
+          x1={frame.x}
+          y1={frame.y + thirdY * 2}
+          x2={frame.x + frame.width}
+          y2={frame.y + thirdY * 2}
+        />
+      </g>
+      <g
+        fill="none"
+        stroke="var(--red, #710014)"
+        strokeWidth={2}
+        vectorEffect="non-scaling-stroke"
+      >
+        {corners.map((path) => (
+          <path key={path} d={path} />
+        ))}
+      </g>
+    </g>
+  );
+});
+
+const DropTargetArt = memo(function DropTargetArt({
+  page,
+  objectId,
+}: {
+  page: PublicationPage;
+  objectId: string;
+}) {
+  const object = page.objects.find((entry) => entry.id === objectId);
+  if (!object || object.kind !== "image-frame") return null;
+  const { frame } = object;
+  const center = frameCenter(frame);
+  return (
+    <g
+      pointerEvents="none"
+      transform={
+        frame.rotation === 0
+          ? undefined
+          : `rotate(${frame.rotation} ${center.x} ${center.y})`
+      }
+    >
+      <rect
+        x={frame.x}
+        y={frame.y}
+        width={frame.width}
+        height={frame.height}
+        fill="color-mix(in oklab, var(--red) 12%, transparent)"
+        stroke="var(--red, #710014)"
+        strokeWidth={2}
+        strokeDasharray="6 4"
+        vectorEffect="non-scaling-stroke"
+      />
+    </g>
   );
 });

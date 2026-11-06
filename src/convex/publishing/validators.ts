@@ -128,6 +128,8 @@ export const objectValidator = v.object({
       scale: v.number(),
       offsetX: v.number(),
       offsetY: v.number(),
+      normalized: v.optional(v.boolean()),
+      rotation: v.optional(v.number()),
     }),
   ),
   focal: v.optional(v.object({ x: v.number(), y: v.number() })),

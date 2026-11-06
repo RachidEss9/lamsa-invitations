@@ -285,6 +285,26 @@ function validateObjects(
         (!isRecord(entry.crop) || !isFiniteNumber(entry.crop.scale) || (entry.crop.scale as number) <= 0)
       ) {
         c.error("image/crop", `${objectPath}.crop`, "Image crop scale must be positive");
+      } else if (isRecord(entry.crop)) {
+        if (
+          !isFiniteNumber(entry.crop.offsetX) ||
+          !isFiniteNumber(entry.crop.offsetY)
+        ) {
+          c.error("image/crop", `${objectPath}.crop`, "Image crop offsets must be finite");
+        }
+        if (entry.crop.rotation !== undefined && !isFiniteNumber(entry.crop.rotation)) {
+          c.error("image/crop", `${objectPath}.crop`, "Image rotation must be finite");
+        }
+        if (
+          entry.crop.normalized !== undefined &&
+          typeof entry.crop.normalized !== "boolean"
+        ) {
+          c.error(
+            "image/crop",
+            `${objectPath}.crop`,
+            "Image crop normalization must be a boolean",
+          );
+        }
       }
     }
     if (kind === "shape" && entry.shape !== undefined) {

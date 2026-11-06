@@ -1,4 +1,4 @@
-import { Component, useMemo, useState, type ReactNode } from "react";
+import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { usePublishingEditor } from "@/hooks/publishing/usePublishingEditor";
@@ -10,6 +10,7 @@ import { PagePanel } from "@/components/publishing/PagePanel";
 import { LayersPanel } from "@/components/publishing/LayersPanel";
 import { AssetsPanel, type StudioAsset } from "@/components/publishing/AssetsPanel";
 import { Inspector } from "@/components/publishing/Inspector";
+import { ImageCropBar } from "@/components/publishing/ImageCropBar";
 import {
   ConflictBanner,
   EditorLoading,
@@ -19,6 +20,13 @@ import {
 } from "@/components/publishing/StatePanels";
 import { Button } from "@/components/ui/button";
 import { PUBLISHING_LIBRARY_PATH } from "@/lib/publishing/routes";
+import {
+  cropDraftFor,
+  defaultImageCrop,
+  panImageCrop,
+  type ImageCropDraft,
+} from "@/lib/publishing/image";
+import type { ImageCrop, ImageFit, Point } from "@/lib/publishing/model";
 import { cn } from "@/lib/utils";
 
 /**
@@ -103,6 +111,14 @@ function EditorWorkspace({
     start: number;
     end: number;
   } | null>(null);
+  const [imageCrop, setImageCrop] = useState<{
+    pageId: string;
+    objectId: string;
+    draft: ImageCropDraft;
+  } | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<
+    "pages" | "layers" | "assets" | "inspector" | null
+  >(null);
 
   const document = editor.document;
   const page = editor.page;
@@ -121,6 +137,14 @@ function EditorWorkspace({
     textSelectionState && page && textSelectionState.pageId === page.id
       ? textSelectionState
       : null;
+  const activeImageCrop =
+    imageCrop && page && imageCrop.pageId === page.id ? imageCrop : null;
+  const selectedImageFrame =
+    page && editor.selection.length === 1
+      ? page.objects.find(
+          (object) => object.id === editor.selection[0] && object.kind === "image-frame",
+        )
+      : undefined;
 
   const geometry = useMemo(() => {
     if (!document || !page) return null;
@@ -141,6 +165,89 @@ function EditorWorkspace({
     };
   }, [editor.assets]);
 
+  const commitImageCrop = () => {
+    if (!activeImageCrop) return;
+    editor.setImagePlacement(activeImageCrop.objectId, activeImageCrop.draft);
+    setImageCrop(null);
+  };
+
+  const startImageCrop = (objectId: string) => {
+    if (!page) return;
+    const frame = page.objects.find((object) => object.id === objectId);
+    if (!frame || frame.kind !== "image-frame") return;
+    editor.setSelection([objectId]);
+    setImageCrop({
+      pageId: page.id,
+      objectId,
+      draft: cropDraftFor(frame),
+    });
+    setMobilePanel(null);
+  };
+
+  const changeImagePlacement = (
+    objectId: string,
+    change: { fit?: ImageFit; crop?: ImageCrop; focal?: Point },
+  ) => {
+    if (activeImageCrop?.objectId === objectId) {
+      setImageCrop((current) =>
+        current
+          ? {
+              ...current,
+              draft: {
+                fit: change.fit ?? current.draft.fit,
+                crop: change.crop ?? current.draft.crop,
+                focal: change.focal ?? current.draft.focal,
+              },
+            }
+          : current,
+      );
+      return;
+    }
+    editor.setImagePlacement(objectId, change);
+  };
+
+  const resetImageCrop = (objectId: string) => {
+    const frame = page?.objects.find((object) => object.id === objectId);
+    if (!frame || frame.kind !== "image-frame") return;
+    const reset = {
+      fit: frame.fit,
+      crop: defaultImageCrop(),
+      focal: { x: 0.5, y: 0.5 },
+    };
+    if (activeImageCrop?.objectId === objectId) {
+      setImageCrop((current) =>
+        current ? { ...current, draft: { ...current.draft, ...reset } } : current,
+      );
+    } else {
+      editor.setImagePlacement(objectId, reset);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeImageCrop) return;
+    const onCropKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setImageCrop(null);
+        return;
+      }
+      if (event.key !== "Enter") return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest("input, textarea, select, button, [contenteditable='true']")
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      editor.setImagePlacement(activeImageCrop.objectId, activeImageCrop.draft);
+      setImageCrop(null);
+    };
+    window.addEventListener("keydown", onCropKey, true);
+    return () => window.removeEventListener("keydown", onCropKey, true);
+  }, [activeImageCrop, editor]);
+
   if (editor.state === "not-found") {
     return (
       <main className="flex min-h-screen flex-col bg-[var(--paper)]">
@@ -156,6 +263,53 @@ function EditorWorkspace({
       </main>
     );
   }
+
+  const assetsPanelNode = (
+    <AssetsPanel
+      document={document}
+      assets={editor.assets as StudioAsset[]}
+      busy={editor.busy}
+      uploading={editor.uploadingAsset}
+      error={editor.assetError}
+      selectedFrameName={
+        selectedImageFrame?.kind === "image-frame" ? selectedImageFrame.name : undefined
+      }
+      onPlaceAsset={(asset) => {
+        setImageCrop(null);
+        editor.placeAsset(asset);
+      }}
+      onUploadAsset={(file) => void editor.uploadAsset(file)}
+    />
+  );
+
+  const inspectorNode = (
+    <Inspector
+      document={document}
+      page={page}
+      selection={editor.selection}
+      assets={editor.assets}
+      displayUnit={document.displayUnit}
+      onPatchPage={editor.patchPage}
+      onPatchObject={editor.patchObject}
+      onSetFrame={editor.setFrame}
+      typography={editor}
+      textSelection={textSelection}
+      onDeleteSelected={editor.deleteSelection}
+      onRestack={editor.restack}
+      onOpenAssetsPanel={() => {
+        setPanel("assets");
+        setMobilePanel("assets");
+      }}
+      imageCropDraft={
+        activeImageCrop && activeImageCrop.objectId === selectedImageFrame?.id
+          ? activeImageCrop.draft
+          : undefined
+      }
+      onChangeImagePlacement={changeImagePlacement}
+      onEnterImageCrop={startImageCrop}
+      onResetImageCrop={resetImageCrop}
+    />
+  );
 
   return (
     <main className="flex h-screen min-h-0 flex-col overflow-hidden bg-[var(--paper)] text-[var(--ink)]">
@@ -270,18 +424,25 @@ function EditorWorkspace({
                 onPatchObject={(objectId, patch) => editor.patchObject(objectId, patch)}
               />
             ) : null}
-            {panel === "assets" ? (
-              <AssetsPanel
-                document={document}
-                assets={editor.assets as StudioAsset[]}
-                busy={editor.busy}
-                onInsertAsset={(asset) => void editor.insertImage(asset)}
-              />
-            ) : null}
+            {panel === "assets" ? assetsPanelNode : null}
           </div>
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col">
+          {activeImageCrop ? (
+            <ImageCropBar
+              name={
+                page.objects.find((object) => object.id === activeImageCrop.objectId)
+                  ?.name ?? "Image"
+              }
+              draft={activeImageCrop.draft}
+              onChange={(draft) =>
+                setImageCrop((current) => (current ? { ...current, draft } : current))
+              }
+              onApply={commitImageCrop}
+              onCancel={() => setImageCrop(null)}
+            />
+          ) : null}
           <EditorCanvas
             document={document}
             geometry={geometry}
@@ -291,6 +452,37 @@ function EditorWorkspace({
             editable={!editor.preview}
             spaceHeld={false}
             assetResolver={resolver}
+            cropPreview={
+              activeImageCrop
+                ? { objectId: activeImageCrop.objectId, ...activeImageCrop.draft }
+                : null
+            }
+            onCropPan={(dx, dy) => {
+              if (!activeImageCrop) return;
+              const frame = page.objects.find(
+                (object) => object.id === activeImageCrop.objectId,
+              );
+              if (!frame || frame.kind !== "image-frame") return;
+              setImageCrop((current) =>
+                current
+                  ? {
+                      ...current,
+                      draft: {
+                        ...current.draft,
+                        crop: panImageCrop(frame.frame, current.draft.crop, dx, dy),
+                      },
+                    }
+                  : current,
+              );
+            }}
+            onDropAsset={(objectId, assetId) => {
+              const asset = editor.assets.find((entry) => entry.assetId === assetId);
+              if (!asset) return;
+              setImageCrop(null);
+              editor.replaceImage(objectId, asset);
+              editor.setSelection([objectId]);
+              setPanel("layers");
+            }}
             onSelect={editor.setSelection}
             onEditPage={editor.editPageObjects}
             onZoom={editor.setZoom}
@@ -327,6 +519,7 @@ function EditorWorkspace({
               editor.endTextEdit();
               setEditing(null);
             }}
+            onEditImage={startImageCrop}
             onActivateObject={(objectId) => {
               editor.setSelection([objectId]);
               setPanel("layers");
@@ -340,6 +533,9 @@ function EditorWorkspace({
             <span className="flex items-center gap-3">
               {editingObjectId ? (
                 <span className="text-[var(--red)]">Editing text · Esc finishes</span>
+              ) : null}
+              {activeImageCrop ? (
+                <span className="text-[var(--red)]">Cropping image · Enter applies</span>
               ) : null}
               <span>{editor.selection.length} selected</span>
               <span>{page.objects.length} objects</span>
@@ -359,23 +555,97 @@ function EditorWorkspace({
         </section>
 
         <aside className="hidden min-h-0 border-l border-[var(--rule)] bg-[var(--paper)] lg:block">
-          <Inspector
-            document={document}
-            page={page}
-            selection={editor.selection}
-            assets={editor.assets}
-            displayUnit={document.displayUnit}
-            onPatchPage={editor.patchPage}
-            onPatchObject={editor.patchObject}
-            onSetFrame={editor.setFrame}
-            typography={editor}
-            textSelection={textSelection}
-            onDeleteSelected={editor.deleteSelection}
-            onRestack={editor.restack}
-            onOpenAssetsPanel={() => setPanel("assets")}
-          />
+          {inspectorNode}
         </aside>
       </div>
+
+      <div className="flex h-10 shrink-0 items-stretch border-t border-[var(--rule)] bg-[var(--paper-light)] lg:hidden">
+        {(
+          [
+            ["pages", "Pages"],
+            ["layers", "Layers"],
+            ["assets", "Assets"],
+            ["inspector", "Inspect"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setMobilePanel((current) => (current === id ? null : id))}
+            className={cn(
+              "flex-1 border-r border-[var(--rule)] py-2 font-meta text-[0.55rem] uppercase tracking-[0.1em]",
+              mobilePanel === id
+                ? "text-[var(--red)]"
+                : "text-[var(--ink-soft)]",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+        {selectedImageFrame?.kind === "image-frame" && !activeImageCrop ? (
+          <button
+            type="button"
+            onClick={() => startImageCrop(selectedImageFrame.id)}
+            className="flex-1 py-2 font-meta text-[0.55rem] uppercase tracking-[0.1em] text-[var(--red)]"
+          >
+            Crop
+          </button>
+        ) : null}
+      </div>
+
+      {mobilePanel ? (
+        <div className="fixed inset-x-0 bottom-0 top-14 z-50 flex flex-col border-t border-[var(--rule)] bg-[var(--paper)] shadow-2xl lg:hidden">
+          <div className="flex h-9 shrink-0 items-center justify-between border-b border-[var(--rule)] px-3">
+            <span className="font-meta text-[0.58rem] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+              {mobilePanel === "inspector" ? "Inspector" : mobilePanel}
+            </span>
+            <button
+              type="button"
+              onClick={() => setMobilePanel(null)}
+              className="font-meta text-[0.58rem] uppercase tracking-[0.1em] text-[var(--red)]"
+            >
+              Close
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {mobilePanel === "pages" ? (
+              <PagePanel
+                document={document}
+                activePageId={page.id}
+                dirtyPages={editor.dirtyPageIds}
+                busy={editor.busy}
+                onActivate={(pageId) => {
+                  editor.activatePage(pageId);
+                  setMobilePanel(null);
+                }}
+                onAddPage={(afterPageId) => void editor.addPage(afterPageId)}
+                onDuplicatePage={(pageId) => void editor.duplicatePage(pageId)}
+                onDeletePage={(pageId) => void editor.deletePage(pageId)}
+                onMovePage={(pageId, toIndex) => void editor.movePageTo(pageId, toIndex)}
+              />
+            ) : null}
+            {mobilePanel === "layers" ? (
+              <LayersPanel
+                page={page}
+                selection={editor.selection}
+                onSelect={(ids) => {
+                  editor.setSelection(ids);
+                  setMobilePanel(null);
+                }}
+                onToggleVisibility={editor.toggleLayerVisible}
+                onToggleLock={editor.toggleLayerLocked}
+                onAddLayer={editor.addLayer}
+                onMoveLayer={editor.nudgeLayer}
+                onMoveObjectInLayer={editor.nudgeObjectInLayer}
+                onMoveObjectToLayer={editor.moveObjectToLayer}
+                onPatchObject={(objectId, patch) => editor.patchObject(objectId, patch)}
+              />
+            ) : null}
+            {mobilePanel === "assets" ? assetsPanelNode : null}
+            {mobilePanel === "inspector" ? inspectorNode : null}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

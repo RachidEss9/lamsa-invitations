@@ -271,11 +271,22 @@ export interface TextFrameObject extends BaseObject {
 export type ImageFit = "fill" | "fit" | "stretch";
 
 export interface ImageCrop {
-  /** 1 = the asset is shown at its natural size relative to the frame. */
+  /**
+   * Zoom relative to the fit baseline. For normalised crops 1 means the
+   * image exactly meets or covers the frame, depending on `fit`.
+   */
   scale: number;
-  /** Offset of the artwork inside the frame, in frame-relative points. */
+  /**
+   * Artwork displacement as a fraction of the frame width/height. Earlier
+   * documents stored points here and are rendered with the identity crop
+   * until they are edited, which keeps their placement stable.
+   */
   offsetX: number;
   offsetY: number;
+  /** Marks offsets as frame-relative fractions rather than legacy points. */
+  normalized?: boolean;
+  /** Image rotation inside the frame, in degrees. Frame rotation is separate. */
+  rotation?: number;
 }
 
 export interface ImageFrameObject extends BaseObject {

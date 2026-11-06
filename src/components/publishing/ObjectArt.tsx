@@ -8,9 +8,9 @@ import type {
 } from "@/lib/publishing/model";
 import {
   fontFamilyFor,
-  imagePreserveAspectRatio,
   polygonPoints,
 } from "@/lib/publishing/render";
+import { imagePlacement } from "@/lib/publishing/image";
 import {
   characterCss,
   resolveCharacter,
@@ -325,10 +325,6 @@ function insetCss(inset: { top: number; right: number; bottom: number; left: num
 /* Images                                                                     */
 /* -------------------------------------------------------------------------- */
 
-// Phase 3A crops nothing: the crop payload is respected for scale/offset, but
-// there is no cropping UI, so "fill" images render their asset sheet before
-// the model gains a cropping tool.
-
 function ImageContent({
   object,
   resolveAsset,
@@ -337,56 +333,96 @@ function ImageContent({
   resolveAsset?: AssetResolver;
 }) {
   const asset = resolveAsset?.(object.assetId);
-  const maskId = `mask-${object.id}`;
+  const maskId = `image-clip-${object.id}`;
   const width = Math.max(0.5, object.frame.width);
   const height = Math.max(0.5, object.frame.height);
-  const preserve = imagePreserveAspectRatio(object.fit);
 
   const clip =
     object.mask === "ellipse" ? (
       <clipPath id={maskId}>
-        <ellipse cx={object.frame.x + width / 2} cy={object.frame.y + height / 2} rx={width / 2} ry={height / 2} />
+        <ellipse
+          cx={object.frame.x + width / 2}
+          cy={object.frame.y + height / 2}
+          rx={width / 2}
+          ry={height / 2}
+        />
       </clipPath>
     ) : object.mask === "path" && object.maskPath ? (
       <clipPath id={maskId}>
         <path d={object.maskPath} />
       </clipPath>
-    ) : null;
-
-  if (!asset?.url) {
-    return (
-      <g>
-        {clip}
+    ) : (
+      <clipPath id={maskId}>
         <rect
           x={object.frame.x}
           y={object.frame.y}
           width={width}
           height={height}
-          fill="color-mix(in oklab, var(--ink) 6%, transparent)"
-          mask={object.mask === "rect" ? undefined : `url(#${maskId})`}
         />
-        <path
-          d={`M ${object.frame.x} ${object.frame.y} l ${width} ${height} M ${object.frame.x + width} ${object.frame.y} l ${-width} ${height}`}
-          stroke="color-mix(in oklab, var(--ink) 16%, transparent)"
-          strokeWidth="1"
-          vectorEffect="non-scaling-stroke"
-        />
+      </clipPath>
+    );
+
+  if (!asset?.url) {
+    return (
+      <g>
+        {clip}
+        <g clipPath={`url(#${maskId})`}>
+          <rect
+            x={object.frame.x}
+            y={object.frame.y}
+            width={width}
+            height={height}
+            fill="color-mix(in oklab, var(--ink) 6%, transparent)"
+          />
+          <path
+            d={`M ${object.frame.x} ${object.frame.y} l ${width} ${height} M ${object.frame.x + width} ${object.frame.y} l ${-width} ${height}`}
+            stroke="color-mix(in oklab, var(--ink) 16%, transparent)"
+            strokeWidth="1"
+            vectorEffect="non-scaling-stroke"
+          />
+          <text
+            x={object.frame.x + width / 2}
+            y={object.frame.y + height / 2}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="color-mix(in oklab, var(--ink) 48%, transparent)"
+            fontFamily="var(--font-meta, ui-monospace, monospace)"
+            fontSize={Math.max(6, Math.min(11, width / 18))}
+            letterSpacing="0.08em"
+          >
+            {object.assetId ? "IMAGE UNAVAILABLE" : "EMPTY IMAGE FRAME"}
+          </text>
+        </g>
       </g>
     );
   }
 
+  const placement = imagePlacement(
+    object.frame,
+    asset,
+    object.fit,
+    object.crop,
+    object.focal,
+  );
+
   return (
     <g>
       {clip}
-      <image
-        href={asset.url}
-        x={object.frame.x}
-        y={object.frame.y}
-        width={width}
-        height={height}
-        preserveAspectRatio={preserve}
-        mask={object.mask === "rect" ? undefined : `url(#${maskId})`}
-      />
+      <g clipPath={`url(#${maskId})`}>
+        <image
+          href={asset.url}
+          x={placement.x}
+          y={placement.y}
+          width={placement.width}
+          height={placement.height}
+          preserveAspectRatio="none"
+          transform={
+            placement.rotation === 0
+              ? undefined
+              : `rotate(${placement.rotation} ${placement.centerX} ${placement.centerY})`
+          }
+        />
+      </g>
     </g>
   );
 }

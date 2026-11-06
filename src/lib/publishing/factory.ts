@@ -179,6 +179,8 @@ export function createImageFrame(
       scale: options.crop?.scale ?? 1,
       offsetX: options.crop?.offsetX ?? 0,
       offsetY: options.crop?.offsetY ?? 0,
+      normalized: options.crop?.normalized ?? true,
+      rotation: options.crop?.rotation ?? 0,
     },
     focal: options.focal,
     mask: options.mask ?? "rect",

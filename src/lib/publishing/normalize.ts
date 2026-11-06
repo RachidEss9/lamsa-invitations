@@ -323,6 +323,8 @@ function normalizeObject(value: unknown, context: ObjectContext): PublicationObj
         scale: positive(crop.scale, 1),
         offsetX: num(crop.offsetX, 0),
         offsetY: num(crop.offsetY, 0),
+        normalized: bool(crop.normalized, false),
+        rotation: normalizeAngle(num(crop.rotation, 0)),
       },
       focal: focal
         ? { x: clamp01(focal.x, 0.5), y: clamp01(focal.y, 0.5) }
