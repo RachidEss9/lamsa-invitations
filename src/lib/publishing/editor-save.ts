@@ -130,6 +130,34 @@ export class PublishingSaver {
   }
 
   /**
+   * "Keep my edits" after a deliberate confirmation. The caller has just read
+   * the server copy, so those versions are adopted as the new guard instead of
+   * dropping it: if a third write lands between that read and this write, the
+   * server refuses again rather than erasing it silently.
+   */
+  async rebaseAndOverwrite(
+    batch: SaveBatch,
+    versions: { pages?: Record<string, number>; stories?: Record<string, number> },
+  ): Promise<boolean> {
+    for (const [id, version] of Object.entries(versions.pages ?? {})) {
+      if (Number.isFinite(version)) this.pageVersions.set(id, version);
+    }
+    for (const [id, version] of Object.entries(versions.stories ?? {})) {
+      if (Number.isFinite(version)) this.storyVersions.set(id, version);
+    }
+    this.blocked = null;
+    this.overwriteNext = false;
+    this.status = "saving";
+    this.notify("saving");
+    const ok = await this.queue.flush(batch);
+    if (ok) {
+      this.status = "saved";
+      this.notify("saved");
+    }
+    return ok;
+  }
+
+  /**
    * The explicit "keep my version" answer to a conflict: the next write drops
    * the version guard, because the designer has seen the warning and chosen.
    */
@@ -188,7 +216,11 @@ export class PublishingSaver {
   }
 
   private translate(error: unknown): unknown {
-    return isSaveConflict(error) ? new SaveConflictError(messageOf(error)) : error;
+    // Never surface the client's transport wrapper (request id, stack) in the
+    // conflict banner: the designer needs the consequence, not a trace.
+    return isSaveConflict(error)
+      ?        new SaveConflictError("This page changed elsewhere while you were editing.")
+      : error;
   }
 
   private publish(state: SaveState): void {

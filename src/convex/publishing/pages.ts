@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
+import { mutation, type MutationCtx } from "../_generated/server";
 import {
   addPage,
   movePage,
@@ -16,6 +17,35 @@ import {
   saveDocumentState,
 } from "./lib";
 import { publicationPageValidator } from "./validators";
+
+/**
+ * Page-structure guard. Content saves do not touch this counter, so a stale
+ * editor is refused only when the *set or order* of pages moved on — not every
+ * time another session types into a different page.
+ */
+function structureVersionOf(publication: { structureVersion?: number }): number {
+  return publication.structureVersion ?? 1;
+}
+
+function assertStructureCurrent(
+  publication: { structureVersion?: number },
+  expected: number | undefined,
+): void {
+  if (expected !== undefined && expected !== structureVersionOf(publication)) {
+    throw new Error(
+      "This publication's pages changed elsewhere. Reload before changing page structure.",
+    );
+  }
+}
+
+async function bumpStructureVersion(
+  ctx: MutationCtx,
+  publication: Doc<"publications">,
+): Promise<number> {
+  const structureVersion = structureVersionOf(publication) + 1;
+  await ctx.db.patch(publication._id, { structureVersion });
+  return structureVersion;
+}
 
 /**
  * Page-level edits. The client sends a complete page and the server applies it
@@ -64,10 +94,12 @@ export const createPage = mutation({
     publicationId: v.id("publications"),
     at: v.optional(v.number()),
     name: v.optional(v.string()),
+    expectedStructureVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    assertStructureCurrent(publication, args.expectedStructureVersion);
     const document = await loadDocument(ctx, publication);
     const before = new Set(document.pages.map((page) => page.id));
     const next = addPage(document, { at: args.at, name: args.name });
@@ -75,7 +107,13 @@ export const createPage = mutation({
     if (!page) throw new Error("The page could not be created.");
     const now = Date.now();
     await saveDocumentState(ctx, publication, next, now);
-    return { pageId: page.id, index: next.pages.indexOf(page), updatedAt: now };
+    const structureVersion = await bumpStructureVersion(ctx, publication);
+    return {
+      pageId: page.id,
+      index: next.pages.indexOf(page),
+      updatedAt: now,
+      structureVersion,
+    };
   },
 });
 
@@ -84,10 +122,12 @@ export const duplicatePage = mutation({
     publicationId: v.id("publications"),
     pageId: v.string(),
     at: v.optional(v.number()),
+    expectedStructureVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    assertStructureCurrent(publication, args.expectedStructureVersion);
     const document = await loadDocument(ctx, publication);
     const source = document.pages.find((page) => page.id === args.pageId);
     if (!source) throw new Error("Page not found.");
@@ -101,7 +141,12 @@ export const duplicatePage = mutation({
     const next = addPage(document, { page: copy, at: index });
     const now = Date.now();
     await saveDocumentState(ctx, publication, next, now);
-    return { pageId: copy.id, index: next.pages.findIndex((page) => page.id === copy.id) };
+    const structureVersion = await bumpStructureVersion(ctx, publication);
+    return {
+      pageId: copy.id,
+      index: next.pages.findIndex((page) => page.id === copy.id),
+      structureVersion,
+    };
   },
 });
 
@@ -109,10 +154,12 @@ export const deletePage = mutation({
   args: {
     publicationId: v.id("publications"),
     pageId: v.string(),
+    expectedStructureVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    assertStructureCurrent(publication, args.expectedStructureVersion);
     const document = await loadDocument(ctx, publication);
     if (!document.pages.some((page) => page.id === args.pageId)) {
       throw new Error("Page not found.");
@@ -123,7 +170,8 @@ export const deletePage = mutation({
     const next = removePage(document, args.pageId);
     const now = Date.now();
     await saveDocumentState(ctx, publication, next, now);
-    return { pageCount: next.pages.length, updatedAt: now };
+    const structureVersion = await bumpStructureVersion(ctx, publication);
+    return { pageCount: next.pages.length, updatedAt: now, structureVersion };
   },
 });
 
@@ -132,10 +180,12 @@ export const movePageTo = mutation({
     publicationId: v.id("publications"),
     pageId: v.string(),
     toIndex: v.number(),
+    expectedStructureVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    assertStructureCurrent(publication, args.expectedStructureVersion);
     const document = await loadDocument(ctx, publication);
     if (!document.pages.some((page) => page.id === args.pageId)) {
       throw new Error("Page not found.");
@@ -143,7 +193,12 @@ export const movePageTo = mutation({
     const next = movePage(document, args.pageId, args.toIndex);
     const now = Date.now();
     await saveDocumentState(ctx, publication, next, now);
-    return { index: next.pages.findIndex((page) => page.id === args.pageId), updatedAt: now };
+    const structureVersion = await bumpStructureVersion(ctx, publication);
+    return {
+      index: next.pages.findIndex((page) => page.id === args.pageId),
+      updatedAt: now,
+      structureVersion,
+    };
   },
 });
 
@@ -152,10 +207,12 @@ export const reorderPages = mutation({
   args: {
     publicationId: v.id("publications"),
     pageIds: v.array(v.string()),
+    expectedStructureVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    assertStructureCurrent(publication, args.expectedStructureVersion);
     const document = await loadDocument(ctx, publication);
     if (
       args.pageIds.length !== document.pages.length ||
@@ -171,6 +228,7 @@ export const reorderPages = mutation({
     const next = reflowPages(document, ordered as typeof document.pages);
     const now = Date.now();
     await saveDocumentState(ctx, publication, next, now);
-    return { pageCount: next.pages.length, updatedAt: now };
+    const structureVersion = await bumpStructureVersion(ctx, publication);
+    return { pageCount: next.pages.length, updatedAt: now, structureVersion };
   },
 });

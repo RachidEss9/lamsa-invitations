@@ -164,6 +164,56 @@ describe("PublishingSaver", () => {
     await saver.dispose();
   });
 
+  it("rebases the guard on the version the designer saw, not no guard at all", async () => {
+    const document = documentFixture();
+    const page = document.pages[0]!;
+    const seen: Array<number | undefined> = [];
+    const saver = new PublishingSaver({
+      savePage: async (_page, expectedVersion) => {
+        seen.push(expectedVersion);
+        if (expectedVersion !== 7) throw new Error("changed elsewhere");
+        return { version: 8 };
+      },
+      saveStory: async () => ({ version: 2 }),
+    });
+    saver.setPageBaseline(page.id, page.version);
+    saver.schedule({ pages: [page], stories: [] });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(saver.current).toBe("conflict");
+
+    const ok = await saver.rebaseAndOverwrite(
+      { pages: [{ ...page, name: "Mine" }], stories: [] },
+      { pages: { [page.id]: 7 } },
+    );
+    expect(ok).toBe(true);
+    expect(seen[1]).toBe(7);
+    expect(saver.current).toBe("saved");
+    await saver.dispose();
+  });
+
+  it("stays in conflict when a newer version lands during the overwrite", async () => {
+    const document = documentFixture();
+    const page = document.pages[0]!;
+    const saver = new PublishingSaver({
+      savePage: async () => {
+        throw new Error("This page changed elsewhere. Reload it and try again.");
+      },
+      saveStory: async () => ({ version: 2 }),
+    });
+    saver.setPageBaseline(page.id, page.version);
+    saver.schedule({ pages: [page], stories: [] });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(saver.current).toBe("conflict");
+
+    const ok = await saver.rebaseAndOverwrite(
+      { pages: [page], stories: [] },
+      { pages: { [page.id]: 9 } },
+    );
+    expect(ok).toBe(false);
+    expect(saver.current).toBe("conflict");
+    await saver.dispose();
+  });
+
   it("keeps a failing save pending so a later flush retries it", async () => {
     const document = documentFixture();
     const page = document.pages[0]!;

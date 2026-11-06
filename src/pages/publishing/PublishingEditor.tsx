@@ -192,8 +192,8 @@ function EditorWorkspace({
         />
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[232px_minmax(0,1fr)_268px]">
-        <aside className="flex min-h-0 flex-col border-r border-[var(--rule)] bg-[var(--paper)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[232px_minmax(0,1fr)_268px]">
+        <aside className="hidden min-h-0 flex-col border-r border-[var(--rule)] bg-[var(--paper)] lg:flex">
           <div className="grid grid-cols-3 border-b border-[var(--rule)]">
             {(
               [
@@ -298,7 +298,7 @@ function EditorWorkspace({
           </div>
         </section>
 
-        <aside className="min-h-0 border-l border-[var(--rule)] bg-[var(--paper)]">
+        <aside className="hidden min-h-0 border-l border-[var(--rule)] bg-[var(--paper)] lg:block">
           <Inspector
             document={document}
             page={page}

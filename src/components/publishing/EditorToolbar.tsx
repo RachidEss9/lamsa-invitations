@@ -97,12 +97,14 @@ export interface EditorToolbarProps {
 
 function ToolButton({
   label,
+  title,
   onClick,
   disabled,
   active,
   children,
 }: {
   label: string;
+  title?: string;
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
@@ -113,7 +115,7 @@ function ToolButton({
       type="button"
       variant="ghost"
       size="icon"
-      title={label}
+      title={title ?? label}
       aria-label={label}
       aria-pressed={active}
       disabled={disabled}
@@ -163,8 +165,8 @@ export function EditorToolbar(props: EditorToolbarProps) {
   } = props;
 
   return (
-    <header className="flex h-12 shrink-0 items-stretch border-b border-[var(--rule)] bg-[var(--paper-light)]">
-      <div className="flex min-w-0 items-center gap-1.5 pl-2 pr-3">
+    <header className="flex min-h-12 shrink-0 flex-wrap items-stretch border-b border-[var(--rule)] bg-[var(--paper-light)] lg:h-12 lg:flex-nowrap">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 pr-2 lg:flex-none lg:py-0 lg:pr-3">
         <ToolButton label="Back to the library" onClick={onBack}>
           <ArrowLeft className="size-4" />
         </ToolButton>
@@ -179,7 +181,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
           }}
           aria-label="Publication title"
           spellCheck={false}
-          className="w-[clamp(120px,18vw,260px)] truncate border-0 bg-transparent font-display text-[0.95rem] leading-6 tracking-[0.01em] text-[var(--ink)] outline-none focus-visible:bg-[color-mix(in_oklab,var(--ink)_4%,transparent)]"
+          className="w-[clamp(72px,26vw,260px)] truncate border-0 bg-transparent font-display lg:w-[clamp(120px,18vw,260px)] text-[0.95rem] leading-6 tracking-[0.01em] text-[var(--ink)] outline-none focus-visible:bg-[color-mix(in_oklab,var(--ink)_4%,transparent)]"
         />
         <span
           className="flex items-center gap-1.5 rounded-full border border-[var(--rule)] px-2 py-[3px] font-meta text-[0.55rem] uppercase tracking-[0.12em] text-[var(--ink-soft)]"
@@ -190,7 +192,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
         </span>
       </div>
 
-      <div className="flex flex-1 items-center justify-center gap-1">
+      <div className="order-3 flex w-full flex-1 items-center justify-center gap-1 border-t border-[var(--rule)] py-1 lg:order-none lg:w-auto lg:border-0 lg:py-0">
         <div className="flex items-center rounded-[4px] border border-[var(--rule)] bg-[var(--paper)] px-0.5">
           <ToolButton label="Previous page" onClick={onPreviousPage} disabled={!canGoPrevious || busy}>
             <ChevronLeft className="size-4" />
@@ -232,7 +234,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1 pr-2">
+      <div className="flex items-center gap-1 pr-1 lg:pr-2">
         <div className="hidden items-center rounded-[4px] border border-[var(--rule)] bg-[var(--paper)] px-0.5 lg:flex">
           <ToolButton label="Guides" active={chrome.guides} onClick={() => onToggleChrome("guides")}>
             <Ruler className="size-3.5" />
@@ -254,10 +256,20 @@ export function EditorToolbar(props: EditorToolbarProps) {
         <span className="mx-1 h-5 w-px bg-[var(--rule)]" />
 
         <div className="flex items-center rounded-[4px] border border-[var(--rule)] bg-[var(--paper)] px-0.5">
-          <ToolButton label="Undo" onClick={onUndo} disabled={!canUndo || busy}>
+          <ToolButton
+            label="Undo"
+            title="Undo the last content edit. Adding, deleting, duplicating or moving pages cannot be undone."
+            onClick={onUndo}
+            disabled={!canUndo || busy}
+          >
             <Undo2 className="size-4" />
           </ToolButton>
-          <ToolButton label="Redo" onClick={onRedo} disabled={!canRedo || busy}>
+          <ToolButton
+            label="Redo"
+            title="Redo the last content edit. Page structure changes are not part of this history."
+            onClick={onRedo}
+            disabled={!canRedo || busy}
+          >
             <Redo2 className="size-4" />
           </ToolButton>
         </div>

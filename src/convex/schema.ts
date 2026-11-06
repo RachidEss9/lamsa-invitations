@@ -179,6 +179,10 @@ const schema = defineSchema(
       presetId: v.string(),
       status: publicationStatusValidator,
       documentVersion: v.number(),
+      // Bumped only by page-structure mutations (add/duplicate/delete/reorder),
+      // never by content saves, so two editors can compare page structure
+      // without every autosave looking like a structural change.
+      structureVersion: v.optional(v.number()),
       displayUnit: lengthUnitValidator,
       spec: pageSpecValidator,
       facingPages: v.boolean(),

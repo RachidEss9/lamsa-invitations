@@ -2,6 +2,17 @@ import { AlertTriangle, ArrowLeft, BookOpen, Loader2, RefreshCw, Save } from "lu
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { PUBLISHING_LIBRARY_PATH } from "@/lib/publishing/routes";
 
@@ -122,23 +133,65 @@ export function ConflictBanner({
         {message || "This publication changed in another tab or on another device."} Your local
         edits are still here; nothing has been overwritten.
       </p>
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-6 rounded-[3px] font-meta text-[0.55rem] uppercase tracking-[0.08em]"
-        disabled={busy}
-        onClick={onTakeServer}
-      >
-        Use server copy
-      </Button>
-      <Button
-        size="sm"
-        className="h-6 rounded-[3px] bg-[var(--red)] font-meta text-[0.55rem] uppercase tracking-[0.08em] text-white hover:bg-[color-mix(in_oklab,var(--red)_88%,black)]"
-        disabled={busy}
-        onClick={onKeepLocal}
-      >
-        Keep my edits
-      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 rounded-[3px] font-meta text-[0.55rem] uppercase tracking-[0.08em]"
+            disabled={busy}
+          >
+            Use server copy
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard your local edits?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The latest server copy will replace everything you changed in this
+              tab. Your unsaved local edits will be discarded and cannot be
+              recovered from the editor.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={onTakeServer}>
+              Use server copy
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            size="sm"
+            className="h-6 rounded-[3px] bg-[var(--red)] font-meta text-[0.55rem] uppercase tracking-[0.08em] text-white hover:bg-[color-mix(in_oklab,var(--red)_88%,black)]"
+            disabled={busy}
+          >
+            Keep my edits
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace the server copy?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your local pages will overwrite the version now on the server,
+              including changes made in another tab or on another device. A
+              recovery copy is saved in this browser first. This cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onKeepLocal}
+              className="bg-[var(--red)] text-white hover:bg-[color-mix(in_oklab,var(--red)_88%,black)]"
+            >
+              Replace server copy
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

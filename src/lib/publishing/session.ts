@@ -142,6 +142,19 @@ export function canRedo(session: EditorSession): boolean {
   return session.redoStack.length > 0;
 }
 
+/**
+ * Drops content history at a structural boundary. Adding, deleting,
+ * duplicating or moving a page is a server operation the session never
+ * records, so old undo entries would otherwise point at a page set that no
+ * longer exists.
+ */
+export function clearHistory(session: EditorSession): EditorSession {
+  if (session.undoStack.length === 0 && session.redoStack.length === 0) {
+    return session;
+  }
+  return { ...session, undoStack: [], redoStack: [] };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Writing                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -610,10 +623,11 @@ export function discardPageEdits(
   session: EditorSession,
   pageId: string,
 ): EditorSession {
-  const { [pageId]: _dropped, ...rest } = session.state.pages;
+  const pages = { ...session.state.pages };
+  delete pages[pageId];
   return {
     ...session,
-    state: { ...session.state, pages: rest },
+    state: { ...session.state, pages },
   };
 }
 
@@ -621,10 +635,11 @@ export function discardStoryEdits(
   session: EditorSession,
   storyId: string,
 ): EditorSession {
-  const { [storyId]: _dropped, ...rest } = session.state.stories;
+  const stories = { ...session.state.stories };
+  delete stories[storyId];
   return {
     ...session,
-    state: { ...session.state, stories: rest },
+    state: { ...session.state, stories },
   };
 }
 

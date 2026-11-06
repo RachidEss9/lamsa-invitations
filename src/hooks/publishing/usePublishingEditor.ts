@@ -27,6 +27,7 @@ import {
   adoptStory,
   canRedo,
   canUndo,
+  clearHistory,
   createEditorSession,
   dirtyPages,
   dirtyStories,
@@ -193,6 +194,10 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     updatePublication: updatePublicationMutation,
   });
   useEffect(() => {
+    loadedRef.current = loaded;
+  }, [loaded]);
+
+  useEffect(() => {
     mutationsRef.current = {
       savePage: savePageMutation,
       updateStory: updateStoryMutation,
@@ -225,6 +230,8 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const [recovery, setRecovery] = useState<RecoveryDraft | null>(null);
   const recoveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushedEmpty = useRef(true);
+  const loadedRef = useRef(loaded);
+  const structureVersionRef = useRef(1);
 
   /* -------------------------------------------------------------- the saver */
 
@@ -320,6 +327,11 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     const saver = saverRef.current;
     for (const page of document.pages) saver?.setPageBaseline(page.id, page.version);
     for (const story of document.stories) saver?.setStoryBaseline(story.id, story.version);
+    const structureVersion =
+      (loaded.publication as { structureVersion?: number }).structureVersion ?? 1;
+    if (structureVersion > structureVersionRef.current) {
+      structureVersionRef.current = structureVersion;
+    }
     if (!current) {
       const draft = readRecoveryDraft(publicationId);
       if (draft && (draft.pages.length > 0 || draft.stories.length > 0)) {
@@ -366,18 +378,40 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     const current = sessionRef.current;
     const saver = saverRef.current;
     if (!current || !saver) return;
+    const batch = {
+      pages: dirtyPages(current),
+      stories: dirtyStories(current),
+    };
     setBusy(true);
     try {
-      const ok = await saver.overwriteWithLocal({
-        pages: dirtyPages(current),
-        stories: dirtyStories(current),
-      });
-      if (ok) toast.success("Your version was written to the server.", IDLE_TOAST);
-      else toast.error("The conflict could not be resolved.");
+      // Keep the local copy on disk before anything is written over the server.
+      saveRecoveryDraft(publicationId, batch);
+      // Read the versions the designer is about to replace. They become the
+      // guard for the write, so a *newer* version arriving in between is still
+      // refused instead of overwritten.
+      const snapshot = (await convex.query(api.publishing.publications.getMine, {
+        publicationId: publicationId as Id<"publications">,
+      })) as { document: PublicationDocument };
+      const pages = Object.fromEntries(
+        snapshot.document.pages.map((entry) => [entry.id, entry.version]),
+      );
+      const stories = Object.fromEntries(
+        snapshot.document.stories.map((entry) => [entry.id, entry.version]),
+      );
+      const ok = await saver.rebaseAndOverwrite(batch, { pages, stories });
+      if (ok) {
+        toast.success("Your version replaced the server copy.", IDLE_TOAST);
+      } else {
+        toast.error(
+          "The server copy changed again. Reload it before choosing which version to keep.",
+        );
+      }
+    } catch (error) {
+      toast.error(messageOf(error) || "The conflict could not be resolved.");
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [convex, publicationId]);
 
   const takeServerCopy = useCallback(async () => {
     const saver = saverRef.current;
@@ -629,14 +663,18 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       setBusy(true);
       try {
         await work();
-        if (success) toast.success(success, IDLE_TOAST);
+        const latest = sessionRef.current;
+        if (latest) apply(clearHistory(latest));
+        if (success) {
+          toast.success(`${success} Page structure is not undoable.`, IDLE_TOAST);
+        }
       } catch (error) {
         toast.error(messageOf(error) || "The change could not be saved.");
       } finally {
         setBusy(false);
       }
     },
-    [],
+    [apply],
   );
 
   const addPage = useCallback(
@@ -644,10 +682,13 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       withBusy(async () => {
         const saver = saverRef.current;
         if (saver) {
-          await saver.flush({
+          const flushed = await saver.flush({
             pages: dirtyPages(sessionRef.current!),
             stories: dirtyStories(sessionRef.current!),
           });
+          if (!flushed) {
+            throw new Error("Resolve the save conflict before changing pages.");
+          }
         }
         const at = (() => {
           const doc = sessionDocument(sessionRef.current!);
@@ -657,7 +698,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
         const result = await mutationsRef.current.createPage({
           publicationId: publicationId as Id<"publications">,
           at,
+          expectedStructureVersion: structureVersionRef.current,
         });
+        structureVersionRef.current = result.structureVersion;
         const current = sessionRef.current;
         if (current) apply(setActivePage(current, result.pageId));
       }, "A blank page was added."),
@@ -669,15 +712,20 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       withBusy(async () => {
         const saver = saverRef.current;
         if (saver) {
-          await saver.flush({
+          const flushed = await saver.flush({
             pages: dirtyPages(sessionRef.current!),
             stories: dirtyStories(sessionRef.current!),
           });
+          if (!flushed) {
+            throw new Error("Resolve the save conflict before changing pages.");
+          }
         }
         const result = await mutationsRef.current.duplicatePage({
           publicationId: publicationId as Id<"publications">,
           pageId,
+          expectedStructureVersion: structureVersionRef.current,
         });
+        structureVersionRef.current = result.structureVersion;
         const current = sessionRef.current;
         if (current) apply(setActivePage(current, result.pageId));
       }, "Page duplicated."),
@@ -689,13 +737,18 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       withBusy(async () => {
         const current = sessionRef.current;
         if (!current) return;
-        if (current.state.pages[pageId]) {
-          apply(discardPageEdits(current, pageId));
-        }
-        await mutationsRef.current.deletePage({
+        const result = await mutationsRef.current.deletePage({
           publicationId: publicationId as Id<"publications">,
           pageId,
+          expectedStructureVersion: structureVersionRef.current,
         });
+        structureVersionRef.current = result.structureVersion;
+        // Only drop local edits for the page once the server accepted the
+        // deletion; a refused stale delete keeps them intact.
+        const after = sessionRef.current;
+        if (after?.state.pages[pageId]) {
+          apply(discardPageEdits(after, pageId));
+        }
         clearRecoveryDraft(publicationId);
       }, "Page deleted."),
     [apply, publicationId, withBusy],
@@ -704,11 +757,13 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const movePageTo = useCallback(
     (pageId: string, toIndex: number) =>
       withBusy(async () => {
-        await mutationsRef.current.movePage({
+        const result = await mutationsRef.current.movePage({
           publicationId: publicationId as Id<"publications">,
           pageId,
           toIndex,
+          expectedStructureVersion: structureVersionRef.current,
         });
+        structureVersionRef.current = result.structureVersion;
       }, "Page order updated."),
     [publicationId, withBusy],
   );
@@ -739,41 +794,65 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     const withStory: TextFrameObject = { ...object, storyId: story.id };
     const next = addObjectToPage(adoptStory(current, story), pageNow.id, withStory);
     apply(next);
-    const pageAfter = sessionDocument(next).pages.find((entry) => entry.id === pageNow.id);
-    const storyAfter = sessionDocument(next).stories.find((entry) => entry.id === story.id);
     const saver = saverRef.current;
     if (!saver) return;
     setBusy(true);
+    let storyCreated = false;
     try {
+      // Create the story *before* the page that names it. The frame does not
+      // exist on the server yet, so the story starts with no thread frames;
+      // the reference is added after the page write succeeds. A story failure
+      // can therefore never leave the page pointing at a missing story.
+      const result = await mutationsRef.current.createStory({
+        publicationId: publicationId as Id<"publications">,
+        story: { ...story, frames: [] },
+      });
+      storyCreated = true;
+      saver.setStoryBaseline(story.id, result.version);
+      const created = sessionRef.current;
+      if (created) apply(adoptStory(created, { ...story, version: result.version }));
+
+      const latest = sessionRef.current;
+      const pageAfter = latest
+        ? sessionDocument(latest).pages.find((entry) => entry.id === pageNow.id)
+        : undefined;
       const pageSaved = await saver.flush({
         pages: pageAfter ? [pageAfter] : [],
         stories: [],
       });
-      if (!pageSaved) throw new Error("The page could not be saved before its story.");
-      const result = await mutationsRef.current.createStory({
-        publicationId: publicationId as Id<"publications">,
-        story: storyAfter ?? story,
-      });
-      const after = sessionRef.current;
-      if (after) {
-        apply(adoptStory(after, { ...(storyAfter ?? story), version: result.version }));
+      if (!pageSaved) {
+        // Keep the frame locally so the autosave can retry it after the
+        // conflict is resolved; re-inserting would create a second story.
+        toast.error(
+          "Your text frame is kept locally. Resolve the conflict and it will retry saving.",
+          IDLE_TOAST,
+        );
+        return;
       }
-      saver.setStoryBaseline(story.id, result.version);
-      const latest = sessionRef.current;
-      const latestPage = latest ? activePage(latest) : null;
-      if (latest && latestPage) apply(setSelection(latest, [withStory.id]));
+
+      // The frame now exists, so the story may safely name it.
+      const storyWithFrame = { ...story, version: result.version };
+      await saver.flush({ pages: [], stories: [storyWithFrame] });
+      const settled = sessionRef.current;
+      if (settled) apply(setSelection(settled, [withStory.id]));
       toast.success("Text frame added.", IDLE_TOAST);
     } catch (error) {
       toast.error(messageOf(error) || "The text frame could not be created.");
-      // The page write may have landed without its story; take the frame out
-      // again so the document never keeps a frame pointing at nothing.
-      const after = sessionRef.current;
-      if (after) {
-        const repaired = discardStoryEdits(
-          removeObjects(after, pageNow.id, [withStory.id]),
-          story.id,
-        );
-        apply(repaired);
+      if (!storyCreated) {
+        // The story was never created, so the local frame would point at
+        // nothing. Remove it (and the story) instead of leaving an orphan.
+        const after = sessionRef.current;
+        if (after) {
+          const repaired = discardStoryEdits(
+            removeObjects(after, pageNow.id, [withStory.id]),
+            story.id,
+          );
+          apply(repaired);
+        }
+      } else {
+        // The story exists; keep the frame so a retry can finish the page
+        // write instead of creating a second story for the same gesture.
+        toast.error("The text frame is kept locally; saving will retry.", IDLE_TOAST);
       }
     } finally {
       setBusy(false);
@@ -1015,7 +1094,17 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
 }
 
 function messageOf(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return "";
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  // Convex wraps server errors with a request id and a (possibly multi-line)
+  // stack. The designer needs the sentence, not the trace.
+  const withoutWrapper = raw.replace(/^\[CONVEX[\s\S]*?Uncaught Error:\s*/, "");
+  const stackStart = withoutWrapper.search(/\s+at\s+\S+\s*\(/);
+  return (stackStart >= 0 ? withoutWrapper.slice(0, stackStart) : withoutWrapper)
+    .replace(/\s+/g, " ")
+    .trim();
 }
