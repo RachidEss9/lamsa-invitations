@@ -36,6 +36,9 @@ import {
   type TypographyEditor,
 } from "./TypographyPanel";
 import { ImagePanel } from "./ImagePanel";
+import { ChevronsUpDown } from "lucide-react";
+import { assetMimeLabel } from "./AssetsPanel";
+import { ImageOff } from "lucide-react";
 
 /**
  * The inspector. Selection first, then page.
@@ -74,6 +77,7 @@ export interface InspectorProps {
   ) => void;
   onEnterImageCrop: (objectId: string) => void;
   onResetImageCrop: (objectId: string) => void;
+  onOpenAssets?: () => void;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -189,6 +193,7 @@ export function Inspector(props: InspectorProps) {
     onChangeImagePlacement,
     onEnterImageCrop,
     onResetImageCrop,
+    onOpenAssets,
   } = props;
 
   const selected = useMemo(() => {

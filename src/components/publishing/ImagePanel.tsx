@@ -5,6 +5,8 @@ import {
   Crosshair,
   RotateCcw,
   Scan,
+  ChevronsUpDown,
+  ImageOff,
 } from "lucide-react";
 
 import type {
@@ -314,24 +316,34 @@ export function ImagePanel({
 
       <Section title="Image information">
         <Row label="Artwork">
-          <Select
-            value={object.assetId ?? "none"}
-            onValueChange={(value) =>
-              onPatchObject({ assetId: value === "none" ? undefined : value })
-            }
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7 flex-1 gap-1 rounded-[3px] text-left font-meta text-[0.62rem]"
+            onClick={onOpenAssets}
           >
-            <SelectTrigger className="h-7 flex-1 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.68rem] shadow-none">
-              <SelectValue placeholder="Choose artwork" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No artwork</SelectItem>
-              {assets.map((entry) => (
-                <SelectItem key={entry._id} value={entry.assetId}>
-                  {entry.filename}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {object.assetId ? (
+              <>
+                <img
+                  src={asset?.proxyUrl ?? asset?.thumbnailUrl ?? asset?.originalUrl}
+                  alt=""
+                  className="size-4 rounded-[2px] object-cover"
+                />
+                <span>{asset?.filename ?? object.assetId}</span>
+              </>
+            ) : (
+              <>
+                <ImageOff className="size-3.5" />
+                <span>No artwork assigned</span>
+              </>
+            )}
+            <ChevronsUpDown className="ml-auto size-3 text-[var(--ink-soft)]" />
+          </Button>
+          {asset && (
+            <p className="font-meta text-[0.52rem] uppercase tracking-[0.06em] text-[var(--ink-soft)]">
+              {assetMimeLabel(asset)} · {asset.width}×{asset.height} · {formatAssetBytes(asset.fileSize)}
+            </p>
+          )}
         </Row>
         {asset ? (
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-meta text-[0.6rem] tabular-nums">
