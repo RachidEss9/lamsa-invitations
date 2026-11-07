@@ -57,6 +57,7 @@ export interface ImagePanelProps {
   }) => void;
   onEnterCrop: () => void;
   onResetCrop: () => void;
+  onOpenAssets: () => void;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -99,6 +100,7 @@ export function ImagePanel({
   onChangePlacement,
   onEnterCrop,
   onResetCrop,
+  onOpenAssets,
 }: ImagePanelProps) {
   const [focalOpen, setFocalOpen] = useState(false);
   const asset = assets.find((entry) => entry.assetId === object.assetId);
@@ -320,12 +322,12 @@ export function ImagePanel({
             variant="secondary"
             size="sm"
             className="h-7 flex-1 gap-1 rounded-[3px] text-left font-meta text-[0.62rem]"
-            onClick={onOpenAssets}
+            onClick={() => onOpenAssets()}
           >
             {object.assetId ? (
               <>
                 <img
-                  src={asset?.proxyUrl ?? asset?.thumbnailUrl ?? asset?.originalUrl}
+                  src={asset?.proxyUrl ?? asset?.thumbnailUrl ?? asset?.originalUrl ?? ""}
                   alt=""
                   className="size-4 rounded-[2px] object-cover"
                 />

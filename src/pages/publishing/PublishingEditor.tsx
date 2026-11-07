@@ -300,10 +300,6 @@ function EditorWorkspace({
         setPanel("assets");
         setMobilePanel("assets");
       }}
-      onOpenAssets={() => {
-        setPanel("assets");
-        setMobilePanel("assets");
-      }}
       imageCropDraft={
         activeImageCrop && activeImageCrop.objectId === selectedImageFrame?.id
           ? activeImageCrop.draft

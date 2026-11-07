@@ -28,17 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 import {
   TypographyPanel,
   type TextSelection,
   type TypographyEditor,
 } from "./TypographyPanel";
 import { ImagePanel } from "./ImagePanel";
-import { ChevronsUpDown } from "lucide-react";
-import { assetMimeLabel } from "./AssetsPanel";
-import { ImageOff } from "lucide-react";
 
 /**
  * The inspector. Selection first, then page.
@@ -49,7 +44,6 @@ import { ImageOff } from "lucide-react";
  * a magazine job reads in millimetres and a book in inches without the model
  * ever storing anything but points.
  */
-
 export interface InspectorProps {
   document: PublicationDocument;
   page: PublicationPage;
@@ -77,7 +71,6 @@ export interface InspectorProps {
   ) => void;
   onEnterImageCrop: (objectId: string) => void;
   onResetImageCrop: (objectId: string) => void;
-  onOpenAssets?: () => void;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -193,7 +186,7 @@ export function Inspector(props: InspectorProps) {
     onChangeImagePlacement,
     onEnterImageCrop,
     onResetImageCrop,
-    onOpenAssets,
+    onOpenAssetsPanel,
   } = props;
 
   const selected = useMemo(() => {
@@ -467,6 +460,7 @@ export function Inspector(props: InspectorProps) {
                 onChangePlacement={(change) => onChangeImagePlacement(single.id, change)}
                 onEnterCrop={() => onEnterImageCrop(single.id)}
                 onResetCrop={() => onResetImageCrop(single.id)}
+                onOpenAssets={onOpenAssetsPanel}
               />
             ) : null}
 
@@ -541,10 +535,15 @@ export function Inspector(props: InspectorProps) {
                 <FieldRow label="Stroke">
                   <input
                     type="color"
-                    aria-label="Line colour"
+                    aria-label="Line stroke"
                     value={single.stroke}
                     onChange={(event) => onPatchObject(single.id, { stroke: event.target.value })}
                     className="h-7 w-8 cursor-pointer rounded-[3px] border border-[var(--rule)] bg-[var(--paper)] p-0.5"
+                  />
+                  <Input
+                    value={single.stroke}
+                    onChange={(event) => onPatchObject(single.id, { stroke: event.target.value })}
+                    className="h-7 flex-1 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] font-meta text-[0.7rem] uppercase shadow-none"
                   />
                 </FieldRow>
                 <NumberField
@@ -554,61 +553,47 @@ export function Inspector(props: InspectorProps) {
                   min={0}
                   onCommit={(value) => onPatchObject(single.id, { strokeWidth: value })}
                 />
+                <FieldRow label="Cap">
+                  <Select
+                    value={single.cap}
+                    onValueChange={(value) =>
+                      onPatchObject(single.id, { cap: value as "butt" | "round" | "square" })
+                    }
+                  >
+                    <SelectTrigger className="h-7 flex-1 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.72rem] shadow-none">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="butt">Butt</SelectItem>
+                      <SelectItem value="round">Round</SelectItem>
+                      <SelectItem value="square">Square</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FieldRow>
               </Section>
             ) : null}
 
-            {single.kind === "generic" ? (
-              <Section title="Unknown object">
-                <p className="text-[0.7rem] leading-5 text-[var(--ink-soft)]">
-                  “{single.originalKind}” came from a newer build. It is drawn as a placeholder and
-                  preserved byte-for-byte; editing its internals is not supported here.
-                </p>
-              </Section>
-            ) : null}
-
-            <div className="px-3 py-2.5">
+            <Section title="Object">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-meta text-[0.6rem] tabular-nums">
+                <dt className="text-[var(--ink-soft)]">Kind</dt>
+                <dd className="text-right">{objectKindLabel(single)}</dd>
+                <dt className="text-[var(--ink-soft)]">Rotation</dt>
+                <dd className="text-right">{Math.round(single.frame.rotation)}°</dd>
+              </dl>
               <Button
                 variant="outline"
                 size="sm"
-                className={cn(
-                  "h-7 w-full rounded-[3px] border-[color-mix(in_oklab,var(--red)_45%,transparent)] font-meta text-[0.55rem] uppercase tracking-[0.1em] text-[var(--red)]",
-                  "hover:bg-[color-mix(in_oklab,var(--red)_8%,transparent)]",
-                )}
+                className="h-6 w-full rounded-[3px] font-meta text-[0.52rem] uppercase tracking-[0.08em] text-[var(--red)]"
                 onClick={onDeleteSelected}
               >
-                Delete selection
+                Delete object
               </Button>
-            </div>
-          </>
-        ) : null}
-
-        {selected.length > 1 ? (
-          <>
-            <Section title={`${selected.length} objects`}>
-              <p className="text-[0.7rem] leading-5 text-[var(--ink-soft)]">
-                Move the group on the canvas, or hold Alt with an arrow key to move one point at a
-                time. Mixed values are edited one object at a time.
-              </p>
             </Section>
-            <div className="px-3 py-2.5">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 w-full rounded-[3px] border-[color-mix(in_oklab,var(--red)_45%,transparent)] font-meta text-[0.55rem] uppercase tracking-[0.1em] text-[var(--red)] hover:bg-[color-mix(in_oklab,var(--red)_8%,transparent)]"
-                onClick={onDeleteSelected}
-              >
-                Delete {selected.length} objects
-              </Button>
-            </div>
           </>
         ) : null}
-
-        <Separator className="mx-3 my-1 w-auto" />
-        <p className="px-3 font-meta text-[0.52rem] leading-4 tracking-[0.06em] text-[color-mix(in_oklab,var(--ink-soft)_70%,transparent)]">
-          Units follow the document · {unitLabel}
-        </p>
       </div>
     </div>
   );
 }
 
+ 
