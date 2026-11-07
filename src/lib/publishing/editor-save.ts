@@ -15,7 +15,7 @@
  */
 
 import { AutosaveQueue, type SaveState } from "../platform/autosave";
-import type { PublicationPage, Story } from "./model";
+import type { MasterPage, PublicationPage, Story } from "./model";
 
 export type PublishingSaveStatus = SaveState | "conflict";
 
@@ -41,6 +41,12 @@ export function isSaveConflict(error: unknown): boolean {
 export interface SaveBatch {
   pages: PublicationPage[];
   stories: Story[];
+  /**
+   * Master edits ride the same queue and the same conflict state as pages,
+   * each with its own version guard. Optional so every existing caller — and
+   * every page-only batch — stays valid.
+   */
+  masters?: MasterPage[];
 }
 
 export interface SavedVersion {
@@ -56,11 +62,16 @@ export interface PublishingSaverOptions {
     story: Story,
     expectedVersion: number | undefined,
   ) => Promise<SavedVersion>;
+  saveMaster?: (
+    master: MasterPage,
+    expectedVersion: number | undefined,
+  ) => Promise<SavedVersion>;
   /** How long to wait after the last edit, in milliseconds. */
   delayMs?: number;
   onStatus?: (status: PublishingSaveStatus, message?: string) => void;
   onPageSaved?: (pageId: string, version: number) => void;
   onStorySaved?: (storyId: string, version: number) => void;
+  onMasterSaved?: (masterId: string, version: number) => void;
 }
 
 const DEFAULT_DELAY = 700;
@@ -70,6 +81,7 @@ export class PublishingSaver {
   private readonly options: PublishingSaverOptions;
   private readonly pageVersions = new Map<string, number>();
   private readonly storyVersions = new Map<string, number>();
+  private readonly masterVersions = new Map<string, number>();
   private status: PublishingSaveStatus = "saved";
   private notified: PublishingSaveStatus = "saved";
   private overwriteNext = false;
@@ -103,6 +115,10 @@ export class PublishingSaver {
     this.raise(this.storyVersions, storyId, version);
   }
 
+  setMasterBaseline(masterId: string, version: number): void {
+    this.raise(this.masterVersions, masterId, version);
+  }
+
   private raise(map: Map<string, number>, id: string, version: number): void {
     if (!Number.isFinite(version)) return;
     const current = map.get(id);
@@ -111,7 +127,13 @@ export class PublishingSaver {
 
   /** Records an edit. Only the newest batch is written. */
   schedule(batch: SaveBatch): void {
-    if (batch.pages.length === 0 && batch.stories.length === 0) return;
+    if (
+      batch.pages.length === 0 &&
+      batch.stories.length === 0 &&
+      (batch.masters?.length ?? 0) === 0
+    ) {
+      return;
+    }
     // A conflict is a decision for the designer, not something to retry past.
     if (this.status === "conflict") {
       this.blocked = batch;
@@ -137,13 +159,20 @@ export class PublishingSaver {
    */
   async rebaseAndOverwrite(
     batch: SaveBatch,
-    versions: { pages?: Record<string, number>; stories?: Record<string, number> },
+    versions: {
+      pages?: Record<string, number>;
+      stories?: Record<string, number>;
+      masters?: Record<string, number>;
+    },
   ): Promise<boolean> {
     for (const [id, version] of Object.entries(versions.pages ?? {})) {
       if (Number.isFinite(version)) this.pageVersions.set(id, version);
     }
     for (const [id, version] of Object.entries(versions.stories ?? {})) {
       if (Number.isFinite(version)) this.storyVersions.set(id, version);
+    }
+    for (const [id, version] of Object.entries(versions.masters ?? {})) {
+      if (Number.isFinite(version)) this.masterVersions.set(id, version);
     }
     this.blocked = null;
     this.overwriteNext = false;
@@ -213,13 +242,27 @@ export class PublishingSaver {
         throw this.translate(error);
       }
     }
+
+    // Masters last: a page write may carry an assignment to a master that this
+    // batch is creating or editing, never the other way round.
+    for (const master of batch.masters ?? []) {
+      if (!this.options.saveMaster) continue;
+      const expected = force ? undefined : this.masterVersions.get(master.id);
+      try {
+        const result = await this.options.saveMaster(master, expected);
+        this.masterVersions.set(master.id, result.version);
+        this.options.onMasterSaved?.(master.id, result.version);
+      } catch (error) {
+        throw this.translate(error);
+      }
+    }
   }
 
   private translate(error: unknown): unknown {
     // Never surface the client's transport wrapper (request id, stack) in the
     // conflict banner: the designer needs the consequence, not a trace.
     return isSaveConflict(error)
-      ?        new SaveConflictError("This page changed elsewhere while you were editing.")
+      ? new SaveConflictError("This content changed elsewhere while you were editing.")
       : error;
   }
 

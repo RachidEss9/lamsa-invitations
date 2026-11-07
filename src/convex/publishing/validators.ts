@@ -283,12 +283,21 @@ export const storyValidator = v.object({
   overflow: v.union(v.literal("thread"), v.literal("stop")),
 });
 
+/** One page's deviation from a master object; only listed keys differ. */
+export const masterObjectOverrideValidator = v.object({
+  objectId: v.string(),
+  hidden: v.optional(v.boolean()),
+  frame: v.optional(frameValidator),
+  opacity: v.optional(v.number()),
+});
+
 export const publicationPageValidator = v.object({
   version: v.number(),
   id: v.string(),
   name: v.string(),
   side: v.union(v.literal("left"), v.literal("right"), v.literal("single")),
   masterId: v.optional(v.string()),
+  masterOverrides: v.optional(v.array(masterObjectOverrideValidator)),
   spec: pageSpecValidator,
   background: backgroundValidator,
   layers: v.array(layerValidator),
@@ -300,6 +309,7 @@ export const masterPageValidator = v.object({
   version: v.number(),
   id: v.string(),
   name: v.string(),
+  description: v.optional(v.string()),
   appliesTo: v.union(v.literal("left"), v.literal("right"), v.literal("both")),
   spec: v.optional(pageSpecValidator),
   background: backgroundValidator,

@@ -13,7 +13,7 @@
  * corrupted or incompatible draft simply reads as absent.
  */
 
-import type { PublicationPage, Story } from "./model";
+import type { MasterPage, PublicationPage, Story } from "./model";
 
 export const RECOVERY_PREFIX = "lamsa.publishing.recovery.v1";
 
@@ -22,10 +22,13 @@ export interface RecoveryDraft {
   savedAt: number;
   pages: PublicationPage[];
   stories: Story[];
+  /** Unsaved master edits, when the draft was written by a Phase 3D build. */
+  masters?: MasterPage[];
 }
 
 const MAX_PAGES = 128;
 const MAX_STORIES = 128;
+const MAX_MASTERS = 64;
 const MAX_DRAFT_BYTES = 1_500_000; // roughly 1.5 MB of model JSON
 
 function keyFor(publicationId: string): string {
@@ -76,6 +79,27 @@ function parseStories(value: unknown): Story[] | null {
   return stories;
 }
 
+/** Masters are optional in a draft: an older draft simply has none. */
+function parseMasters(value: unknown): MasterPage[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return null;
+  const masters: MasterPage[] = [];
+  for (const raw of value) {
+    if (
+      !isRecord(raw) ||
+      typeof raw.id !== "string" ||
+      !raw.id ||
+      typeof raw.version !== "number" ||
+      !Array.isArray(raw.layers) ||
+      !Array.isArray(raw.objects)
+    ) {
+      return null;
+    }
+    masters.push(raw as unknown as MasterPage);
+  }
+  return masters;
+}
+
 function storage(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
@@ -94,17 +118,23 @@ export function recoveryKey(publicationId: string): string {
  */
 export function saveRecoveryDraft(
   publicationId: string,
-  draft: { pages: PublicationPage[]; stories: Story[] },
+  draft: { pages: PublicationPage[]; stories: Story[]; masters?: MasterPage[] },
   store: Storage | null = storage(),
 ): boolean {
   if (!store || !publicationId) return false;
+  const masters = (draft.masters ?? []).slice(0, MAX_MASTERS);
   const payload: RecoveryDraft = {
     publicationId,
     savedAt: Date.now(),
     pages: draft.pages.slice(0, MAX_PAGES),
     stories: draft.stories.slice(0, MAX_STORIES),
+    ...(masters.length > 0 ? { masters } : {}),
   };
-  if (payload.pages.length === 0 && payload.stories.length === 0) {
+  if (
+    payload.pages.length === 0 &&
+    payload.stories.length === 0 &&
+    masters.length === 0
+  ) {
     clearRecoveryDraft(publicationId, store);
     return true;
   }
@@ -131,7 +161,14 @@ export function readRecoveryDraft(
     if (!parsed || parsed.publicationId !== publicationId) return null;
     const pages = parsePages(parsed.pages);
     const stories = parseStories(parsed.stories);
-    if (!pages || !stories || parsed.pages === undefined || parsed.stories === undefined) {
+    const masters = parseMasters(parsed.masters);
+    if (
+      !pages ||
+      !stories ||
+      !masters ||
+      parsed.pages === undefined ||
+      parsed.stories === undefined
+    ) {
       return null;
     }
     if (typeof parsed.savedAt !== "number" || !Number.isFinite(parsed.savedAt)) {
@@ -142,6 +179,7 @@ export function readRecoveryDraft(
       savedAt: parsed.savedAt,
       pages: pages.slice(0, MAX_PAGES),
       stories: stories.slice(0, MAX_STORIES),
+      ...(masters.length > 0 ? { masters: masters.slice(0, MAX_MASTERS) } : {}),
     };
   } catch {
     return null;

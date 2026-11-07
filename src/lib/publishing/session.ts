@@ -20,6 +20,7 @@
 
 import type {
   Layer,
+  MasterPage,
   PublicationDocument,
   PublicationObject,
   PublicationPage,
@@ -34,6 +35,7 @@ import {
   reorderLayer,
 } from "./layers";
 import { movePage, pageIndexOf, removePage } from "./operations";
+import { applyPageToMaster, masterAsPage, masterById } from "./masters";
 
 const HISTORY_LIMIT = 60;
 
@@ -48,11 +50,22 @@ export interface StoryOverride {
   dirty: boolean;
 }
 
+export interface MasterOverride {
+  master: MasterPage;
+  dirty: boolean;
+}
+
 export interface SessionState {
   base: PublicationDocument;
   pages: Record<string, PageOverride>;
   stories: Record<string, StoryOverride>;
+  masters: Record<string, MasterOverride>;
   activePageId: string;
+  /**
+   * The master being edited, if any. Page navigation keeps working while it
+   * is set; the canvas and inspector follow this context instead of the page.
+   */
+  activeMasterId?: string;
   /** Selected object ids on the active page. */
   selection: string[];
   /** The layer new objects are added to. */
@@ -78,13 +91,22 @@ export interface EditorSession {
 /** The document with local overrides applied. Untouched records are shared. */
 export function sessionDocument(session: EditorSession): PublicationDocument {
   const { base, pages, stories } = session.state;
+  const masterOverrides = Object.values(session.state.masters).filter(
+    (override) => base.masters.some((master) => master.id === override.master.id),
+  );
   const pageOverrides = Object.values(pages).filter(
     (override) => base.pages.some((page) => page.id === override.page.id),
   );
   const storyOverrides = Object.values(stories).filter(
     (override) => base.stories.some((story) => story.id === override.story.id),
   );
-  if (pageOverrides.length === 0 && storyOverrides.length === 0) return base;
+  if (
+    pageOverrides.length === 0 &&
+    storyOverrides.length === 0 &&
+    masterOverrides.length === 0
+  ) {
+    return base;
+  }
   return {
     ...base,
     pages: pageOverrides.length
@@ -95,7 +117,33 @@ export function sessionDocument(session: EditorSession): PublicationDocument {
     stories: storyOverrides.length
       ? base.stories.map((story) => stories[story.id]?.story ?? story)
       : base.stories,
+    masters: masterOverrides.length
+      ? base.masters.map(
+          (master) => session.state.masters[master.id]?.master ?? master,
+        )
+      : base.masters,
   };
+}
+
+/** The master being edited, from the latest local state. */
+export function activeMaster(session: EditorSession): MasterPage | null {
+  if (!session.state.activeMasterId) return null;
+  return masterById(sessionDocument(session), session.state.activeMasterId) ?? null;
+}
+
+/**
+ * The surface the canvas edits: a master (in page shape) or the active page.
+ * Everything object-shaped — selection, transforms, insertion — goes through
+ * this, so master editing reuses the page tools instead of a second editor.
+ */
+export function activeSurface(session: EditorSession): PublicationPage | null {
+  const master = activeMaster(session);
+  if (master) return masterAsPage(master, sessionDocument(session));
+  return activePage(session);
+}
+
+export function isEditingMaster(session: EditorSession): boolean {
+  return session.state.activeMasterId !== undefined;
 }
 
 export function activePage(session: EditorSession): PublicationPage | null {
@@ -113,19 +161,33 @@ export function activePageIndex(session: EditorSession): number {
 }
 
 export function activeLayerId(session: EditorSession): string | null {
-  const page = activePage(session);
-  if (!page) return null;
-  const layer = page.layers.find((entry) => entry.id === session.state.activeLayerId);
+  // The active layer belongs to the surface being edited. A master's layers
+  // are its own, so resolving them from the page would hand a new master
+  // object a layer id the master does not have — and the save would (rightly)
+  // be refused.
+  const surface = activeSurface(session);
+  if (!surface) return null;
+  const layer = surface.layers.find((entry) => entry.id === session.state.activeLayerId);
   if (layer) return layer.id;
-  const content = page.layers.find((entry) => entry.name === "Content");
-  return (content ?? page.layers[page.layers.length - 1] ?? page.layers[0])?.id ?? null;
+  const content = surface.layers.find((entry) => entry.name === "Content");
+  return (
+    (content ?? surface.layers[surface.layers.length - 1] ?? surface.layers[0])?.id ??
+    null
+  );
 }
 
 export function hasUnsavedEdits(session: EditorSession): boolean {
   return (
     Object.values(session.state.pages).some((override) => override.dirty) ||
-    Object.values(session.state.stories).some((override) => override.dirty)
+    Object.values(session.state.stories).some((override) => override.dirty) ||
+    Object.values(session.state.masters).some((override) => override.dirty)
   );
+}
+
+export function dirtyMasters(session: EditorSession): MasterPage[] {
+  return Object.values(session.state.masters)
+    .filter((override) => override.dirty)
+    .map((override) => override.master);
 }
 
 export function dirtyPages(session: EditorSession): PublicationPage[] {
@@ -191,6 +253,7 @@ export function createEditorSession(
       base: document,
       pages: {},
       stories: {},
+      masters: {},
       activePageId: page?.id ?? "",
       selection: [],
       activeLayerId: page ? defaultLayerId(page) : "",
@@ -228,12 +291,117 @@ export function setActivePage(
   );
 }
 
+function defaultMasterLayerId(master: MasterPage): string {
+  const content = master.layers.find((layer) => layer.name === "Content");
+  return (
+    (content ?? master.layers[master.layers.length - 1] ?? master.layers[0])?.id ?? ""
+  );
+}
+
+/**
+ * Enters or leaves master editing. Local edits live in the session overrides,
+ * so switching context never loses a pending page or master change; only the
+ * selection and the active layer are re-scoped to the new surface.
+ */
+export function setActiveMaster(
+  session: EditorSession,
+  masterId: string | undefined,
+): EditorSession {
+  if (session.state.activeMasterId === masterId) return session;
+  if (masterId) {
+    const master = masterById(sessionDocument(session), masterId);
+    if (!master) return session;
+    return withState(
+      session,
+      {
+        ...session.state,
+        activeMasterId: masterId,
+        selection: [],
+        activeLayerId: defaultMasterLayerId(master),
+        editGroup: undefined,
+      },
+      false,
+    );
+  }
+  const page = activePage(session);
+  return withState(
+    session,
+    {
+      ...session.state,
+      activeMasterId: undefined,
+      selection: [],
+      activeLayerId: page ? defaultLayerId(page) : "",
+      editGroup: undefined,
+    },
+    false,
+  );
+}
+
 export function setActiveLayer(
   session: EditorSession,
   layerId: string,
 ): EditorSession {
   if (session.state.activeLayerId === layerId) return session;
   return withState(session, { ...session.state, activeLayerId: layerId }, false);
+}
+
+/** Replaces the master record, recording one history entry. */
+export function editMaster(
+  session: EditorSession,
+  masterId: string,
+  updater: (master: MasterPage) => MasterPage,
+): EditorSession {
+  const master = masterById(sessionDocument(session), masterId);
+  if (!master) return session;
+  const next = updater(master);
+  if (next === master) return session;
+  return withState(
+    session,
+    {
+      ...session.state,
+      masters: {
+        ...session.state.masters,
+        [masterId]: { master: next, dirty: true },
+      },
+    },
+    true,
+  );
+}
+
+/**
+ * Writes a page-shaped surface (the master, edited with the page tools) back
+ * onto its master. The canvas only knows pages, so this is the seam that keeps
+ * one set of object gestures for both contexts.
+ */
+export function editMasterSurface(
+  session: EditorSession,
+  masterId: string,
+  surface: PublicationPage,
+): EditorSession {
+  return editMaster(session, masterId, (master) => applyPageToMaster(master, surface));
+}
+
+/**
+ * Edits the active surface, whichever it is. Object gestures, insertion and
+ * the layer tools all land here: a page edit and a master edit can never be
+ * confused, and a master edit can never touch a page's objects.
+ */
+export function editSurface(
+  session: EditorSession,
+  updater: (surface: PublicationPage) => PublicationPage,
+): EditorSession {
+  const masterId = session.state.activeMasterId;
+  if (masterId) {
+    const master = masterById(sessionDocument(session), masterId);
+    if (!master) return session;
+    const surface = masterAsPage(master, sessionDocument(session));
+    const next = updater(surface);
+    if (next === surface) return session;
+    return editMasterSurface(session, masterId, next);
+  }
+  const page = activePage(session);
+  if (!page) return session;
+  return editPage(session, page.id, updater);
 }
 
 export function setSelection(
@@ -266,7 +434,7 @@ export function toggleSelection(
 }
 
 export function selectAllObjects(session: EditorSession): EditorSession {
-  const page = activePage(session);
+  const page = activeSurface(session);
   if (!page) return session;
   return setSelection(
     session,
@@ -274,6 +442,27 @@ export function selectAllObjects(session: EditorSession): EditorSession {
       .filter((object) => !object.hidden && !object.locked)
       .map((object) => object.id),
   );
+}
+
+/**
+ * Edits the record a surface id names: a master (when it is the active
+ * master surface) or a page. The canvas hands back the id it drew, so this is
+ * what stops a master gesture from ever landing on a page.
+ */
+function editTarget(
+  session: EditorSession,
+  targetId: string,
+  updater: (page: PublicationPage) => PublicationPage,
+): EditorSession {
+  if (session.state.activeMasterId === targetId) {
+    const master = masterById(sessionDocument(session), targetId);
+    if (!master) return session;
+    const surface = masterAsPage(master, sessionDocument(session));
+    const next = updater(surface);
+    if (next === surface) return session;
+    return editMasterSurface(session, targetId, next);
+  }
+  return editPage(session, targetId, updater);
 }
 
 /** Replaces the page record for `pageId`, recording one history entry. */
@@ -397,7 +586,7 @@ export function addObjectToPage(
   pageId: string,
   object: PublicationObject,
 ): EditorSession {
-  return editPage(session, pageId, (page) =>
+  return editTarget(session, pageId, (page) =>
     page.objects.some((entry) => entry.id === object.id)
       ? page
       : { ...page, objects: [...page.objects, object] },
@@ -416,7 +605,10 @@ export function removeObjects(
   const wanted = new Set(ids);
   if (wanted.size === 0) return session;
   const document = sessionDocument(session);
-  const page = document.pages.find((entry) => entry.id === pageId);
+  const page =
+    session.state.activeMasterId === pageId
+      ? activeSurface(session)
+      : document.pages.find((entry) => entry.id === pageId);
   if (!page) return session;
 
   const objects = page.objects.filter((object) => !wanted.has(object.id));
@@ -432,6 +624,27 @@ export function removeObjects(
       },
       dirty: true,
     };
+  }
+
+  if (session.state.activeMasterId === pageId) {
+    const master = masterById(document, pageId);
+    if (!master) return session;
+    return withState(
+      session,
+      {
+        ...session.state,
+        masters: {
+          ...session.state.masters,
+          [pageId]: {
+            master: applyPageToMaster(master, { ...page, objects }),
+            dirty: true,
+          },
+        },
+        stories,
+        selection: session.state.selection.filter((id) => !wanted.has(id)),
+      },
+      true,
+    );
   }
 
   return withState(
@@ -454,9 +667,9 @@ export function nudgeSelection(
   dx: number,
   dy: number,
 ): EditorSession {
-  const page = activePage(session);
+  const page = activeSurface(session);
   if (!page || session.state.selection.length === 0) return session;
-  return editPage(session, page.id, (current) =>
+  return editSurface(session, (current) =>
     transformPageObjects(current, session.state.selection, (object) => ({
       ...object,
       frame: {
@@ -476,7 +689,7 @@ export function patchObjects(
   patch: Partial<PublicationObject> | ((object: PublicationObject) => PublicationObject),
 ): EditorSession {
   const wanted = new Set(ids);
-  return editPage(session, pageId, (page) =>
+  return editTarget(session, pageId, (page) =>
     transformPageObjects(page, [...wanted], (object) =>
       typeof patch === "function"
         ? patch(object)
@@ -510,7 +723,7 @@ function editLayers(
   pageId: string,
   updater: (page: PublicationPage) => PublicationPage,
 ): EditorSession {
-  return editPage(session, pageId, updater);
+  return editTarget(session, pageId, updater);
 }
 
 export function toggleLayerVisibility(
@@ -557,7 +770,10 @@ export function addLayerToPage(
   pageId: string,
   name?: string,
 ): EditorSession {
-  const page = sessionDocument(session).pages.find((entry) => entry.id === pageId);
+  const page =
+    session.state.activeMasterId === pageId
+      ? activeSurface(session)
+      : sessionDocument(session).pages.find((entry) => entry.id === pageId);
   if (!page) return session;
   const layer: Layer = createLayer(name ?? `Layer ${page.layers.length + 1}`, {
     ids: defaultIds,
@@ -573,7 +789,7 @@ export function setObjectLayer(
   objectId: string,
   layerId: string,
 ): EditorSession {
-  return editPage(session, pageId, (page) => {
+  return editTarget(session, pageId, (page) => {
     if (!page.layers.some((layer) => layer.id === layerId)) return page;
     return transformPageObjects(page, [objectId], (object) =>
       object.layerId === layerId ? object : { ...object, layerId },
@@ -588,7 +804,7 @@ export function restackObject(
   objectId: string,
   direction: 1 | -1,
 ): EditorSession {
-  return editPage(session, pageId, (page) =>
+  return editTarget(session, pageId, (page) =>
     direction > 0 ? raiseObject(page, objectId) : lowerObject(page, objectId),
   );
 }
@@ -615,6 +831,26 @@ export function markPageSaved(
           page: { ...override.page, version },
           dirty: false,
         },
+      },
+    },
+  };
+}
+
+/** The server acknowledged a master; keep showing it, stop calling it dirty. */
+export function markMasterSaved(
+  session: EditorSession,
+  masterId: string,
+  version: number,
+): EditorSession {
+  const override = session.state.masters[masterId];
+  if (!override) return session;
+  return {
+    ...session,
+    state: {
+      ...session.state,
+      masters: {
+        ...session.state.masters,
+        [masterId]: { master: { ...override.master, version }, dirty: false },
       },
     },
   };
@@ -655,6 +891,7 @@ export function syncBase(
 
   const pageIds = new Set(document.pages.map((page) => page.id));
   const storyIds = new Set(document.stories.map((story) => story.id));
+  const masterIds = new Set(document.masters.map((master) => master.id));
   const pages: Record<string, PageOverride> = {};
   for (const [id, override] of Object.entries(session.state.pages)) {
     if (override.dirty && pageIds.has(id)) pages[id] = override;
@@ -663,10 +900,20 @@ export function syncBase(
   for (const [id, override] of Object.entries(session.state.stories)) {
     if (override.dirty && storyIds.has(id)) stories[id] = override;
   }
+  // A dirty master survives a server refresh exactly like a dirty page; a
+  // clean one is dropped because the server now holds that content.
+  const masters: Record<string, MasterOverride> = {};
+  for (const [id, override] of Object.entries(session.state.masters)) {
+    if (override.dirty && masterIds.has(id)) masters[id] = override;
+  }
 
   const activePageId = pageIds.has(session.state.activePageId)
     ? session.state.activePageId
     : (document.pages[0]?.id ?? "");
+  const activeMasterId =
+    session.state.activeMasterId && masterIds.has(session.state.activeMasterId)
+      ? session.state.activeMasterId
+      : undefined;
 
   return {
     ...session,
@@ -675,9 +922,14 @@ export function syncBase(
       base: document,
       pages,
       stories,
+      masters,
       activePageId,
+      activeMasterId,
       selection:
-        activePageId === session.state.activePageId ? session.state.selection : [],
+        activePageId === session.state.activePageId &&
+        activeMasterId === session.state.activeMasterId
+          ? session.state.selection
+          : [],
     },
   };
 }
@@ -704,6 +956,18 @@ export function discardStoryEdits(
   return {
     ...session,
     state: { ...session.state, stories },
+  };
+}
+
+export function discardMasterEdits(
+  session: EditorSession,
+  masterId: string,
+): EditorSession {
+  const masters = { ...session.state.masters };
+  delete masters[masterId];
+  return {
+    ...session,
+    state: { ...session.state, masters },
   };
 }
 

@@ -429,6 +429,12 @@ export interface PublicationPage {
   side: PageSide;
   /** Master applied to this page, if any. */
   masterId?: string;
+  /**
+   * Per-page deviations from the assigned master. Stored here rather than on
+   * the master so an override can never leak onto another page, and left
+   * absent on pages that follow their master exactly (the common case).
+   */
+  masterOverrides?: MasterObjectOverride[];
   /** Per-page override: an insert can use a different trim without a new doc. */
   spec: PageSpec;
   background: Background;
@@ -440,16 +446,38 @@ export interface PublicationPage {
 /**
  * Reusable page furniture (folios, running heads, frames). A master has no
  * side of its own: `appliesTo` decides which pages receive it.
+ *
+ * Master objects are the *original* content: a page never copies them. A page
+ * that needs to differ records an override against the stable object id
+ * instead (see `MasterObjectOverride`).
  */
 export interface MasterPage {
   version: number;
   id: string;
   name: string;
+  /** Optional note shown in the master panel; purely descriptive. */
+  description?: string;
   appliesTo: "left" | "right" | "both";
   spec?: PageSpec;
   background: Background;
   layers: Layer[];
   objects: PublicationObject[];
+}
+
+/**
+ * One page's deviation from its master, keyed by the master object's stable id.
+ * Only the properties listed are overridden; everything else still follows the
+ * master. An empty record means "no deviation", so it is dropped on write.
+ */
+export interface MasterObjectOverride {
+  /** The master object this applies to. */
+  objectId: string;
+  /** Hide the master object on this page only. */
+  hidden?: boolean;
+  /** Frame override, in page points (position, size, rotation). */
+  frame?: ObjectFrame;
+  /** 0–1. */
+  opacity?: number;
 }
 
 /** Two facing pages (or one standalone page) as the reader sees them. */

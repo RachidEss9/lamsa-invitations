@@ -36,6 +36,7 @@ import {
   type Guide,
   type ImageFit,
   type Layer,
+  type MasterObjectOverride,
   type MasterPage,
   type ObjectKind,
   type OverflowMode,
@@ -408,18 +409,61 @@ function normalizePage(value: unknown, context: PageContext): PublicationPage {
     if (object) objects.push(object);
   }
 
+  const masterOverrides = normalizeMasterOverrides(raw.masterOverrides);
   return {
     version: clampInt(raw.version, PUBLICATION_PAGE_VERSION, 1, 999),
     id,
     name: text(raw.name, "Page", 120),
     side: "single",
     masterId: optionalText(raw.masterId, 120),
+    ...(masterOverrides ? { masterOverrides } : {}),
     spec,
     background: normalizeBackground(raw.background),
     layers,
     objects,
     hidden: bool(raw.hidden, false),
   };
+}
+
+/**
+ * Override records are small and optional. Unknown keys are dropped, an entry
+ * without an object id is ignored, and an entry that overrides nothing is not
+ * stored at all — an empty override is the same as no override.
+ */
+export function normalizeMasterOverrides(
+  value: unknown,
+): MasterObjectOverride[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const seen = new Set<string>();
+  const overrides: MasterObjectOverride[] = [];
+  for (const entry of value) {
+    const raw = record(entry);
+    if (!raw) continue;
+    const objectId = optionalText(raw.objectId, 120);
+    if (!objectId || seen.has(objectId)) continue;
+    const frameRaw = record(raw.frame);
+    const frame = frameRaw
+      ? {
+          x: num(frameRaw.x, 0),
+          y: num(frameRaw.y, 0),
+          width: nonNegative(frameRaw.width, 0),
+          height: nonNegative(frameRaw.height, 0),
+          rotation: normalizeAngle(num(frameRaw.rotation, 0)),
+        }
+      : undefined;
+    const override: MasterObjectOverride = { objectId };
+    if (raw.hidden !== undefined) override.hidden = bool(raw.hidden, false);
+    if (frame) override.frame = frame;
+    if (raw.opacity !== undefined) override.opacity = clamp01(raw.opacity, 1);
+    const empty =
+      override.hidden === undefined &&
+      override.frame === undefined &&
+      override.opacity === undefined;
+    if (empty) continue;
+    seen.add(objectId);
+    overrides.push(override);
+  }
+  return overrides.length > 0 ? overrides : undefined;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -455,10 +499,14 @@ function normalizeMaster(value: unknown, context: MasterContext): MasterPage | n
     if (object) objects.push(object);
   }
 
+  const description = optionalText(raw.description, 400);
   return {
     version: clampInt(raw.version, PUBLICATION_MASTER_VERSION, 1, 999),
     id,
     name: text(raw.name, "Master", 120),
+    // Only present when set, so unrelated documents normalise byte-for-byte
+    // the way they did before masters had descriptions.
+    ...(description ? { description } : {}),
     appliesTo: oneOf(raw.appliesTo, ["left", "right", "both"] as const, "both"),
     spec: record(raw.spec) ? normalizeSpec(raw.spec, context.documentSpec) : undefined,
     background: normalizeBackground(raw.background),

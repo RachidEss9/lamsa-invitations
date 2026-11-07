@@ -277,6 +277,56 @@ describe("masters", () => {
     expect(result.document.pages[0]!.masterId).toBeUndefined();
   });
 
+  it("persists master descriptions, assignments and per-page overrides", async () => {
+    const t = setup();
+    const { owner } = await seedUsers(t);
+    const { publicationId } = await createPublication(t, owner, 2);
+    const asOwner = t.withIdentity({ subject: owner });
+    let result = await asOwner.query(api.publishing.publications.getMine, {
+      publicationId,
+    });
+    const page = result.document.pages[0]!;
+    const master = masterFor(page);
+    const rule = textFrame(page.layers[0]!.id, "object_master_rule");
+
+    await asOwner.mutation(api.publishing.masters.createMaster, {
+      publicationId,
+      master: asMaster({
+        ...master,
+        description: "Folio and running head",
+        objects: [rule],
+      }),
+    });
+    await asOwner.mutation(api.publishing.pages.savePage, {
+      publicationId,
+      pageId: page.id,
+      page: asPage({
+        ...page,
+        masterId: master.id,
+        masterOverrides: [{ objectId: rule.id, hidden: true }],
+      }),
+    });
+
+    result = await asOwner.query(api.publishing.publications.getMine, { publicationId });
+    expect(result.document.masters[0]!.description).toBe("Folio and running head");
+    expect(result.document.pages[0]!.masterId).toBe(master.id);
+    expect(result.document.pages[0]!.masterOverrides).toEqual([
+      { objectId: rule.id, hidden: true },
+    ]);
+    // The second page never inherits the first page's override.
+    expect(result.document.pages[1]!.masterOverrides).toBeUndefined();
+
+    // Reassigning to the same master keeps the override; removing it clears
+    // both the reference and the records that described the old furniture.
+    await asOwner.mutation(api.publishing.pages.savePage, {
+      publicationId,
+      pageId: page.id,
+      page: asPage({ ...page, masterId: master.id }),
+    });
+    result = await asOwner.query(api.publishing.publications.getMine, { publicationId });
+    expect(result.document.pages[0]!.masterOverrides).toBeUndefined();
+  });
+
   it("rejects a duplicate master and another user's edit", async () => {
     const t = setup();
     const { owner, stranger } = await seedUsers(t);

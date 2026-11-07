@@ -403,6 +403,64 @@ function validatePage(
     context,
     typeof id === "string" ? id : "",
   );
+  validateMasterOverrides(
+    value.masterOverrides,
+    `${path}.masterOverrides`,
+    c,
+    value.masterId,
+  );
+}
+
+/** Overrides must name one master object each, with only supported keys. */
+function validateMasterOverrides(
+  value: unknown,
+  path: string,
+  c: Collector,
+  masterId: unknown,
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    c.error("page/master-overrides", path, "Master overrides must be a list");
+    return;
+  }
+  if (typeof masterId !== "string" || masterId.length === 0) {
+    c.warn(
+      "page/overrides-without-master",
+      path,
+      "A page with overrides should have a master assigned",
+    );
+  }
+  const seen = new Set<string>();
+  value.forEach((entry, index) => {
+    const entryPath = `${path}[${index}]`;
+    if (!isRecord(entry)) {
+      c.error("override/not-object", entryPath, "An override must be an object");
+      return;
+    }
+    if (typeof entry.objectId !== "string" || entry.objectId.length === 0) {
+      c.error("override/object", `${entryPath}.objectId`, "An override needs a master object id");
+      return;
+    }
+    if (seen.has(entry.objectId)) {
+      c.error(
+        "override/duplicate",
+        `${entryPath}.objectId`,
+        `Duplicate override for "${entry.objectId}"`,
+      );
+    }
+    seen.add(entry.objectId);
+    if (entry.hidden !== undefined && typeof entry.hidden !== "boolean") {
+      c.error("override/hidden", `${entryPath}.hidden`, "An override's hidden flag must be boolean");
+    }
+    if (entry.opacity !== undefined) {
+      if (!isFiniteNumber(entry.opacity) || entry.opacity < 0 || entry.opacity > 1) {
+        c.error("override/opacity", `${entryPath}.opacity`, "An override opacity is 0–1");
+      }
+    }
+    if (entry.frame !== undefined) {
+      validateFrame(entry.frame, `${entryPath}.frame`, c);
+    }
+  });
 }
 
 function validateMasters(value: unknown, c: Collector, context: Context): void {
@@ -423,6 +481,9 @@ function validateMasters(value: unknown, c: Collector, context: Context): void {
     }
     if (entry.appliesTo !== undefined && !["left", "right", "both"].includes(String(entry.appliesTo))) {
       c.error("master/applies-to", `${path}.appliesTo`, "A master applies to left, right or both");
+    }
+    if (entry.description !== undefined && typeof entry.description !== "string") {
+      c.error("master/description", `${path}.description`, "A master description must be text");
     }
     validateSpec(entry.spec, `${path}.spec`, c, { requireTrim: false });
     if (entry.background !== undefined && !isRecord(entry.background)) {

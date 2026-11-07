@@ -271,11 +271,38 @@ export function removeMaster(
   const masters = document.masters.filter((master) => master.id !== masterId);
   const pages = document.pages.map((page) => {
     if (page.masterId !== masterId) return page;
+    // The overrides described the deleted master's objects, so they go with
+    // it: a page can never keep furniture overrides for furniture that no
+    // longer exists.
     const next = { ...page };
     delete next.masterId;
+    delete next.masterOverrides;
     return next;
   });
   return { ...document, masters, pages };
+}
+
+/** Applies one master to several pages in a single document change. */
+export function applyMasterToPages(
+  document: PublicationDocument,
+  pageIds: readonly string[],
+  masterId: string | undefined,
+): PublicationDocument {
+  if (masterId && !document.masters.some((master) => master.id === masterId)) {
+    return document;
+  }
+  const wanted = new Set(pageIds);
+  let changed = false;
+  const pages = document.pages.map((page) => {
+    if (!wanted.has(page.id) || page.masterId === masterId) return page;
+    changed = true;
+    const next = { ...page, masterId };
+    // Overrides name objects of one specific master; changing the master
+    // invalidates them rather than letting them point at nothing.
+    delete next.masterOverrides;
+    return next;
+  });
+  return changed ? { ...document, pages } : document;
 }
 
 /** Applies a master to a page (or clears it with `undefined`). */
@@ -287,9 +314,12 @@ export function applyMaster(
   if (masterId && !document.masters.some((master) => master.id === masterId)) {
     return document;
   }
-  return updatePage(document, pageId, (page) =>
-    page.masterId === masterId ? page : { ...page, masterId },
-  );
+  return updatePage(document, pageId, (page) => {
+    if (page.masterId === masterId) return page;
+    const next = { ...page, masterId };
+    delete next.masterOverrides;
+    return next;
+  });
 }
 
 export function updateStory(

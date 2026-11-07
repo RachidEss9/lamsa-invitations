@@ -20,6 +20,7 @@ import {
   type GridSettings,
   type Guide,
   type Layer,
+  type MasterObjectOverride,
   type MasterPage,
   type PageSide,
   type PageSpec,
@@ -74,6 +75,7 @@ export interface PageRecord {
   index: number;
   side: PageSide;
   masterId?: string;
+  masterOverrides?: MasterObjectOverride[];
   version: number;
   name: string;
   spec: PageSpec;
@@ -87,6 +89,7 @@ export interface MasterRecord {
   masterId: string;
   version: number;
   name: string;
+  description?: string;
   appliesTo: MasterPage["appliesTo"];
   spec?: PageSpec;
   background: Background;
@@ -170,6 +173,13 @@ function layerCopy(layer: Layer): Layer {
   return { ...layer };
 }
 
+function overrideCopy(override: MasterObjectOverride): MasterObjectOverride {
+  return {
+    ...override,
+    ...(override.frame ? { frame: { ...override.frame } } : {}),
+  };
+}
+
 function objectCopy(object: PublicationObject): PublicationObject {
   return {
     ...object,
@@ -246,6 +256,9 @@ export function documentFromRecords(records: PublicationRecords): PublicationDoc
     name: page.name,
     side: page.side,
     ...(page.masterId ? { masterId: page.masterId } : {}),
+    ...(page.masterOverrides && page.masterOverrides.length > 0
+      ? { masterOverrides: page.masterOverrides.map(overrideCopy) }
+      : {}),
     spec: pageSpecOf(page.spec),
     background: backgroundOf(page.background),
     layers: page.layers.map(layerCopy),
@@ -276,6 +289,7 @@ export function documentFromRecords(records: PublicationRecords): PublicationDoc
       version: master.version,
       id: master.masterId,
       name: master.name,
+      ...(master.description ? { description: master.description } : {}),
       appliesTo: master.appliesTo,
       ...(master.spec ? { spec: pageSpecOf(master.spec) } : {}),
       background: backgroundOf(master.background),
@@ -348,6 +362,9 @@ export function pageRecordFromDocument(
     index,
     side: page.side,
     ...(page.masterId ? { masterId: page.masterId } : {}),
+    ...(page.masterOverrides && page.masterOverrides.length > 0
+      ? { masterOverrides: page.masterOverrides.map(overrideCopy) }
+      : {}),
     version: page.version,
     name: page.name,
     spec: pageSpecOf(page.spec),
@@ -363,6 +380,7 @@ export function masterRecordFromDocument(master: MasterPage): MasterRecord {
     masterId: master.id,
     version: master.version,
     name: master.name,
+    ...(master.description ? { description: master.description } : {}),
     appliesTo: master.appliesTo,
     ...(master.spec ? { spec: pageSpecOf(master.spec) } : {}),
     background: backgroundOf(master.background),
@@ -584,6 +602,16 @@ export function remapDocumentForDuplicate(
     id: pageIds.get(page.id) ?? page.id,
     ...(page.masterId
       ? { masterId: masterIds.get(page.masterId) ?? page.masterId }
+      : {}),
+    ...(page.masterOverrides && page.masterOverrides.length > 0
+      ? {
+          masterOverrides: page.masterOverrides
+            .map((override) => {
+              const objectId = objectIds.get(override.objectId);
+              return objectId ? { ...overrideCopy(override), objectId } : null;
+            })
+            .filter((override): override is MasterObjectOverride => override !== null),
+        }
       : {}),
     background: {
       ...page.background,

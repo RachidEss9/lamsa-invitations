@@ -19,6 +19,11 @@ import {
 import type { AssetResolver } from "./ObjectArt";
 import { ObjectArt } from "./ObjectArt";
 import { estimateOverflow, resolveThread } from "@/lib/publishing/typography";
+import {
+  masterBackgroundFor,
+  masterForPage,
+  masterObjectsForPage,
+} from "@/lib/publishing/masters";
 
 /**
  * One page of the active spread, authored in page points.
@@ -269,6 +274,11 @@ const PageSurface = memo(function PageSurface({
   onTextSelection?: (objectId: string, start: number, end: number) => void;
 }) {
   const bleed = bleedBox(page.spec);
+  // Inheritance is resolved at paint time, never copied into the page: one
+  // master edit repaints every page that uses it.
+  const master = masterForPage(document, page);
+  const masterObjects = masterObjectsForPage(page, master);
+  const masterBackground = masterBackgroundFor(master);
   return (
     <g pointerEvents="none">
       <rect
@@ -293,6 +303,49 @@ const PageSurface = memo(function PageSurface({
             ) : null;
           })()
         : null}
+      {/*
+        Master paint order, then the page's own: master background, master
+        objects (bottom to top), then the page's objects (bottom to top). The
+        page paper above is the sheet itself, so it never covers furniture.
+      */}
+      {masterBackground ? (
+        <g data-master={master?.id} data-master-background="true">
+          <rect
+            x={bleed.x}
+            y={bleed.y}
+            width={bleed.width}
+            height={bleed.height}
+            fill={masterBackground.color || "transparent"}
+          />
+          {masterBackground.assetId && resolveAsset
+            ? (() => {
+                const asset = resolveAsset(masterBackground.assetId);
+                return asset?.url ? (
+                  <image
+                    href={asset.url}
+                    x={bleed.x}
+                    y={bleed.y}
+                    width={bleed.width}
+                    height={bleed.height}
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                ) : null;
+              })()
+            : null}
+        </g>
+      ) : null}
+      {masterObjects.length > 0 ? (
+        <g data-master={master?.id} data-master-objects="true">
+          {masterObjects.map((object) => (
+            <ObjectArt
+              key={`master-${object.id}`}
+              object={object}
+              document={document}
+              resolveAsset={resolveAsset}
+            />
+          ))}
+        </g>
+      ) : null}
       {/* Paint order is layers then objects, bottom to top, exactly as stored. */}
       {page.objects
         .filter((object) => !object.hidden)

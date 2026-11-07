@@ -3,6 +3,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import type {
   ImageCrop,
   ImageFit,
+  MasterPage,
   Point,
   PublicationDocument,
   PublicationObject,
@@ -71,6 +72,15 @@ export interface InspectorProps {
   ) => void;
   onEnterImageCrop: (objectId: string) => void;
   onResetImageCrop: (objectId: string) => void;
+  /** Set while a master is being edited; the page sections then describe it. */
+  masterMode?: {
+    master: MasterPage;
+    onRename: (name: string) => void;
+    onPatch: (
+      patch: Partial<Pick<MasterPage, "description" | "appliesTo" | "background">>,
+    ) => void;
+    onExit: () => void;
+  };
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -187,6 +197,7 @@ export function Inspector(props: InspectorProps) {
     onEnterImageCrop,
     onResetImageCrop,
     onOpenAssetsPanel,
+    masterMode,
   } = props;
 
   const selected = useMemo(() => {
@@ -204,7 +215,7 @@ export function Inspector(props: InspectorProps) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between border-b border-[var(--rule)] px-3 py-2">
         <span className="font-meta text-[0.6rem] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
-          Inspector
+          {masterMode ? "Master inspector" : "Inspector"}
         </span>
         <span className="font-meta text-[0.55rem] uppercase tracking-[0.1em] text-[color-mix(in_oklab,var(--ink-soft)_75%,transparent)]">
           {selected.length > 0 ? `${selected.length} selected` : "Page"}
@@ -212,7 +223,117 @@ export function Inspector(props: InspectorProps) {
       </div>
 
       <div className="scroll-slim min-h-0 flex-1 overflow-y-auto pb-6">
-        {!single ? (
+        {masterMode && !single ? (
+          <>
+            <Section title="Master">
+              <FieldRow label="Name">
+                <Input
+                  value={masterMode.master.name}
+                  onChange={(event) => masterMode.onRename(event.target.value)}
+                  aria-label="Master name"
+                  className="h-7 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.72rem] shadow-none"
+                />
+              </FieldRow>
+              <FieldRow label="Note">
+                <Input
+                  value={masterMode.master.description ?? ""}
+                  placeholder="Optional description"
+                  onChange={(event) =>
+                    masterMode.onPatch({ description: event.target.value })
+                  }
+                  aria-label="Master description"
+                  className="h-7 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.72rem] shadow-none"
+                />
+              </FieldRow>
+              <FieldRow label="Applies">
+                <Select
+                  value={masterMode.master.appliesTo}
+                  onValueChange={(value) =>
+                    masterMode.onPatch({ appliesTo: value as MasterPage["appliesTo"] })
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Master applies to"
+                    className="h-7 flex-1 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] text-[0.72rem] shadow-none"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="both">Both sides</SelectItem>
+                    <SelectItem value="left">Left pages</SelectItem>
+                    <SelectItem value="right">Right pages</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldRow>
+              <FieldRow label="Paper">
+                <span className="flex flex-1 items-center gap-1.5">
+                  <input
+                    type="color"
+                    aria-label="Master background colour"
+                    value={masterMode.master.background.color || "#ffffff"}
+                    onChange={(event) =>
+                      // Backgrounds are a master property: changing this
+                      // repaints every page that uses the master.
+                      masterMode.onPatch({
+                        background: {
+                          ...masterMode.master.background,
+                          color: event.target.value,
+                        },
+                      })
+                    }
+                    className="h-7 w-8 cursor-pointer rounded-[3px] border border-[var(--rule)] bg-[var(--paper)] p-0.5"
+                  />
+                  <Input
+                    value={masterMode.master.background.color || "#ffffff"}
+                    aria-label="Master background value"
+                    onChange={(event) =>
+                      masterMode.onPatch({
+                        background: {
+                          ...masterMode.master.background,
+                          color: event.target.value,
+                        },
+                      })
+                    }
+                    className="h-7 flex-1 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] font-meta text-[0.7rem] uppercase shadow-none"
+                  />
+                </span>
+              </FieldRow>
+            </Section>
+
+            <Section title="Paper & bleed">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-meta text-[0.66rem] tabular-nums">
+                <dt className="text-[var(--ink-soft)]">Trim</dt>
+                <dd>
+                  {display(masterMode.master.spec?.trim.width ?? page.spec.trim.width)} ×{" "}
+                  {display(masterMode.master.spec?.trim.height ?? page.spec.trim.height)}{" "}
+                  {unitLabel}
+                </dd>
+                <dt className="text-[var(--ink-soft)]">Bleed</dt>
+                <dd>
+                  {display(masterMode.master.spec?.bleed ?? page.spec.bleed)} {unitLabel}
+                </dd>
+                <dt className="text-[var(--ink-soft)]">Objects</dt>
+                <dd>{masterMode.master.objects.length}</dd>
+                <dt className="text-[var(--ink-soft)]">Layers</dt>
+                <dd>{masterMode.master.layers.length}</dd>
+              </dl>
+              <p className="text-[0.64rem] leading-relaxed text-[var(--ink-soft)]">
+                Master objects paint beneath every page that uses this master. Page
+                objects always stay on top and are never changed by a master edit.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-full rounded-[3px] border-[var(--rule)] font-meta text-[0.55rem] uppercase tracking-[0.1em]"
+                onClick={masterMode.onExit}
+              >
+                Return to page editing
+              </Button>
+            </Section>
+          </>
+        ) : null}
+
+        {!single && !masterMode ? (
           <>
             <Section title="Page">
               <FieldRow label="Name">

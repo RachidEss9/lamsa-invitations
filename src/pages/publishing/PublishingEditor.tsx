@@ -9,6 +9,7 @@ import { EditorToolbar } from "@/components/publishing/EditorToolbar";
 import { PagePanel } from "@/components/publishing/PagePanel";
 import { LayersPanel } from "@/components/publishing/LayersPanel";
 import { AssetsPanel, type StudioAsset } from "@/components/publishing/AssetsPanel";
+import { MastersPanel } from "@/components/publishing/MastersPanel";
 import { Inspector } from "@/components/publishing/Inspector";
 import { ImageCropBar } from "@/components/publishing/ImageCropBar";
 import {
@@ -99,7 +100,7 @@ function EditorWorkspace({
   const editor = usePublishingEditor(publicationId);
   const [chrome, setChrome] = useState<PageChrome>(DEFAULT_CHROME);
   const [chromeBeforePreview, setChromeBeforePreview] = useState<PageChrome>(DEFAULT_CHROME);
-  const [panel, setPanel] = useState<"pages" | "layers" | "assets">("pages");
+  const [panel, setPanel] = useState<"pages" | "layers" | "masters" | "assets">("pages");
   const [fitSignal, setFitSignal] = useState(0);
   const [editing, setEditing] = useState<{
     pageId: string;
@@ -117,41 +118,71 @@ function EditorWorkspace({
     draft: ImageCropDraft;
   } | null>(null);
   const [mobilePanel, setMobilePanel] = useState<
-    "pages" | "layers" | "assets" | "inspector" | null
+    "pages" | "layers" | "masters" | "assets" | "inspector" | null
   >(null);
 
   const document = editor.document;
   const page = editor.page;
+  const master = editor.master;
+  // In master editing the canvas, layers and inspector all follow the master
+  // surface; Pages and the page thumbnails keep showing the real pages.
+  const surface = editor.surface ?? page;
+  const activeMasterId = master?.id;
 
   // Editing is scoped to the page and the current selection. No effect is
   // needed: leaving the page or selecting elsewhere simply makes it inactive,
   // while the text stays in the session and autosaves.
   const editingObjectId =
     editing &&
-    page &&
-    editing.pageId === page.id &&
+    surface &&
+    editing.pageId === surface.id &&
     editor.selection.includes(editing.objectId)
       ? editing.objectId
       : null;
   const textSelection =
-    textSelectionState && page && textSelectionState.pageId === page.id
+    textSelectionState && surface && textSelectionState.pageId === surface.id
       ? textSelectionState
       : null;
   const activeImageCrop =
-    imageCrop && page && imageCrop.pageId === page.id ? imageCrop : null;
+    imageCrop && surface && imageCrop.pageId === surface.id ? imageCrop : null;
   const selectedImageFrame =
-    page && editor.selection.length === 1
-      ? page.objects.find(
+    surface && editor.selection.length === 1
+      ? surface.objects.find(
           (object) => object.id === editor.selection[0] && object.kind === "image-frame",
         )
       : undefined;
 
+  /**
+   * The canvas draws one page-shaped surface. In master editing that surface
+   * is the master itself, alone on the stage, exactly as it will print on its
+   * pages — never the active page with master objects layered in.
+   */
+  const displayDocument = useMemo(() => {
+    if (!document || !surface) return null;
+    if (!master) return document;
+    return { ...document, pages: [surface], spreads: [] };
+  }, [document, master, surface]);
+
   const geometry = useMemo(() => {
-    if (!document || !page) return null;
+    if (!displayDocument || !surface) return null;
+    if (master) {
+      return spreadGeometry(
+        {
+          id: `master-${master.id}`,
+          index: 0,
+          kind: "single",
+          pageIds: [surface.id],
+          gutter: 0,
+        },
+        [surface],
+      );
+    }
     const spread =
-      spreadForPage(document.spreads, page.id) ?? document.spreads[0] ?? null;
-    return spread ? spreadGeometry(spread, document.pages) : null;
-  }, [document, page]);
+      spreadForPage(displayDocument.spreads, surface.id) ??
+      displayDocument.spreads[0] ??
+      null;
+    return spread ? spreadGeometry(spread, displayDocument.pages) : null;
+  }, [displayDocument, master, surface]);
 
   const resolver = useMemo(() => {
     const byId = new Map(editor.assets.map((asset) => [asset.assetId, asset]));
@@ -172,12 +203,12 @@ function EditorWorkspace({
   };
 
   const startImageCrop = (objectId: string) => {
-    if (!page) return;
-    const frame = page.objects.find((object) => object.id === objectId);
+    if (!surface) return;
+    const frame = surface.objects.find((object) => object.id === objectId);
     if (!frame || frame.kind !== "image-frame") return;
     editor.setSelection([objectId]);
     setImageCrop({
-      pageId: page.id,
+      pageId: surface.id,
       objectId,
       draft: cropDraftFor(frame),
     });
@@ -207,7 +238,7 @@ function EditorWorkspace({
   };
 
   const resetImageCrop = (objectId: string) => {
-    const frame = page?.objects.find((object) => object.id === objectId);
+    const frame = surface?.objects.find((object) => object.id === objectId);
     if (!frame || frame.kind !== "image-frame") return;
     const reset = {
       fit: frame.fit,
@@ -256,7 +287,7 @@ function EditorWorkspace({
     );
   }
 
-  if (editor.state === "loading" || !document || !page || !geometry) {
+  if (editor.state === "loading" || !document || !page || !surface || !geometry) {
     return (
       <main className="flex min-h-screen flex-col bg-[var(--paper)]">
         <EditorLoading />
@@ -282,10 +313,28 @@ function EditorWorkspace({
     />
   );
 
+  const mastersPanelNode = (
+    <MastersPanel
+      document={document}
+      page={page}
+      activeMasterId={activeMasterId}
+      busy={editor.busy}
+      onCreate={() => void editor.createMaster()}
+      onDuplicate={(masterId) => void editor.duplicateMasterById(masterId)}
+      onRename={(masterId, name) => editor.renameMaster(masterId, name)}
+      onDelete={(masterId) => void editor.deleteMasterById(masterId)}
+      onEnter={editor.enterMaster}
+      onAssign={(pageIds, masterId) => void editor.assignMaster(pageIds, masterId)}
+      onOverride={(objectId, patch) => editor.overrideMasterObject(objectId, patch)}
+      onRestore={(objectId) => editor.clearMasterOverride(objectId)}
+      onDetach={(objectId) => editor.detachMasterObject(objectId)}
+    />
+  );
+
   const inspectorNode = (
     <Inspector
       document={document}
-      page={page}
+      page={surface}
       selection={editor.selection}
       assets={editor.assets}
       displayUnit={document.displayUnit}
@@ -308,6 +357,16 @@ function EditorWorkspace({
       onChangeImagePlacement={changeImagePlacement}
       onEnterImageCrop={startImageCrop}
       onResetImageCrop={resetImageCrop}
+      masterMode={
+        master
+          ? {
+              master,
+              onRename: (name) => editor.renameMaster(master.id, name),
+              onPatch: (patch) => editor.updateMasterMeta(master.id, patch),
+              onExit: editor.exitMaster,
+            }
+          : undefined
+      }
     />
   );
 
@@ -373,11 +432,12 @@ function EditorWorkspace({
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[232px_minmax(0,1fr)_268px]">
         <aside className="hidden min-h-0 flex-col border-r border-[var(--rule)] bg-[var(--paper)] lg:flex">
-          <div className="grid grid-cols-3 border-b border-[var(--rule)]">
+          <div className="grid grid-cols-4 border-b border-[var(--rule)]">
             {(
               [
                 ["pages", "Pages"],
                 ["layers", "Layers"],
+                ["masters", "Masters"],
                 ["assets", "Assets"],
               ] as const
             ).map(([id, label]) => (
@@ -410,9 +470,10 @@ function EditorWorkspace({
                 onMovePage={(pageId, toIndex) => void editor.movePageTo(pageId, toIndex)}
               />
             ) : null}
+            {panel === "masters" ? mastersPanelNode : null}
             {panel === "layers" ? (
               <LayersPanel
-                page={page}
+                page={surface}
                 selection={editor.selection}
                 onSelect={editor.setSelection}
                 onToggleVisibility={editor.toggleLayerVisible}
@@ -428,11 +489,35 @@ function EditorWorkspace({
           </div>
         </aside>
 
-        <section className="flex min-h-0 min-w-0 flex-col">
+        <section
+          className={cn(
+            "flex min-h-0 min-w-0 flex-col",
+            master && "bg-[color-mix(in_oklab,var(--red)_3%,transparent)]",
+          )}
+        >
+          {master ? (
+            <div
+              data-master-banner
+              className="flex h-8 shrink-0 items-center justify-between gap-2 border-b-2 border-[var(--red)] bg-[color-mix(in_oklab,var(--red)_8%,var(--paper))] px-3"
+            >
+              <span className="truncate font-meta text-[0.55rem] uppercase tracking-[0.12em] text-[var(--red)]">
+                Editing master: {master.name} · {editor.masterUsage(master.id)} page
+                {editor.masterUsage(master.id) === 1 ? "" : "s"} · changes apply
+                everywhere
+              </span>
+              <Button
+                variant="ghost"
+                className="h-5 px-1.5 font-meta text-[0.52rem] uppercase tracking-[0.1em] text-[var(--red)] hover:bg-white/40"
+                onClick={editor.exitMaster}
+              >
+                Return to pages
+              </Button>
+            </div>
+          ) : null}
           {activeImageCrop ? (
             <ImageCropBar
               name={
-                page.objects.find((object) => object.id === activeImageCrop.objectId)
+                surface.objects.find((object) => object.id === activeImageCrop.objectId)
                   ?.name ?? "Image"
               }
               draft={activeImageCrop.draft}
@@ -444,7 +529,7 @@ function EditorWorkspace({
             />
           ) : null}
           <EditorCanvas
-            document={document}
+            document={displayDocument ?? document}
             geometry={geometry}
             chrome={chrome}
             selection={editor.selection}
@@ -459,7 +544,7 @@ function EditorWorkspace({
             }
             onCropPan={(dx, dy) => {
               if (!activeImageCrop) return;
-              const frame = page.objects.find(
+              const frame = surface.objects.find(
                 (object) => object.id === activeImageCrop.objectId,
               );
               if (!frame || frame.kind !== "image-frame") return;
@@ -489,27 +574,27 @@ function EditorWorkspace({
             fitSignal={fitSignal}
             editingObjectId={editingObjectId ?? undefined}
             onEditText={(objectId) => {
-              const frame = page.objects.find((object) => object.id === objectId);
+              const frame = surface.objects.find((object) => object.id === objectId);
               if (frame?.kind !== "text-frame" || !frame.storyId) return;
               editor.setSelection([objectId]);
-              setEditing({ pageId: page.id, objectId });
+              setEditing({ pageId: surface.id, objectId });
               setTextSelectionState({
-                pageId: page.id,
+                pageId: surface.id,
                 storyId: frame.storyId,
                 start: 0,
                 end: 0,
               });
             }}
             onTextDraft={(objectId, text) => {
-              const frame = page.objects.find((object) => object.id === objectId);
+              const frame = surface.objects.find((object) => object.id === objectId);
               if (frame?.kind !== "text-frame" || !frame.storyId) return;
               editor.patchStoryText(frame.storyId, text, `story:${frame.storyId}`);
             }}
             onTextSelection={(objectId, start, end) => {
-              const frame = page.objects.find((object) => object.id === objectId);
+              const frame = surface.objects.find((object) => object.id === objectId);
               if (frame?.kind !== "text-frame" || !frame.storyId) return;
               setTextSelectionState({
-                pageId: page.id,
+                pageId: surface.id,
                 storyId: frame.storyId,
                 start,
                 end,
@@ -538,8 +623,8 @@ function EditorWorkspace({
                 <span className="text-[var(--red)]">Cropping image · Enter applies</span>
               ) : null}
               <span>{editor.selection.length} selected</span>
-              <span>{page.objects.length} objects</span>
-              <span>{page.layers.length} layers</span>
+              <span>{surface.objects.length} objects</span>
+              <span>{surface.layers.length} layers</span>
               <Button
                 variant="ghost"
                 className="h-5 px-1 font-meta text-[0.52rem] uppercase tracking-[0.12em] text-[var(--ink-soft)] hover:text-[var(--red)]"
@@ -564,6 +649,7 @@ function EditorWorkspace({
           [
             ["pages", "Pages"],
             ["layers", "Layers"],
+            ["masters", "Masters"],
             ["assets", "Assets"],
             ["inspector", "Inspect"],
           ] as const
@@ -624,9 +710,10 @@ function EditorWorkspace({
                 onMovePage={(pageId, toIndex) => void editor.movePageTo(pageId, toIndex)}
               />
             ) : null}
+            {mobilePanel === "masters" ? mastersPanelNode : null}
             {mobilePanel === "layers" ? (
               <LayersPanel
-                page={page}
+                page={surface}
                 selection={editor.selection}
                 onSelect={(ids) => {
                   editor.setSelection(ids);

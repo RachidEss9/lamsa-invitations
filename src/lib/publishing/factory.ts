@@ -272,6 +272,7 @@ export function createMasterPage(
   name: string,
   options: {
     id?: string;
+    description?: string;
     appliesTo?: MasterPage["appliesTo"];
     spec?: PageSpec;
     background?: Background;
@@ -285,6 +286,7 @@ export function createMasterPage(
     version: PUBLICATION_MASTER_VERSION,
     id: options.id ?? ids("master"),
     name,
+    ...(options.description ? { description: options.description } : {}),
     appliesTo: options.appliesTo ?? "both",
     spec: options.spec,
     background: { ...(options.background ?? DEFAULT_BACKGROUND) },

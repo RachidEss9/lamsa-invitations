@@ -9,6 +9,8 @@ import type {
   CharacterStyle,
   ImageCrop,
   ImageFit,
+  MasterPage,
+  ObjectFrame,
   ParagraphFormat,
   ParagraphStyle,
   Point,
@@ -29,7 +31,9 @@ import {
 } from "@/lib/publishing/factory";
 import {
   activeLayerId,
+  activeMaster,
   activePage,
+  activeSurface,
   addLayerToPage,
   addObjectToPage,
   adoptStory,
@@ -39,12 +43,18 @@ import {
   canUndo,
   clearHistory,
   createEditorSession,
+  dirtyMasters,
   dirtyPages,
   dirtyStories,
+  discardMasterEdits,
   discardPageEdits,
   discardStoryEdits,
+  editMaster,
+  editMasterSurface,
   editPage,
   editStory,
+  editSurface,
+  markMasterSaved,
   markPageSaved,
   markStorySaved,
   moveLayer,
@@ -56,6 +66,7 @@ import {
   selectAllObjects,
   sessionDocument,
   setActiveLayer,
+  setActiveMaster,
   setActivePage,
   setObjectLayer,
   setSelection,
@@ -65,7 +76,16 @@ import {
   undo,
   type EditorSession,
 } from "@/lib/publishing/session";
-import { pageIndexOf } from "@/lib/publishing/operations";
+import { applyMasterToPages, pageIndexOf } from "@/lib/publishing/operations";
+import {
+  blankMaster,
+  clearMasterOverride,
+  detachMasterObject,
+  duplicateMaster,
+  masterForPage,
+  masterUsageCount,
+  setMasterOverride,
+} from "@/lib/publishing/masters";
 import { paragraphsFromText } from "@/lib/publishing/render";
 import {
   applyCharacterFormat,
@@ -136,6 +156,32 @@ export interface UsePublishingEditorResult {
   title: string;
   canUndo: boolean;
   canRedo: boolean;
+  /** Every master in the publication, in creation order. */
+  masters: readonly MasterPage[];
+  /** The master being edited, if any. */
+  master: MasterPage | null;
+  /** The canvas surface: the master being edited, or the active page. */
+  surface: PublicationPage | null;
+  isEditingMaster: boolean;
+  masterUsage: (masterId: string) => number;
+  enterMaster: (masterId: string) => void;
+  exitMaster: () => void;
+  createMaster: (name?: string) => Promise<string | null>;
+  duplicateMasterById: (masterId: string) => Promise<string | null>;
+  renameMaster: (masterId: string, name: string) => void;
+  updateMasterMeta: (
+    masterId: string,
+    patch: Partial<Pick<MasterPage, "description" | "appliesTo" | "spec" | "background">>,
+  ) => void;
+  deleteMasterById: (masterId: string) => Promise<void>;
+  assignMaster: (pageIds: readonly string[], masterId: string | undefined) => Promise<void>;
+  /** Hides, moves or restores one master object on the active page. */
+  overrideMasterObject: (
+    objectId: string,
+    patch: { hidden?: boolean; frame?: ObjectFrame; opacity?: number },
+  ) => void;
+  clearMasterOverride: (objectId: string) => void;
+  detachMasterObject: (objectId: string) => void;
   setTitle: (title: string) => void;
   commitTitle: () => Promise<void>;
   setZoom: (zoom: number) => void;
@@ -264,10 +310,16 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const setAssetDerivativesMutation = useMutation(
     api.publishing.assets.setAssetDerivatives,
   );
+  const createMasterMutation = useMutation(api.publishing.masters.createMaster);
+  const updateMasterMutation = useMutation(api.publishing.masters.updateMaster);
+  const deleteMasterMutation = useMutation(api.publishing.masters.deleteMaster);
 
   const mutationsRef = useRef({
     savePage: savePageMutation,
     updateStory: updateStoryMutation,
+    createMaster: createMasterMutation,
+    updateMaster: updateMasterMutation,
+    deleteMaster: deleteMasterMutation,
     createStory: createStoryMutation,
     createPage: createPageMutation,
     duplicatePage: duplicatePageMutation,
@@ -287,6 +339,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     mutationsRef.current = {
       savePage: savePageMutation,
       updateStory: updateStoryMutation,
+      createMaster: createMasterMutation,
+      updateMaster: updateMasterMutation,
+      deleteMaster: deleteMasterMutation,
       createStory: createStoryMutation,
       createPage: createPageMutation,
       duplicatePage: duplicatePageMutation,
@@ -301,6 +356,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   }, [
     savePageMutation,
     updateStoryMutation,
+    createMasterMutation,
+    updateMasterMutation,
+    deleteMasterMutation,
     createStoryMutation,
     createPageMutation,
     duplicatePageMutation,
@@ -413,12 +471,13 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     if (!current) return;
     const pages = dirtyPages(next);
     const stories = dirtyStories(next);
-    if (pages.length > 0 || stories.length > 0) {
-      current.schedule({ pages, stories });
+    const masters = dirtyMasters(next);
+    if (pages.length > 0 || stories.length > 0 || masters.length > 0) {
+      current.schedule({ pages, stories, masters });
       if (recoveryTimer.current) clearTimeout(recoveryTimer.current);
       const id = publicationId;
       recoveryTimer.current = setTimeout(() => {
-        saveRecoveryDraft(id, { pages, stories });
+        saveRecoveryDraft(id, { pages, stories, masters });
       }, 600);
       flushedEmpty.current = false;
     } else if (!flushedEmpty.current) {
@@ -433,6 +492,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     let next = current;
     for (const id of Object.keys(current.state.pages)) next = discardPageEdits(next, id);
     for (const id of Object.keys(current.state.stories)) next = discardStoryEdits(next, id);
+    for (const id of Object.keys(current.state.masters)) next = discardMasterEdits(next, id);
     apply(next);
   }, [apply]);
 
@@ -455,6 +515,12 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
           story,
           expectedVersion,
         }),
+      saveMaster: (master, expectedVersion) =>
+        mutationsRef.current.updateMaster({
+          publicationId: publicationId as Id<"publications">,
+          master: master as never,
+          expectedVersion,
+        }),
       onStatus: (status, message) => {
         setSaveStatus(status);
         setSaveMessage(message);
@@ -471,6 +537,11 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
         const current = sessionRef.current;
         if (!current) return;
         apply(markStorySaved(current, storyId, version));
+      },
+      onMasterSaved: (masterId, version) => {
+        const current = sessionRef.current;
+        if (!current) return;
+        apply(markMasterSaved(current, masterId, version));
       },
     });
     saverRef.current = instance;
@@ -494,6 +565,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     const saver = saverRef.current;
     for (const page of document.pages) saver?.setPageBaseline(page.id, page.version);
     for (const story of document.stories) saver?.setStoryBaseline(story.id, story.version);
+    for (const master of document.masters) {
+      saver?.setMasterBaseline(master.id, master.version);
+    }
     const structureVersion =
       (loaded.publication as { structureVersion?: number }).structureVersion ?? 1;
     if (structureVersion > structureVersionRef.current) {
@@ -512,7 +586,12 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     }
     if (!current) {
       const draft = readRecoveryDraft(publicationId);
-      if (draft && (draft.pages.length > 0 || draft.stories.length > 0)) {
+      if (
+        draft &&
+        (draft.pages.length > 0 ||
+          draft.stories.length > 0 ||
+          (draft.masters?.length ?? 0) > 0)
+      ) {
         setRecovery(draft);
       }
     }
@@ -526,6 +605,8 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     return stylesOverride ? { ...base, styles: stylesOverride } : base;
   }, [session, stylesOverride]);
   const page = session ? activePage(session) : null;
+  const master = session ? activeMaster(session) : null;
+  const surface = session ? activeSurface(session) : null;
   const pageIndex = session && page ? pageIndexOf(document!, page.id) : -1;
   const spread = page && document ? document.spreads.find((entry) => entry.pageIds.includes(page.id)) : undefined;
   const spreadLabel = spread
@@ -563,6 +644,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     const batch = {
       pages: dirtyPages(current),
       stories: dirtyStories(current),
+      masters: dirtyMasters(current),
     };
     setBusy(true);
     try {
@@ -580,7 +662,10 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       const stories = Object.fromEntries(
         snapshot.document.stories.map((entry) => [entry.id, entry.version]),
       );
-      const ok = await saver.rebaseAndOverwrite(batch, { pages, stories });
+      const masters = Object.fromEntries(
+        snapshot.document.masters.map((entry) => [entry.id, entry.version]),
+      );
+      const ok = await saver.rebaseAndOverwrite(batch, { pages, stories, masters });
       if (ok) {
         toast.success("Your version replaced the server copy.", IDLE_TOAST);
       } else {
@@ -615,6 +700,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
         for (const storyRecord of snapshot.document.stories) {
           saver.setStoryBaseline(storyRecord.id, storyRecord.version);
         }
+        for (const masterRecord of snapshot.document.masters) {
+          saver.setMasterBaseline(masterRecord.id, masterRecord.version);
+        }
       }
       saver.clearConflict();
       clearRecoveryDraft(publicationId);
@@ -632,7 +720,14 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     (pageId: string, nextPage: PublicationPage) => {
       const current = sessionRef.current;
       if (!current) return;
-      apply(editPage(current, pageId, () => nextPage));
+      // The canvas drew one surface. When that surface is the master being
+      // edited, its gesture belongs to the master — never to a page that
+      // happens to be active behind it.
+      apply(
+        current.state.activeMasterId === pageId
+          ? editMasterSurface(current, pageId, nextPage)
+          : editPage(current, pageId, () => nextPage),
+      );
     },
     [apply],
   );
@@ -640,7 +735,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const patchObject = useCallback<UsePublishingEditorResult["patchObject"]>(
     (objectId, patch) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       const ids = current.state.selection.includes(objectId)
         ? current.state.selection
@@ -653,17 +748,12 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const setFrame = useCallback<UsePublishingEditorResult["setFrame"]>(
     (objectId, frame) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(
-        editPage(current, pageNow.id, (pageUpdate) => ({
-          ...pageUpdate,
-          objects: pageUpdate.objects.map((object) =>
-            object.id === objectId
-              ? ({ ...object, frame: { ...object.frame, ...frame } } as PublicationObject)
-              : object,
-          ),
-        })),
+        patchObjects(current, pageNow.id, [objectId], (object) =>
+          ({ ...object, frame: { ...object.frame, ...frame } }) as PublicationObject,
+        ),
       );
     },
     [apply],
@@ -1040,7 +1130,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
 
   const deleteSelection = useCallback(() => {
     const current = sessionRef.current;
-    const pageNow = current ? activePage(current) : null;
+    const pageNow = current ? activeSurface(current) : null;
     if (!current || !pageNow) return;
     const ids = current.state.selection;
     if (ids.length === 0) return;
@@ -1051,7 +1141,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const restack = useCallback(
     (objectId: string, direction: 1 | -1) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(restackObject(current, pageNow.id, objectId, direction));
     },
@@ -1061,7 +1151,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const toggleLayerVisible = useCallback(
     (layerId: string) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(toggleLayerVisibility(current, pageNow.id, layerId));
     },
@@ -1071,7 +1161,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const toggleLayerLocked = useCallback(
     (layerId: string) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(toggleLayerLock(current, pageNow.id, layerId));
     },
@@ -1080,7 +1170,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
 
   const addLayer = useCallback(() => {
     const current = sessionRef.current;
-    const pageNow = current ? activePage(current) : null;
+    const pageNow = current ? activeSurface(current) : null;
     if (!current || !pageNow) return;
     apply(addLayerToPage(current, pageNow.id));
   }, [apply]);
@@ -1088,7 +1178,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const nudgeLayer = useCallback(
     (layerId: string, direction: 1 | -1) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(moveLayer(current, pageNow.id, layerId, direction));
     },
@@ -1098,7 +1188,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const nudgeObjectInLayer = useCallback(
     (layerId: string, objectId: string, direction: 1 | -1) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       const inLayer = pageNow.objects.filter((object) => object.layerId === layerId);
       const index = inLayer.findIndex((object) => object.id === objectId);
@@ -1114,9 +1204,252 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const moveObjectToLayer = useCallback(
     (objectId: string, layerId: string) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(setObjectLayer(current, pageNow.id, objectId, layerId));
+    },
+    [apply],
+  );
+
+  /* ---------------------------------------------------------------- masters */
+
+  const masterIdPending = useRef<string | null>(null);
+
+  /** Enters master editing once the created master has arrived from the server. */
+  useEffect(() => {
+    const pending = masterIdPending.current;
+    if (!pending || !session || !document) return;
+    if (!document.masters.some((entry) => entry.id === pending)) return;
+    masterIdPending.current = null;
+    apply(setActiveMaster(session, pending));
+  }, [apply, document, session]);
+
+  const enterMaster = useCallback(
+    (masterId: string) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(setActiveMaster(current, masterId));
+      setPreview(false);
+    },
+    [apply],
+  );
+
+  const exitMaster = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    apply(setActiveMaster(current, undefined));
+  }, [apply]);
+
+  const createMaster = useCallback<UsePublishingEditorResult["createMaster"]>(
+    async (name?: string) => {
+      const current = sessionRef.current;
+      const documentNow = current ? sessionDocument(current) : null;
+      if (!documentNow) return null;
+      const taken = new Set(documentNow.masters.map((entry) => entry.name.trim()));
+      let label = name?.trim() || "Master";
+      if (!name) {
+        let index = documentNow.masters.length + 1;
+        while (taken.has(`Master ${index}`)) index += 1;
+        label = `Master ${index}`;
+      }
+      const master = blankMaster(label, documentNow);
+      // A new master is a new record: it goes through the same ownership-checked
+      // mutation as any other write, then the editor opens it for editing.
+      setBusy(true);
+      try {
+        const result = await mutationsRef.current.createMaster({
+          publicationId: publicationId as Id<"publications">,
+          master: master as never,
+        });
+        saverRef.current?.setMasterBaseline(result.masterId, result.version);
+        masterIdPending.current = result.masterId;
+        toast.success("Master created.", IDLE_TOAST);
+        return result.masterId;
+      } catch (error) {
+        toast.error(messageOf(error) || "The master could not be created.");
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [publicationId],
+  );
+
+  const duplicateMasterById = useCallback<
+    UsePublishingEditorResult["duplicateMasterById"]
+  >(
+    async (masterId: string) => {
+      const current = sessionRef.current;
+      const documentNow = current ? sessionDocument(current) : null;
+      const source = documentNow?.masters.find((entry) => entry.id === masterId);
+      if (!documentNow || !source) return null;
+      const copy = duplicateMaster(source);
+      setBusy(true);
+      try {
+        const result = await mutationsRef.current.createMaster({
+          publicationId: publicationId as Id<"publications">,
+          // A duplicated master is independent: text that still pointed at the
+          // original's stories is dropped rather than silently shared, so
+          // editing the copy can never rewrite the original's text.
+          master: {
+            ...copy,
+            objects: copy.objects.map((object) => {
+              if (object.kind !== "text-frame" || !object.storyId) return object;
+              const next = { ...object };
+              delete next.storyId;
+              return next;
+            }),
+          } as never,
+        });
+        saverRef.current?.setMasterBaseline(result.masterId, result.version);
+        toast.success("Master duplicated.", IDLE_TOAST);
+        return result.masterId;
+      } catch (error) {
+        toast.error(messageOf(error) || "The master could not be duplicated.");
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [publicationId],
+  );
+
+  const renameMaster = useCallback(
+    (masterId: string, name: string) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      const trimmed = name.slice(0, 120);
+      apply(
+        editMaster(current, masterId, (entry) =>
+          entry.name === trimmed ? entry : { ...entry, name: trimmed },
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const updateMasterMeta = useCallback<
+    UsePublishingEditorResult["updateMasterMeta"]
+  >(
+    (masterId, patch) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(
+        editMaster(current, masterId, (entry) => {
+          const next = {
+            ...entry,
+            ...(patch.description !== undefined
+              ? { description: patch.description }
+              : {}),
+            ...(patch.appliesTo !== undefined ? { appliesTo: patch.appliesTo } : {}),
+            ...(patch.spec !== undefined ? { spec: patch.spec } : {}),
+            ...(patch.background !== undefined ? { background: patch.background } : {}),
+          };
+          return { ...next };
+        }),
+      );
+    },
+    [apply],
+  );
+
+  const deleteMasterById = useCallback<
+    UsePublishingEditorResult["deleteMasterById"]
+  >(
+    async (masterId: string) => {
+      const current = sessionRef.current;
+      const saver = saverRef.current;
+      if (!current) return;
+      setBusy(true);
+      try {
+        // Pending page writes go first: they may carry an assignment to this
+        // master, and the delete has to be the last word.
+        await saver?.flush();
+        await mutationsRef.current.deleteMaster({
+          publicationId: publicationId as Id<"publications">,
+          masterId,
+        });
+        const latest = sessionRef.current;
+        if (latest) {
+          const rebased: EditorSession = {
+            ...latest,
+            state: {
+              ...latest.state,
+              ...(latest.state.activeMasterId === masterId
+                ? { activeMasterId: undefined }
+                : {}),
+              selection: [],
+            },
+          };
+          apply(clearHistory(discardMasterEdits(rebased, masterId)));
+        }
+        toast.success("Master deleted. Pages that used it keep their own content.", IDLE_TOAST);
+      } catch (error) {
+        toast.error(messageOf(error) || "The master could not be deleted.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [apply, publicationId],
+  );
+
+  const assignMaster = useCallback<
+    UsePublishingEditorResult["assignMaster"]
+  >(
+    async (pageIds: readonly string[], masterId: string | undefined) => {
+      const current = sessionRef.current;
+      if (!current || pageIds.length === 0) return;
+      const before = sessionDocument(current);
+      const next = applyMasterToPages(before, pageIds, masterId);
+      if (next === before) return;
+      // Assignment is content, not structure: each changed page is autosaved
+      // with its own version guard and its own undo entry (one edit here).
+      apply(applyDocumentChanges(current, next));
+    },
+    [apply],
+  );
+
+  const overrideMasterObject = useCallback<
+    UsePublishingEditorResult["overrideMasterObject"]
+  >(
+    (objectId, patch) => {
+      const current = sessionRef.current;
+      const page = current ? activePage(current) : null;
+      if (!current || !page) return;
+      apply(
+        editPage(current, page.id, (target) =>
+          setMasterOverride(target, objectId, patch),
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const clearMasterOverrideAction = useCallback(
+    (objectId: string) => {
+      const current = sessionRef.current;
+      const page = current ? activePage(current) : null;
+      if (!current || !page) return;
+      apply(
+        editPage(current, page.id, (target) => clearMasterOverride(target, objectId)),
+      );
+    },
+    [apply],
+  );
+
+  const detachMasterObjectAction = useCallback(
+    (objectId: string) => {
+      const current = sessionRef.current;
+      const page = current ? activePage(current) : null;
+      const masterNow =
+        current && page ? masterForPage(sessionDocument(current), page) : undefined;
+      if (!current || !page || !masterNow) return;
+      const detached = detachMasterObject(page, masterNow, objectId);
+      if (!detached) return;
+      apply(
+        editPage(current, page.id, () => detached.page),
+      );
+      apply(setSelection(sessionRef.current ?? current, [detached.objectId]));
+      toast.success("Master object detached onto this page.", IDLE_TOAST);
     },
     [apply],
   );
@@ -1299,7 +1632,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
 
   const insertText = useCallback(async () => {
     const current = sessionRef.current;
-    const pageNow = current ? activePage(current) : null;
+    const pageNow = current ? activeSurface(current) : null;
     if (!current || !pageNow) return;
     const layerId = activeLayerId(current);
     if (!layerId) return;
@@ -1314,10 +1647,40 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       height: frameHeight,
       name: "Text",
     });
+    const masterMode = current.state.activeMasterId !== undefined;
+    // A master frame is not part of a page thread, so its story carries its
+    // paragraphs without a frame reference; the frame names the story.
     const story = createStory("Body text", {
-      frames: [{ pageId: pageNow.id, objectId: object.id }],
+      frames: masterMode
+        ? []
+        : [{ pageId: pageNow.id, objectId: object.id }],
       paragraphs: [createParagraph("New text")],
     });
+    if (masterMode) {
+      const saver = saverRef.current;
+      setBusy(true);
+      try {
+        const created = await mutationsRef.current.createStory({
+          publicationId: publicationId as Id<"publications">,
+          story: { ...story, frames: [] },
+        });
+        saver?.setStoryBaseline(story.id, created.version);
+        const afterStory = sessionRef.current;
+        if (!afterStory) return;
+        const adopted = adoptStory(afterStory, { ...story, version: created.version });
+        const withStory: TextFrameObject = { ...object, storyId: story.id };
+        apply(addObjectToPage(adopted, pageNow.id, withStory));
+        await saver?.flush();
+        const settled = sessionRef.current;
+        if (settled) apply(setSelection(settled, [withStory.id]));
+        toast.success("Text frame added to the master.", IDLE_TOAST);
+      } catch (error) {
+        toast.error(messageOf(error) || "The text frame could not be created.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const withStory: TextFrameObject = { ...object, storyId: story.id };
     const next = addObjectToPage(adoptStory(current, story), pageNow.id, withStory);
     apply(next);
@@ -1389,7 +1752,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const insertShape = useCallback(
     async (shape: "rectangle" | "ellipse") => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       const layerId = current ? activeLayerId(current) : null;
       if (!current || !pageNow || !layerId) return;
       const safe = safeBox(pageNow.spec, pageNow.side);
@@ -1412,7 +1775,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
 
   const insertLine = useCallback(async () => {
     const current = sessionRef.current;
-    const pageNow = current ? activePage(current) : null;
+    const pageNow = current ? activeSurface(current) : null;
     const layerId = current ? activeLayerId(current) : null;
     if (!current || !pageNow || !layerId) return;
     const safe = safeBox(pageNow.spec, pageNow.side);
@@ -1432,7 +1795,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const insertImage = useCallback(
     async (asset: StudioAssetRecord) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       const layerId = current ? activeLayerId(current) : null;
       if (!current || !pageNow || !layerId) return;
       const safe = safeBox(pageNow.spec, pageNow.side);
@@ -1466,10 +1829,10 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const replaceImage = useCallback(
     (objectId: string, asset: StudioAssetRecord) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(
-        editPage(current, pageNow.id, (pageUpdate) => ({
+        editSurface(current, (pageUpdate) => ({
           ...pageUpdate,
           objects: pageUpdate.objects.map((object) =>
             object.id === objectId && object.kind === "image-frame"
@@ -1485,10 +1848,10 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const setImagePlacement = useCallback<UsePublishingEditorResult["setImagePlacement"]>(
     (objectId, change) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(
-        editPage(current, pageNow.id, (pageUpdate) => ({
+        editSurface(current, (pageUpdate) => ({
           ...pageUpdate,
           objects: pageUpdate.objects.map((object) =>
             object.id === objectId && object.kind === "image-frame"
@@ -1509,7 +1872,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const placeAsset = useCallback(
     (asset: StudioAssetRecord, targetObjectId?: string) => {
       const current = sessionRef.current;
-      const pageNow = current ? activePage(current) : null;
+      const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       const target =
         targetObjectId ??
@@ -1619,6 +1982,12 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
         next = editStory(next, storyRecord.id, () => storyRecord);
       }
     }
+    for (const masterRecord of draft.masters ?? []) {
+      if (!sessionDocument(next).masters.some((entry) => entry.id === masterRecord.id)) {
+        continue;
+      }
+      next = editMaster(next, masterRecord.id, () => masterRecord);
+    }
     apply(next);
     setRecovery(null);
     toast.success("The draft is open again; review it before saving.", IDLE_TOAST);
@@ -1633,7 +2002,11 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     const current = sessionRef.current;
     const saver = saverRef.current;
     if (!current || !saver) return;
-    await saver.flush({ pages: dirtyPages(current), stories: dirtyStories(current) });
+    await saver.flush({
+      pages: dirtyPages(current),
+      stories: dirtyStories(current),
+      masters: dirtyMasters(current),
+    });
   }, []);
 
   /* -------------------------------------------------------------- shortcuts */
@@ -1723,6 +2096,23 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     title,
     canUndo: session ? canUndo(session) : false,
     canRedo: session ? canRedo(session) : false,
+    masters: document?.masters ?? [],
+    master,
+    surface,
+    isEditingMaster: session?.state.activeMasterId !== undefined,
+    masterUsage: (masterId: string) =>
+      document ? masterUsageCount(document, masterId) : 0,
+    enterMaster,
+    exitMaster,
+    createMaster,
+    duplicateMasterById,
+    renameMaster,
+    updateMasterMeta,
+    deleteMasterById,
+    assignMaster,
+    overrideMasterObject,
+    clearMasterOverride: clearMasterOverrideAction,
+    detachMasterObject: detachMasterObjectAction,
     setTitle,
     commitTitle,
     setZoom,
