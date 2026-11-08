@@ -125,8 +125,9 @@ export function ExportDialog({
           <DialogDescription className="text-[0.75rem] leading-relaxed text-[var(--ink-soft)]">
             Vector pages: shapes and lines stay vector, photographs are
             embedded from the original files with their crop applied, and
-            Latin text stays selectable. Arabic and other non-Latin frames are
-            preserved as high-resolution images instead of being omitted.
+            Latin-only frames stay selectable. Frames containing Arabic or other
+            non-Latin text are preserved as high-resolution images instead of being
+            omitted, so that text cannot be selected or searched.
           </DialogDescription>
         </DialogHeader>
 

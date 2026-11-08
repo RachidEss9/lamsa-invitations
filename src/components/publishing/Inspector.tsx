@@ -510,6 +510,7 @@ export function Inspector(props: InspectorProps) {
                 </span>
               </label>
               <Slider
+                aria-label="Object opacity"
                 value={[Math.round(single.opacity * 100)]}
                 min={0}
                 max={100}

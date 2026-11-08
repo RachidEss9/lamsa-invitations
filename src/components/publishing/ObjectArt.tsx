@@ -42,6 +42,8 @@ interface ObjectArtProps {
   onTextDraft?: (text: string) => void;
   onTextEnd?: () => void;
   onTextSelection?: (start: number, end: number) => void;
+  /** Thumbnails omit the placeholder label; the crossed box is enough. */
+  placeholder?: "label" | "silent";
 }
 
 export function ObjectArt({
@@ -52,6 +54,7 @@ export function ObjectArt({
   onTextDraft,
   onTextEnd,
   onTextSelection,
+  placeholder = "label",
 }: ObjectArtProps) {
   const width = Math.max(0, object.frame.width);
   const height = Math.max(0, object.frame.height);
@@ -77,7 +80,13 @@ export function ObjectArt({
           />
         );
       case "image-frame":
-        return <ImageContent object={object} resolveAsset={resolveAsset} />;
+        return (
+          <ImageContent
+            object={object}
+            resolveAsset={resolveAsset}
+            placeholder={placeholder}
+          />
+        );
       case "shape":
         return <ShapeContent object={object} />;
       case "line":
@@ -332,9 +341,11 @@ function insetCss(inset: { top: number; right: number; bottom: number; left: num
 function ImageContent({
   object,
   resolveAsset,
+  placeholder,
 }: {
   object: ImageFrameObject;
   resolveAsset?: AssetResolver;
+  placeholder: "label" | "silent";
 }) {
   const asset = resolveAsset?.(object.assetId);
   const maskId = `image-clip-${object.id}`;
@@ -384,18 +395,20 @@ function ImageContent({
             strokeWidth="1"
             vectorEffect="non-scaling-stroke"
           />
-          <text
-            x={object.frame.x + width / 2}
-            y={object.frame.y + height / 2}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="color-mix(in oklab, var(--ink) 48%, transparent)"
-            fontFamily="var(--font-meta, ui-monospace, monospace)"
-            fontSize={Math.max(6, Math.min(11, width / 18))}
-            letterSpacing="0.08em"
-          >
-            {object.assetId ? "IMAGE UNAVAILABLE" : "EMPTY IMAGE FRAME"}
-          </text>
+          {placeholder === "label" ? (
+            <text
+              x={object.frame.x + width / 2}
+              y={object.frame.y + height / 2}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill="color-mix(in oklab, var(--ink) 48%, transparent)"
+              fontFamily="var(--font-meta, ui-monospace, monospace)"
+              fontSize={Math.max(6, Math.min(11, width / 18))}
+              letterSpacing="0.08em"
+            >
+              {object.assetId ? "IMAGE UNAVAILABLE" : "EMPTY IMAGE FRAME"}
+            </text>
+          ) : null}
         </g>
       </g>
     );

@@ -639,17 +639,40 @@ export function setActiveLayer(
   return withState(session, { ...session.state, activeLayerId: layerId }, false);
 }
 
+const TYPING_GROUP_MS = 1200;
+
+/**
+ * A repeated control (slider, color picker) can coalesce its updates into the
+ * history entry opened by the first one. Without this, one drag would cost
+ * dozens of undo steps and undoing a crop would only move it back one pixel.
+ */
+function historyCoalescing(
+  session: EditorSession,
+  coalesceKey?: string,
+): { continuing: boolean; editGroup: SessionState["editGroup"] } {
+  if (!coalesceKey) return { continuing: false, editGroup: undefined };
+  const now = Date.now();
+  const existing = session.state.editGroup;
+  return {
+    continuing:
+      existing?.key === coalesceKey && now - existing.at <= TYPING_GROUP_MS,
+    editGroup: { key: coalesceKey, at: now },
+  };
+}
+
 /** Replaces the master record, recording one history entry. */
 export function editMaster(
   session: EditorSession,
   masterId: string,
   updater: (master: MasterPage) => MasterPage,
   label = "Edit master",
+  coalesceKey?: string,
 ): EditorSession {
   const master = masterById(sessionDocument(session), masterId);
   if (!master) return session;
   const next = updater(master);
   if (next === master) return session;
+  const group = historyCoalescing(session, coalesceKey);
   return withState(
     session,
     {
@@ -658,8 +681,9 @@ export function editMaster(
         ...session.state.masters,
         [masterId]: { master: next, dirty: true },
       },
+      editGroup: group.editGroup,
     },
-    true,
+    !group.continuing,
     label,
   );
 }
@@ -674,12 +698,14 @@ export function editMasterSurface(
   masterId: string,
   surface: PublicationPage,
   label?: string,
+  coalesceKey?: string,
 ): EditorSession {
   return editMaster(
     session,
     masterId,
     (master) => applyPageToMaster(master, surface),
     label,
+    coalesceKey,
   );
 }
 
@@ -692,6 +718,7 @@ export function editSurface(
   session: EditorSession,
   updater: (surface: PublicationPage) => PublicationPage,
   label?: string,
+  coalesceKey?: string,
 ): EditorSession {
   const masterId = session.state.activeMasterId;
   if (masterId) {
@@ -700,11 +727,11 @@ export function editSurface(
     const surface = masterAsPage(master, sessionDocument(session));
     const next = updater(surface);
     if (next === surface) return session;
-    return editMasterSurface(session, masterId, next, label);
+    return editMasterSurface(session, masterId, next, label, coalesceKey);
   }
   const page = activePage(session);
   if (!page) return session;
-  return editPage(session, page.id, updater, label);
+  return editPage(session, page.id, updater, label, coalesceKey);
 }
 
 export function setSelection(
@@ -775,12 +802,14 @@ export function editPage(
   pageId: string,
   updater: (page: PublicationPage) => PublicationPage,
   label = "Edit page",
+  coalesceKey?: string,
 ): EditorSession {
   const document = sessionDocument(session);
   const page = document.pages.find((entry) => entry.id === pageId);
   if (!page) return session;
   const next = updater(page);
   if (next === page) return session;
+  const group = historyCoalescing(session, coalesceKey);
   return withState(
     session,
     {
@@ -789,13 +818,12 @@ export function editPage(
         ...session.state.pages,
         [pageId]: { page: next, dirty: true },
       },
+      editGroup: group.editGroup,
     },
-    true,
+    !group.continuing,
     label,
   );
 }
-
-const TYPING_GROUP_MS = 1200;
 
 export function editStory(
   session: EditorSession,
@@ -1339,6 +1367,66 @@ export function discardMasterEdits(
 /* History                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Content history predates autosave acknowledgements. A step stores the
+ * session state from before the edit, but that state may name no override for
+ * a record — it still lived in `base`. Once the edit has saved, `base` holds
+ * the edited value, so restoring the step's state verbatim would leave the
+ * edit in place. Rebuild the step's records as overrides against the latest
+ * base: old content survives a server refresh and is saved back by undo.
+ */
+function restoredContentState(
+  session: EditorSession,
+  previous: SessionState,
+): SessionState {
+  const base = session.state.base;
+  const previousDocument = sessionDocument({ ...session, state: previous });
+  const contentDiffers = (a: { version: number }, b: { version: number }) => {
+    const { version: _a, ...restA } = a;
+    const { version: _b, ...restB } = b;
+    return JSON.stringify(restA) !== JSON.stringify(restB);
+  };
+
+  const pages: Record<string, PageOverride> = {};
+  for (const page of previousDocument.pages) {
+    const server = base.pages.find((entry) => entry.id === page.id);
+    if (server && !contentDiffers(page, server)) continue;
+    pages[page.id] = {
+      page: { ...page, version: server?.version ?? page.version },
+      dirty: true,
+    };
+  }
+
+  const stories: Record<string, StoryOverride> = {};
+  for (const story of previousDocument.stories) {
+    const server = base.stories.find((entry) => entry.id === story.id);
+    if (server && !contentDiffers(story, server)) continue;
+    stories[story.id] = {
+      story: { ...story, version: server?.version ?? story.version },
+      dirty: true,
+    };
+  }
+
+  const masters: Record<string, MasterOverride> = {};
+  for (const master of previousDocument.masters) {
+    const server = base.masters.find((entry) => entry.id === master.id);
+    if (server && !contentDiffers(master, server)) continue;
+    masters[master.id] = {
+      master: { ...master, version: server?.version ?? master.version },
+      dirty: true,
+    };
+  }
+
+  return {
+    ...previous,
+    base,
+    pages,
+    stories,
+    masters,
+    editGroup: undefined,
+  };
+}
+
 /** Undoes one content edit. Structure steps are async and handled by the hook. */
 export function undo(session: EditorSession): EditorSession {
   const target = undoTarget(session);
@@ -1346,9 +1434,7 @@ export function undo(session: EditorSession): EditorSession {
   const entry = target.entry;
   return {
     ...session,
-    // The base stays the latest server copy: history is about edits, not the
-    // document that happened to be open when they were made.
-    state: { ...entry.state, base: session.state.base, editGroup: undefined },
+    state: restoredContentState(session, entry.state),
     undoStack: session.undoStack.slice(0, -1),
     redoStack: [
       ...session.redoStack,
@@ -1366,7 +1452,7 @@ export function redo(session: EditorSession): EditorSession {
   const entry = target.entry;
   return {
     ...session,
-    state: { ...entry.state, base: session.state.base, editGroup: undefined },
+    state: restoredContentState(session, entry.state),
     undoStack: [
       ...session.undoStack,
       { ...entry, state: { ...session.state, editGroup: undefined } },

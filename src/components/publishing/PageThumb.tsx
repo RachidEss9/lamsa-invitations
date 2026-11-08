@@ -64,12 +64,18 @@ export const PageThumb = memo(function PageThumb({
               key={`master-${object.id}`}
               object={object}
               document={document}
+              placeholder="silent"
             />
           ))}
           {page.objects
             .filter((object) => !object.hidden)
             .map((object) => (
-              <ObjectArt key={object.id} object={object} document={document} />
+              <ObjectArt
+                key={object.id}
+                object={object}
+                document={document}
+                placeholder="silent"
+              />
             ))}
         </g>
       )}

@@ -162,6 +162,7 @@ export function ImagePanel({
 
         <Row label="Zoom">
           <Slider
+            aria-label="Image zoom"
             value={[Math.round(resolved.zoom * 100)]}
             min={50}
             max={400}
@@ -174,6 +175,7 @@ export function ImagePanel({
         </Row>
         <Row label="Horizontal">
           <Slider
+            aria-label="Image horizontal offset"
             value={[Math.round(resolved.offsetX * 100)]}
             min={-50}
             max={50}
@@ -191,6 +193,7 @@ export function ImagePanel({
         </Row>
         <Row label="Vertical">
           <Slider
+            aria-label="Image vertical offset"
             value={[Math.round(resolved.offsetY * 100)]}
             min={-50}
             max={50}
@@ -208,6 +211,7 @@ export function ImagePanel({
         </Row>
         <Row label="Rotate">
           <Slider
+            aria-label="Image rotation"
             value={[Math.round(resolved.rotation)]}
             min={-180}
             max={180}

@@ -2258,19 +2258,24 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(
-        editSurface(current, (pageUpdate) => ({
-          ...pageUpdate,
-          objects: pageUpdate.objects.map((object) =>
-            object.id === objectId && object.kind === "image-frame"
-              ? {
-                  ...object,
-                  ...(change.fit ? { fit: change.fit } : {}),
-                  ...(change.crop ? { crop: change.crop } : {}),
-                  ...(change.focal ? { focal: change.focal } : {}),
-                }
-              : object,
-          ),
-        })),
+        editSurface(
+          current,
+          (pageUpdate) => ({
+            ...pageUpdate,
+            objects: pageUpdate.objects.map((object) =>
+              object.id === objectId && object.kind === "image-frame"
+                ? {
+                    ...object,
+                    ...(change.fit ? { fit: change.fit } : {}),
+                    ...(change.crop ? { crop: change.crop } : {}),
+                    ...(change.focal ? { focal: change.focal } : {}),
+                  }
+                : object,
+            ),
+          }),
+          "Place image",
+          `image-placement:${objectId}`,
+        ),
       );
     },
     [apply],

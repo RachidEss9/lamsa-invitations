@@ -337,7 +337,12 @@ export function MastersPanel({
               className="h-6 flex-1 rounded-[3px] border-[var(--rule)] px-1 font-meta text-[0.52rem] uppercase tracking-[0.08em]"
               disabled={busy || selectedPages.length === 0}
               onClick={() =>
-                onAssign(selectedPages, page.masterId ?? document.masters[0]?.id)
+                // The master under inspection wins: assigning while editing a
+                // duplicate must not quietly apply the current page's master.
+                onAssign(
+                  selectedPages,
+                  activeMasterId ?? page.masterId ?? document.masters[0]?.id,
+                )
               }
             >
               Assign to {selectedPages.length}

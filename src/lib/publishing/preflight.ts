@@ -561,8 +561,8 @@ export function runPreflight(
                 severity: "info",
                 title: mixed ? "Mixed-direction text" : "Right-to-left text",
                 detail: mixed
-                  ? `“${objectLabel(object)}” mixes Latin and right-to-left runs. The exporter keeps Latin text selectable and leaves runs the built-in fonts cannot encode out of the PDF rather than substituting a face.`
-                  : `“${objectLabel(object)}” contains right-to-left text. The exporter's built-in fonts cannot encode it, so those runs are reported after export rather than silently replaced.`,
+                  ? `“${objectLabel(object)}” mixes Latin and right-to-left runs. The exporter's built-in fonts cannot encode the right-to-left runs, so the whole frame is preserved as a high-resolution image rather than silently dropping text. Its text will not be selectable or searchable.`
+                  : `“${objectLabel(object)}” contains right-to-left text. The exporter's built-in fonts cannot encode it, so the frame is preserved as a high-resolution image instead of being omitted. Its text will not be selectable or searchable.`,
                 pageId: page.id,
                 pageIndex: index,
                 objectId: object.id,

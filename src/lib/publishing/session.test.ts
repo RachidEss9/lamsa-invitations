@@ -352,6 +352,84 @@ describe("history", () => {
     // Nothing left to redo.
     expect(redo(session)).toBe(session);
   });
+
+  it("coalesces repeated slider updates into one undo step", () => {
+    const document = editorDocument();
+    let session = createEditorSession(document);
+    const page = activePage(session)!;
+    const key = "image-placement:test";
+    const setZoom = (zoom: number) =>
+      editPage(
+        session,
+        page.id,
+        (current) => ({ ...current, name: `Zoom ${zoom}` }),
+        "Place image",
+        key,
+      );
+    session = setZoom(1);
+    session = setZoom(2);
+    session = setZoom(3);
+    expect(activePage(session)!.name).toBe("Zoom 3");
+    expect(session.undoStack).toHaveLength(1);
+    session = undo(session);
+    expect(activePage(session)!.name).toBe("Page 1");
+    session = redo(session);
+    expect(activePage(session)!.name).toBe("Zoom 3");
+  });
+
+  it("undo still restores text after the edit has been saved and the base refreshed", () => {
+    const story = createStory("Body", {
+      id: "story_saved_undo",
+      paragraphs: [createParagraph("before", { id: "p_before" })],
+    });
+    const document = { ...editorDocument(), stories: [story] };
+    const storyText = (value: PublicationDocument) =>
+      value.stories[0]!.paragraphs[0]!.runs[0]!.text;
+    let session = createEditorSession(document);
+    session = editStory(session, story.id, (current) => ({
+      ...current,
+      paragraphs: [{ ...current.paragraphs[0]!, runs: [{ text: "after" }] }],
+    }));
+    session = markStorySaved(session, story.id, 2);
+    session = syncBase(session, {
+      ...document,
+      stories: [
+        {
+          ...story,
+          version: 2,
+          paragraphs: [{ ...story.paragraphs[0]!, runs: [{ text: "after" }] }],
+        },
+      ],
+    });
+    expect(storyText(sessionDocument(session))).toBe("after");
+
+    session = undo(session);
+    expect(storyText(sessionDocument(session))).toBe("before");
+    // The old text is a local override, so a second refresh cannot bring the
+    // saved edit back while the undo is being written to the server.
+    expect(session.state.stories[story.id]?.dirty).toBe(true);
+    expect(
+      storyText(
+        sessionDocument(
+          syncBase(session, {
+            ...document,
+            stories: [
+              {
+                ...story,
+                version: 2,
+                paragraphs: [
+                  { ...story.paragraphs[0]!, runs: [{ text: "after" }] },
+                ],
+              },
+            ],
+          }),
+        ),
+      ),
+    ).toBe("before");
+
+    session = redo(session);
+    expect(storyText(sessionDocument(session))).toBe("after");
+  });
 });
 
 describe("image crop history", () => {
