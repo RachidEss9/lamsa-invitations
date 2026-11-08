@@ -275,6 +275,31 @@ describe("reflow and timestamp", () => {
     expect(reflowPages(BASE, [...BASE.pages])).toBe(BASE);
   });
 
+  it("rebuilds spreads that still reference a removed page", () => {
+    const staleSpread = {
+      id: "spread_stale",
+      index: 0,
+      kind: "single" as const,
+      pageIds: ["page_gone"],
+      gutter: 0,
+    };
+    const stale = { ...BASE, spreads: [...BASE.spreads, staleSpread] };
+    const next = reflowPages(stale, [...BASE.pages]);
+    const known = new Set(next.pages.map((page) => page.id));
+    expect(next).not.toBe(stale);
+    expect(next.spreads.some((spread) => spread.pageIds.some((id) => !known.has(id)))).toBe(false);
+  });
+
+  it("rebuilds spreads that do not yet cover a replayed page", () => {
+    // A structural redo replays more pages than the document currently has;
+    // the stored spreads are incomplete and must not be kept.
+    const added = { ...BASE.pages[0]!, id: "page_replayed" };
+    const next = reflowPages(BASE, [...BASE.pages, added]);
+    const placed = next.spreads.flatMap((spread) => spread.pageIds);
+    expect(placed).toHaveLength(next.pages.length);
+    expect(placed).toContain("page_replayed");
+  });
+
   it("stamps the update time without changing anything else", () => {
     const stamped = touchDocument(BASE, 1234);
     expect(stamped.metadata.updatedAt).toBe(1234);

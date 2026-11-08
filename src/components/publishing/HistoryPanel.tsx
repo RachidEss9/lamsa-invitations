@@ -98,8 +98,8 @@ export function HistoryPanel({
         )}
       </div>
       <p className="border-t border-[var(--rule)] px-3 py-2 font-meta text-[0.48rem] uppercase tracking-[0.1em] leading-relaxed text-[var(--ink-soft)]">
-        ⌘Z / Ctrl+Z undo · ⇧⌘Z redo. History is per session and is cleared by a
-        save conflict.
+        ⌘Z / Ctrl+Z undo · ⇧⌘Z redo. History is per session; resolving a save
+        conflict or opening a recovery draft starts a new one.
       </p>
     </div>
   );

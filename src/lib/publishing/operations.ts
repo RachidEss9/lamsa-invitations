@@ -18,6 +18,7 @@ import {
   type PublicationDocument,
   type PublicationObject,
   type PublicationPage,
+  type Spread,
   type Story,
 } from "./model";
 import { defaultIds, type IdFactory } from "./ids";
@@ -52,6 +53,23 @@ export function spreadGutterOf(document: PublicationDocument): number {
   return document.spreads.find((spread) => spread.kind === "facing")?.gutter ?? 0;
 }
 
+/** True when every page sits in exactly one spread and no spread names a
+ * page outside the list. */
+function spreadsCoverPages(
+  spreads: readonly Spread[],
+  pages: readonly PublicationPage[],
+): boolean {
+  const pageIds = new Set(pages.map((page) => page.id));
+  const placed = new Set<string>();
+  for (const spread of spreads) {
+    for (const pageId of spread.pageIds) {
+      if (!pageIds.has(pageId) || placed.has(pageId)) return false;
+      placed.add(pageId);
+    }
+  }
+  return placed.size === pageIds.size;
+}
+
 /**
  * Recomputes spreads and page sides for a new page list, keeping the document
  * object when the list is unchanged.
@@ -61,7 +79,15 @@ export function reflowPages(
   pages: PublicationPage[],
   ids: IdFactory = defaultIds,
 ): PublicationDocument {
-  if (pages.length === document.pages.length && pages.every((page, index) => page === document.pages[index])) {
+  const unchanged =
+    pages.length === document.pages.length &&
+    pages.every((page, index) => page === document.pages[index]);
+  // An unchanged page list is only safe to return untouched when the stored
+  // spreads describe exactly those pages, once each. A structural undo or redo
+  // replays a page list over a document whose spreads belong to the other
+  // state, so they can mention pages that just vanished or omit pages that
+  // just came back; either way the spreads have to be rebuilt, not reused.
+  if (unchanged && spreadsCoverPages(document.spreads, pages)) {
     return document;
   }
   const planned = planSpreads(pages, {

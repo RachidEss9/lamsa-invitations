@@ -42,6 +42,7 @@ import {
   breakEditGroup,
   canRedo,
   canUndo,
+  clearHistory,
   completeStructureStep,
   createEditorSession,
   historyLog,
@@ -727,6 +728,10 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       );
       const ok = await saver.rebaseAndOverwrite(batch, { pages, stories, masters });
       if (ok) {
+        // The write re-based on newer server versions, so older undo steps no
+        // longer describe anything this publication contains.
+        const latest = sessionRef.current;
+        if (latest) apply(clearHistory(latest));
         toast.success("Your version replaced the server copy.", IDLE_TOAST);
       } else {
         toast.error(
@@ -738,7 +743,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     } finally {
       setBusy(false);
     }
-  }, [convex, publicationId]);
+  }, [apply, convex, publicationId]);
 
   const takeServerCopy = useCallback(async () => {
     const saver = saverRef.current;
@@ -751,7 +756,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       discard();
       const current = sessionRef.current;
       if (current) {
-        const next = syncBase(current, snapshot.document);
+        const next = clearHistory(syncBase(current, snapshot.document));
         sessionRef.current = next;
         setSession(next);
         for (const pageRecord of snapshot.document.pages) {
@@ -1391,12 +1396,13 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
         const result = await mutationsRef.current.createMaster({
           publicationId: publicationId as Id<"publications">,
           master: master as never,
+          expectedStructureVersion: structureVersionRef.current,
         });
         created = result.masterId;
         saverRef.current?.setMasterBaseline(result.masterId, result.version);
         return {
           document: result.document as unknown as PublicationDocument,
-          structureVersion: structureVersionRef.current,
+          structureVersion: result.structureVersion,
         };
       });
       if (created) {
@@ -1433,12 +1439,13 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
               return next;
             }),
           } as never,
+          expectedStructureVersion: structureVersionRef.current,
         });
         created = result.masterId;
         saverRef.current?.setMasterBaseline(result.masterId, result.version);
         return {
           document: result.document as unknown as PublicationDocument,
-          structureVersion: structureVersionRef.current,
+          structureVersion: result.structureVersion,
         };
       });
       if (created) toast.success("Master duplicated.", IDLE_TOAST);
@@ -1496,10 +1503,11 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
         const result = await mutationsRef.current.deleteMaster({
           publicationId: publicationId as Id<"publications">,
           masterId,
+          expectedStructureVersion: structureVersionRef.current,
         });
         return {
           document: result.document as unknown as PublicationDocument,
-          structureVersion: structureVersionRef.current,
+          structureVersion: result.structureVersion,
         };
       });
       const latest = sessionRef.current;
@@ -2382,7 +2390,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       }
       next = editMaster(next, masterRecord.id, () => masterRecord);
     }
-    apply(next);
+    apply(clearHistory(next));
     setRecovery(null);
     toast.success("The draft is open again; review it before saving.", IDLE_TOAST);
   }, [apply, recovery]);

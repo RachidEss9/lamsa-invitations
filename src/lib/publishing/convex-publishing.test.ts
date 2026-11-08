@@ -277,6 +277,46 @@ describe("masters", () => {
     expect(result.document.pages[0]!.masterId).toBeUndefined();
   });
 
+  it("guards master structure with the shared structure version", async () => {
+    const t = setup();
+    const { owner } = await seedUsers(t);
+    const { publicationId } = await createPublication(t, owner, 2);
+    const asOwner = t.withIdentity({ subject: owner });
+    const result = await asOwner.query(api.publishing.publications.getMine, {
+      publicationId,
+    });
+    const master = masterFor(result.document.pages[0]!);
+
+    const created = await asOwner.mutation(api.publishing.masters.createMaster, {
+      publicationId,
+      master: asMaster(master),
+      expectedStructureVersion: 1,
+    });
+    expect(created.structureVersion).toBe(2);
+
+    await expect(
+      asOwner.mutation(api.publishing.masters.createMaster, {
+        publicationId,
+        master: asMaster({ ...master, id: "master_stale" }),
+        expectedStructureVersion: 1,
+      }),
+    ).rejects.toThrow(/structure changed elsewhere/);
+    await expect(
+      asOwner.mutation(api.publishing.masters.deleteMaster, {
+        publicationId,
+        masterId: created.masterId,
+        expectedStructureVersion: 1,
+      }),
+    ).rejects.toThrow(/structure changed elsewhere/);
+
+    const deleted = await asOwner.mutation(api.publishing.masters.deleteMaster, {
+      publicationId,
+      masterId: created.masterId,
+      expectedStructureVersion: 2,
+    });
+    expect(deleted.structureVersion).toBe(3);
+  });
+
   it("persists master descriptions, assignments and per-page overrides", async () => {
     const t = setup();
     const { owner } = await seedUsers(t);

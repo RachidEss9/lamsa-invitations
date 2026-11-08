@@ -33,6 +33,37 @@ import {
 export type PublishingCtx = QueryCtx | MutationCtx;
 export type PublicationId = Id<"publications">;
 
+/**
+ * Page/master-structure guard. Content saves do not touch this counter, so a
+ * stale editor is refused only when the *set or order* of pages or masters
+ * moved on — not every time another session types into a different page.
+ */
+export function structureVersionOf(publication: {
+  structureVersion?: number;
+}): number {
+  return publication.structureVersion ?? 1;
+}
+
+export function assertStructureCurrent(
+  publication: { structureVersion?: number },
+  expected: number | undefined,
+): void {
+  if (expected !== undefined && expected !== structureVersionOf(publication)) {
+    throw new Error(
+      "This publication's page or master structure changed elsewhere. Reload before changing it.",
+    );
+  }
+}
+
+export async function bumpStructureVersion(
+  ctx: MutationCtx,
+  publication: Doc<"publications">,
+): Promise<number> {
+  const structureVersion = structureVersionOf(publication) + 1;
+  await ctx.db.patch(publication._id, { structureVersion });
+  return structureVersion;
+}
+
 export async function requireUserId(ctx: PublishingCtx): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
   if (!userId) {

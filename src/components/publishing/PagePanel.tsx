@@ -237,7 +237,7 @@ export function PagePanel({
             <AlertDialogTitle>Delete this page?</AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDelete
-                ? `“${confirmDelete.name.trim() || "Untitled page"}” and every object on it will be removed from the publication. This cannot be undone from the editor.`
+                ? `“${confirmDelete.name.trim() || "Untitled page"}” and every object on it will be removed from the publication. Undo is available from the History panel for this session.`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>

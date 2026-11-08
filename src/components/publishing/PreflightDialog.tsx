@@ -47,9 +47,7 @@ export function PreflightDialog({
     DEFAULT_PREFLIGHT_SETTINGS,
   );
   const [filter, setFilter] = useState<PreflightSeverity | "all">("all");
-  // Derived, never stored: the report is always the current document. The
-  // token only exists so "Re-run" can re-evaluate the same data on request.
-  const [runToken, setRunToken] = useState(0);
+  // Derived, never stored: the report always reflects the current document.
   const report: PreflightReport = useMemo(
     () =>
       runPreflight(
@@ -64,8 +62,7 @@ export function PreflightDialog({
         })),
         settings,
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the token is the re-run trigger
-    [assets, document, settings, runToken],
+    [assets, document, settings],
   );
 
   const findings = useMemo(
@@ -140,7 +137,7 @@ export function PreflightDialog({
             variant="outline"
             size="sm"
             className="ml-auto h-7 gap-1 rounded-[3px] font-meta text-[0.55rem] uppercase tracking-[0.1em]"
-            onClick={() => setRunToken((token) => token + 1)}
+            onClick={() => setSettings((current) => ({ ...current }))}
           >
             <RefreshCw className="size-3" />
             Re-run

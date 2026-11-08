@@ -3,6 +3,8 @@ import { mutation } from "../_generated/server";
 import { addMaster, removeMaster } from "../../lib/publishing/operations";
 import type { MasterPage } from "../../lib/publishing/model";
 import {
+  assertStructureCurrent,
+  bumpStructureVersion,
   loadDocument,
   requireOwnedPublication,
   requireUserId,
@@ -20,10 +22,12 @@ export const createMaster = mutation({
   args: {
     publicationId: v.id("publications"),
     master: masterPageValidator,
+    expectedStructureVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    assertStructureCurrent(publication, args.expectedStructureVersion);
     const document = await loadDocument(ctx, publication);
     if (document.masters.some((master) => master.id === args.master.id)) {
       throw new Error("A master with that id already exists.");
@@ -32,12 +36,14 @@ export const createMaster = mutation({
     const next = addMaster(document, master);
     const now = Date.now();
     const saved = await saveDocumentState(ctx, publication, next, now);
+    const structureVersion = await bumpStructureVersion(ctx, publication);
     // The returned document lets the editor record a structural undo step
     // without guessing how the server normalised the record.
     return {
       masterId: master.id,
       version: master.version,
       updatedAt: now,
+      structureVersion,
       document: saved,
     };
   },
@@ -85,10 +91,12 @@ export const deleteMaster = mutation({
   args: {
     publicationId: v.id("publications"),
     masterId: v.string(),
+    expectedStructureVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    assertStructureCurrent(publication, args.expectedStructureVersion);
     const document = await loadDocument(ctx, publication);
     if (!document.masters.some((master) => master.id === args.masterId)) {
       throw new Error("Master not found.");
@@ -96,6 +104,7 @@ export const deleteMaster = mutation({
     const next = removeMaster(document, args.masterId);
     const now = Date.now();
     const saved = await saveDocumentState(ctx, publication, next, now);
-    return { updatedAt: now, document: saved };
+    const structureVersion = await bumpStructureVersion(ctx, publication);
+    return { updatedAt: now, structureVersion, document: saved };
   },
 });

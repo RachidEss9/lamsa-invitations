@@ -1,6 +1,5 @@
 import { v } from "convex/values";
-import type { Doc } from "../_generated/dataModel";
-import { mutation, type MutationCtx } from "../_generated/server";
+import { mutation } from "../_generated/server";
 import {
   addPage,
   movePage,
@@ -11,6 +10,8 @@ import {
 import { remapPageForDuplicate } from "../../lib/publishing/persistence";
 import type { MasterPage, PublicationPage } from "../../lib/publishing/model";
 import {
+  assertStructureCurrent,
+  bumpStructureVersion,
   loadDocument,
   requireOwnedPublication,
   requireUserId,
@@ -24,35 +25,6 @@ import {
   publicationPageValidator,
   storyValidator,
 } from "./validators";
-
-/**
- * Page-structure guard. Content saves do not touch this counter, so a stale
- * editor is refused only when the *set or order* of pages moved on — not every
- * time another session types into a different page.
- */
-function structureVersionOf(publication: { structureVersion?: number }): number {
-  return publication.structureVersion ?? 1;
-}
-
-function assertStructureCurrent(
-  publication: { structureVersion?: number },
-  expected: number | undefined,
-): void {
-  if (expected !== undefined && expected !== structureVersionOf(publication)) {
-    throw new Error(
-      "This publication's pages changed elsewhere. Reload before changing page structure.",
-    );
-  }
-}
-
-async function bumpStructureVersion(
-  ctx: MutationCtx,
-  publication: Doc<"publications">,
-): Promise<number> {
-  const structureVersion = structureVersionOf(publication) + 1;
-  await ctx.db.patch(publication._id, { structureVersion });
-  return structureVersion;
-}
 
 /**
  * Page-level edits. The client sends a complete page and the server applies it
