@@ -1382,8 +1382,10 @@ function restoredContentState(
   const base = session.state.base;
   const previousDocument = sessionDocument({ ...session, state: previous });
   const contentDiffers = (a: { version: number }, b: { version: number }) => {
-    const { version: _a, ...restA } = a;
-    const { version: _b, ...restB } = b;
+    const restA = { ...a } as Record<string, unknown>;
+    const restB = { ...b } as Record<string, unknown>;
+    delete restA.version;
+    delete restB.version;
     return JSON.stringify(restA) !== JSON.stringify(restB);
   };
 

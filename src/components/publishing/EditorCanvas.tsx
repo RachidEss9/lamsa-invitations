@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type {
   Point,
@@ -177,7 +184,9 @@ export function EditorCanvas({
   // through a ref keeps click mapping correct instead of freezing the layout
   // from the render that created the handler.
   const layoutRef = useRef(layout);
-  layoutRef.current = layout;
+  useLayoutEffect(() => {
+    layoutRef.current = layout;
+  }, [layout]);
 
   /* --------------------------------------------------------------- renders */
 
@@ -728,7 +737,6 @@ export function EditorCanvas({
       if (page) onEditPage(drag.pageId, page);
       setPreviewFrames({});
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [onEditPage, onSelect],
   );
 
