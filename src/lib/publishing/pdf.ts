@@ -3,10 +3,12 @@
  *
  * This is a vector writer, not a screenshot: shapes and lines stay vector, text
  * is drawn with an embedded PDF font, and photographs are placed at their
- * original resolution with the document's crop applied. The one honest
- * limitation is type: `pdf-lib` ships the standard Latin fonts only, so runs
- * that cannot be encoded (Arabic, for example) are reported and skipped rather
- * than drawn as boxes or silently substituted.
+ * original resolution with the document's crop applied. `pdf-lib` ships the
+ * standard Latin fonts only, so a frame containing non-WinAnsi text (Arabic,
+ * for example) is handed to an optional browser rasteriser instead. That keeps
+ * the text visible without pretending it is selectable; callers must pass the
+ * callback to avoid the historical behaviour of skipping the frame and only
+ * reporting it afterwards.
  *
  * Coordinates: the document is top-left origin, y down; PDF is bottom-left,
  * y up. Every draw call converts through `toPdfBox` once, so geometry can be
@@ -132,6 +134,11 @@ export interface ExportOptions {
   settings: ExportSettings;
   /** Resolves an asset id to its file; null means "not available". */
   loadAsset: (assetId: string) => Promise<ExportAsset | null>;
+  /**
+   * Browser-only: renders a frame containing non-Latin text to a transparent
+   * PNG at the frame's size. Without it those frames are skipped and reported.
+   */
+  rasterTextFrame?: (object: TextFrameObject) => Promise<Uint8Array | null>;
 }
 
 export interface ExportPageInfo {
@@ -147,10 +154,18 @@ export interface ExportResult {
   pages: ExportPageInfo[];
   /** Text frames whose runs could not be encoded, by page id. */
   skippedTextFrames: string[];
+  /** Non-Latin frames embedded as images rather than selectable text. */
+  rasterizedTextFrames: string[];
   /** Photographs that could not be embedded (missing file/unsupported type). */
   missingImages: string[];
   warnings: string[];
-  stats: { shapes: number; images: number; textFrames: number; lines: number };
+  stats: {
+    shapes: number;
+    images: number;
+    textFrames: number;
+    rasterTextFrames: number;
+    lines: number;
+  };
 }
 
 const POINTS_PER_INCH = 72;
@@ -301,6 +316,20 @@ export function encodable(text: string): boolean {
   return true;
 }
 
+/** True when a frame contains text the standard PDF fonts cannot encode. */
+export function textFrameNeedsRaster(
+  document: PublicationDocument,
+  object: TextFrameObject,
+): boolean {
+  const story = object.storyId
+    ? document.stories.find((entry) => entry.id === object.storyId)
+    : undefined;
+  if (!story) return false;
+  return story.paragraphs.some((paragraph) =>
+    paragraph.runs.some((run) => !encodable(run.text)),
+  );
+}
+
 export function isLatinFont(fontId: string | undefined): boolean {
   const id = (fontId ?? "").toLowerCase();
   return !id || LATIN_FONT_IDS.some((name) => id.includes(name));
@@ -348,9 +377,17 @@ interface Context {
   images: Map<string, PDFImage | null>;
   loadAsset: (assetId: string) => Promise<ExportAsset | null>;
   skippedTextFrames: string[];
+  rasterizedTextFrames: string[];
+  rasterTextFrame?: (object: TextFrameObject) => Promise<Uint8Array | null>;
   missingImages: string[];
   warnings: Set<string>;
-  stats: { shapes: number; images: number; textFrames: number; lines: number };
+  stats: {
+    shapes: number;
+    images: number;
+    textFrames: number;
+    rasterTextFrames: number;
+    lines: number;
+  };
 }
 
 function clipToFrame(page: PDFPage, box: PdfBox): void {
@@ -560,16 +597,62 @@ function drawLineObject(
   context.stats.lines += 1;
 }
 
-function drawTextFrame(
+async function drawRasterizedText(
+  context: Context,
+  page: PDFPage,
+  object: TextFrameObject,
+  png: Uint8Array,
+  pageHeight: number,
+): Promise<void> {
+  const image = await context.pdf.embedPng(png);
+  const width = object.frame.width;
+  const height = object.frame.height;
+  const rotation = object.frame.rotation ?? 0;
+  const radians = (-rotation * Math.PI) / 180;
+  const centerX = object.frame.x + width / 2;
+  const centerY = pageHeight - object.frame.y - height / 2;
+  // pdf-lib rotates around the image's bottom-left corner; shift the origin so
+  // the visible result rotates around the frame's centre like the editor.
+  const x =
+    centerX - (width / 2) * Math.cos(radians) + (height / 2) * Math.sin(radians);
+  const y =
+    centerY - (width / 2) * Math.sin(radians) - (height / 2) * Math.cos(radians);
+  page.drawImage(image, {
+    x,
+    y,
+    width,
+    height,
+    opacity: object.opacity,
+    ...(rotation ? { rotate: degrees(-rotation) } : {}),
+  });
+  context.stats.textFrames += 1;
+  context.stats.rasterTextFrames += 1;
+  context.rasterizedTextFrames.push(object.id);
+  context.warnings.add(
+    "Arabic and other non-Latin text was rendered as a high-resolution image to preserve its appearance; those text frames are not selectable in the PDF.",
+  );
+}
+
+async function drawTextFrame(
   context: Context,
   page: PDFPage,
   object: TextFrameObject,
   pageHeight: number,
-): void {
+): Promise<void> {
   const story = object.storyId
     ? context.document.stories.find((entry) => entry.id === object.storyId)
     : undefined;
   if (!story) return;
+  if (textFrameNeedsRaster(context.document, object) && context.rasterTextFrame) {
+    const png = await context.rasterTextFrame(object);
+    if (png) {
+      await drawRasterizedText(context, page, object, png, pageHeight);
+      return;
+    }
+    context.warnings.add(
+      "A text frame containing Arabic or another non-Latin script could not be rendered as an image; its non-Latin runs are missing from this export.",
+    );
+  }
   const box = toPdfBox(object.frame, pageHeight);
   const origin = rotatedOrigin(object.frame, pageHeight);
   const rotation = object.frame.rotation;
@@ -642,7 +725,7 @@ async function drawObject(
   } else if (object.kind === "line") {
     drawLineObject(context, page, object, pageHeight);
   } else if (object.kind === "text-frame") {
-    drawTextFrame(context, page, object, pageHeight);
+    await drawTextFrame(context, page, object, pageHeight);
   }
 }
 
@@ -716,9 +799,11 @@ export async function exportPublicationPdf(
     images: new Map(),
     loadAsset: options.loadAsset,
     skippedTextFrames: [],
+    rasterizedTextFrames: [],
+    ...(options.rasterTextFrame ? { rasterTextFrame: options.rasterTextFrame } : {}),
     missingImages: [],
     warnings: new Set(),
-    stats: { shapes: 0, images: 0, textFrames: 0, lines: 0 },
+    stats: { shapes: 0, images: 0, textFrames: 0, rasterTextFrames: 0, lines: 0 },
   };
 
   const wanted =
@@ -801,6 +886,7 @@ export async function exportPublicationPdf(
     bytes,
     pages: exported,
     skippedTextFrames: [...new Set(context.skippedTextFrames)],
+    rasterizedTextFrames: [...new Set(context.rasterizedTextFrames)],
     missingImages: [...new Set(context.missingImages)],
     warnings: [...context.warnings],
     stats: context.stats,

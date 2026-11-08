@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName } from "pdf-lib";
 
 import {
   createDocument,
@@ -10,7 +10,11 @@ import {
   createTextFrame,
 } from "./factory";
 import { createSequentialIds } from "./ids";
-import type { PublicationDocument, PublicationPage } from "./model";
+import type {
+  PublicationDocument,
+  PublicationPage,
+  TextFrameObject,
+} from "./model";
 import {
   cropMarkSegments,
   defaultExportSettings,
@@ -18,6 +22,7 @@ import {
   exportPublicationPdf,
   exportPageSize,
   parseCssColor,
+  textFrameNeedsRaster,
 } from "./pdf";
 
 const ids = createSequentialIds(6000);
@@ -151,6 +156,60 @@ describe("PDF export", () => {
     expect(arabicResult.warnings.some((warning) => /cannot be embedded/i.test(warning))).toBe(
       true,
     );
+  });
+
+  it("preserves non-Latin frames as positioned images when a rasteriser is supplied", async () => {
+    const document = fixture();
+    const arabic = createStory("Arabic", {
+      paragraphs: [createParagraph("مرحبا بالعالم")],
+      ids,
+    });
+    const frame = createTextFrame({
+      name: "Arabic",
+      layerId: layer(document.pages[0]!),
+      x: 40,
+      y: 40,
+      width: 300,
+      height: 120,
+      storyId: arabic.id,
+    });
+    const withArabic: PublicationDocument = {
+      ...document,
+      stories: [arabic],
+      pages: document.pages.map((page, index) =>
+        index === 0 ? { ...page, objects: [frame] } : page,
+      ),
+    };
+    expect(textFrameNeedsRaster(withArabic, frame)).toBe(true);
+    const latinFrame = document.pages[0]!.objects!.find(
+      (object) => object.kind === "text-frame",
+    ) as TextFrameObject;
+    expect(textFrameNeedsRaster(document, latinFrame)).toBe(false);
+
+    const png = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      ),
+      (character) => character.charCodeAt(0),
+    );
+    let calls = 0;
+    const result = await exportPublicationPdf(withArabic, {
+      settings: defaultExportSettings("print"),
+      loadAsset: async () => null,
+      rasterTextFrame: async () => {
+        calls += 1;
+        return png;
+      },
+    });
+    expect(calls).toBe(1);
+    expect(result.skippedTextFrames).toHaveLength(0);
+    expect(result.rasterizedTextFrames).toEqual([frame.id]);
+    expect(result.stats.rasterTextFrames).toBe(1);
+    expect(result.warnings.some((warning) => /not selectable/i.test(warning))).toBe(true);
+
+    const pdf = await PDFDocument.load(result.bytes);
+    expect(pdf.getPageCount()).toBe(2);
+    expect(pdf.getPage(0).node.Resources()?.lookup(PDFName.of("XObject"))).toBeDefined();
   });
 
   it("adds bleed to the media box and draws crop marks only when asked", async () => {

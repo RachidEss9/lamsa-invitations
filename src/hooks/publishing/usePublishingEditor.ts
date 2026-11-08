@@ -314,6 +314,7 @@ export interface UsePublishingEditorResult {
   ) => void;
   placeAsset: (asset: StudioAssetRecord, targetObjectId?: string) => void;
   uploadAsset: (file: File) => Promise<void>;
+  deleteAsset: (assetId: string) => Promise<void>;
   uploadingAsset: boolean;
   assetError?: string;
   restoreRecovery: () => void;
@@ -368,6 +369,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const setAssetDerivativesMutation = useMutation(
     api.publishing.assets.setAssetDerivatives,
   );
+  const deleteAssetMutation = useMutation(api.publishing.assets.deleteAsset);
   const createMasterMutation = useMutation(api.publishing.masters.createMaster);
   const updateMasterMutation = useMutation(api.publishing.masters.updateMaster);
   const deleteMasterMutation = useMutation(api.publishing.masters.deleteMaster);
@@ -389,6 +391,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     generateAssetUploadUrl,
     registerAsset: registerAssetMutation,
     setAssetDerivatives: setAssetDerivativesMutation,
+    deleteAsset: deleteAssetMutation,
   });
   useEffect(() => {
     loadedRef.current = loaded;
@@ -412,6 +415,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       generateAssetUploadUrl,
       registerAsset: registerAssetMutation,
       setAssetDerivatives: setAssetDerivativesMutation,
+      deleteAsset: deleteAssetMutation,
     };
   }, [
     savePageMutation,
@@ -430,6 +434,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     generateAssetUploadUrl,
     registerAssetMutation,
     setAssetDerivativesMutation,
+    deleteAssetMutation,
   ]);
 
   const sessionRef = useRef<EditorSession | null>(null);
@@ -2366,6 +2371,21 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     [publicationId],
   );
 
+  const deleteAsset = useCallback(async (assetId: string) => {
+    setAssetError(undefined);
+    try {
+      await mutationsRef.current.deleteAsset({
+        assetId: assetId as Id<"publicationAssets">,
+      });
+      toast.success("Artwork removed from the library.");
+    } catch (error) {
+      const message =
+        messageOf(error) || "This artwork could not be deleted; it may still be in use.";
+      setAssetError(message);
+      toast.error(message);
+    }
+  }, []);
+
   /* ---------------------------------------------------------------- recovery */
 
   const restoreRecovery = useCallback(() => {
@@ -2588,6 +2608,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     setImagePlacement,
     placeAsset,
     uploadAsset,
+    deleteAsset,
     uploadingAsset,
     assetError,
     restoreRecovery,

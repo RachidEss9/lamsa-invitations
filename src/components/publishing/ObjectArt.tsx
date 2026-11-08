@@ -268,6 +268,10 @@ function TextContent({
             columns: Math.max(1, object.columns),
             columnGap: object.gutter,
             columnFill: "auto",
+            // A multi-column box only fragments when it has a definite height;
+            // with `height:auto` Chrome fills the first column and clips the
+            // rest, so the second column silently stayed empty.
+            ...(object.columns > 1 ? { height: "100%" } : {}),
           }}
         >
         {text.map((paragraph) => {

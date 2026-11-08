@@ -439,8 +439,15 @@ describe("master object overrides", () => {
     expect(detached!.page.objects).toHaveLength(1);
     expect(detached!.page.objects[0]!.id).not.toBe(rule.id);
     expect(detached!.page.objects[0]!.name).toBe("Rule");
-    expect(detached!.page.masterOverrides).toBeUndefined();
-    // The master keeps its original for every other page.
+    // The copy lives on a real page layer, not the master's layer.
+    expect(page.layers.map((layer) => layer.id)).toContain(
+      detached!.page.objects[0]!.layerId,
+    );
+    // The master original stays on other pages, but is hidden on this one so
+    // the detached copy does not paint twice.
+    expect(detached!.page.masterOverrides).toEqual([
+      { objectId: rule.id, hidden: true },
+    ]);
     expect(master.objects).toHaveLength(1);
     expect(master.objects[0]!.id).toBe(rule.id);
     expect(detachMasterObject(page, master, "missing", ids)).toBeNull();

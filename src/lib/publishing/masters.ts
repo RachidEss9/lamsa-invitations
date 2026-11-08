@@ -233,10 +233,28 @@ export function detachMasterObject(
   const source = master.objects.find((object) => object.id === objectId);
   if (!source) return null;
   const detachedId = ids("object");
+  // Master layers are not page layers. Copying `layerId` verbatim produced a
+  // page object whose layer did not exist, which the server correctly refused
+  // to save. Match the layer by name when possible, otherwise place the copy on
+  // the page's top content layer.
+  const masterLayer = master.layers.find((layer) => layer.id === source.layerId);
+  const layer =
+    page.layers.find((entry) => entry.id === source.layerId) ??
+    page.layers.find((entry) => entry.name === masterLayer?.name) ??
+    page.layers[page.layers.length - 1];
+  if (!layer) return null;
+  const copy = { ...source, id: detachedId, layerId: layer.id };
+  delete copy.groupId;
+  // The page now owns the copy, so the master's original must stay hidden here.
+  // Otherwise the detached text/image would paint twice.
+  const overrides = (page.masterOverrides ?? []).filter(
+    (override) => override.objectId !== objectId,
+  );
   return {
     page: {
-      ...withoutOverride(page, objectId),
-      objects: [...page.objects, { ...source, id: detachedId }],
+      ...page,
+      masterOverrides: [...overrides, { objectId, hidden: true }],
+      objects: [...page.objects, copy],
     },
     objectId: detachedId,
   };

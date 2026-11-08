@@ -84,6 +84,8 @@ describe("Arabic and mixed-direction rendering", () => {
     expect(html).toContain("Amiri");
     expect(html).toContain("columns:2");
     expect(html).toContain("column-gap:12px");
+    // Multi-column text must have a definite height or it never reaches column 2.
+    expect(html).toContain("height:100%");
   });
 
   it("keeps an explicitly English paragraph LTR and preserves mixed content", () => {

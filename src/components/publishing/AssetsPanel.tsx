@@ -5,6 +5,7 @@ import {
   ImagePlus,
   Loader2,
   Search,
+  Trash2,
   TriangleAlert,
   Upload,
 } from "lucide-react";
@@ -20,6 +21,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 /**
@@ -54,6 +65,8 @@ export interface AssetsPanelProps {
   selectedFrameName?: string;
   onPlaceAsset: (asset: StudioAsset) => void;
   onUploadAsset: (file: File) => void;
+  /** Only unused artwork can be deleted; the server checks again. */
+  onDeleteAsset?: (asset: StudioAsset) => void;
 }
 
 const MIME_LABELS: Record<string, string> = {
@@ -83,7 +96,9 @@ export function AssetsPanel({
   selectedFrameName,
   onPlaceAsset,
   onUploadAsset,
+  onDeleteAsset,
 }: AssetsPanelProps) {
+  const [confirmDelete, setConfirmDelete] = useState<StudioAsset | null>(null);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -334,8 +349,55 @@ export function AssetsPanel({
               ? "The image frame stays in place."
               : "Or drag the card onto an image frame."}
           </p>
+          {onDeleteAsset ? (
+            selectedUsed ? (
+              <p className="mt-2 text-center font-meta text-[0.46rem] uppercase tracking-[0.07em] text-[var(--ink-soft)]">
+                In use · remove its frames before deleting
+              </p>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() => setConfirmDelete(selected)}
+                className="mt-2 h-6 w-full gap-1 rounded-[3px] font-meta text-[0.5rem] uppercase tracking-[0.08em] text-[var(--red)]"
+              >
+                <Trash2 className="size-3" />
+                Delete artwork
+              </Button>
+            )
+          ) : null}
         </div>
       ) : null}
+
+      <AlertDialog
+        open={Boolean(confirmDelete)}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this artwork?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{confirmDelete?.filename}” will be removed from this publication's
+              library. Frames using it must be removed or replaced first, so a
+              page can never be left pointing at deleted artwork.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep artwork</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[var(--red)] text-white hover:bg-[color-mix(in_oklab,var(--red)_88%,black)]"
+              onClick={() => {
+                if (confirmDelete) onDeleteAsset?.(confirmDelete);
+                setConfirmDelete(null);
+              }}
+            >
+              Delete artwork
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

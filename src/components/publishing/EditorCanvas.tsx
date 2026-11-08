@@ -172,6 +172,12 @@ export function EditorCanvas({
   }, [document, selection, zoom, editable, spaceHeld, onCropPan]);
 
   const layout = useMemo(() => stageLayout(geometry, zoom), [geometry, zoom]);
+  // Gesture handlers are memoised with deliberately narrow dependency lists;
+  // the stage layout still changes after mount (fit, resize, zoom). Reading it
+  // through a ref keeps click mapping correct instead of freezing the layout
+  // from the render that created the handler.
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
 
   /* --------------------------------------------------------------- renders */
 
@@ -278,21 +284,25 @@ export function EditorCanvas({
   };
 
   const pageIdAtClient = (clientX: number, clientY: number): string | null =>
-    pageAtStagePoint(layout, stagePointFromClient(clientX, clientY));
+    pageAtStagePoint(layoutRef.current, stagePointFromClient(clientX, clientY));
 
   const pagePointFromClient = (
     clientX: number,
     clientY: number,
     pageId: string,
   ): Point | null =>
-    stagePointToPage(layout, pageId, stagePointFromClient(clientX, clientY));
+    stagePointToPage(
+      layoutRef.current,
+      pageId,
+      stagePointFromClient(clientX, clientY),
+    );
 
   const pageRectFromStage = (pageId: string, rect: StageMarquee): Rect | null => {
-    const from = stagePointToPage(layout, pageId, {
+    const from = stagePointToPage(layoutRef.current, pageId, {
       x: Math.min(rect.x1, rect.x2),
       y: Math.min(rect.y1, rect.y2),
     });
-    const to = stagePointToPage(layout, pageId, {
+    const to = stagePointToPage(layoutRef.current, pageId, {
       x: Math.max(rect.x1, rect.x2),
       y: Math.max(rect.y1, rect.y2),
     });

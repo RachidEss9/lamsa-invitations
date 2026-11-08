@@ -17,7 +17,8 @@ import {
   type ExportResult,
   type ExportSettings,
 } from "@/lib/publishing/pdf";
-import type { PublicationDocument } from "@/lib/publishing/model";
+import type { PublicationDocument, TextFrameObject } from "@/lib/publishing/model";
+import { rasterizeTextFrame } from "@/lib/publishing/text-raster";
 import type { StudioAssetRecord } from "@/hooks/publishing/usePublishingEditor";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +88,10 @@ export function ExportDialog({
             mime: asset?.mimeType ?? response.headers.get("content-type") ?? "image/png",
           };
         },
+        // Arabic and other non-Latin frames go through the browser's shaping
+        // engine and arrive as transparent images at print resolution.
+        rasterTextFrame: (object: TextFrameObject) =>
+          rasterizeTextFrame(document, object),
       });
       setResult(output);
       const name = `${(document.title || "publication")
@@ -118,9 +123,10 @@ export function ExportDialog({
             Export PDF
           </DialogTitle>
           <DialogDescription className="text-[0.75rem] leading-relaxed text-[var(--ink-soft)]">
-            Vector pages: shapes and lines stay vector, text stays selectable
-            where the built-in Latin fonts can encode it, and photographs are
-            embedded from the original files with their crop applied.
+            Vector pages: shapes and lines stay vector, photographs are
+            embedded from the original files with their crop applied, and
+            Latin text stays selectable. Arabic and other non-Latin frames are
+            preserved as high-resolution images instead of being omitted.
           </DialogDescription>
         </DialogHeader>
 
@@ -270,11 +276,7 @@ export function ExportDialog({
             </label>
           </section>
 
-          <p className="rounded-[3px] border border-[var(--rule)] bg-[var(--paper-light)] px-3 py-2 text-[0.68rem] leading-relaxed text-[var(--ink-soft)]">
-            Limitations, stated plainly: the file is RGB with no colour
-            management (no CMYK or PDF/X claim); Arabic and other non-Latin runs
-            are not embedded by the built-in PDF fonts and are reported after
-            export; rounded shape corners print square.
+          <p className="rounded-[3px] border border-[var(--rule)] bg-[var(--paper-light)] px-3 py-2 text-[0.68rem] leading-relaxed text-[var(--ink-soft)]">Stated plainly: the file is RGB with no colour management (no CMYK or PDF/X claim); Arabic and other non-Latin frames are images, so their text cannot be selected or searched; rounded shape corners print square.
           </p>
 
           {error ? (
@@ -303,6 +305,11 @@ export function ExportDialog({
                 {result.stats.shapes} vector shape
                 {result.stats.shapes === 1 ? "" : "s"}, {result.stats.textFrames}{" "}
                 text frame{result.stats.textFrames === 1 ? "" : "s"}
+                {result.stats.rasterTextFrames > 0
+                  ? ` (${result.stats.rasterTextFrames} preserved as ${
+                      result.stats.rasterTextFrames === 1 ? "an image" : "images"
+                    }, not selectable)`
+                  : ""}
               </p>
               {result.warnings.map((warning) => (
                 <p key={warning} className="text-[0.68rem] text-[var(--red)]">

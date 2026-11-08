@@ -331,6 +331,7 @@ function EditorWorkspace({
         editor.placeAsset(asset);
       }}
       onUploadAsset={(file) => void editor.uploadAsset(file)}
+      onDeleteAsset={(asset) => void editor.deleteAsset(asset._id)}
     />
   );
 
