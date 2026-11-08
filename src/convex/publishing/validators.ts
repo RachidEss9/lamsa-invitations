@@ -341,6 +341,7 @@ export const publicationSettingsValidator = v.object({
   facingPages: v.optional(v.boolean()),
   defaultGutter: v.optional(v.number()),
   grid: v.optional(gridValidator),
+  guides: v.optional(v.array(guideValidator)),
   metadata: v.optional(documentMetadataValidator),
 });
 

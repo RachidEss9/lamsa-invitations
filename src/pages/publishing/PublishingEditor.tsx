@@ -10,6 +10,13 @@ import { PagePanel } from "@/components/publishing/PagePanel";
 import { LayersPanel } from "@/components/publishing/LayersPanel";
 import { AssetsPanel, type StudioAsset } from "@/components/publishing/AssetsPanel";
 import { MastersPanel } from "@/components/publishing/MastersPanel";
+import { HistoryPanel } from "@/components/publishing/HistoryPanel";
+import { GuidesPanel } from "@/components/publishing/GuidesPanel";
+import { SelectionTools } from "@/components/publishing/SelectionTools";
+import { PreflightDialog } from "@/components/publishing/PreflightDialog";
+import { ExportDialog } from "@/components/publishing/ExportDialog";
+import { SmartAlbumDialog } from "@/components/publishing/SmartAlbumDialog";
+import { AssistDialog } from "@/components/publishing/AssistDialog";
 import { Inspector } from "@/components/publishing/Inspector";
 import { ImageCropBar } from "@/components/publishing/ImageCropBar";
 import {
@@ -20,7 +27,7 @@ import {
   RecoveryBanner,
 } from "@/components/publishing/StatePanels";
 import { Button } from "@/components/ui/button";
-import { PUBLISHING_LIBRARY_PATH } from "@/lib/publishing/routes";
+import { PUBLISHING_LIBRARY_PATH, editorHref } from "@/lib/publishing/routes";
 import {
   cropDraftFor,
   defaultImageCrop,
@@ -100,7 +107,13 @@ function EditorWorkspace({
   const editor = usePublishingEditor(publicationId);
   const [chrome, setChrome] = useState<PageChrome>(DEFAULT_CHROME);
   const [chromeBeforePreview, setChromeBeforePreview] = useState<PageChrome>(DEFAULT_CHROME);
-  const [panel, setPanel] = useState<"pages" | "layers" | "masters" | "assets">("pages");
+  const [panel, setPanel] = useState<
+    "pages" | "layers" | "masters" | "assets" | "history" | "guides"
+  >("pages");
+  const [dialog, setDialog] = useState<
+    "preflight" | "export" | "album" | "assist" | null
+  >(null);
+  const [guidesLocked, setGuidesLocked] = useState(false);
   const [fitSignal, setFitSignal] = useState(0);
   const [editing, setEditing] = useState<{
     pageId: string;
@@ -118,8 +131,16 @@ function EditorWorkspace({
     draft: ImageCropDraft;
   } | null>(null);
   const [mobilePanel, setMobilePanel] = useState<
-    "pages" | "layers" | "masters" | "assets" | "inspector" | null
+    | "pages"
+    | "layers"
+    | "masters"
+    | "assets"
+    | "history"
+    | "guides"
+    | "inspector"
+    | null
   >(null);
+  const navigate = useNavigate();
 
   const document = editor.document;
   const page = editor.page;
@@ -407,6 +428,10 @@ function EditorWorkspace({
         onInsertShape={(shape) => void editor.insertShape(shape)}
         onInsertLine={() => void editor.insertLine()}
         onOpenAssets={() => setPanel("assets")}
+        onOpenPreflight={() => setDialog("preflight")}
+        onOpenExport={() => setDialog("export")}
+        onOpenSmartAlbum={() => setDialog("album")}
+        onOpenAssist={() => setDialog("assist")}
         busy={editor.busy}
         onBack={() => {
           void editor.flush();
@@ -432,13 +457,15 @@ function EditorWorkspace({
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[232px_minmax(0,1fr)_268px]">
         <aside className="hidden min-h-0 flex-col border-r border-[var(--rule)] bg-[var(--paper)] lg:flex">
-          <div className="grid grid-cols-4 border-b border-[var(--rule)]">
+          <div className="grid grid-cols-3 border-b border-[var(--rule)]">
             {(
               [
                 ["pages", "Pages"],
                 ["layers", "Layers"],
                 ["masters", "Masters"],
                 ["assets", "Assets"],
+                ["history", "History"],
+                ["guides", "Guides"],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -486,6 +513,35 @@ function EditorWorkspace({
               />
             ) : null}
             {panel === "assets" ? assetsPanelNode : null}
+            {panel === "history" ? (
+              <HistoryPanel
+                history={editor.history}
+                canUndo={editor.canUndo}
+                canRedo={editor.canRedo}
+                busy={editor.busy}
+                onUndo={() => void editor.performUndo()}
+                onRedo={() => void editor.performRedo()}
+              />
+            ) : null}
+            {panel === "guides" ? (
+              <GuidesPanel
+                document={document}
+                page={page}
+                unit={document.displayUnit}
+                locked={guidesLocked}
+                onLockChange={setGuidesLocked}
+                onAddGuide={(guide) =>
+                  editor.addGuide(guide.axis, guide.position, guide.scope)
+                }
+                onMoveGuide={editor.moveGuide}
+                onRemoveGuide={editor.removeGuide}
+                onClearGuides={editor.clearGuides}
+                chrome={chrome}
+                onToggleChrome={(key) =>
+                  setChrome((current) => ({ ...current, [key]: !current[key] }))
+                }
+              />
+            ) : null}
           </div>
         </aside>
 
@@ -526,6 +582,20 @@ function EditorWorkspace({
               }
               onApply={commitImageCrop}
               onCancel={() => setImageCrop(null)}
+            />
+          ) : null}
+          {!master && editor.selection.length > 0 && !editor.preview ? (
+            <SelectionTools
+              count={editor.selection.length}
+              onAlign={editor.alignSelection}
+              onDistribute={editor.distributeSelection}
+              onMatchSize={editor.matchSelectionSize}
+              onGroup={editor.groupSelection}
+              onUngroup={editor.ungroupSelection}
+              onDuplicate={editor.duplicateSelection}
+              onArrange={editor.arrangeSelection}
+              onLock={editor.lockSelection}
+              onHide={editor.hideSelection}
             />
           ) : null}
           <EditorCanvas
@@ -572,6 +642,12 @@ function EditorWorkspace({
             onEditPage={editor.editPageObjects}
             onZoom={editor.setZoom}
             fitSignal={fitSignal}
+            showRulers={chrome.guides && !editor.preview}
+            unit={document.displayUnit}
+            onAddGuide={(axis, position) => {
+              if (guidesLocked) return;
+              editor.addGuide(axis, position);
+            }}
             editingObjectId={editingObjectId ?? undefined}
             onEditText={(objectId) => {
               const frame = surface.objects.find((object) => object.id === objectId);
@@ -644,13 +720,15 @@ function EditorWorkspace({
         </aside>
       </div>
 
-      <div className="flex h-10 shrink-0 items-stretch border-t border-[var(--rule)] bg-[var(--paper-light)] lg:hidden">
+      <div className="flex h-10 shrink-0 items-stretch overflow-x-auto border-t border-[var(--rule)] bg-[var(--paper-light)] lg:hidden">
         {(
           [
             ["pages", "Pages"],
             ["layers", "Layers"],
             ["masters", "Masters"],
             ["assets", "Assets"],
+            ["history", "History"],
+            ["guides", "Guides"],
             ["inspector", "Inspect"],
           ] as const
         ).map(([id, label]) => (
@@ -659,7 +737,7 @@ function EditorWorkspace({
             type="button"
             onClick={() => setMobilePanel((current) => (current === id ? null : id))}
             className={cn(
-              "flex-1 border-r border-[var(--rule)] py-2 font-meta text-[0.55rem] uppercase tracking-[0.1em]",
+              "min-w-[64px] flex-1 shrink-0 border-r border-[var(--rule)] py-2 font-meta text-[0.55rem] uppercase tracking-[0.1em]",
               mobilePanel === id
                 ? "text-[var(--red)]"
                 : "text-[var(--ink-soft)]",
@@ -729,10 +807,74 @@ function EditorWorkspace({
               />
             ) : null}
             {mobilePanel === "assets" ? assetsPanelNode : null}
+            {mobilePanel === "history" ? (
+              <HistoryPanel
+                history={editor.history}
+                canUndo={editor.canUndo}
+                canRedo={editor.canRedo}
+                busy={editor.busy}
+                onUndo={() => void editor.performUndo()}
+                onRedo={() => void editor.performRedo()}
+              />
+            ) : null}
+            {mobilePanel === "guides" ? (
+              <GuidesPanel
+                document={document}
+                page={page}
+                unit={document.displayUnit}
+                locked={guidesLocked}
+                onLockChange={setGuidesLocked}
+                onAddGuide={(guide) =>
+                  editor.addGuide(guide.axis, guide.position, guide.scope)
+                }
+                onMoveGuide={editor.moveGuide}
+                onRemoveGuide={editor.removeGuide}
+                onClearGuides={editor.clearGuides}
+                chrome={chrome}
+                onToggleChrome={(key) =>
+                  setChrome((current) => ({ ...current, [key]: !current[key] }))
+                }
+              />
+            ) : null}
             {mobilePanel === "inspector" ? inspectorNode : null}
           </div>
         </div>
       ) : null}
+
+      <PreflightDialog
+        open={dialog === "preflight"}
+        onOpenChange={(open) => setDialog(open ? "preflight" : null)}
+        document={document}
+        assets={editor.assets}
+        onNavigate={(pageId, objectId) => {
+          editor.activatePage(pageId);
+          if (objectId) editor.setSelection([objectId]);
+        }}
+      />
+      <ExportDialog
+        open={dialog === "export"}
+        onOpenChange={(open) => setDialog(open ? "export" : null)}
+        document={document}
+        assets={editor.assets}
+        currentPageId={page.id}
+      />
+      <SmartAlbumDialog
+        open={dialog === "album"}
+        onOpenChange={(open) => setDialog(open ? "album" : null)}
+        document={document}
+        assets={editor.assets}
+        onCreated={(createdId) => {
+          setDialog(null);
+          navigate(editorHref(createdId));
+        }}
+      />
+      <AssistDialog
+        open={dialog === "assist"}
+        onOpenChange={(open) => setDialog(open ? "assist" : null)}
+        document={document}
+        currentPageId={page.id}
+        onApply={(next, label) => editor.applyLayoutDocument(next, label)}
+      />
     </main>
   );
 }

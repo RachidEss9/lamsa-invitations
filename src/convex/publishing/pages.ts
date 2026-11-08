@@ -9,14 +9,21 @@ import {
   updatePage,
 } from "../../lib/publishing/operations";
 import { remapPageForDuplicate } from "../../lib/publishing/persistence";
-import type { PublicationPage } from "../../lib/publishing/model";
+import type { MasterPage, PublicationPage } from "../../lib/publishing/model";
 import {
   loadDocument,
   requireOwnedPublication,
   requireUserId,
   saveDocumentState,
 } from "./lib";
-import { publicationPageValidator } from "./validators";
+import {
+  guideValidator,
+  gridValidator,
+  masterPageValidator,
+  pageSpecValidator,
+  publicationPageValidator,
+  storyValidator,
+} from "./validators";
 
 /**
  * Page-structure guard. Content saves do not touch this counter, so a stale
@@ -106,13 +113,14 @@ export const createPage = mutation({
     const page = next.pages.find((candidate) => !before.has(candidate.id));
     if (!page) throw new Error("The page could not be created.");
     const now = Date.now();
-    await saveDocumentState(ctx, publication, next, now);
+    const saved = await saveDocumentState(ctx, publication, next, now);
     const structureVersion = await bumpStructureVersion(ctx, publication);
     return {
       pageId: page.id,
       index: next.pages.indexOf(page),
       updatedAt: now,
       structureVersion,
+      document: saved,
     };
   },
 });
@@ -140,12 +148,13 @@ export const duplicatePage = mutation({
     const index = args.at ?? document.pages.indexOf(source) + 1;
     const next = addPage(document, { page: copy, at: index });
     const now = Date.now();
-    await saveDocumentState(ctx, publication, next, now);
+    const prepared = await saveDocumentState(ctx, publication, next, now);
     const structureVersion = await bumpStructureVersion(ctx, publication);
     return {
       pageId: copy.id,
       index: next.pages.findIndex((page) => page.id === copy.id),
       structureVersion,
+      document: prepared,
     };
   },
 });
@@ -169,9 +178,14 @@ export const deletePage = mutation({
     }
     const next = removePage(document, args.pageId);
     const now = Date.now();
-    await saveDocumentState(ctx, publication, next, now);
+    const prepared = await saveDocumentState(ctx, publication, next, now);
     const structureVersion = await bumpStructureVersion(ctx, publication);
-    return { pageCount: next.pages.length, updatedAt: now, structureVersion };
+    return {
+      pageCount: next.pages.length,
+      updatedAt: now,
+      structureVersion,
+      document: prepared,
+    };
   },
 });
 
@@ -192,12 +206,13 @@ export const movePageTo = mutation({
     }
     const next = movePage(document, args.pageId, args.toIndex);
     const now = Date.now();
-    await saveDocumentState(ctx, publication, next, now);
+    const prepared = await saveDocumentState(ctx, publication, next, now);
     const structureVersion = await bumpStructureVersion(ctx, publication);
     return {
       index: next.pages.findIndex((page) => page.id === args.pageId),
       updatedAt: now,
       structureVersion,
+      document: prepared,
     };
   },
 });
@@ -227,8 +242,80 @@ export const reorderPages = mutation({
     }
     const next = reflowPages(document, ordered as typeof document.pages);
     const now = Date.now();
-    await saveDocumentState(ctx, publication, next, now);
+    const prepared = await saveDocumentState(ctx, publication, next, now);
     const structureVersion = await bumpStructureVersion(ctx, publication);
-    return { pageCount: next.pages.length, updatedAt: now, structureVersion };
+    return {
+      pageCount: next.pages.length,
+      updatedAt: now,
+      structureVersion,
+      document: prepared,
+    };
+  },
+});
+
+/**
+ * Restores a full structural snapshot for undo/redo.
+ *
+ * A structural command (add/delete/move page, create/delete master) changes
+ * the set of records, so its inverse cannot be expressed as an edit of the
+ * current document. The client replays the exact records it had, guarded by
+ * the structural counter — a stale snapshot is refused rather than merged.
+ * Content versions are incremented so a client still holding the old records
+ * cannot save over the restored ones.
+ */
+export const restoreStructure = mutation({
+  args: {
+    publicationId: v.id("publications"),
+    expectedStructureVersion: v.optional(v.number()),
+    pages: v.array(publicationPageValidator),
+    masters: v.array(masterPageValidator),
+    stories: v.array(storyValidator),
+    guides: v.array(guideValidator),
+    spec: pageSpecValidator,
+    facingPages: v.boolean(),
+    grid: gridValidator,
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    assertStructureCurrent(publication, args.expectedStructureVersion);
+    const document = await loadDocument(ctx, publication);
+
+    const pageVersions = new Map(document.pages.map((page) => [page.id, page.version]));
+    const storyVersions = new Map(
+      document.stories.map((story) => [story.id, story.version]),
+    );
+    const masterVersions = new Map(
+      document.masters.map((master) => [master.id, master.version]),
+    );
+
+    const pages = args.pages.map((page) => ({
+      ...page,
+      version: Math.max(page.version, pageVersions.get(page.id) ?? 0) + 1,
+    })) as unknown as PublicationPage[];
+    const stories = args.stories.map((story) => ({
+      ...story,
+      version: Math.max(story.version, storyVersions.get(story.id) ?? 0) + 1,
+    }));
+    const masters = args.masters.map((master) => ({
+      ...master,
+      version: Math.max(master.version, masterVersions.get(master.id) ?? 0) + 1,
+    })) as unknown as MasterPage[];
+
+    const restored = {
+      ...document,
+      pages,
+      masters,
+      stories,
+      guides: args.guides,
+      spec: args.spec,
+      facingPages: args.facingPages,
+      grid: args.grid,
+    };
+    const next = reflowPages(restored, pages);
+    const now = Date.now();
+    const saved = await saveDocumentState(ctx, publication, next, now);
+    const structureVersion = await bumpStructureVersion(ctx, publication);
+    return { document: saved, structureVersion, updatedAt: now };
   },
 });

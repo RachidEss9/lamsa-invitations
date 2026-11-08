@@ -31,8 +31,15 @@ export const createMaster = mutation({
     const master = { ...args.master, version: 1 } as unknown as MasterPage;
     const next = addMaster(document, master);
     const now = Date.now();
-    await saveDocumentState(ctx, publication, next, now);
-    return { masterId: master.id, version: master.version, updatedAt: now };
+    const saved = await saveDocumentState(ctx, publication, next, now);
+    // The returned document lets the editor record a structural undo step
+    // without guessing how the server normalised the record.
+    return {
+      masterId: master.id,
+      version: master.version,
+      updatedAt: now,
+      document: saved,
+    };
   },
 });
 
@@ -88,7 +95,7 @@ export const deleteMaster = mutation({
     }
     const next = removeMaster(document, args.masterId);
     const now = Date.now();
-    await saveDocumentState(ctx, publication, next, now);
-    return { updatedAt: now };
+    const saved = await saveDocumentState(ctx, publication, next, now);
+    return { updatedAt: now, document: saved };
   },
 });

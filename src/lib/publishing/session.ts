@@ -19,6 +19,7 @@
  */
 
 import type {
+  Guide,
   Layer,
   MasterPage,
   PublicationDocument,
@@ -38,6 +39,44 @@ import { movePage, pageIndexOf, removePage } from "./operations";
 import { applyPageToMaster, masterAsPage, masterById } from "./masters";
 
 const HISTORY_LIMIT = 60;
+/** Structure snapshots are whole-record sets, so they get a smaller budget. */
+const STRUCTURE_LIMIT = 30;
+/** The visible operation log; larger than the stacks because it is tiny. */
+const LOG_LIMIT = 160;
+
+export interface StructureSnapshot {
+  pages: PublicationPage[];
+  masters: MasterPage[];
+  stories: Story[];
+  guides: Guide[];
+  spec: PublicationDocument["spec"];
+  facingPages: boolean;
+  grid: PublicationDocument["grid"];
+}
+
+/** One undoable structural command, with the exact structure before and after. */
+export interface StructureEntry {
+  id: string;
+  sequence: number;
+  label: string;
+  before: StructureSnapshot;
+  after: StructureSnapshot;
+}
+
+/** A content history step. The state is shared, not deep-copied. */
+export interface ContentEntry {
+  id: string;
+  sequence: number;
+  label: string;
+  state: SessionState;
+}
+
+export interface HistoryLogEntry {
+  id: string;
+  label: string;
+  kind: "content" | "structure";
+  state: "done" | "undone";
+}
 
 export interface PageOverride {
   page: PublicationPage;
@@ -68,6 +107,8 @@ export interface SessionState {
   activeMasterId?: string;
   /** Selected object ids on the active page. */
   selection: string[];
+  /** Local guide edits, saved by the editor separately from page records. */
+  guides?: Guide[];
   /** The layer new objects are added to. */
   activeLayerId: string;
   /**
@@ -80,8 +121,15 @@ export interface SessionState {
 
 export interface EditorSession {
   state: SessionState;
-  undoStack: SessionState[];
-  redoStack: SessionState[];
+  undoStack: ContentEntry[];
+  redoStack: ContentEntry[];
+  /** Structural commands (page/spread/master set changes) and their snapshots. */
+  structureUndo: StructureEntry[];
+  structureRedo: StructureEntry[];
+  /** Newest operation last; the history panel reads this. */
+  log: HistoryLogEntry[];
+  /** Monotonic ordering shared by content and structure entries. */
+  sequence: number;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -105,10 +153,11 @@ export function sessionDocument(session: EditorSession): PublicationDocument {
     storyOverrides.length === 0 &&
     masterOverrides.length === 0
   ) {
-    return base;
+    return session.state.guides ? { ...base, guides: session.state.guides } : base;
   }
   return {
     ...base,
+    ...(session.state.guides ? { guides: session.state.guides } : {}),
     pages: pageOverrides.length
       ? base.pages.map(
           (page) => pages[page.id]?.page ?? page,
@@ -203,41 +252,282 @@ export function dirtyStories(session: EditorSession): Story[] {
 }
 
 export function canUndo(session: EditorSession): boolean {
-  return session.undoStack.length > 0;
+  return session.undoStack.length > 0 || session.structureUndo.length > 0;
 }
 
 export function canRedo(session: EditorSession): boolean {
-  return session.redoStack.length > 0;
+  return session.redoStack.length > 0 || session.structureRedo.length > 0;
 }
 
 /**
- * Drops content history at a structural boundary. Adding, deleting,
- * duplicating or moving a page is a server operation the session never
- * records, so old undo entries would otherwise point at a page set that no
- * longer exists.
+ * Drops all history and ends the current typing transaction. The boundary is
+ * used when the server refuses a save (the local timeline may no longer
+ * describe the stored document) and after a named version is restored.
  */
 export function clearHistory(session: EditorSession): EditorSession {
-  if (session.undoStack.length === 0 && session.redoStack.length === 0) {
+  if (
+    session.undoStack.length === 0 &&
+    session.redoStack.length === 0 &&
+    session.structureUndo.length === 0 &&
+    session.structureRedo.length === 0
+  ) {
     return session;
   }
-  return { ...session, undoStack: [], redoStack: [] };
+  return {
+    ...session,
+    undoStack: [],
+    redoStack: [],
+    structureUndo: [],
+    structureRedo: [],
+    log: session.log.map((entry) => ({ ...entry, state: "undone" as const })),
+    state: { ...session.state, editGroup: undefined },
+  };
 }
 
 /* -------------------------------------------------------------------------- */
 /* Writing                                                                    */
 /* -------------------------------------------------------------------------- */
 
+function nextEntry<T extends { id: string; sequence: number; label: string }>(
+  session: EditorSession,
+  label: string,
+  build: (id: string, sequence: number) => T,
+): { entry: T; sequence: number } {
+  const sequence = session.sequence + 1;
+  return { entry: build(`h${sequence}`, sequence), sequence };
+}
+
+function appendLog(
+  log: HistoryLogEntry[],
+  entry: HistoryLogEntry,
+): HistoryLogEntry[] {
+  // A new edit makes the undone future unreal; drop those rows so the panel
+  // never shows an operation that can no longer be redone.
+  return [...log.filter((row) => row.state === "done"), entry].slice(-LOG_LIMIT);
+}
+
 function withState(
   session: EditorSession,
   state: SessionState,
   recordHistory: boolean,
+  label = "Edit content",
 ): EditorSession {
   if (!recordHistory) return { ...session, state };
+  const { entry, sequence } = nextEntry(session, label, (id, seq) => ({
+    id,
+    sequence: seq,
+    label,
+    state: session.state,
+  }));
   return {
     state,
-    undoStack: [...session.undoStack, session.state].slice(-HISTORY_LIMIT),
+    sequence,
+    undoStack: [...session.undoStack, entry].slice(-HISTORY_LIMIT),
     redoStack: [],
+    structureUndo: session.structureUndo,
+    structureRedo: session.structureRedo,
+    log: appendLog(session.log, {
+      id: entry.id,
+      label,
+      kind: "content",
+      state: "done",
+    }),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Structural history                                                         */
+/* -------------------------------------------------------------------------- */
+
+/** The structural records of a document, shared by reference where possible. */
+export function snapshotStructure(document: PublicationDocument): StructureSnapshot {
+  return {
+    pages: document.pages,
+    masters: document.masters,
+    stories: document.stories,
+    guides: document.guides,
+    spec: document.spec,
+    facingPages: document.facingPages,
+    grid: document.grid,
+  };
+}
+
+/**
+ * Records one structural command (add/delete/move page, create/delete master).
+ * The snapshots hold the same record objects the session already has, so the
+ * cost is the arrays, never the images.
+ */
+export function recordStructure(
+  session: EditorSession,
+  options: {
+    label: string;
+    before: StructureSnapshot;
+    after: StructureSnapshot;
+    document: PublicationDocument;
+  },
+): EditorSession {
+  const { entry, sequence } = nextEntry(session, options.label, (id, seq) => ({
+    id,
+    sequence: seq,
+    label: options.label,
+    before: options.before,
+    after: options.after,
+  }));
+  return {
+    ...session,
+    sequence,
+    state: {
+      ...session.state,
+      // The server has accepted the new structure; the returned document is
+      // the base the next edit must build on.
+      base: options.document,
+      pages: {},
+      stories: {},
+      masters: {},
+      guides: undefined,
+      editGroup: undefined,
+      selection: session.state.selection.filter((id) =>
+        options.document.pages.some((page) =>
+          page.objects.some((object) => object.id === id),
+        ),
+      ),
+    },
+    structureUndo: [...session.structureUndo, entry].slice(-STRUCTURE_LIMIT),
+    structureRedo: [],
+    log: appendLog(session.log, {
+      id: entry.id,
+      label: options.label,
+      kind: "structure",
+      state: "done",
+    }),
+  };
+}
+
+function restoredPageId(
+  current: string,
+  document: PublicationDocument,
+): string {
+  return document.pages.some((page) => page.id === current)
+    ? current
+    : (document.pages[0]?.id ?? "");
+}
+
+export type UndoTarget =
+  | { kind: "content"; entry: ContentEntry }
+  | { kind: "structure"; entry: StructureEntry };
+
+export type RedoTarget = UndoTarget;
+
+/** The next operation undo would take, whichever timeline is newer. */
+export function undoTarget(session: EditorSession): UndoTarget | null {
+  const content = session.undoStack[session.undoStack.length - 1];
+  const structure = session.structureUndo[session.structureUndo.length - 1];
+  if (!content && !structure) return null;
+  if (content && structure) {
+    return structure.sequence > content.sequence
+      ? { kind: "structure", entry: structure }
+      : { kind: "content", entry: content };
+  }
+  return content
+    ? { kind: "content", entry: content }
+    : { kind: "structure", entry: structure! };
+}
+
+export function redoTarget(session: EditorSession): RedoTarget | null {
+  const content = session.redoStack[session.redoStack.length - 1];
+  const structure = session.structureRedo[session.structureRedo.length - 1];
+  if (!content && !structure) return null;
+  if (content && structure) {
+    return structure.sequence < content.sequence
+      ? { kind: "structure", entry: structure }
+      : { kind: "content", entry: content };
+  }
+  return content
+    ? { kind: "content", entry: content }
+    : { kind: "structure", entry: structure! };
+}
+
+/**
+ * Moves a structure entry between the undo and redo stacks after the server
+ * accepted (or restored) the snapshot. The document must be the base the
+ * server returned, so later content edits build on real data.
+ */
+export function completeStructureStep(
+  session: EditorSession,
+  direction: "undo" | "redo",
+  document: PublicationDocument,
+): EditorSession {
+  if (direction === "undo") {
+    const entry = session.structureUndo[session.structureUndo.length - 1];
+    if (!entry) return session;
+    return {
+      ...session,
+      state: {
+        ...session.state,
+        base: document,
+        pages: {},
+        stories: {},
+        masters: {},
+        guides: undefined,
+        selection: [],
+        activePageId: restoredPageId(session.state.activePageId, document),
+        activeMasterId: document.masters.some(
+          (master) => master.id === session.state.activeMasterId,
+        )
+          ? session.state.activeMasterId
+          : undefined,
+        activeLayerId: document.pages.length
+          ? defaultLayerId(
+              document.pages.find((page) => page.id === restoredPageId(session.state.activePageId, document)) ??
+                document.pages[0]!,
+            )
+          : "",
+        editGroup: undefined,
+      },
+      structureUndo: session.structureUndo.slice(0, -1),
+      structureRedo: [...session.structureRedo, entry].slice(-STRUCTURE_LIMIT),
+      log: session.log.map((row) =>
+        row.id === entry.id ? { ...row, state: "undone" as const } : row,
+      ),
+    };
+  }
+  const entry = session.structureRedo[session.structureRedo.length - 1];
+  if (!entry) return session;
+  const pageId = restoredPageId(session.state.activePageId, document);
+  return {
+    ...session,
+    state: {
+      ...session.state,
+      base: document,
+      pages: {},
+      stories: {},
+      masters: {},
+      guides: undefined,
+      selection: [],
+      activePageId: pageId,
+      activeMasterId: document.masters.some(
+        (master) => master.id === session.state.activeMasterId,
+      )
+        ? session.state.activeMasterId
+        : undefined,
+      activeLayerId: document.pages.length
+        ? defaultLayerId(document.pages.find((page) => page.id === pageId) ?? document.pages[0]!)
+        : "",
+      editGroup: undefined,
+    },
+    structureRedo: session.structureRedo.slice(0, -1),
+    structureUndo: [...session.structureUndo, entry].slice(-STRUCTURE_LIMIT),
+    log: session.log.map((row) =>
+      row.id === entry.id ? { ...row, state: "done" as const } : row,
+    ),
+  };
+}
+
+/** The panel view: newest first, with its current state. */
+export function historyLog(
+  session: EditorSession,
+): { id: string; label: string; kind: "content" | "structure"; state: "done" | "undone" }[] {
+  return [...session.log].reverse();
 }
 
 export function createEditorSession(
@@ -260,6 +550,10 @@ export function createEditorSession(
     },
     undoStack: [],
     redoStack: [],
+    structureUndo: [],
+    structureRedo: [],
+    log: [],
+    sequence: 0,
   };
 }
 
@@ -350,6 +644,7 @@ export function editMaster(
   session: EditorSession,
   masterId: string,
   updater: (master: MasterPage) => MasterPage,
+  label = "Edit master",
 ): EditorSession {
   const master = masterById(sessionDocument(session), masterId);
   if (!master) return session;
@@ -365,6 +660,7 @@ export function editMaster(
       },
     },
     true,
+    label,
   );
 }
 
@@ -377,8 +673,14 @@ export function editMasterSurface(
   session: EditorSession,
   masterId: string,
   surface: PublicationPage,
+  label?: string,
 ): EditorSession {
-  return editMaster(session, masterId, (master) => applyPageToMaster(master, surface));
+  return editMaster(
+    session,
+    masterId,
+    (master) => applyPageToMaster(master, surface),
+    label,
+  );
 }
 
 /**
@@ -389,6 +691,7 @@ export function editMasterSurface(
 export function editSurface(
   session: EditorSession,
   updater: (surface: PublicationPage) => PublicationPage,
+  label?: string,
 ): EditorSession {
   const masterId = session.state.activeMasterId;
   if (masterId) {
@@ -397,11 +700,11 @@ export function editSurface(
     const surface = masterAsPage(master, sessionDocument(session));
     const next = updater(surface);
     if (next === surface) return session;
-    return editMasterSurface(session, masterId, next);
+    return editMasterSurface(session, masterId, next, label);
   }
   const page = activePage(session);
   if (!page) return session;
-  return editPage(session, page.id, updater);
+  return editPage(session, page.id, updater, label);
 }
 
 export function setSelection(
@@ -453,6 +756,7 @@ function editTarget(
   session: EditorSession,
   targetId: string,
   updater: (page: PublicationPage) => PublicationPage,
+  label?: string,
 ): EditorSession {
   if (session.state.activeMasterId === targetId) {
     const master = masterById(sessionDocument(session), targetId);
@@ -460,9 +764,9 @@ function editTarget(
     const surface = masterAsPage(master, sessionDocument(session));
     const next = updater(surface);
     if (next === surface) return session;
-    return editMasterSurface(session, targetId, next);
+    return editMasterSurface(session, targetId, next, label);
   }
-  return editPage(session, targetId, updater);
+  return editPage(session, targetId, updater, label);
 }
 
 /** Replaces the page record for `pageId`, recording one history entry. */
@@ -470,6 +774,7 @@ export function editPage(
   session: EditorSession,
   pageId: string,
   updater: (page: PublicationPage) => PublicationPage,
+  label = "Edit page",
 ): EditorSession {
   const document = sessionDocument(session);
   const page = document.pages.find((entry) => entry.id === pageId);
@@ -486,6 +791,7 @@ export function editPage(
       },
     },
     true,
+    label,
   );
 }
 
@@ -495,7 +801,7 @@ export function editStory(
   session: EditorSession,
   storyId: string,
   updater: (story: Story) => Story,
-  options: { coalesceKey?: string; now?: number } = {},
+  options: { coalesceKey?: string; now?: number; label?: string } = {},
 ): EditorSession {
   const document = sessionDocument(session);
   const story = document.stories.find((entry) => entry.id === storyId);
@@ -522,6 +828,7 @@ export function editStory(
           : { key: options.coalesceKey, at: now },
     },
     !continuing,
+    options.label ?? "Edit text",
   );
 }
 
@@ -539,6 +846,7 @@ export function breakEditGroup(session: EditorSession): EditorSession {
 export function applyDocumentChanges(
   session: EditorSession,
   next: PublicationDocument,
+  label = "Edit document",
 ): EditorSession {
   const current = sessionDocument(session);
   const pages = { ...session.state.pages };
@@ -563,6 +871,7 @@ export function applyDocumentChanges(
     session,
     { ...session.state, pages, stories, editGroup: undefined },
     true,
+    label,
   );
 }
 
@@ -644,6 +953,7 @@ export function removeObjects(
         selection: session.state.selection.filter((id) => !wanted.has(id)),
       },
       true,
+      "Delete objects",
     );
   }
 
@@ -659,6 +969,7 @@ export function removeObjects(
       selection: session.state.selection.filter((id) => !wanted.has(id)),
     },
     true,
+    "Delete objects",
   );
 }
 
@@ -678,6 +989,7 @@ export function nudgeSelection(
         y: object.frame.y + dy,
       },
     })),
+    "Nudge objects",
   );
 }
 
@@ -687,6 +999,7 @@ export function patchObjects(
   pageId: string,
   ids: readonly string[],
   patch: Partial<PublicationObject> | ((object: PublicationObject) => PublicationObject),
+  label = "Change objects",
 ): EditorSession {
   const wanted = new Set(ids);
   return editTarget(session, pageId, (page) =>
@@ -695,6 +1008,7 @@ export function patchObjects(
         ? patch(object)
         : ({ ...object, ...patch } as PublicationObject),
     ),
+    label,
   );
 }
 
@@ -714,6 +1028,27 @@ function transformPageObjects(
   return changed ? { ...page, objects } : page;
 }
 
+/** Replaces the guide list as one undoable edit. */
+export function editGuides(
+  session: EditorSession,
+  guides: Guide[],
+  label = "Edit guides",
+): EditorSession {
+  const current = sessionDocument(session).guides;
+  if (
+    current.length === guides.length &&
+    current.every((guide, index) => guide === guides[index])
+  ) {
+    return session;
+  }
+  return withState(session, { ...session.state, guides }, true, label);
+}
+
+/** The latest guide list, including unsaved local edits. */
+export function currentGuides(session: EditorSession): Guide[] {
+  return sessionDocument(session).guides;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Layers                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -722,8 +1057,9 @@ function editLayers(
   session: EditorSession,
   pageId: string,
   updater: (page: PublicationPage) => PublicationPage,
+  label?: string,
 ): EditorSession {
-  return editTarget(session, pageId, updater);
+  return editTarget(session, pageId, updater, label);
 }
 
 export function toggleLayerVisibility(
@@ -731,12 +1067,17 @@ export function toggleLayerVisibility(
   pageId: string,
   layerId: string,
 ): EditorSession {
-  return editLayers(session, pageId, (page) => ({
-    ...page,
-    layers: page.layers.map((layer) =>
-      layer.id === layerId ? { ...layer, hidden: !layer.hidden } : layer,
-    ),
-  }));
+  return editLayers(
+    session,
+    pageId,
+    (page) => ({
+      ...page,
+      layers: page.layers.map((layer) =>
+        layer.id === layerId ? { ...layer, hidden: !layer.hidden } : layer,
+      ),
+    }),
+    "Change layer visibility",
+  );
 }
 
 export function toggleLayerLock(
@@ -744,12 +1085,17 @@ export function toggleLayerLock(
   pageId: string,
   layerId: string,
 ): EditorSession {
-  return editLayers(session, pageId, (page) => ({
-    ...page,
-    layers: page.layers.map((layer) =>
-      layer.id === layerId ? { ...layer, locked: !layer.locked } : layer,
-    ),
-  }));
+  return editLayers(
+    session,
+    pageId,
+    (page) => ({
+      ...page,
+      layers: page.layers.map((layer) =>
+        layer.id === layerId ? { ...layer, locked: !layer.locked } : layer,
+      ),
+    }),
+    "Lock layer",
+  );
 }
 
 /** Moves a layer up (towards the front) or down in the stack. */
@@ -759,10 +1105,15 @@ export function moveLayer(
   layerId: string,
   direction: 1 | -1,
 ): EditorSession {
-  return editLayers(session, pageId, (page) => {
-    const from = page.layers.findIndex((layer) => layer.id === layerId);
-    return from < 0 ? page : reorderLayer(page, layerId, from + direction);
-  });
+  return editLayers(
+    session,
+    pageId,
+    (page) => {
+      const from = page.layers.findIndex((layer) => layer.id === layerId);
+      return from < 0 ? page : reorderLayer(page, layerId, from + direction);
+    },
+    "Reorder layers",
+  );
 }
 
 export function addLayerToPage(
@@ -779,7 +1130,12 @@ export function addLayerToPage(
     ids: defaultIds,
     color: "#9a8f7c",
   });
-  const next = editLayers(session, pageId, (current) => addLayer(current, layer));
+  const next = editLayers(
+    session,
+    pageId,
+    (current) => addLayer(current, layer),
+    "Add layer",
+  );
   return setActiveLayer(next, layer.id);
 }
 
@@ -789,12 +1145,17 @@ export function setObjectLayer(
   objectId: string,
   layerId: string,
 ): EditorSession {
-  return editTarget(session, pageId, (page) => {
-    if (!page.layers.some((layer) => layer.id === layerId)) return page;
-    return transformPageObjects(page, [objectId], (object) =>
-      object.layerId === layerId ? object : { ...object, layerId },
-    );
-  });
+  return editTarget(
+    session,
+    pageId,
+    (page) => {
+      if (!page.layers.some((layer) => layer.id === layerId)) return page;
+      return transformPageObjects(page, [objectId], (object) =>
+        object.layerId === layerId ? object : { ...object, layerId },
+      );
+    },
+    "Move object to layer",
+  );
 }
 
 /** Raises or lowers an object within its own layer. */
@@ -804,8 +1165,11 @@ export function restackObject(
   objectId: string,
   direction: 1 | -1,
 ): EditorSession {
-  return editTarget(session, pageId, (page) =>
-    direction > 0 ? raiseObject(page, objectId) : lowerObject(page, objectId),
+  return editTarget(
+    session,
+    pageId,
+    (page) => (direction > 0 ? raiseObject(page, objectId) : lowerObject(page, objectId)),
+    direction > 0 ? "Bring forward" : "Send backward",
   );
 }
 
@@ -975,28 +1339,42 @@ export function discardMasterEdits(
 /* History                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/** Undoes one content edit. Structure steps are async and handled by the hook. */
 export function undo(session: EditorSession): EditorSession {
-  const previous = session.undoStack[session.undoStack.length - 1];
-  if (!previous) return session;
+  const target = undoTarget(session);
+  if (!target || target.kind !== "content") return session;
+  const entry = target.entry;
   return {
+    ...session,
     // The base stays the latest server copy: history is about edits, not the
     // document that happened to be open when they were made.
-    state: { ...previous, base: session.state.base, editGroup: undefined },
+    state: { ...entry.state, base: session.state.base, editGroup: undefined },
     undoStack: session.undoStack.slice(0, -1),
-    redoStack: [...session.redoStack, { ...session.state, editGroup: undefined }],
+    redoStack: [
+      ...session.redoStack,
+      { ...entry, state: { ...session.state, editGroup: undefined } },
+    ].slice(-HISTORY_LIMIT),
+    log: session.log.map((row) =>
+      row.id === entry.id ? { ...row, state: "undone" as const } : row,
+    ),
   };
 }
 
 export function redo(session: EditorSession): EditorSession {
-  const next = session.redoStack[session.redoStack.length - 1];
-  if (!next) return session;
+  const target = redoTarget(session);
+  if (!target || target.kind !== "content") return session;
+  const entry = target.entry;
   return {
-    state: { ...next, base: session.state.base, editGroup: undefined },
+    ...session,
+    state: { ...entry.state, base: session.state.base, editGroup: undefined },
     undoStack: [
       ...session.undoStack,
-      { ...session.state, editGroup: undefined },
-    ],
+      { ...entry, state: { ...session.state, editGroup: undefined } },
+    ].slice(-HISTORY_LIMIT),
     redoStack: session.redoStack.slice(0, -1),
+    log: session.log.map((row) =>
+      row.id === entry.id ? { ...row, state: "done" as const } : row,
+    ),
   };
 }
 

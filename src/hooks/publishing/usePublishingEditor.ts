@@ -7,6 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import type {
   CharacterFormat,
   CharacterStyle,
+  Guide,
   ImageCrop,
   ImageFit,
   MasterPage,
@@ -41,8 +42,9 @@ import {
   breakEditGroup,
   canRedo,
   canUndo,
-  clearHistory,
+  completeStructureStep,
   createEditorSession,
+  historyLog,
   dirtyMasters,
   dirtyPages,
   dirtyStories,
@@ -50,6 +52,7 @@ import {
   discardPageEdits,
   discardStoryEdits,
   editMaster,
+  editGuides,
   editMasterSurface,
   editPage,
   editStory,
@@ -60,11 +63,14 @@ import {
   moveLayer,
   nudgeSelection,
   patchObjects,
+  recordStructure,
   redo,
+  redoTarget,
   removeObjects,
   restackObject,
   selectAllObjects,
   sessionDocument,
+  snapshotStructure,
   setActiveLayer,
   setActiveMaster,
   setActivePage,
@@ -74,9 +80,33 @@ import {
   toggleLayerLock,
   toggleLayerVisibility,
   undo,
+  undoTarget,
   type EditorSession,
+  type StructureSnapshot,
 } from "@/lib/publishing/session";
 import { applyMasterToPages, pageIndexOf } from "@/lib/publishing/operations";
+import type { AlignKind } from "@/lib/arrange";
+import {
+  addGuide as addGuideToList,
+  clampGuidePosition,
+  clearGuides as clearGuideList,
+  makeGuide,
+  moveGuide as moveGuideInList,
+  removeGuide as removeGuideFromList,
+} from "@/lib/publishing/guides";
+import {
+  alignObjectsInPage,
+  arrangeInPage,
+  distributeObjectsInPage,
+  duplicateObjects,
+  groupObjects,
+  matchObjectSize,
+  setObjectsHidden,
+  setObjectsLocked,
+  ungroupObjects,
+  type ArrangeMode,
+  type MatchSizeMode,
+} from "@/lib/publishing/tools";
 import {
   blankMaster,
   clearMasterOverride,
@@ -156,6 +186,13 @@ export interface UsePublishingEditorResult {
   title: string;
   canUndo: boolean;
   canRedo: boolean;
+  /** Recent operations, newest first; `undone` rows can be redone. */
+  history: readonly {
+    id: string;
+    label: string;
+    kind: "content" | "structure";
+    state: "done" | "undone";
+  }[];
   /** Every master in the publication, in creation order. */
   masters: readonly MasterPage[];
   /** The master being edited, if any. */
@@ -187,6 +224,23 @@ export interface UsePublishingEditorResult {
   setZoom: (zoom: number) => void;
   setPreview: (preview: boolean) => void;
   setSelection: (ids: readonly string[]) => void;
+  /** Alignment/distribution/arrangement tools, applied to the selection. */
+  alignSelection: (mode: AlignKind) => void;
+  distributeSelection: (axis: "h" | "v") => void;
+  matchSelectionSize: (mode: MatchSizeMode) => void;
+  groupSelection: () => void;
+  ungroupSelection: () => void;
+  duplicateSelection: () => void;
+  arrangeSelection: (mode: ArrangeMode) => void;
+  lockSelection: (locked: boolean) => void;
+  hideSelection: (hidden: boolean) => void;
+  /** Adopts a derived document (assisted layout) as one undoable edit. */
+  applyLayoutDocument: (next: PublicationDocument, label: string) => void;
+  guides: readonly Guide[];
+  addGuide: (axis: Guide["axis"], position: number, scope?: Guide["scope"]) => void;
+  moveGuide: (guideId: string, position: number) => void;
+  removeGuide: (guideId: string) => void;
+  clearGuides: (scope: Guide["scope"]) => void;
   activatePage: (pageId: string) => void;
   activateLayer: (layerId: string) => void;
   activateNextPage: () => void;
@@ -299,6 +353,9 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
   const duplicatePageMutation = useMutation(api.publishing.pages.duplicatePage);
   const deletePageMutation = useMutation(api.publishing.pages.deletePage);
   const movePageMutation = useMutation(api.publishing.pages.movePageTo);
+  const restoreStructureMutation = useMutation(
+    api.publishing.pages.restoreStructure,
+  );
   const createStoryMutation = useMutation(api.publishing.stories.createStory);
   const updateStoryMutation = useMutation(api.publishing.stories.updateStory);
   const updatePublicationMutation = useMutation(
@@ -325,6 +382,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     duplicatePage: duplicatePageMutation,
     deletePage: deletePageMutation,
     movePage: movePageMutation,
+    restoreStructure: restoreStructureMutation,
     updatePublication: updatePublicationMutation,
     saveStyles: saveStylesMutation,
     generateAssetUploadUrl,
@@ -347,6 +405,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       duplicatePage: duplicatePageMutation,
       deletePage: deletePageMutation,
       movePage: movePageMutation,
+      restoreStructure: restoreStructureMutation,
       updatePublication: updatePublicationMutation,
       saveStyles: saveStylesMutation,
       generateAssetUploadUrl,
@@ -364,6 +423,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     duplicatePageMutation,
     deletePageMutation,
     movePageMutation,
+    restoreStructureMutation,
     updatePublicationMutation,
     saveStylesMutation,
     generateAssetUploadUrl,
@@ -725,8 +785,8 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       // happens to be active behind it.
       apply(
         current.state.activeMasterId === pageId
-          ? editMasterSurface(current, pageId, nextPage)
-          : editPage(current, pageId, () => nextPage),
+          ? editMasterSurface(current, pageId, nextPage, "Transform object")
+          : editPage(current, pageId, () => nextPage, "Transform object"),
       );
     },
     [apply],
@@ -751,8 +811,13 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       const pageNow = current ? activeSurface(current) : null;
       if (!current || !pageNow) return;
       apply(
-        patchObjects(current, pageNow.id, [objectId], (object) =>
-          ({ ...object, frame: { ...object.frame, ...frame } }) as PublicationObject,
+        patchObjects(
+          current,
+          pageNow.id,
+          [objectId],
+          (object) =>
+            ({ ...object, frame: { ...object.frame, ...frame } }) as PublicationObject,
+          "Set object geometry",
         ),
       );
     },
@@ -764,7 +829,14 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       const current = sessionRef.current;
       const pageNow = current ? activePage(current) : null;
       if (!current || !pageNow) return;
-      apply(editPage(current, pageNow.id, (pageUpdate) => ({ ...pageUpdate, ...patch })));
+      apply(
+        editPage(
+          current,
+          pageNow.id,
+          (pageUpdate) => ({ ...pageUpdate, ...patch }),
+          "Change page",
+        ),
+      );
     },
     [apply],
   );
@@ -781,7 +853,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
             ...story,
             paragraphs: paragraphsFromText(text, story.paragraphs),
           }),
-          coalesceKey ? { coalesceKey } : {},
+          coalesceKey ? { coalesceKey, label: "Type" } : { label: "Edit text" },
         ),
       );
     },
@@ -1224,6 +1296,64 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     apply(setActiveMaster(session, pending));
   }, [apply, document, session]);
 
+  /**
+   * Runs one structural server command and records it as a single undoable
+   * step. Pending content is flushed first, so the snapshot the history keeps
+   * is the state the server actually had — never a half-saved page.
+   */
+  const runStructural = useCallback(
+    async (
+      label: string,
+      work: () => Promise<{
+        document: PublicationDocument;
+        pageId?: string;
+        structureVersion: number;
+      }>,
+    ) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      setBusy(true);
+      try {
+        const saver = saverRef.current;
+        if (saver) {
+          const flushed = await saver.flush({
+            pages: dirtyPages(current),
+            stories: dirtyStories(current),
+            masters: dirtyMasters(current),
+          });
+          if (!flushed) {
+            throw new Error("Resolve the save conflict before changing page structure.");
+          }
+        }
+        const before = sessionDocument(sessionRef.current ?? current);
+        const result = await work();
+        structureVersionRef.current = result.structureVersion;
+        const latest = sessionRef.current ?? current;
+        let next = recordStructure(latest, {
+          label,
+          before: snapshotStructure(before),
+          after: snapshotStructure(result.document),
+          document: result.document,
+        });
+        if (result.pageId) {
+          next = setActivePage(next, result.pageId);
+        } else if (
+          !result.document.pages.some((page) => page.id === next.state.activePageId)
+        ) {
+          const fallback = result.document.pages[0]?.id;
+          if (fallback) next = setActivePage(next, fallback);
+        }
+        apply(next);
+        setPreview(false);
+      } catch (error) {
+        toast.error(messageOf(error) || "The change could not be saved.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [apply],
+  );
+
   const enterMaster = useCallback(
     (masterId: string) => {
       const current = sessionRef.current;
@@ -1254,25 +1384,28 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       }
       const master = blankMaster(label, documentNow);
       // A new master is a new record: it goes through the same ownership-checked
-      // mutation as any other write, then the editor opens it for editing.
-      setBusy(true);
-      try {
+      // mutation as any other write, then the editor opens it for editing. The
+      // command is one structural history step, so undo removes it again.
+      let created: string | null = null;
+      await runStructural("Create master", async () => {
         const result = await mutationsRef.current.createMaster({
           publicationId: publicationId as Id<"publications">,
           master: master as never,
         });
+        created = result.masterId;
         saverRef.current?.setMasterBaseline(result.masterId, result.version);
-        masterIdPending.current = result.masterId;
+        return {
+          document: result.document as unknown as PublicationDocument,
+          structureVersion: structureVersionRef.current,
+        };
+      });
+      if (created) {
+        masterIdPending.current = created;
         toast.success("Master created.", IDLE_TOAST);
-        return result.masterId;
-      } catch (error) {
-        toast.error(messageOf(error) || "The master could not be created.");
-        return null;
-      } finally {
-        setBusy(false);
       }
+      return created;
     },
-    [publicationId],
+    [publicationId, runStructural],
   );
 
   const duplicateMasterById = useCallback<
@@ -1284,8 +1417,8 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       const source = documentNow?.masters.find((entry) => entry.id === masterId);
       if (!documentNow || !source) return null;
       const copy = duplicateMaster(source);
-      setBusy(true);
-      try {
+      let created: string | null = null;
+      await runStructural("Duplicate master", async () => {
         const result = await mutationsRef.current.createMaster({
           publicationId: publicationId as Id<"publications">,
           // A duplicated master is independent: text that still pointed at the
@@ -1301,17 +1434,17 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
             }),
           } as never,
         });
+        created = result.masterId;
         saverRef.current?.setMasterBaseline(result.masterId, result.version);
-        toast.success("Master duplicated.", IDLE_TOAST);
-        return result.masterId;
-      } catch (error) {
-        toast.error(messageOf(error) || "The master could not be duplicated.");
-        return null;
-      } finally {
-        setBusy(false);
-      }
+        return {
+          document: result.document as unknown as PublicationDocument,
+          structureVersion: structureVersionRef.current,
+        };
+      });
+      if (created) toast.success("Master duplicated.", IDLE_TOAST);
+      return created;
     },
-    [publicationId],
+    [publicationId, runStructural],
   );
 
   const renameMaster = useCallback(
@@ -1356,40 +1489,26 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     UsePublishingEditorResult["deleteMasterById"]
   >(
     async (masterId: string) => {
-      const current = sessionRef.current;
-      const saver = saverRef.current;
-      if (!current) return;
-      setBusy(true);
-      try {
-        // Pending page writes go first: they may carry an assignment to this
-        // master, and the delete has to be the last word.
-        await saver?.flush();
-        await mutationsRef.current.deleteMaster({
+      if (!sessionRef.current) return;
+      // Pending page writes go first (inside runStructural): they may carry an
+      // assignment to this master, and the delete has to be the last word.
+      await runStructural("Delete master", async () => {
+        const result = await mutationsRef.current.deleteMaster({
           publicationId: publicationId as Id<"publications">,
           masterId,
         });
-        const latest = sessionRef.current;
-        if (latest) {
-          const rebased: EditorSession = {
-            ...latest,
-            state: {
-              ...latest.state,
-              ...(latest.state.activeMasterId === masterId
-                ? { activeMasterId: undefined }
-                : {}),
-              selection: [],
-            },
-          };
-          apply(clearHistory(discardMasterEdits(rebased, masterId)));
-        }
-        toast.success("Master deleted. Pages that used it keep their own content.", IDLE_TOAST);
-      } catch (error) {
-        toast.error(messageOf(error) || "The master could not be deleted.");
-      } finally {
-        setBusy(false);
+        return {
+          document: result.document as unknown as PublicationDocument,
+          structureVersion: structureVersionRef.current,
+        };
+      });
+      const latest = sessionRef.current;
+      if (latest?.state.activeMasterId === masterId) {
+        apply(setActiveMaster(latest, undefined));
       }
+      toast.success("Master deleted. Pages that used it keep their own content.", IDLE_TOAST);
     },
-    [apply, publicationId],
+    [apply, publicationId, runStructural],
   );
 
   const assignMaster = useCallback<
@@ -1404,6 +1523,17 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
       // Assignment is content, not structure: each changed page is autosaved
       // with its own version guard and its own undo entry (one edit here).
       apply(applyDocumentChanges(current, next));
+    },
+    [apply],
+  );
+
+  const applyLayoutDocument = useCallback<
+    UsePublishingEditorResult["applyLayoutDocument"]
+  >(
+    (next, label) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(applyDocumentChanges(current, next, label));
     },
     [apply],
   );
@@ -1454,17 +1584,319 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     [apply],
   );
 
-  const performUndo = useCallback(() => {
+  /**
+   * Replays a structural snapshot through the server. The guard is the
+   * structure counter, so a page set that changed in another tab is refused
+   * instead of being replaced by an out-of-date history entry.
+   */
+  const restoreStructural = useCallback(
+    async (target: StructureSnapshot, direction: "undo" | "redo") => {
+      setBusy(true);
+      try {
+        const flushed = await saverRef.current?.flush();
+        if (flushed === false) {
+          throw new Error("Resolve the save conflict before reversing a page change.");
+        }
+        const result = await mutationsRef.current.restoreStructure({
+          publicationId: publicationId as Id<"publications">,
+          expectedStructureVersion: structureVersionRef.current,
+          ...target,
+        });
+        structureVersionRef.current = result.structureVersion;
+        const latest = sessionRef.current;
+        if (!latest) return;
+        apply(
+          completeStructureStep(
+            latest,
+            direction,
+            result.document as unknown as PublicationDocument,
+          ),
+        );
+        setPreview(false);
+      } catch (error) {
+        toast.error(messageOf(error) || "That change could not be reversed.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [apply, publicationId],
+  );
+
+  const guidesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const guidesPending = useRef<Guide[] | null>(null);
+
+  /** Guides are publication-level data, saved on their own small debounce. */
+  const persistGuides = useCallback(
+    (guides: Guide[]) => {
+      guidesPending.current = guides;
+      if (guidesTimer.current) clearTimeout(guidesTimer.current);
+      guidesTimer.current = setTimeout(() => {
+        guidesTimer.current = null;
+        const pending = guidesPending.current;
+        guidesPending.current = null;
+        if (!pending) return;
+        void mutationsRef.current
+          .updatePublication({
+            publicationId: publicationId as Id<"publications">,
+            settings: { guides: pending },
+          })
+          .catch((error: unknown) => {
+            toast.error(messageOf(error) || "The guides could not be saved.");
+          });
+      }, 400);
+    },
+    [publicationId],
+  );
+
+  useEffect(
+    () => () => {
+      if (guidesTimer.current) clearTimeout(guidesTimer.current);
+    },
+    [],
+  );
+
+  const applyGuides = useCallback(
+    (guides: Guide[], label: string) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      apply(editGuides(current, guides, label));
+      persistGuides(guides);
+    },
+    [apply, persistGuides],
+  );
+
+  const addGuide = useCallback(
+    (axis: Guide["axis"], position: number, scope: Guide["scope"] = "page") => {
+      const current = sessionRef.current;
+      const surface = current ? activeSurface(current) : null;
+      if (!current || !surface) return;
+      const guide = makeGuide(
+        axis,
+        clampGuidePosition(position, axis, surface.spec),
+        scope === "page" ? "page" : "document",
+        scope === "page" ? surface.id : undefined,
+      );
+      applyGuides(
+        addGuideToList(sessionDocument(current).guides, guide),
+        "Add guide",
+      );
+    },
+    [applyGuides],
+  );
+
+  const moveGuide = useCallback(
+    (guideId: string, position: number) => {
+      const current = sessionRef.current;
+      const surface = current ? activeSurface(current) : null;
+      if (!current || !surface) return;
+      applyGuides(
+        moveGuideInList(sessionDocument(current).guides, guideId, position, surface.spec),
+        "Move guide",
+      );
+    },
+    [applyGuides],
+  );
+
+  const removeGuide = useCallback(
+    (guideId: string) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      applyGuides(
+        removeGuideFromList(sessionDocument(current).guides, guideId),
+        "Delete guide",
+      );
+    },
+    [applyGuides],
+  );
+
+  const clearGuides = useCallback(
+    (scope: Guide["scope"]) => {
+      const current = sessionRef.current;
+      const pageNow = current ? activePage(current) : null;
+      if (!current) return;
+      applyGuides(
+        clearGuideList(
+          sessionDocument(current).guides,
+          scope,
+          scope === "page" ? pageNow?.id : undefined,
+        ),
+        "Clear guides",
+      );
+    },
+    [applyGuides],
+  );
+
+  /* -------------------------------------------------------------- selection tools */
+
+  const selectionSurface = () => {
     const current = sessionRef.current;
-    if (!current || !canUndo(current)) return;
-    apply(undo(current));
+    const surface = current ? activeSurface(current) : null;
+    return current && surface ? { current, surface } : null;
+  };
+
+  const alignSelection = useCallback(
+    (mode: AlignKind) => {
+      const found = selectionSurface();
+      if (!found) return;
+      apply(
+        editSurface(
+          found.current,
+          (surface) => alignObjectsInPage(surface, found.current.state.selection, mode),
+          "Align objects",
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const distributeSelection = useCallback(
+    (axis: "h" | "v") => {
+      const found = selectionSurface();
+      if (!found) return;
+      apply(
+        editSurface(
+          found.current,
+          (surface) =>
+            distributeObjectsInPage(surface, found.current.state.selection, axis),
+          "Distribute objects",
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const matchSelectionSize = useCallback(
+    (mode: MatchSizeMode) => {
+      const found = selectionSurface();
+      if (!found) return;
+      apply(
+        editSurface(
+          found.current,
+          (surface) => matchObjectSize(surface, found.current.state.selection, mode),
+          "Match size",
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const groupSelection = useCallback(() => {
+    const found = selectionSurface();
+    if (!found) return;
+    const groupId = `group_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    apply(
+      editSurface(
+        found.current,
+        (surface) => groupObjects(surface, found.current.state.selection, groupId),
+        "Group objects",
+      ),
+    );
   }, [apply]);
 
-  const performRedo = useCallback(() => {
-    const current = sessionRef.current;
-    if (!current || !canRedo(current)) return;
-    apply(redo(current));
+  const ungroupSelection = useCallback(() => {
+    const found = selectionSurface();
+    if (!found) return;
+    apply(
+      editSurface(
+        found.current,
+        (surface) => ungroupObjects(surface, found.current.state.selection),
+        "Ungroup objects",
+      ),
+    );
   }, [apply]);
+
+  const duplicateSelection = useCallback(() => {
+    const found = selectionSurface();
+    if (!found) return;
+    let created: string[] = [];
+    const next = editSurface(
+      found.current,
+      (surface) => {
+        const result = duplicateObjects(surface, found.current.state.selection);
+        created = result.objectIds;
+        return result.page;
+      },
+      "Duplicate objects",
+    );
+    apply(next);
+    const latest = sessionRef.current;
+    if (latest && created.length > 0) apply(setSelection(latest, created));
+  }, [apply]);
+
+  const arrangeSelection = useCallback(
+    (mode: ArrangeMode) => {
+      const found = selectionSurface();
+      if (!found) return;
+      apply(
+        editSurface(
+          found.current,
+          (surface) => arrangeInPage(surface, found.current.state.selection, mode),
+          mode === "front"
+            ? "Bring to front"
+            : mode === "back"
+              ? "Send to back"
+              : mode === "forward"
+                ? "Bring forward"
+                : "Send backward",
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const lockSelection = useCallback(
+    (locked: boolean) => {
+      const found = selectionSurface();
+      if (!found) return;
+      apply(
+        editSurface(
+          found.current,
+          (surface) => setObjectsLocked(surface, found.current.state.selection, locked),
+          locked ? "Lock objects" : "Unlock objects",
+        ),
+      );
+    },
+    [apply],
+  );
+
+  const hideSelection = useCallback(
+    (hidden: boolean) => {
+      const found = selectionSurface();
+      if (!found) return;
+      apply(
+        editSurface(
+          found.current,
+          (surface) => setObjectsHidden(surface, found.current.state.selection, hidden),
+          hidden ? "Hide objects" : "Show objects",
+        ),
+      );
+      const latest = sessionRef.current;
+      if (latest && hidden) apply(setSelection(latest, []));
+    },
+    [apply],
+  );
+
+  const performUndo = useCallback(async () => {
+    const current = sessionRef.current;
+    const target = current ? undoTarget(current) : null;
+    if (!current || !target) return;
+    if (target.kind === "content") {
+      apply(undo(current));
+      return;
+    }
+    await restoreStructural(target.entry.before, "undo");
+  }, [apply, restoreStructural]);
+
+  const performRedo = useCallback(async () => {
+    const current = sessionRef.current;
+    const target = current ? redoTarget(current) : null;
+    if (!current || !target) return;
+    if (target.kind === "content") {
+      apply(redo(current));
+      return;
+    }
+    await restoreStructural(target.entry.after, "redo");
+  }, [apply, restoreStructural]);
 
   /* ------------------------------------------------------- navigation/selection */
 
@@ -1518,114 +1950,76 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
 
   /* ------------------------------------------------------------- structure ops */
 
-  const withBusy = useCallback(
-    async (work: () => Promise<void>, success?: string) => {
-      setBusy(true);
-      try {
-        await work();
-        const latest = sessionRef.current;
-        if (latest) apply(clearHistory(latest));
-        if (success) {
-          toast.success(`${success} Page structure is not undoable.`, IDLE_TOAST);
-        }
-      } catch (error) {
-        toast.error(messageOf(error) || "The change could not be saved.");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [apply],
-  );
-
   const addPage = useCallback(
     (afterPageId: string) =>
-      withBusy(async () => {
-        const saver = saverRef.current;
-        if (saver) {
-          const flushed = await saver.flush({
-            pages: dirtyPages(sessionRef.current!),
-            stories: dirtyStories(sessionRef.current!),
-          });
-          if (!flushed) {
-            throw new Error("Resolve the save conflict before changing pages.");
-          }
-        }
-        const at = (() => {
-          const doc = sessionDocument(sessionRef.current!);
-          const index = pageIndexOf(doc, afterPageId);
-          return index < 0 ? doc.pages.length : index + 1;
-        })();
+      runStructural("Add page", async () => {
+        const sessionNow = sessionRef.current;
+        if (!sessionNow) throw new Error("The editor is still loading.");
+        const doc = sessionDocument(sessionNow);
+        const index = pageIndexOf(doc, afterPageId);
         const result = await mutationsRef.current.createPage({
           publicationId: publicationId as Id<"publications">,
-          at,
+          at: index < 0 ? doc.pages.length : index + 1,
           expectedStructureVersion: structureVersionRef.current,
         });
-        structureVersionRef.current = result.structureVersion;
-        const current = sessionRef.current;
-        if (current) apply(setActivePage(current, result.pageId));
-      }, "A blank page was added."),
-    [apply, publicationId, withBusy],
+        return {
+          document: result.document as unknown as PublicationDocument,
+          pageId: result.pageId,
+          structureVersion: result.structureVersion,
+        };
+      }),
+    [publicationId, runStructural],
   );
 
   const duplicatePage = useCallback(
     (pageId: string) =>
-      withBusy(async () => {
-        const saver = saverRef.current;
-        if (saver) {
-          const flushed = await saver.flush({
-            pages: dirtyPages(sessionRef.current!),
-            stories: dirtyStories(sessionRef.current!),
-          });
-          if (!flushed) {
-            throw new Error("Resolve the save conflict before changing pages.");
-          }
-        }
+      runStructural("Duplicate page", async () => {
         const result = await mutationsRef.current.duplicatePage({
           publicationId: publicationId as Id<"publications">,
           pageId,
           expectedStructureVersion: structureVersionRef.current,
         });
-        structureVersionRef.current = result.structureVersion;
-        const current = sessionRef.current;
-        if (current) apply(setActivePage(current, result.pageId));
-      }, "Page duplicated."),
-    [apply, publicationId, withBusy],
+        return {
+          document: result.document as unknown as PublicationDocument,
+          pageId: result.pageId,
+          structureVersion: result.structureVersion,
+        };
+      }),
+    [publicationId, runStructural],
   );
 
   const deletePage = useCallback(
     (pageId: string) =>
-      withBusy(async () => {
-        const current = sessionRef.current;
-        if (!current) return;
+      runStructural("Delete page", async () => {
         const result = await mutationsRef.current.deletePage({
           publicationId: publicationId as Id<"publications">,
           pageId,
           expectedStructureVersion: structureVersionRef.current,
         });
-        structureVersionRef.current = result.structureVersion;
-        // Only drop local edits for the page once the server accepted the
-        // deletion; a refused stale delete keeps them intact.
-        const after = sessionRef.current;
-        if (after?.state.pages[pageId]) {
-          apply(discardPageEdits(after, pageId));
-        }
         clearRecoveryDraft(publicationId);
-      }, "Page deleted."),
-    [apply, publicationId, withBusy],
+        return {
+          document: result.document as unknown as PublicationDocument,
+          structureVersion: result.structureVersion,
+        };
+      }),
+    [publicationId, runStructural],
   );
 
   const movePageTo = useCallback(
     (pageId: string, toIndex: number) =>
-      withBusy(async () => {
+      runStructural("Move page", async () => {
         const result = await mutationsRef.current.movePage({
           publicationId: publicationId as Id<"publications">,
           pageId,
           toIndex,
           expectedStructureVersion: structureVersionRef.current,
         });
-        structureVersionRef.current = result.structureVersion;
-      }, "Page order updated."),
-    [publicationId, withBusy],
+        return {
+          document: result.document as unknown as PublicationDocument,
+          structureVersion: result.structureVersion,
+        };
+      }),
+    [publicationId, runStructural],
   );
 
   /* -------------------------------------------------------------- insertions */
@@ -2096,6 +2490,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     title,
     canUndo: session ? canUndo(session) : false,
     canRedo: session ? canRedo(session) : false,
+    history: session ? historyLog(session) : [],
     masters: document?.masters ?? [],
     master,
     surface,
@@ -2118,6 +2513,21 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     setZoom,
     setPreview,
     setSelection: setEditorSelection,
+    alignSelection,
+    distributeSelection,
+    matchSelectionSize,
+    groupSelection,
+    ungroupSelection,
+    duplicateSelection,
+    arrangeSelection,
+    lockSelection,
+    hideSelection,
+    applyLayoutDocument,
+    guides: document?.guides ?? [],
+    addGuide,
+    moveGuide,
+    removeGuide,
+    clearGuides,
     activatePage,
     activateLayer,
     activateNextPage,

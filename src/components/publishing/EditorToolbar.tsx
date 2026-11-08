@@ -5,7 +5,12 @@ import {
   Circle,
   Columns3,
   Eye,
+  FileDown,
+  BookOpen,
   Grid2x2,
+  Lightbulb,
+  ShieldCheck,
+  Sparkles,
   Image as ImageIcon,
   LayoutTemplate,
   Maximize2,
@@ -91,6 +96,10 @@ export interface EditorToolbarProps {
   onInsertShape: (shape: "rectangle" | "ellipse") => void;
   onInsertLine: () => void;
   onOpenAssets: () => void;
+  onOpenPreflight: () => void;
+  onOpenExport: () => void;
+  onOpenSmartAlbum: () => void;
+  onOpenAssist: () => void;
   busy?: boolean;
   onBack: () => void;
 }
@@ -160,6 +169,10 @@ export function EditorToolbar(props: EditorToolbarProps) {
     onInsertShape,
     onInsertLine,
     onOpenAssets,
+    onOpenPreflight,
+    onOpenExport,
+    onOpenSmartAlbum,
+    onOpenAssist,
     busy,
     onBack,
   } = props;
@@ -258,7 +271,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
         <div className="flex items-center rounded-[4px] border border-[var(--rule)] bg-[var(--paper)] px-0.5">
           <ToolButton
             label="Undo"
-            title="Undo the last content edit. Adding, deleting, duplicating or moving pages cannot be undone."
+            title="Undo the last edit, including page, master and layer commands (⌘/Ctrl+Z)"
             onClick={onUndo}
             disabled={!canUndo || busy}
           >
@@ -266,13 +279,45 @@ export function EditorToolbar(props: EditorToolbarProps) {
           </ToolButton>
           <ToolButton
             label="Redo"
-            title="Redo the last content edit. Page structure changes are not part of this history."
+            title="Redo the last undone edit (⇧⌘/Ctrl+Shift+Z)"
             onClick={onRedo}
             disabled={!canRedo || busy}
           >
             <Redo2 className="size-4" />
           </ToolButton>
         </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              className="h-7 gap-1.5 rounded-[3px] px-2 font-meta text-[0.6rem] uppercase tracking-[0.1em] text-[var(--ink)] hover:bg-[color-mix(in_oklab,var(--ink)_7%,transparent)]"
+            >
+              <BookOpen className="size-3.5" /> Document
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="font-meta text-[0.55rem] uppercase tracking-[0.12em]">
+              Publication tools
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onOpenPreflight} className="gap-2 text-[0.78rem]">
+              <ShieldCheck className="size-3.5" /> Preflight…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onOpenExport} className="gap-2 text-[0.78rem]">
+              <FileDown className="size-3.5" /> Export PDF…
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onOpenSmartAlbum} className="gap-2 text-[0.78rem]">
+              <Sparkles className="size-3.5" /> Smart Album…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onOpenAssist} className="gap-2 text-[0.78rem]">
+              <Lightbulb className="size-3.5" /> Layout suggestions…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

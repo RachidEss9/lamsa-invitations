@@ -130,6 +130,7 @@ function applySettings(
     spec?: PublicationDocument["spec"];
     facingPages?: boolean;
     grid?: PublicationDocument["grid"];
+    guides?: PublicationDocument["guides"];
     metadata?: PublicationDocument["metadata"];
   },
 ): PublicationDocument {
@@ -149,6 +150,7 @@ function applySettings(
     next = { ...next, facingPages: settings.facingPages };
   }
   if (settings.grid !== undefined) next = { ...next, grid: settings.grid };
+  if (settings.guides !== undefined) next = { ...next, guides: settings.guides };
   if (settings.metadata !== undefined) next = { ...next, metadata: settings.metadata };
   return next;
 }
@@ -272,6 +274,95 @@ export const duplicatePublication = mutation({
     }
 
     return { publicationId };
+  },
+});
+
+/**
+ * Creates a new publication from a complete generated document (Smart Album).
+ *
+ * The document is validated like any other write, and its photographs are
+ * rebuilt from the *source* publication's own asset rows: a client can never
+ * point the new publication at another owner's files, and the files are shared
+ * by reference rather than uploaded or copied again.
+ */
+export const createFromDocument = mutation({
+  args: {
+    sourcePublicationId: v.id("publications"),
+    document: v.any(),
+    title: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const source = await requireOwnedPublication(ctx, args.sourcePublicationId, userId);
+    const rows = await loadPublicationRows(ctx, source);
+    const incoming = args.document as PublicationDocument;
+    if (!incoming || typeof incoming !== "object" || !Array.isArray(incoming.pages)) {
+      throw new Error("The generated album is not a valid publication document.");
+    }
+
+    const byAssetId = new Map(rows.assets.map((asset) => [asset.assetId, asset]));
+    const referenced = new Set<string>();
+    const collect = (objects: { kind: string; assetId?: string }[]) => {
+      for (const object of objects) {
+        if (object.assetId) referenced.add(object.assetId);
+      }
+    };
+    for (const page of incoming.pages) {
+      if (page.background?.assetId) referenced.add(page.background.assetId);
+      collect(page.objects);
+    }
+    for (const master of incoming.masters ?? []) {
+      if (master.background?.assetId) referenced.add(master.background.assetId);
+      collect(master.objects);
+    }
+
+    const assets = [...referenced].map((assetId) => {
+      const row = byAssetId.get(assetId);
+      if (!row) throw new Error("The album references a photograph that is not in this library.");
+      return {
+        id: row.assetId,
+        name: row.filename,
+        storageId: row.originalStorageId,
+        width: row.width,
+        height: row.height,
+        mime: row.mimeType,
+        tags: row.tags,
+      };
+    });
+
+    const title = (args.title?.trim() || incoming.title || "Untitled album").slice(0, 200);
+    const now = Date.now();
+    const document = prepareDocumentForPersistence({
+      ...incoming,
+      title,
+      assets,
+      metadata: { ...incoming.metadata, updatedAt: now },
+    });
+    const publicationId = await insertPublication(ctx, userId, document, "draft", now);
+
+    for (const assetId of referenced) {
+      const row = byAssetId.get(assetId)!;
+      await ctx.db.insert("publicationAssets", {
+        ownerId: userId,
+        publicationId,
+        assetId: row.assetId,
+        originalStorageId: row.originalStorageId,
+        ...(row.proxyStorageId ? { proxyStorageId: row.proxyStorageId } : {}),
+        ...(row.thumbnailStorageId ? { thumbnailStorageId: row.thumbnailStorageId } : {}),
+        filename: row.filename,
+        mimeType: row.mimeType,
+        width: row.width,
+        height: row.height,
+        fileSize: row.fileSize,
+        ...(row.checksum ? { checksum: row.checksum } : {}),
+        tags: row.tags,
+        metadata: row.metadata,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { publicationId, pageCount: document.pages.length };
   },
 });
 

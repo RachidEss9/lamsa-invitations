@@ -30,7 +30,9 @@ import {
   zoomAtPoint,
 } from "@/lib/publishing/viewport";
 import { PageView, type PageChrome } from "./PageView";
+import { Rulers } from "./Rulers";
 import type { AssetResolver } from "./ObjectArt";
+import type { LengthUnit } from "@/lib/publishing/units";
 import type { ImageCropDraft } from "@/lib/publishing/image";
 import { cn } from "@/lib/utils";
 
@@ -112,6 +114,10 @@ export interface EditorCanvasProps {
   onTextDraft?: (objectId: string, text: string) => void;
   onTextEnd?: () => void;
   onTextSelection?: (objectId: string, start: number, end: number) => void;
+  /** Physical rulers; dragging out of one adds a guide. */
+  showRulers?: boolean;
+  unit?: LengthUnit;
+  onAddGuide?: (axis: "x" | "y", positionPoints: number) => void;
 }
 
 export function EditorCanvas({
@@ -137,6 +143,9 @@ export function EditorCanvas({
   onTextDraft,
   onTextEnd,
   onTextSelection,
+  showRulers = false,
+  unit = "mm",
+  onAddGuide,
 }: EditorCanvasProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -511,11 +520,18 @@ export function EditorCanvas({
 
       const hit = hitTestPage(page, pointer);
       if (hit && isInteractive(hit, page)) {
-        const idsOnDown = selection.includes(hit.id) ? selection : [hit.id];
+        // Clicking one member of a group selects the whole group; the ids are
+        // read from the page so a grouped selection moves as one object.
+        const grouped = hit.groupId
+          ? page.objects
+              .filter((object) => object.groupId === hit.groupId)
+              .map((object) => object.id)
+          : [hit.id];
+        const idsOnDown = selection.includes(hit.id) ? selection : grouped;
         if (event.shiftKey) {
           const next = selection.includes(hit.id)
-            ? selection.filter((id) => id !== hit.id)
-            : [...selection, hit.id];
+            ? selection.filter((id) => !grouped.includes(id))
+            : [...selection, ...grouped.filter((id) => !selection.includes(id))];
           onSelect(next);
           return;
         }
@@ -822,6 +838,15 @@ export function EditorCanvas({
             userSelect: "none",
           }}
         >
+          {showRulers && onAddGuide ? (
+            <Rulers
+              width={layout.width}
+              height={layout.height}
+              zoom={zoom}
+              unit={unit}
+              onAddGuide={onAddGuide}
+            />
+          ) : null}
           {pagesToRender.map(({ page, stageBox }) => (
             <PageView
               key={page.id}
