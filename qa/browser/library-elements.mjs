@@ -161,12 +161,17 @@ try {
 
   await check("favourites persist across a reload", async () => {
     await nav().getByRole("button", { name: /^Elements/ }).click();
-    await page.getByLabel("Search elements").fill("garden rose");
-    await page.waitForTimeout(800);
+    // The browser remounts per section, so wait for the new section before typing.
+    await page
+      .getByRole("heading", { name: "Elements", exact: true })
+      .waitFor({ timeout: TIMEOUT });
+    const search = page.getByLabel("Search elements");
+    await search.fill("garden rose");
     const card = page
       .locator('section [role="button"]')
       .filter({ hasText: "Garden rose" })
       .first();
+    await card.waitFor({ timeout: TIMEOUT });
     assert.equal(await card.count(), 1, "expected the searched card in the library grid");
     await card.hover();
     const star = card.getByRole("button", { name: /favorites/ }).first();
