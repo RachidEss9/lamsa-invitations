@@ -397,7 +397,7 @@ function field() {
       ...Array.from({ length: 5 }, (_, row) =>
         Array.from({ length: 3 }, (_, col) => circle(40 + col * 10, 34 + row * 9, 2)).join(" "),
       ),
-      ...Array.from({ length: 3 }, (_, index) => leaf(50, 78, 26 - index * 4, 8, 120 + index * 35)),
+      ...Array.from({ length: 3 }, (_, index) => leaf(50, 78, 20 - index * 3, 6, 120 + index * 35)),
       line(50, 84, 50, 94),
     )],
     ["Sunflower", join(
@@ -408,8 +408,8 @@ function field() {
       }),
       ...seedDots(50, 50, 12, 8),
       line(50, 78, 50, 96),
-      leaf(42, 82, 22, 8, 140),
-      leaf(58, 86, 20, 7, 40),
+      leaf(42, 82, 18, 5, 140),
+      leaf(58, 86, 14, 5, 40),
     )],
     ["Cornflower", join(
       ...Array.from({ length: 8 }, (_, index) => {

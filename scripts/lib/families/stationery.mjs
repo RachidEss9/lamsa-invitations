@@ -76,10 +76,8 @@ function paper() {
     )],
     ["Graph sheet", join(
       rect(12, 6, 76, 88),
-      ...Array.from({ length: 14 }, (_, index) => line(16 + index * 5.4, 10, 16 + index * 5.4, 90)),
-      ...Array.from({ length: 16 }, (_, index) => line(16, 14 + index * 5, 88, 14 + index * 5)),
-      line(16, 64, 88, 64),
-      line(45, 10, 45, 90),
+      ...Array.from({ length: 9 }, (_, index) => line(18 + index * 8.5, 10, 18 + index * 8.5, 90)),
+      ...Array.from({ length: 10 }, (_, index) => line(16, 14 + index * 8, 88, 14 + index * 8)),
     )],
     ["To-do list", join(
       roundedRect(16, 8, 68, 84, 2),

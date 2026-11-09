@@ -19,7 +19,7 @@ function landmarks() {
       line(34, 70, 66, 70),
       "M 30 92 C 38 86 62 86 70 92",
       "M 46 26 L 54 26",
-      line(50, 6, 50, 0),
+      line(50, 6, 50, 2),
     )],
     ["Big Ben clock tower", join(
       rect(34, 26, 32, 66),
@@ -228,7 +228,7 @@ function transport() {
       ...Array.from({ length: 5 }, (_, index) => `M 50 6 C ${30 + index * 10} ${20 + index * 4} ${64 + index * 4} ${34 + index * 4} ${36 + index * 7} 74`),
       line(42, 74, 44, 84),
       line(58, 74, 56, 84),
-      rect(40, 84, 20, 14, 2),
+      rect(40, 84, 20, 12, 2),
       line(10, 96, 90, 96),
     )],
     ["Helicopter", join(
@@ -328,8 +328,8 @@ function navigation() {
     )],
     ["North arrow", join(
       circle(50, 50, 36),
-      polygon(50, 12, 14, 20, 3, 0),
-      polygon(50, 88, 8, 10, 3, 180),
+      polygon(50, 22, 10, 12, 3, -90),
+      polygon(50, 78, 8, 10, 3, 90),
       line(50, 12, 50, 88),
       line(50, 50, 30, 62),
       line(50, 50, 70, 62),
@@ -526,12 +526,12 @@ function scenery() {
     ["Beach and palm", join(
       line(4, 68, 96, 68),
       "M 6 68 C 20 82 42 78 56 86 L 94 86 L 94 68",
-      "M 64 68 C 62 46 68 30 78 22",
+      "M 60 68 C 58 46 64 30 72 22",
       ...Array.from({ length: 5 }, (_, index) => {
         const angle = ((-150 + index * 30) * Math.PI) / 180;
-        return `M 78 22 Q ${78 + Math.cos(angle) * 22} ${22 + Math.sin(angle) * 10} ${78 + Math.cos(angle) * 34} ${22 + Math.sin(angle) * 22}`;
+        return `M 72 22 Q ${72 + Math.cos(angle) * 18} ${22 + Math.sin(angle) * 10} ${72 + Math.cos(angle) * 28} ${22 + Math.sin(angle) * 20}`;
       }),
-      circle(78, 22, 3),
+      circle(72, 22, 3),
       "M 24 24 C 18 20 22 14 28 16 C 34 18 30 24 24 24 Z",
       sweep(88, 30, 8, 8, 200, 520),
     )],
@@ -570,7 +570,7 @@ function scenery() {
     ["Volcano", join(
       "M 6 86 L 34 34 L 44 44 L 50 22 L 58 46 L 68 36 L 94 86 Z",
       "M 50 22 C 44 30 46 38 50 46 C 54 38 56 30 50 22 Z",
-      ...Array.from({ length: 3 }, (_, index) => `M ${44 + index * 5} ${22 - index * 4} C ${38 + index * 5} ${12 - index * 4} ${30 + index * 8} ${16 - index * 4} ${28 + index * 8} ${8 - index * 4}`),
+      ...Array.from({ length: 3 }, (_, index) => `M ${44 + index * 5} ${22 - index * 3} C ${38 + index * 5} ${16 - index * 3} ${30 + index * 8} ${18 - index * 3} ${28 + index * 8} ${12 - index * 2}`),
       line(6, 86, 94, 86),
       "M 70 60 C 76 52 82 56 86 48",
     )],

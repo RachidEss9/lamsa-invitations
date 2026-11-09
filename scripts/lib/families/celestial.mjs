@@ -42,7 +42,15 @@ function sunMoon() {
     )],
     ["Sun and horizon", join(
       circle(50, 62, 22),
-      rays(50, 62, 26, 40, 9, 200),
+      ...Array.from({ length: 9 }, (_, index) => {
+        const angle = ((190 + index * 20) * Math.PI) / 180;
+        return line(
+          50 + Math.cos(angle) * 26,
+          62 + Math.sin(angle) * 26,
+          50 + Math.cos(angle) * 40,
+          62 + Math.sin(angle) * 40,
+        );
+      }),
       circle(50, 62, 10),
       line(6, 82, 94, 82),
       line(4, 90, 96, 90),
@@ -163,8 +171,8 @@ function stars() {
     )],
     ["Shooting star", join(
       star(72, 28, 16, 6, 4),
-      ...Array.from({ length: 4 }, (_, index) => line(58 - index * 10, 42 + index * 10, 34 - index * 10, 68 + index * 10)),
-      ...Array.from({ length: 4 }, (_, index) => line(64 - index * 9, 34 + index * 9, 44 - index * 9, 56 + index * 9)),
+      ...Array.from({ length: 4 }, (_, index) => line(58 - index * 9, 42 + index * 9, 36 - index * 9, 66 + index * 9)),
+      ...Array.from({ length: 4 }, (_, index) => line(64 - index * 8, 34 + index * 8, 46 - index * 8, 54 + index * 8)),
     )],
     ["Star cluster", join(
       ...[[24, 24], [46, 16], [68, 28], [34, 44], [58, 48], [20, 64], [44, 72], [72, 64], [80, 44], [52, 34]].map(([x, y], index) => star(x, y, 4 + (index % 3) * 2, 1.6 + (index % 2), 4)),
@@ -190,7 +198,7 @@ function stars() {
     )],
     ["Comet with tail", join(
       circle(70, 30, 12),
-      ...Array.from({ length: 6 }, (_, index) => `M ${60 - index * 6} ${40 + index * 6} C ${48 - index * 8} ${44 + index * 6} ${40 - index * 8} ${52 + index * 8} ${26 - index * 8} ${58 + index * 8}`),
+      ...Array.from({ length: 6 }, (_, index) => `M ${58 - index * 4} ${42 + index * 4} C ${46 - index * 5} ${46 + index * 4} ${36 - index * 5} ${52 + index * 5} ${22 - index * 3} ${58 + index * 4}`),
       ...Array.from({ length: 3 }, (_, index) => circle(30 - index * 6, 24 + index * 8, 2)),
       star(84, 18, 4, 1.6, 4),
     )],
@@ -294,7 +302,7 @@ function mystic() {
       line(50, 6, 50, 26),
       line(28, 26, 72, 26),
       line(50, 26, 50, 62),
-      polygon(50, 88, 12, 18, 3, 0),
+      polygon(50, 80, 12, 10, 3, 90),
       circle(50, 70, 3),
       star(50, 22, 3, 1.2, 4),
     )],

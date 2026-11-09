@@ -276,7 +276,7 @@ function beauty() {
       "M 30 28 C 30 18 56 18 60 30 L 62 46 C 64 58 56 66 44 64 L 30 60 Z",
       "M 30 60 L 14 74 L 22 84 L 38 70",
       roundedRect(58, 44, 22, 12, 4),
-      ...Array.from({ length: 3 }, (_, index) => line(82 + index * 4, 46 + index * 2, 92 + index * 4, 42 + index * 2)),
+      ...Array.from({ length: 3 }, (_, index) => line(78 + index * 4, 46 + index * 2, 88 + index * 4, 42 + index * 2)),
       circle(34, 36, 4),
     )],
     ["Hair straightener", join(
