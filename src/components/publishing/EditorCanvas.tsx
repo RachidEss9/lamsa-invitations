@@ -847,7 +847,7 @@ export function EditorCanvas({
     <div
       ref={scrollerRef}
       className={cn(
-        "relative flex-1 overflow-auto scroll-slim bg-[var(--paper-deep)]",
+        "studio-canvas-stage relative flex-1 overflow-auto scroll-slim",
         spaceHeld && "cursor-grab",
       )}
       onPointerDown={onPointerDown}
@@ -859,9 +859,6 @@ export function EditorCanvas({
       onDragLeave={() => setDropTargetId(null)}
       onDrop={onDrop}
       style={{
-        backgroundImage:
-          "radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--ink) 8%, transparent) 1px, transparent 0)",
-        backgroundSize: "18px 18px",
         touchAction: cropPreview ? "none" : undefined,
       }}
     >
@@ -872,9 +869,9 @@ export function EditorCanvas({
           style={{
             width: layout.width,
             height: layout.height,
-            background: "color-mix(in oklab, var(--ink) 10%, var(--rail, #141413))",
+            background: "var(--surface-sunk)",
             boxShadow:
-              "0 1px 2px rgba(21,21,21,0.06), 0 24px 48px -28px rgba(21,21,21,0.35)",
+              "0 1px 2px rgba(26,25,23,0.06), 0 26px 54px -32px rgba(26,25,23,0.38)",
             cursor,
             userSelect: "none",
           }}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
+  ArrowLeft,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
@@ -11,6 +12,7 @@ import {
   Loader2,
   Plus,
 } from "lucide-react";
+import { BrandSymbol } from "@/components/brand/Wordmark";
 
 import { api } from "@/convex/_generated/api";
 import type { DocType } from "@/lib/publishing/model";
@@ -162,31 +164,41 @@ export default function PublishingLibrary() {
 
   return (
     <main className="min-h-screen bg-[var(--paper)] text-[var(--ink)]">
-      <header className="border-b border-[var(--rule)] bg-[var(--paper-light)]">
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-baseline gap-3">
+      <header className="sticky top-0 z-30 border-b border-[var(--workspace-line)] bg-[color-mix(in_oklab,var(--surface-overlay)_94%,transparent)] backdrop-blur-xl">
+        <div className="mx-auto flex h-[64px] max-w-[1240px] items-center justify-between gap-4 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
             <Link
               to="/dashboard"
-              className="font-meta text-[0.55rem] uppercase tracking-[0.18em] text-[var(--ink-soft)] hover:text-[var(--red)]"
+              aria-label="Back to the studio"
+              title="Back to the studio"
+              className="studio-back-button"
             >
-              LAMSA Studio
+              <ArrowLeft className="size-4" aria-hidden />
             </Link>
-            <span className="h-3 w-px bg-[var(--rule)]" />
-            <h1 className="font-display text-[1.35rem] leading-none tracking-[0.01em]">
-              Publishing Studio
-            </h1>
+            <span className="grid size-7 place-items-center" aria-hidden>
+              <BrandSymbol className="h-[17px]" />
+            </span>
+            <span className="hidden h-6 w-px bg-[var(--workspace-line)] sm:block" aria-hidden />
+            <div className="min-w-0">
+              <p className="studio-context">
+                <span>LAMSA</span>
+                <span aria-hidden className="studio-context__slash">/</span>
+                <span className="studio-context__product">Publishing Studio</span>
+              </p>
+              <h1 className="studio-document-title">Publications</h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Link
               to="/library?section=elements"
-              className="hidden items-center gap-1 font-meta text-[0.54rem] uppercase tracking-[0.1em] text-[var(--ink-soft)] hover:text-[var(--red)] sm:flex"
+              className="hidden items-center gap-1.5 rounded-[8px] border border-[var(--workspace-line)] bg-[var(--surface-card)] px-2.5 py-2 font-ui text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-[var(--ink-soft)] shadow-[var(--shadow-xs)] transition-colors hover:border-[var(--workspace-line-strong)] hover:text-[var(--ink)] sm:flex"
             >
               <LayoutGrid className="size-3.5" />
-              Elements library
+              Elements
             </Link>
           <Dialog open={open} onOpenChange={(next) => (setOpen(next), next || resetForm())}>
             <DialogTrigger asChild>
-              <Button className="h-8 gap-1.5 rounded-[3px] bg-[var(--red)] px-3 font-meta text-[0.58rem] uppercase tracking-[0.1em] text-white hover:bg-[color-mix(in_oklab,var(--red)_88%,black)]">
+              <Button className="h-[1.95rem] gap-1.5 rounded-[8px] px-3 text-[0.58rem] uppercase tracking-[0.1em]">
                 <Plus className="size-3.5" /> New publication
               </Button>
             </DialogTrigger>
@@ -313,27 +325,24 @@ export default function PublishingLibrary() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1240px] px-6 pb-20 pt-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="mx-auto max-w-[1240px] px-4 pb-20 pt-10 sm:px-6 sm:pt-14">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--workspace-line)] pb-5">
           <div>
-            <p className="font-meta text-[0.55rem] uppercase tracking-[0.18em] text-[var(--gold)]">
-              Phase 3A · Editor shell
-            </p>
-            <h2 className="mt-1 font-display text-[2rem] leading-tight tracking-[0.01em]">
-              Publications
+            <p className="section-label text-[var(--red)]">The publishing desk</p>
+            <h2 className="mt-2 font-ui text-[clamp(2rem,4vw,3.2rem)] font-semibold leading-[1.02] tracking-[-0.035em]">
+              Documents made to be held.
             </h2>
-            <p className="mt-1 max-w-2xl text-[0.82rem] leading-6 text-[var(--ink-soft)]">
-              One editor for albums, magazines, catalogues, books, brochures, portfolios, menus and
-              custom jobs. Pages are real spreads with bleed and margins; objects are real model
-              records, saved as you work.
+            <p className="mt-3 max-w-2xl text-[0.84rem] leading-6 text-[var(--ink-soft)]">
+              Albums, magazines, catalogues, books, brochures, portfolios and menus — real spreads,
+              real margins and artwork that autosaves as you work.
             </p>
           </div>
-          <div className="flex items-center gap-4 font-meta text-[0.55rem] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-            <span className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2 font-meta text-[0.5rem] uppercase tracking-[0.1em] text-[var(--ink-soft)]">
+            <span className="flex items-center gap-1.5 rounded-full border border-[var(--workspace-line)] bg-[var(--surface-card)] px-2.5 py-1.5">
               <Layers className="size-3.5" /> {publications?.length ?? 0} documents
             </span>
-            <span className="hidden items-center gap-1.5 sm:flex">
-              <LayoutGrid className="size-3.5" /> Convex persistence
+            <span className="hidden items-center gap-1.5 rounded-full border border-[var(--workspace-line)] bg-[var(--surface-card)] px-2.5 py-1.5 sm:flex">
+              <LayoutGrid className="size-3.5" /> Autosaved privately
             </span>
           </div>
         </div>
@@ -375,7 +384,7 @@ export default function PublishingLibrary() {
                 <li key={publication._id}>
                   <Link
                     to={editorHref(publication._id)}
-                    className="group flex h-full flex-col justify-between gap-5 border border-[var(--rule)] bg-[var(--paper-light)] p-4 transition-colors hover:border-[color-mix(in_oklab,var(--red)_55%,var(--rule))]"
+                    className="group flex h-full flex-col justify-between gap-5 rounded-[16px] border border-[var(--workspace-line)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--workspace-line-strong)] hover:shadow-[var(--shadow-card)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -437,10 +446,10 @@ export default function PublishingLibrary() {
       <footer className="border-t border-[var(--rule)] bg-[var(--paper-light)]">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-2 px-6 py-4 font-meta text-[0.55rem] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
           <span>
-            {DOCUMENT_PRESETS.length} presets · one document model · one editor
+            {DOCUMENT_PRESETS.length} document formats · one considered workspace
           </span>
           <Link to="/dashboard" className="hover:text-[var(--red)]">
-            Back to the studio
+            Back to LAMSA
           </Link>
         </div>
       </footer>

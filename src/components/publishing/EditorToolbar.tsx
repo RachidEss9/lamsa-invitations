@@ -1,28 +1,30 @@
 import {
-  ArrowLeft,
+  BookOpen,
+  Check,
   ChevronLeft,
   ChevronRight,
   Circle,
   Columns3,
   Eye,
   FileDown,
-  BookOpen,
   Grid2x2,
   History,
-  Lightbulb,
-  ShieldCheck,
-  Sparkles,
   Image as ImageIcon,
   LayoutTemplate,
+  Lightbulb,
   Maximize2,
   Minus,
+  PanelLeft,
+  PanelRight,
   Plus,
   Redo2,
+  Ruler,
+  ShieldCheck,
+  Sparkles,
   Square,
   SquareDashed,
   Type as TypeIcon,
   Undo2,
-  Ruler,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -37,14 +39,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { StudioHeader, StudioSaveState } from "@/components/workspace/StudioChrome";
 import { zoomPercent } from "@/lib/publishing/viewport";
 import { cn } from "@/lib/utils";
 
 /**
- * The editor's only toolbar. Every control here does exactly one real thing:
- * navigate pages, change the real zoom, undo, insert an object that the model
- * stores, toggle a chrome overlay, or save. Nothing fakes progress and nothing
- * is present for decoration.
+ * The publishing workspace bar.
+ *
+ * Document identity sits on the left, view controls in the centre and document
+ * actions on the right. Nothing here is decorative: each control is bound to
+ * the same editor session and history as before the redesign.
  */
 
 export interface SaveStatusView {
@@ -54,18 +58,18 @@ export interface SaveStatusView {
 
 const SAVE_LABEL: Record<PublishingSaveStatus, string> = {
   saved: "Saved",
-  unsaved: "Unsaved changes",
-  saving: "Saving…",
+  unsaved: "Unsaved",
+  saving: "Saving",
   error: "Save failed",
   conflict: "Changed elsewhere",
 };
 
-const SAVE_DOT: Record<PublishingSaveStatus, string> = {
-  saved: "bg-[var(--olive)]",
-  unsaved: "bg-[var(--gold)]",
-  saving: "bg-[var(--gold)] animate-pulse",
-  error: "bg-[var(--red)]",
-  conflict: "bg-[var(--red)]",
+const SAVE_TONE: Record<PublishingSaveStatus, "saved" | "unsaved" | "saving" | "error"> = {
+  saved: "saved",
+  unsaved: "unsaved",
+  saving: "saving",
+  error: "error",
+  conflict: "error",
 };
 
 export interface EditorToolbarProps {
@@ -104,6 +108,10 @@ export interface EditorToolbarProps {
   onOpenVersions: () => void;
   busy?: boolean;
   onBack: () => void;
+  leftOpen?: boolean;
+  rightOpen?: boolean;
+  onToggleLeft?: () => void;
+  onToggleRight?: () => void;
 }
 
 function ToolButton({
@@ -122,22 +130,18 @@ function ToolButton({
   children: ReactNode;
 }) {
   return (
-    <Button
+    <button
       type="button"
-      variant="ghost"
-      size="icon"
       title={title ?? label}
       aria-label={label}
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        "size-7 rounded-[3px] text-[var(--ink-soft)] hover:bg-[color-mix(in_oklab,var(--ink)_7%,transparent)] hover:text-[var(--ink)]",
-        active && "bg-[color-mix(in_oklab,var(--red)_10%,transparent)] text-[var(--red)]",
-      )}
+      className="studio-tool"
+      data-active={active}
     >
       {children}
-    </Button>
+    </button>
   );
 }
 
@@ -178,192 +182,278 @@ export function EditorToolbar(props: EditorToolbarProps) {
     onOpenVersions,
     busy,
     onBack,
+    leftOpen = true,
+    rightOpen = true,
+    onToggleLeft,
+    onToggleRight,
   } = props;
 
+  const chromeItems: Array<[keyof PageChrome, string, ReactNode]> = [
+    ["guides", "Guides", <Ruler key="guides" className="size-3.5" />],
+    ["margins", "Margins", <SquareDashed key="margins" className="size-3.5" />],
+    ["columns", "Column grid", <Columns3 key="columns" className="size-3.5" />],
+    ["baseline", "Baseline grid", <Grid2x2 key="baseline" className="size-3.5" />],
+    ["bleed", "Bleed outline", <LayoutTemplate key="bleed" className="size-3.5" />],
+  ];
+
   return (
-    <header className="flex min-h-12 shrink-0 flex-wrap items-stretch border-b border-[var(--rule)] bg-[var(--paper-light)] lg:h-12 lg:flex-nowrap">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 pr-2 lg:flex-none lg:py-0 lg:pr-3">
-        <ToolButton label="Back to the library" onClick={onBack}>
-          <ArrowLeft className="size-4" />
-        </ToolButton>
-        <span className="mx-1 h-5 w-px bg-[var(--rule)]" />
+    <StudioHeader
+      product="Publishing Studio"
+      backLabel="Back to the publishing library"
+      onBack={onBack}
+      title={
         <input
           value={title}
           onChange={(event) => onTitleChange(event.target.value)}
           onBlur={onTitleCommit}
           onKeyDown={(event) => {
-            if (event.key === "Enter") event.currentTarget.blur();
-            if (event.key === "Escape") event.currentTarget.blur();
+            if (event.key === "Enter" || event.key === "Escape") {
+              event.currentTarget.blur();
+            }
           }}
           aria-label="Publication title"
           spellCheck={false}
-          className="w-[clamp(72px,26vw,260px)] truncate border-0 bg-transparent font-display lg:w-[clamp(120px,18vw,260px)] text-[0.95rem] leading-6 tracking-[0.01em] text-[var(--ink)] outline-none focus-visible:bg-[color-mix(in_oklab,var(--ink)_4%,transparent)]"
+          className="studio-title-input"
         />
-        <span
-          className="flex items-center gap-1.5 rounded-full border border-[var(--rule)] px-2 py-[3px] font-meta text-[0.55rem] uppercase tracking-[0.12em] text-[var(--ink-soft)]"
-          title={save.message ?? SAVE_LABEL[save.status]}
-        >
-          <span className={cn("size-1.5 rounded-full", SAVE_DOT[save.status])} />
-          {SAVE_LABEL[save.status]}
-        </span>
-      </div>
-
-      <div className="order-3 flex w-full flex-1 items-center justify-center gap-1 border-t border-[var(--rule)] py-1 lg:order-none lg:w-auto lg:border-0 lg:py-0">
-        <div className="flex items-center rounded-[4px] border border-[var(--rule)] bg-[var(--paper)] px-0.5">
-          <ToolButton label="Previous page" onClick={onPreviousPage} disabled={!canGoPrevious || busy}>
-            <ChevronLeft className="size-4" />
-          </ToolButton>
-          <span
-            title={spreadLabel}
-            className="min-w-[86px] px-1 text-center font-meta text-[0.62rem] uppercase tracking-[0.08em] text-[var(--ink)]"
-          >
-            {pageCount > 0 ? `${pageIndex + 1} / ${pageCount}` : "—"}
-            <span className="ml-1.5 hidden text-[color-mix(in_oklab,var(--ink-soft)_80%,transparent)] sm:inline">
-              {spreadLabel}
-            </span>
+      }
+      meta={
+        <>
+          <StudioSaveState
+            tone={SAVE_TONE[save.status]}
+            label={SAVE_LABEL[save.status]}
+            title={save.message ?? SAVE_LABEL[save.status]}
+          />
+          <span aria-hidden className="studio-meta-separator" />
+          <span>
+            Page {pageCount > 0 ? pageIndex + 1 : "—"} of {pageCount || "—"}
           </span>
-          <ToolButton label="Next page" onClick={onNextPage} disabled={!canGoNext || busy}>
-            <ChevronRight className="size-4" />
-          </ToolButton>
-        </div>
+          <span aria-hidden className="studio-meta-separator" />
+          <span className="truncate">{spreadLabel}</span>
+        </>
+      }
+      center={
+        <>
+          <div className="studio-toolgroup">
+            <ToolButton
+              label="Previous page"
+              onClick={onPreviousPage}
+              disabled={!canGoPrevious || busy}
+            >
+              <ChevronLeft className="size-4" />
+            </ToolButton>
+            <button
+              type="button"
+              title={`${spreadLabel} — click to fit`}
+              onClick={onFit}
+              className="min-w-[5.4rem] px-1 text-center font-meta text-[0.58rem] uppercase tracking-[0.08em] text-ink/70 transition-colors hover:text-[var(--red)]"
+            >
+              {pageCount > 0 ? `${pageIndex + 1} / ${pageCount}` : "—"}
+              <span className="ml-1.5 hidden text-ink/35 xl:inline">{spreadLabel}</span>
+            </button>
+            <ToolButton
+              label="Next page"
+              onClick={onNextPage}
+              disabled={!canGoNext || busy}
+            >
+              <ChevronRight className="size-4" />
+            </ToolButton>
+          </div>
 
-        <span className="mx-1 h-5 w-px bg-[var(--rule)]" />
+          <div className="studio-toolgroup">
+            <ToolButton label="Zoom out" onClick={onZoomOut}>
+              <Minus className="size-3.5" />
+            </ToolButton>
+            <button
+              type="button"
+              onClick={onZoomReset}
+              title="Reset to 100%"
+              className="min-w-[2.8rem] px-1 text-center font-meta text-[0.56rem] tabular-nums text-ink/75 transition-colors hover:text-[var(--red)]"
+            >
+              {zoomPercent(zoom)}%
+            </button>
+            <ToolButton label="Zoom in" onClick={onZoomIn}>
+              <Plus className="size-3.5" />
+            </ToolButton>
+            <ToolButton label="Fit spread" onClick={onFit}>
+              <Maximize2 className="size-3.5" />
+            </ToolButton>
+          </div>
+        </>
+      }
+      actions={
+        <>
+          {onToggleLeft ? (
+            <button
+              type="button"
+              onClick={onToggleLeft}
+              aria-label={leftOpen ? "Hide left panel" : "Show left panel"}
+              aria-pressed={leftOpen}
+              title={leftOpen ? "Hide left panel" : "Show left panel"}
+              className="studio-icon-button hidden lg:grid"
+            >
+              <PanelLeft className="size-4" aria-hidden />
+            </button>
+          ) : null}
+          {onToggleRight ? (
+            <button
+              type="button"
+              onClick={onToggleRight}
+              aria-label={rightOpen ? "Hide inspector" : "Show inspector"}
+              aria-pressed={rightOpen}
+              title={rightOpen ? "Hide inspector" : "Show inspector"}
+              className="studio-icon-button hidden lg:grid"
+            >
+              <PanelRight className="size-4" aria-hidden />
+            </button>
+          ) : null}
+          <span aria-hidden className="mx-0.5 hidden h-5 w-px bg-[var(--workspace-line)] lg:block" />
 
-        <div className="flex items-center rounded-[4px] border border-[var(--rule)] bg-[var(--paper)] px-0.5">
-          <ToolButton label="Zoom out" onClick={onZoomOut}>
-            <Minus className="size-3.5" />
-          </ToolButton>
+          <div className="studio-toolgroup">
+            <ToolButton
+              label="Undo"
+              title="Undo the last edit (⌘/Ctrl+Z)"
+              onClick={onUndo}
+              disabled={!canUndo || busy}
+            >
+              <Undo2 className="size-4" />
+            </ToolButton>
+            <ToolButton
+              label="Redo"
+              title="Redo the last undone edit (⇧⌘/Ctrl+Shift+Z)"
+              onClick={onRedo}
+              disabled={!canRedo || busy}
+            >
+              <Redo2 className="size-4" />
+            </ToolButton>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="studio-action-button studio-action-button--quiet hidden px-2 sm:inline-flex"
+                aria-label="Insert"
+                title="Insert an object"
+              >
+                <Plus className="size-3.5" aria-hidden />
+                <span className="hidden xl:inline">Insert</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>New object on this page</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onInsertText} className="gap-2 text-[0.78rem]">
+                <TypeIcon className="size-3.5" /> Text frame
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => onInsertShape("rectangle")}
+                className="gap-2 text-[0.78rem]"
+              >
+                <Square className="size-3.5" /> Rectangle
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => onInsertShape("ellipse")}
+                className="gap-2 text-[0.78rem]"
+              >
+                <Circle className="size-3.5" /> Ellipse
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onInsertLine} className="gap-2 text-[0.78rem]">
+                <Minus className="size-3.5" /> Rule / line
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onOpenAssets} className="gap-2 text-[0.78rem]">
+                <ImageIcon className="size-3.5" /> Place artwork…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="studio-action-button studio-action-button--quiet hidden px-2 md:inline-flex"
+                aria-label="View"
+                title="Drawing aids"
+              >
+                <Grid2x2 className="size-3.5" aria-hidden />
+                <span className="hidden xl:inline">View</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Drawing aids</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {chromeItems.map(([key, label, icon]) => (
+                <DropdownMenuItem
+                  key={key}
+                  onSelect={() => onToggleChrome(key)}
+                  className="gap-2 text-[0.78rem]"
+                >
+                  {icon}
+                  <span className="flex-1">{label}</span>
+                  {chrome[key] ? <Check className="size-3.5 text-[var(--red)]" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="studio-action-button studio-action-button--quiet px-2"
+                aria-label="Document"
+                title="Document tools"
+              >
+                <BookOpen className="size-3.5" aria-hidden />
+                <span className="hidden lg:inline">Document</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuLabel>Publication tools</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onOpenPreflight} className="gap-2 text-[0.78rem]">
+                <ShieldCheck className="size-3.5" /> Preflight…
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onOpenExport} className="gap-2 text-[0.78rem]">
+                <FileDown className="size-3.5" /> Export PDF…
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onOpenVersions} className="gap-2 text-[0.78rem]">
+                <History className="size-3.5" /> Named versions…
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onOpenSmartAlbum} className="gap-2 text-[0.78rem]">
+                <Sparkles className="size-3.5" /> Smart Album…
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onOpenAssist} className="gap-2 text-[0.78rem]">
+                <Lightbulb className="size-3.5" /> Layout suggestions…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <button
             type="button"
-            onClick={onZoomReset}
-            title="Reset to 100%"
-            className="min-w-[46px] px-1 text-center font-meta text-[0.62rem] tabular-nums text-[var(--ink)] hover:text-[var(--red)]"
+            onClick={onTogglePreview}
+            aria-label={preview ? "Leave preview" : "Preview without guides"}
+            aria-pressed={preview}
+            title={preview ? "Leave preview" : "Preview without guides"}
+            className="studio-icon-button"
+            data-active={preview}
           >
-            {zoomPercent(zoom)}%
+            <Eye className="size-4" aria-hidden />
           </button>
-          <ToolButton label="Zoom in" onClick={onZoomIn}>
-            <Plus className="size-3.5" />
-          </ToolButton>
-          <ToolButton label="Fit spread" onClick={onFit}>
-            <Maximize2 className="size-3.5" />
-          </ToolButton>
-        </div>
-      </div>
 
-      <div className="flex items-center gap-1 pr-1 lg:pr-2">
-        <div className="hidden items-center rounded-[4px] border border-[var(--rule)] bg-[var(--paper)] px-0.5 lg:flex">
-          <ToolButton label="Guides" active={chrome.guides} onClick={() => onToggleChrome("guides")}>
-            <Ruler className="size-3.5" />
-          </ToolButton>
-          <ToolButton label="Margins" active={chrome.margins} onClick={() => onToggleChrome("margins")}>
-            <SquareDashed className="size-3.5" />
-          </ToolButton>
-          <ToolButton label="Column grid" active={chrome.columns} onClick={() => onToggleChrome("columns")}>
-            <Columns3 className="size-3.5" />
-          </ToolButton>
-          <ToolButton label="Baseline grid" active={chrome.baseline} onClick={() => onToggleChrome("baseline")}>
-            <Grid2x2 className="size-3.5" />
-          </ToolButton>
-          <ToolButton label="Bleed outline" active={chrome.bleed} onClick={() => onToggleChrome("bleed")}>
-            <LayoutTemplate className="size-3.5" />
-          </ToolButton>
-        </div>
-
-        <span className="mx-1 h-5 w-px bg-[var(--rule)]" />
-
-        <div className="flex items-center rounded-[4px] border border-[var(--rule)] bg-[var(--paper)] px-0.5">
-          <ToolButton
-            label="Undo"
-            title="Undo the last edit, including page, master and layer commands (⌘/Ctrl+Z)"
-            onClick={onUndo}
-            disabled={!canUndo || busy}
+          <Button
+            type="button"
+            onClick={onOpenExport}
+            disabled={busy}
+            className="hidden h-[1.95rem] gap-1.5 rounded-[8px] px-3 text-[0.58rem] uppercase tracking-[0.1em] sm:inline-flex"
           >
-            <Undo2 className="size-4" />
-          </ToolButton>
-          <ToolButton
-            label="Redo"
-            title="Redo the last undone edit (⇧⌘/Ctrl+Shift+Z)"
-            onClick={onRedo}
-            disabled={!canRedo || busy}
-          >
-            <Redo2 className="size-4" />
-          </ToolButton>
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={busy}
-              className="h-7 gap-1.5 rounded-[3px] px-2 font-meta text-[0.6rem] uppercase tracking-[0.1em] text-[var(--ink)] hover:bg-[color-mix(in_oklab,var(--ink)_7%,transparent)]"
-            >
-              <BookOpen className="size-3.5" /> Document
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="font-meta text-[0.55rem] uppercase tracking-[0.12em]">
-              Publication tools
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onOpenPreflight} className="gap-2 text-[0.78rem]">
-              <ShieldCheck className="size-3.5" /> Preflight…
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onOpenExport} className="gap-2 text-[0.78rem]">
-              <FileDown className="size-3.5" /> Export PDF…
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onOpenVersions} className="gap-2 text-[0.78rem]">
-              <History className="size-3.5" /> Named versions…
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onOpenSmartAlbum} className="gap-2 text-[0.78rem]">
-              <Sparkles className="size-3.5" /> Smart Album…
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onOpenAssist} className="gap-2 text-[0.78rem]">
-              <Lightbulb className="size-3.5" /> Layout suggestions…
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={busy || preview}
-              className="h-7 gap-1.5 rounded-[3px] px-2 font-meta text-[0.6rem] uppercase tracking-[0.1em] text-[var(--ink)] hover:bg-[color-mix(in_oklab,var(--ink)_7%,transparent)]"
-            >
-              <Plus className="size-3.5" /> Insert
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel className="font-meta text-[0.55rem] uppercase tracking-[0.12em]">
-              New object on this page
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onInsertText} className="gap-2 text-[0.78rem]">
-              <TypeIcon className="size-3.5" /> Text frame
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onInsertShape("rectangle")} className="gap-2 text-[0.78rem]">
-              <Square className="size-3.5" /> Rectangle
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onInsertShape("ellipse")} className="gap-2 text-[0.78rem]">
-              <Circle className="size-3.5" /> Ellipse
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onInsertLine} className="gap-2 text-[0.78rem]">
-              <Minus className="size-3.5" /> Rule / line
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onOpenAssets} className="gap-2 text-[0.78rem]">
-              <ImageIcon className="size-3.5" /> Place artwork…
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <ToolButton label={preview ? "Leave preview" : "Preview without guides"} active={preview} onClick={onTogglePreview}>
-          <Eye className="size-4" />
-        </ToolButton>
-      </div>
-    </header>
+            <FileDown className="size-3.5" aria-hidden />
+            <span className="hidden xl:inline">Export</span>
+          </Button>
+        </>
+      }
+      className={cn(preview && "bg-[color-mix(in_oklab,var(--surface-overlay)_98%,transparent)]")}
+    />
   );
 }

@@ -5,8 +5,16 @@ import { projectPath } from "@/lib/platform/project";
 import { reorderSections, updateSection, ensureSections, appendSection, removeSection } from "@/lib/sections";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Wordmark } from "@/components/brand/Wordmark";
 import { DesignPageView, DesignStage } from "@/components/invitation/DesignPageView";
+import { Wordmark } from "@/components/brand/Wordmark";
+import {
+  StudioDock,
+  StudioHeader,
+  StudioPanelRail,
+  StudioSaveState,
+  type StudioPanelItem,
+} from "@/components/workspace/StudioChrome";
+import { PanelResizer } from "@/components/workspace/PanelResizer";
 
 import { ColourPanel } from "@/components/studio/ColourPanel";
 import { Inspector } from "@/components/studio/Inspector";
@@ -24,6 +32,14 @@ import { StudioCanvas, type CanvasContextAction } from "@/components/studio/Stud
 import { ShortcutReference } from "@/components/studio/ShortcutReference";
 import { Timeline } from "@/components/studio/Timeline";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -167,10 +183,10 @@ import type { TextOverflow } from "@/lib/text-fit";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import {
-  AlertCircle,
   ArrowLeft,
   Check,
   ChevronDown,
+  Clock,
   ChevronUp,
   Copy,
   Crosshair,
@@ -191,6 +207,7 @@ import {
   Lock,
   Magnet,
   Monitor,
+  MoreHorizontal,
   Palette,
   PanelLeft,
   PanelRight,
@@ -461,6 +478,8 @@ export default function Studio() {
   const [leftPanel, setLeftPanel] = useState<LeftPanel>("add");
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [leftWidth, setLeftWidth] = useState(248);
+  const [rightWidth, setRightWidth] = useState(304);
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [pixelsPerSecond, setPixelsPerSecond] = useState(80);
   const [librariesOpen, setLibrariesOpen] = useState(false);
@@ -476,6 +495,7 @@ export default function Studio() {
   const [comparing, setComparing] = useState(false);
   const [timelinePreviewOpen, setTimelinePreviewOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
+  const [mobileMore, setMobileMore] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<{
     design: DesignDocument;
     name: string;
@@ -3436,144 +3456,221 @@ export default function Studio() {
   };
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--paper-deep)]">
-        <header className="z-40 flex h-[60px] shrink-0 items-center gap-1.5 overflow-hidden border-b border-[var(--edge)] bg-[var(--surface-overlay)]/95 px-2 backdrop-blur-xl sm:gap-2 sm:px-4">
-        <button
-          type="button"
-          onClick={() => navigate("/dashboard")}
-          className="pressable grid size-9 shrink-0 place-items-center rounded-full border border-[var(--edge)] bg-[var(--surface-card)] text-ink/60 shadow-[var(--shadow-xs)] transition-[background-color,border-color,color] duration-150 hover:border-[var(--edge-strong)] hover:text-ink sm:size-8"
-          aria-label="Back to your projects"
-        >
-          <ArrowLeft className="size-3.5" />
-        </button>
-        <Wordmark className="hidden h-[17px] sm:block" />
-        <div className="mx-1 hidden h-6 w-px bg-ink/15 sm:block" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-ui text-[15px] font-semibold leading-tight">{content.title}</p>
-          <button
-            type="button"
-            onClick={() => void persistDesign(design)}
-            className={cn(
-              "flex items-center gap-1 font-meta text-[8px] uppercase tracking-[0.16em]",
-              saveState === "error"
-                ? "text-[var(--red)]"
-                : saveState === "saved"
-                  ? "text-ink/55"
-                  : "text-ink/40",
-            )}
-          >
-            {saveState === "saving" ? (
-              <Loader2 className="size-2.5 animate-spin" />
-            ) : saveState === "saved" ? (
-              <Check className="size-2.5" />
-            ) : saveState === "error" ? (
-              <AlertCircle className="size-2.5" />
-            ) : (
-              <span className="size-1 bg-[var(--gold)]" />
-            )}
-            {saveLabel} · Canvas
-          </button>
-        </div>
+    <div className="studio-workspace">
+      <StudioHeader
+        product="Invitation Studio"
+        backLabel="Back to your invitations"
+        onBack={() => navigate("/dashboard")}
+        title={<span className="studio-document-title">{content.title}</span>}
+        meta={
+          <>
+            <StudioSaveState
+              tone={
+                saveState === "error"
+                  ? "error"
+                  : saveState === "saving"
+                    ? "saving"
+                    : saveState === "unsaved"
+                      ? "unsaved"
+                      : "saved"
+              }
+              label={saveLabel}
+              onClick={() => void persistDesign(design)}
+              title="Save this canvas now"
+            />
+            <span aria-hidden className="studio-meta-separator" />
+            <span>
+              Page {pageIndex + 1} of {design.pages.length}
+            </span>
+            <span aria-hidden className="studio-meta-separator" />
+            <span>{published ? "Published" : "Draft"}</span>
+          </>
+        }
+        center={
+          <>
+            <div className="studio-toolgroup">
+              <button
+                type="button"
+                aria-label="Undo"
+                title="Undo"
+                onClick={undo}
+                disabled={!historyFlags.undo}
+                className="studio-tool"
+              >
+                <Undo2 className="size-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                aria-label="Redo"
+                title="Redo"
+                onClick={redo}
+                disabled={!historyFlags.redo}
+                className="studio-tool"
+              >
+                <Redo2 className="size-4" aria-hidden />
+              </button>
+            </div>
 
-        <div className="flex items-center gap-0.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-0.5 shadow-[var(--shadow-xs)]">
-          <IconButton label="Undo" onClick={undo} disabled={!historyFlags.undo} className="size-9 border-transparent sm:size-8"><Undo2 className="size-3.5" /></IconButton>
-          <IconButton label="Redo" onClick={redo} disabled={!historyFlags.redo} className="size-9 border-transparent sm:size-8"><Redo2 className="size-3.5" /></IconButton>
-        </div>
+            <div className="studio-segmented" aria-label="Canvas device">
+              {([
+                ["desktop", "Desktop canvas", Monitor],
+                ["tablet", "Tablet canvas", Tablet],
+                ["phone", "Phone canvas", Smartphone],
+              ] as const).map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-label={label}
+                  title={label}
+                  onClick={() => setDevice(id)}
+                  className="studio-segmented__item"
+                  data-active={device === id}
+                >
+                  <Icon className="size-3.5" aria-hidden />
+                </button>
+              ))}
+            </div>
 
-        {/* Medium headers keep only the drawing aids: showing every workspace
-            toggle here clipped the title and the publish action. */}
-        <div className="hidden items-center gap-1 md:flex lg:hidden">
-          <span className="mx-1 h-5 w-px bg-ink/12" />
-          <IconButton label="Grid" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
-          <IconButton label="Rulers" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
-          <IconButton label="Safe area, trim and bleed" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
-          <IconButton label="Centre guides" active={overlays.guides} onClick={() => toggleOverlay("guides")}><Crosshair className="size-3.5" /></IconButton>
-          <IconButton label="Snapping" active={overlays.snap} onClick={() => toggleOverlay("snap")}><Magnet className="size-3.5" /></IconButton>
-        </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="studio-action-button studio-action-button--quiet px-2"
+                  aria-label="View"
+                  title="Drawing aids"
+                >
+                  <Grid2x2 className="size-3.5" aria-hidden />
+                  <span className="hidden xl:inline">View</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-56">
+                <DropdownMenuLabel>Drawing aids</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {([
+                  ["grid", "Grid", Grid2x2],
+                  ["rulers", "Rulers", Ruler],
+                  ["safe", "Safe area, trim and bleed", Frame],
+                  ["guides", "Centre guides", Crosshair],
+                  ["snap", "Snapping", Magnet],
+                ] as const).map(([key, label, Icon]) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onSelect={() => toggleOverlay(key)}
+                    className="gap-2 text-[0.78rem]"
+                  >
+                    <Icon className="size-3.5" />
+                    <span className="flex-1">{label}</span>
+                    {overlays[key] ? <Check className="size-3.5 text-[var(--red)]" /> : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-        <div className="hidden items-center gap-1 lg:flex">
-          <span className="mx-1 h-5 w-px bg-ink/10" />
-          <div className="flex items-center gap-0.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-0.5 shadow-[var(--shadow-xs)]">
-            <IconButton label="Desktop canvas" className="rounded-full border-transparent" active={device === "desktop"} onClick={() => setDevice("desktop")}><Monitor className="size-3.5" /></IconButton>
-            <IconButton label="Tablet canvas" className="rounded-full border-transparent" active={device === "tablet"} onClick={() => setDevice("tablet")}><Tablet className="size-3.5" /></IconButton>
-            <IconButton label="Phone canvas" className="rounded-full border-transparent" active={device === "phone"} onClick={() => setDevice("phone")}><Smartphone className="size-3.5" /></IconButton>
-          </div>
-          <span className="mx-1 h-5 w-px bg-ink/10" />
-          <div className="flex items-center gap-0.5 rounded-full border border-[var(--edge)] bg-[var(--surface-card)]/85 p-0.5 shadow-[var(--shadow-xs)]">
-            <IconButton label="Grid" className="rounded-full border-transparent" active={overlays.grid} onClick={() => toggleOverlay("grid")}><Grid2x2 className="size-3.5" /></IconButton>
-            <IconButton label="Rulers" className="rounded-full border-transparent" active={overlays.rulers} onClick={() => toggleOverlay("rulers")}><Ruler className="size-3.5" /></IconButton>
-            <IconButton label="Safe area, trim and bleed" className="rounded-full border-transparent" active={overlays.safe} onClick={() => toggleOverlay("safe")}><Frame className="size-3.5" /></IconButton>
-            <IconButton label="Centre guides" className="rounded-full border-transparent" active={overlays.guides} onClick={() => toggleOverlay("guides")}><Crosshair className="size-3.5" /></IconButton>
-            <IconButton label="Snapping" className="rounded-full border-transparent" active={overlays.snap} onClick={() => toggleOverlay("snap")}><Magnet className="size-3.5" /></IconButton>
-          </div>
-          <span className="mx-1 h-5 w-px bg-ink/10" />
-          <IconButton label="Toggle left panel" active={leftOpen} onClick={() => setLeftOpen((value) => !value)}><PanelLeft className="size-3.5" /></IconButton>
-          <IconButton label="Toggle properties" active={rightOpen} onClick={() => setRightOpen((value) => !value)}><PanelRight className="size-3.5" /></IconButton>
-          <span className="mx-1 h-5 w-px bg-ink/12" />
-          <IconButton label="Version history" onClick={() => setHistoryOpen(true)}><History className="size-3.5" /></IconButton>
-          <IconButton label="Colour variations" onClick={() => setVariationsOpen(true)}><Palette className="size-3.5" /></IconButton>
-        </div>
-
-        <div className="ml-1 flex items-center gap-1.5">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setLibrariesOpen(true)}
-            className="hidden h-8 rounded-full px-3 text-[9px] uppercase tracking-[0.12em] sm:inline-flex"
-          >
-            <Library className="size-3.5" />
-            <span className="hidden sm:inline">Libraries</span>
-          </Button>
-          <span className="hidden sm:block">
-            <IconButton
-              label="Keyboard shortcuts"
-              onClick={() => setShortcutsOpen(true)}
+            <button
+              type="button"
+              onClick={() => setLeftOpen((value) => !value)}
+              aria-label={leftOpen ? "Hide tool panel" : "Show tool panel"}
+              aria-pressed={leftOpen}
+              title={leftOpen ? "Hide tool panel" : "Show tool panel"}
+              className="studio-icon-button"
             >
-              <Keyboard className="size-3.5" />
-            </IconButton>
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setTimelinePreviewOpen(true)}
-            className="hidden h-8 rounded-full px-3 text-[9px] uppercase tracking-[0.12em] lg:inline-flex"
-          >
-            <Play className="size-3.5" />
-            Timeline
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setGuestOpen(true)}
-            aria-label="Guest preview"
-            title="Guest preview"
-            className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
-          >
-            <Eye className="size-3.5" />
-            <span className="hidden sm:inline">Guest preview</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setPrintOpen(true)}
-            className="h-9 rounded-full px-2.5 text-[9px] uppercase tracking-[0.12em] sm:h-8"
-            aria-label="Export a print-ready PDF"
-            title="Export a print-ready PDF"
-          >
-            <FileText className="size-3.5" />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
-          <Button
-            type="button"
-            onClick={handlePublish}
-            disabled={publishing}
-            className="h-8 rounded-full px-3.5 text-[9px] uppercase tracking-[0.14em] shadow-[var(--shadow-pill)]"
-          >
-            {publishing ? <Loader2 className="size-3.5 animate-spin" /> : published ? <Share2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
-            {published ? "Share" : "Publish"}
-          </Button>
-        </div>
-      </header>
+              <PanelLeft className="size-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => setRightOpen((value) => !value)}
+              aria-label={rightOpen ? "Hide inspector" : "Show inspector"}
+              aria-pressed={rightOpen}
+              title={rightOpen ? "Hide inspector" : "Show inspector"}
+              className="studio-icon-button"
+            >
+              <PanelRight className="size-4" aria-hidden />
+            </button>
+          </>
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => setLibrariesOpen(true)}
+              className="studio-action-button studio-action-button--quiet hidden px-2 sm:inline-flex"
+              aria-label="Libraries"
+              title="Templates, type, animation and finishes"
+            >
+              <Library className="size-3.5" aria-hidden />
+              <span className="hidden xl:inline">Libraries</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setGuestOpen(true)}
+              className="studio-action-button studio-action-button--quiet px-2"
+              aria-label="Guest preview"
+              title="Guest preview"
+            >
+              <Eye className="size-3.5" aria-hidden />
+              <span className="hidden lg:inline">Preview</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintOpen(true)}
+              className="studio-action-button studio-action-button--quiet hidden px-2 sm:inline-flex"
+              aria-label="Export a print-ready PDF"
+              title="Export a print-ready PDF"
+            >
+              <FileText className="size-3.5" aria-hidden />
+              <span className="hidden xl:inline">Export</span>
+            </button>
+            <Button
+              type="button"
+              onClick={handlePublish}
+              disabled={publishing}
+              className="h-[1.95rem] gap-1.5 rounded-[8px] px-3 text-[0.58rem] uppercase tracking-[0.1em]"
+            >
+              {publishing ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : published ? (
+                <Share2 className="size-3.5" aria-hidden />
+              ) : (
+                <Sparkles className="size-3.5" aria-hidden />
+              )}
+              <span className="hidden sm:inline">{published ? "Share" : "Publish"}</span>
+              <span className="sm:hidden">{published ? "Share" : "Publish"}</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="studio-icon-button"
+                  aria-label="More studio tools"
+                  title="More studio tools"
+                >
+                  <MoreHorizontal className="size-4" aria-hidden />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuLabel>Invitation workspace</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setTimelinePreviewOpen(true)} className="gap-2 text-[0.78rem]">
+                  <Play className="size-3.5" /> Timeline preview
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setTimelineOpen((value) => !value)} className="gap-2 text-[0.78rem]">
+                  <Clock className="size-3.5" /> {timelineOpen ? "Hide timeline" : "Show timeline"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setHistoryOpen(true)} className="gap-2 text-[0.78rem]">
+                  <History className="size-3.5" /> Version history
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setVariationsOpen(true)} className="gap-2 text-[0.78rem]">
+                  <Palette className="size-3.5" /> Colour variations
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setShortcutsOpen(true)} className="gap-2 text-[0.78rem]">
+                  <Keyboard className="size-3.5" /> Keyboard shortcuts
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
 
       {/* The suite strip: one chip per piece of stationery, its brief, and the
           actions that keep a set coordinated. */}
@@ -3651,60 +3748,53 @@ export default function Studio() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex min-h-0 flex-1">
-        <aside className="relative z-20 hidden shrink-0 border-r border-[var(--edge)] bg-[var(--surface-card)] lg:flex">
-          {/* Panel rail: one icon per panel, with a paper-white tooltip so the
-              five workspace areas never need a row of tiny text tabs. */}
-          <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 border-r border-[var(--edge)] bg-[var(--surface-sunk)]/40 py-2">
-            {([
-              { id: "add" as LeftPanel, icon: Plus, label: "Add" },
-              { id: "layers" as LeftPanel, icon: Layers, label: "Layers" },
-              { id: "colour" as LeftPanel, icon: Palette, label: "Colour" },
-              { id: "pages" as LeftPanel, icon: Layout, label: "Pages" },
-              { id: "sections" as LeftPanel, icon: BookOpen, label: "Sections" },
-            ]).map(({ id, icon: Icon, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => {
-                  if (leftPanel === id && leftOpen) {
-                    setLeftOpen(false);
-                    return;
-                  }
-                  setLeftPanel(id);
-                  setLeftOpen(true);
-                }}
-                aria-label={label}
-                aria-pressed={leftPanel === id && leftOpen}
-                title={label}
-                className={cn(
-                  "pressable group relative grid size-8 place-items-center rounded-[11px]",
-                  leftPanel === id && leftOpen
-                    ? "bg-[var(--ink)] text-[var(--paper)] shadow-[var(--shadow-pill)]"
-                    : "text-ink/45 hover:bg-ink/[0.055] hover:text-ink",
-                )}
-              >
-                <Icon className="size-[16px]" strokeWidth={1.7} aria-hidden />
-                <span className="pointer-events-none absolute left-full z-50 ml-2 -translate-x-1 rounded-full border border-[var(--edge)] bg-[var(--surface-overlay)] px-2 py-1 font-ui text-[10px] font-medium whitespace-nowrap text-ink opacity-0 shadow-[var(--shadow-pill)] transition-[opacity,translate] duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
-                  {label}
-                </span>
-              </button>
-            ))}
-          </div>
+      <div className="studio-workspace__body">
+        <aside className="studio-sidebar hidden lg:flex" aria-label="Invitation tools">
+          <StudioPanelRail
+            label="Invitation tools"
+            items={[
+              { id: "add", label: "Add", icon: Plus },
+              { id: "layers", label: "Layers", icon: Layers },
+              { id: "colour", label: "Colour", icon: Palette },
+              { id: "pages", label: "Pages", icon: Layout },
+              { id: "sections", label: "Sections", icon: BookOpen },
+            ] satisfies readonly StudioPanelItem<LeftPanel>[]}
+            active={leftPanel}
+            expanded={leftOpen}
+            onSelect={(id) => {
+              if (id === leftPanel && leftOpen) {
+                setLeftOpen(false);
+                return;
+              }
+              setLeftPanel(id);
+              setLeftOpen(true);
+            }}
+            onToggle={() => setLeftOpen((value) => !value)}
+          />
           <div
-            className={cn(
-              "min-h-0 overflow-hidden transition-[width] duration-200 ease-[var(--ease-soft)]",
-              leftOpen ? "w-[248px]" : "w-0",
-            )}
+            className="studio-panel-column"
+            data-collapsed={!leftOpen}
+            style={leftOpen ? { width: leftWidth, flexBasis: leftWidth } : undefined}
           >
             <div className="h-full overflow-y-auto scroll-slim">{renderLeftPanel()}</div>
           </div>
         </aside>
 
-        <main className="flex min-w-0 flex-1 flex-col">
+        {leftOpen ? (
+          <PanelResizer
+            side="left"
+            value={leftWidth}
+            min={220}
+            max={380}
+            onChange={setLeftWidth}
+            label="Resize invitation panel"
+          />
+        ) : null}
+
+        <main className="studio-canvas-column">
           <div className="relative flex min-h-0 flex-1 flex-col">
             <div
-              className="relative mx-auto flex min-h-0 w-full flex-1 items-stretch justify-center p-2 sm:p-4"
+              className="studio-canvas-stage relative mx-auto flex min-h-0 w-full flex-1 items-stretch justify-center p-2 sm:p-4"
               style={{ maxWidth: DEVICE_WIDTH[device] }}
             >
               <StudioCanvas
@@ -4077,12 +4167,42 @@ export default function Studio() {
           )}
         </main>
 
+        {rightOpen ? (
+          <PanelResizer
+            side="right"
+            value={rightWidth}
+            min={268}
+            max={420}
+            onChange={setRightWidth}
+            label="Resize inspector"
+          />
+        ) : null}
+        {rightOpen ? (
         <aside
-          className={cn(
-            "hidden shrink-0 overflow-y-auto border-l border-[var(--edge)] bg-[var(--surface-card)] transition-[width] duration-200 lg:block",
-            rightOpen ? "w-[304px]" : "w-0 overflow-hidden border-l-0",
-          )}
+          className="studio-inspector hidden lg:flex"
+          aria-label="Inspector"
+          style={{ width: rightWidth, flexBasis: rightWidth }}
         >
+          <div className="studio-panel-heading">
+            <div className="min-w-0">
+              <p className="section-label">Properties</p>
+              <p className="studio-panel-heading__note">
+                {selected.length > 0
+                  ? `${selected.length} layer${selected.length === 1 ? "" : "s"} selected`
+                  : "Nothing selected — showing page setup"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRightOpen(false)}
+              className="studio-icon-button"
+              aria-label="Hide inspector"
+              title="Hide inspector"
+            >
+              <PanelRight className="size-3.5" aria-hidden />
+            </button>
+          </div>
+          <div className="scroll-slim min-h-0 flex-1 overflow-y-auto">
           <Inspector
             page={page}
             selected={selected}
@@ -4115,50 +4235,108 @@ export default function Studio() {
               setEditTextRequest({ id: elementId, token: Date.now() })
             }
           />
+          </div>
         </aside>
+        ) : null}
       </div>
 
-      {/* Mobile navigation */}
-      <nav className="flex shrink-0 items-stretch border-t border-[var(--edge)] bg-[var(--surface-card)] pb-[env(safe-area-inset-bottom)] lg:hidden">
-        {[
-          { id: "add" as const, label: "Add", icon: Plus },
-          { id: "libraries" as const, label: "Library", icon: Library },
-          { id: "layers" as const, label: "Layers", icon: Layers },
-          { id: "colour" as const, label: "Colour", icon: Palette },
-          { id: "sections" as const, label: "Sections", icon: BookOpen },
-          { id: "properties" as const, label: "Props", icon: PanelRight },
-          { id: "pages" as const, label: "Pages", icon: Layout },
-          { id: "timeline" as const, label: "Motion", icon: Play },
-          { id: "history" as const, label: "History", icon: History },
-        ].map(({ id: sheet, label, icon: Icon }) => (
-          <button
-            key={sheet}
-            type="button"
-            onClick={() => {
-              if (sheet === "libraries") {
-                setLibrariesOpen(true);
-                return;
-              }
-              if (sheet === "history") {
-                setHistoryOpen(true);
-                return;
-              }
-              setMobileSheet((current) => (current === sheet ? null : sheet));
-              if (sheet === "add" || sheet === "layers" || sheet === "colour" || sheet === "pages" || sheet === "sections") {
-                setLeftPanel(sheet);
-              }
-            }}
-            aria-expanded={mobileSheet === sheet}
-            className={cn(
-              "flex min-h-[46px] flex-1 flex-col items-center justify-center gap-0.5 py-2 font-meta text-[8px] uppercase tracking-[0.1em] transition-colors duration-150",
-              mobileSheet === sheet ? "text-[var(--red)]" : "text-ink/50",
-            )}
-          >
-            <Icon className="size-4" />
-            {label}
-          </button>
-        ))}
-      </nav>
+      {/* Mobile navigation: four direct tools and one organised overflow. */}
+      <StudioDock
+        label="Invitation tools"
+        items={[
+          { id: "add", label: "Add", icon: Plus, active: mobileSheet === "add" },
+          { id: "layers", label: "Layers", icon: Layers, active: mobileSheet === "layers" },
+          { id: "pages", label: "Pages", icon: Layout, active: mobileSheet === "pages" },
+          { id: "properties", label: "Props", icon: PanelRight, active: mobileSheet === "properties" },
+          { id: "more", label: "More", icon: MoreHorizontal, active: mobileMore },
+        ]}
+        onSelect={(id) => {
+          if (id === "more") {
+            setMobileSheet(null);
+            setMobileMore((value) => !value);
+            return;
+          }
+          setMobileMore(false);
+          const sheet = id as MobileSheet;
+          setMobileSheet((current) => (current === sheet ? null : sheet));
+          if (id === "add" || id === "layers" || id === "pages") {
+            setLeftPanel(id);
+          }
+        }}
+      />
+
+      {mobileMore ? (
+        <div className="pointer-events-none fixed inset-0 z-[70] flex flex-col justify-end pb-[calc(3.35rem+env(safe-area-inset-bottom))] lg:hidden">
+          <div className="pointer-events-auto flex max-h-[min(70dvh,calc(100dvh-6rem))] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-t border-[var(--workspace-line)] bg-[var(--surface-overlay)] shadow-[var(--shadow-sheet)]">
+            <button
+              type="button"
+              onClick={() => setMobileMore(false)}
+              aria-label="Close more tools"
+              className="flex h-7 w-full items-center justify-center"
+            >
+              <span className="h-1 w-9 rounded-full bg-ink/25" />
+            </button>
+            <div className="flex items-center justify-between border-b border-[var(--workspace-line)] px-4 py-2.5">
+              <div>
+                <p className="section-label">More tools</p>
+                <p className="mt-0.5 text-[10px] text-ink/45">
+                  Library, colour, motion and document actions.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileMore(false)}
+                className="studio-action-button studio-action-button--quiet"
+              >
+                Close
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-3">
+              {([
+                ["Library", Library, () => setLibrariesOpen(true)],
+                ["Colour", Palette, () => { setLeftPanel("colour"); setMobileSheet("colour"); }],
+                ["Sections", BookOpen, () => { setLeftPanel("sections"); setMobileSheet("sections"); }],
+                ["Motion", Play, () => setMobileSheet("timeline")],
+                ["History", History, () => setHistoryOpen(true)],
+                ["Shortcuts", Keyboard, () => setShortcutsOpen(true)],
+              ] as const).map(([label, Icon, action]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    setMobileMore(false);
+                    action();
+                  }}
+                  className="flex items-center gap-2.5 rounded-[10px] border border-[var(--workspace-line)] bg-[var(--surface-card)] px-3 py-3 text-left text-[11px] font-medium text-ink/75"
+                >
+                  <Icon className="size-4 text-ink/45" aria-hidden />
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-1 border-t border-[var(--workspace-line)] p-3 pt-2">
+              {([
+                ["Guest preview", () => setGuestOpen(true)],
+                ["Timeline preview", () => setTimelinePreviewOpen(true)],
+                ["Export PDF", () => setPrintOpen(true)],
+              ] as const).map(([label, action]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    setMobileMore(false);
+                    action();
+                  }}
+                  className="flex h-9 items-center justify-between border-b border-[var(--workspace-line)] px-1 text-left text-[11px] text-ink/65 last:border-0"
+                >
+                  {label}
+                  <ArrowLeft className="size-3.5 rotate-180 text-ink/30" aria-hidden />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/*
         The sheet is a true bottom sheet, not a modal: it sits above the tool
@@ -4168,8 +4346,8 @@ export default function Studio() {
         second layer of UI in the way.
       */}
       {mobileSheet && (
-        <div className="pointer-events-none fixed inset-0 z-[70] flex flex-col justify-end pb-[calc(46px+env(safe-area-inset-bottom))] lg:hidden">
-          <div className="pointer-events-auto flex max-h-[min(64dvh,calc(100dvh-7rem))] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-t border-[var(--edge)] bg-[var(--surface-overlay)] shadow-[var(--shadow-sheet)]">
+        <div className="pointer-events-none fixed inset-0 z-[70] flex flex-col justify-end pb-[calc(3.35rem+env(safe-area-inset-bottom))] lg:hidden">
+          <div className="pointer-events-auto flex max-h-[min(72dvh,calc(100dvh-6rem))] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-t border-[var(--workspace-line)] bg-[var(--surface-overlay)] shadow-[var(--shadow-sheet)]">
             {/* The grab handle doubles as an always-reachable dismiss. */}
             <button
               type="button"

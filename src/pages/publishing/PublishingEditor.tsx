@@ -1,8 +1,20 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowUpRight } from "lucide-react";
+import {
+  ArrowUpRight,
+  Files,
+  History as HistoryIcon,
+  Image as ImageIcon,
+  Layers as LayersIcon,
+  LayoutTemplate,
+  MoreHorizontal,
+  Ruler,
+  Shapes,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import { usePublishingEditor } from "@/hooks/publishing/usePublishingEditor";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { spreadGeometry, spreadForPage } from "@/lib/publishing/spreads";
 import { DEFAULT_CHROME, type PageChrome } from "@/components/publishing/PageView";
 import { EditorCanvas } from "@/components/publishing/EditorCanvas";
@@ -23,6 +35,13 @@ import { ElementsBrowser } from "@/components/library/ElementsBrowser";
 import { assetById, cachedGeometry } from "@/lib/library/catalog";
 import { Inspector } from "@/components/publishing/Inspector";
 import { ImageCropBar } from "@/components/publishing/ImageCropBar";
+import {
+  StudioDock,
+  StudioPanelHeading,
+  StudioPanelRail,
+  type StudioPanelItem,
+} from "@/components/workspace/StudioChrome";
+import { PanelResizer } from "@/components/workspace/PanelResizer";
 import {
   ConflictBanner,
   EditorLoading,
@@ -101,6 +120,35 @@ export default function PublishingEditor() {
   );
 }
 
+type WorkspacePanel =
+  | "pages"
+  | "layers"
+  | "masters"
+  | "elements"
+  | "assets"
+  | "history"
+  | "guides";
+
+const PANEL_ITEMS: readonly StudioPanelItem<WorkspacePanel>[] = [
+  { id: "pages", label: "Pages", icon: Files },
+  { id: "layers", label: "Layers", icon: LayersIcon },
+  { id: "masters", label: "Masters", icon: LayoutTemplate },
+  { id: "elements", label: "Elements", icon: Shapes },
+  { id: "assets", label: "Assets", icon: ImageIcon },
+  { id: "history", label: "History", icon: HistoryIcon },
+  { id: "guides", label: "Guides", icon: Ruler },
+];
+
+const PANEL_TITLES: Record<WorkspacePanel, string> = {
+  pages: "Pages",
+  layers: "Layers",
+  masters: "Masters",
+  elements: "Elements",
+  assets: "Assets",
+  history: "History",
+  guides: "Guides",
+};
+
 function EditorWorkspace({
   publicationId,
   onBack,
@@ -111,14 +159,18 @@ function EditorWorkspace({
   const editor = usePublishingEditor(publicationId);
   const [chrome, setChrome] = useState<PageChrome>(DEFAULT_CHROME);
   const [chromeBeforePreview, setChromeBeforePreview] = useState<PageChrome>(DEFAULT_CHROME);
-  const [panel, setPanel] = useState<
-    "pages" | "layers" | "masters" | "elements" | "assets" | "history" | "guides"
-  >("pages");
+  const [panel, setPanel] = useState<WorkspacePanel>("pages");
   const [dialog, setDialog] = useState<
     "preflight" | "export" | "album" | "assist" | "versions" | null
   >(null);
   const [guidesLocked, setGuidesLocked] = useState(false);
   const [fitSignal, setFitSignal] = useState(0);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+  const [leftWidth, setLeftWidth] = useState(248);
+  const [rightWidth, setRightWidth] = useState(304);
+  const [mobileMore, setMobileMore] = useState(false);
+  const isMobile = useIsMobile();
   const [editing, setEditing] = useState<{
     pageId: string;
     objectId: string;
@@ -146,6 +198,12 @@ function EditorWorkspace({
     | null
   >(null);
   const navigate = useNavigate();
+
+  // Crossing the compact-layout breakpoint changes the available canvas width;
+  // refit once so a phone never opens on the desktop zoom level.
+  useEffect(() => {
+    setFitSignal((signal) => signal + 1);
+  }, [isMobile]);
 
   const document = editor.document;
   const page = editor.page;
@@ -419,7 +477,7 @@ function EditorWorkspace({
   );
 
   return (
-    <main className="flex h-screen min-h-0 flex-col overflow-hidden bg-[var(--paper)] text-[var(--ink)]">
+    <main className="studio-workspace">
       <EditorToolbar
         title={editor.title}
         onTitleChange={editor.setTitle}
@@ -465,6 +523,10 @@ function EditorWorkspace({
           void editor.flush();
           onBack();
         }}
+        leftOpen={leftOpen}
+        rightOpen={rightOpen}
+        onToggleLeft={() => setLeftOpen((value) => !value)}
+        onToggleRight={() => setRightOpen((value) => !value)}
       />
 
       {editor.saveStatus === "conflict" ? (
@@ -483,36 +545,51 @@ function EditorWorkspace({
         />
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[232px_minmax(0,1fr)_268px]">
-        <aside className="hidden min-h-0 flex-col border-r border-[var(--rule)] bg-[var(--paper)] lg:flex">
-          <div className="grid grid-cols-4 border-b border-[var(--rule)]">
-            {(
-              [
-                ["pages", "Pages"],
-                ["layers", "Layers"],
-                ["masters", "Masters"],
-                ["elements", "Elements"],
-                ["assets", "Assets"],
-                ["history", "History"],
-                ["guides", "Guides"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setPanel(id)}
-                className={cn(
-                  "py-2 font-meta text-[0.56rem] uppercase tracking-[0.12em] transition-colors",
-                  panel === id
-                    ? "border-b border-[var(--red)] text-[var(--red)]"
-                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="min-h-0 flex-1">
+      <div className="studio-workspace__body">
+        <aside
+          className="studio-sidebar hidden lg:flex"
+          data-open={leftOpen}
+          aria-label="Publication panels"
+        >
+          <StudioPanelRail
+            label="Publication panels"
+            items={PANEL_ITEMS}
+            active={panel}
+            expanded={leftOpen}
+            onSelect={(id) => {
+              if (id === panel && leftOpen) {
+                setLeftOpen(false);
+                return;
+              }
+              setPanel(id);
+              setLeftOpen(true);
+            }}
+            onToggle={() => setLeftOpen((value) => !value)}
+          />
+          <div
+            className="studio-panel-column"
+            data-collapsed={!leftOpen}
+            style={leftOpen ? { width: leftWidth, flexBasis: leftWidth } : undefined}
+          >
+            <StudioPanelHeading
+              title={PANEL_TITLES[panel]}
+              note={
+                panel === "pages"
+                  ? "The document's spine. Select, add or reorder pages."
+                  : panel === "layers"
+                    ? "Objects on this page, in stacking order."
+                    : panel === "masters"
+                      ? "Shared page furniture, managed once."
+                      : panel === "elements"
+                        ? "The shared LAMSA library, ready to place."
+                        : panel === "assets"
+                          ? "Photographs and artwork in this publication."
+                          : panel === "history"
+                            ? "Every edit in this session, reversible."
+                            : "Precise guides for this document."
+              }
+            />
+            <div className="min-h-0 flex-1 overflow-hidden">
             {panel === "pages" ? (
               <PagePanel
                 document={document}
@@ -572,13 +649,25 @@ function EditorWorkspace({
                 }
               />
             ) : null}
+            </div>
           </div>
         </aside>
 
+        {leftOpen ? (
+          <PanelResizer
+            side="left"
+            value={leftWidth}
+            min={220}
+            max={380}
+            onChange={setLeftWidth}
+            label="Resize document panel"
+          />
+        ) : null}
+
         <section
           className={cn(
-            "flex min-h-0 min-w-0 flex-col",
-            master && "bg-[color-mix(in_oklab,var(--red)_3%,transparent)]",
+            "studio-canvas-column relative",
+            master && "bg-[color-mix(in_oklab,var(--red)_3%,var(--workspace-canvas))]",
           )}
         >
           {master ? (
@@ -725,7 +814,7 @@ function EditorWorkspace({
               setPanel("layers");
             }}
           />
-          <div className="flex h-7 shrink-0 items-center justify-between border-t border-[var(--rule)] bg-[var(--paper-light)] px-3 font-meta text-[0.52rem] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+          <div className="studio-statusbar">
             <span>
               {page.name.trim() || `Page ${editor.pageIndex + 1}`} · {page.side} ·{" "}
               {document.facingPages ? "facing pages" : "single pages"}
@@ -754,59 +843,176 @@ function EditorWorkspace({
           </div>
         </section>
 
-        <aside className="hidden min-h-0 border-l border-[var(--rule)] bg-[var(--paper)] lg:block">
-          {inspectorNode}
-        </aside>
-      </div>
+        {rightOpen ? (
+          <PanelResizer
+            side="right"
+            value={rightWidth}
+            min={268}
+            max={420}
+            onChange={setRightWidth}
+            label="Resize inspector"
+          />
+        ) : null}
 
-      <div className="flex h-10 shrink-0 items-stretch overflow-x-auto border-t border-[var(--rule)] bg-[var(--paper-light)] lg:hidden">
-        {(
-          [
-            ["pages", "Pages"],
-            ["layers", "Layers"],
-            ["masters", "Masters"],
-            ["elements", "Elements"],
-            ["assets", "Assets"],
-            ["history", "History"],
-            ["guides", "Guides"],
-            ["inspector", "Inspect"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setMobilePanel((current) => (current === id ? null : id))}
-            className={cn(
-              "min-w-[64px] flex-1 shrink-0 border-r border-[var(--rule)] py-2 font-meta text-[0.55rem] uppercase tracking-[0.1em]",
-              mobilePanel === id
-                ? "text-[var(--red)]"
-                : "text-[var(--ink-soft)]",
-            )}
+        {rightOpen ? (
+          <aside
+            className="studio-inspector hidden lg:flex"
+            aria-label="Inspector"
+            style={{ width: rightWidth, flexBasis: rightWidth }}
           >
-            {label}
-          </button>
-        ))}
-        {selectedImageFrame?.kind === "image-frame" && !activeImageCrop ? (
-          <button
-            type="button"
-            onClick={() => startImageCrop(selectedImageFrame.id)}
-            className="flex-1 py-2 font-meta text-[0.55rem] uppercase tracking-[0.1em] text-[var(--red)]"
-          >
-            Crop
-          </button>
+            <StudioPanelHeading
+              title="Properties"
+              note={
+                editor.selection.length > 0
+                  ? `${editor.selection.length} object${editor.selection.length === 1 ? "" : "s"} selected`
+                  : "Nothing selected — showing page setup"
+              }
+              actions={
+                <button
+                  type="button"
+                  onClick={() => setRightOpen(false)}
+                  className="studio-icon-button"
+                  aria-label="Hide inspector"
+                  title="Hide inspector"
+                >
+                  <SlidersHorizontal className="size-3.5" aria-hidden />
+                </button>
+              }
+            />
+            <div className="scroll-slim min-h-0 flex-1 overflow-y-auto">
+              {inspectorNode}
+            </div>
+          </aside>
         ) : null}
       </div>
 
+      <StudioDock
+        label="Publication tools"
+        items={[
+          { id: "pages", label: "Pages", icon: Files, active: mobilePanel === "pages" },
+          { id: "layers", label: "Layers", icon: LayersIcon, active: mobilePanel === "layers" },
+          { id: "elements", label: "Elements", icon: Shapes, active: mobilePanel === "elements" },
+          { id: "inspector", label: "Inspect", icon: SlidersHorizontal, active: mobilePanel === "inspector" },
+          { id: "more", label: "More", icon: MoreHorizontal, active: mobileMore },
+        ]}
+        onSelect={(id) => {
+          if (id === "more") {
+            setMobilePanel(null);
+            setMobileMore((value) => !value);
+            return;
+          }
+          setMobileMore(false);
+          setMobilePanel((current) => (current === id ? null : (id as typeof mobilePanel)));
+        }}
+      />
+
+      {mobileMore ? (
+        <div className="pointer-events-none fixed inset-0 z-[70] flex flex-col justify-end pb-[calc(3.35rem+env(safe-area-inset-bottom))] lg:hidden">
+          <div className="pointer-events-auto flex max-h-[min(68dvh,calc(100dvh-6rem))] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-t border-[var(--workspace-line)] bg-[var(--surface-overlay)] shadow-[var(--shadow-sheet)]">
+            <button
+              type="button"
+              onClick={() => setMobileMore(false)}
+              aria-label="Close more tools"
+              className="flex h-7 w-full items-center justify-center"
+            >
+              <span className="h-1 w-9 rounded-full bg-ink/25" />
+            </button>
+            <div className="flex items-center justify-between border-b border-[var(--workspace-line)] px-4 py-2.5">
+              <div>
+                <p className="section-label">More tools</p>
+                <p className="mt-0.5 text-[10px] text-ink/45">Document, panels and output.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileMore(false)}
+                className="studio-action-button studio-action-button--quiet"
+              >
+                Close
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-3">
+              {([
+                ["masters", "Masters", LayoutTemplate],
+                ["assets", "Assets", ImageIcon],
+                ["history", "History", HistoryIcon],
+                ["guides", "Guides", Ruler],
+              ] as const).map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setMobileMore(false);
+                    setMobilePanel(id);
+                  }}
+                  className="flex items-center gap-2.5 rounded-[10px] border border-[var(--workspace-line)] bg-[var(--surface-card)] px-3 py-3 text-left text-[11px] font-medium text-ink/75"
+                >
+                  <Icon className="size-4 text-ink/45" aria-hidden />
+                  {label}
+                </button>
+              ))}
+              {selectedImageFrame?.kind === "image-frame" && !activeImageCrop ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMore(false);
+                    startImageCrop(selectedImageFrame.id);
+                  }}
+                  className="flex items-center gap-2.5 rounded-[10px] border border-[var(--red)]/30 bg-[var(--red)]/[0.05] px-3 py-3 text-left text-[11px] font-medium text-[var(--red)]"
+                >
+                  <ImageIcon className="size-4" aria-hidden /> Crop image
+                </button>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-1 gap-1 border-t border-[var(--workspace-line)] p-3 pt-2">
+              {([
+                ["Preflight", () => setDialog("preflight")],
+                ["Export PDF", () => setDialog("export")],
+                ["Named versions", () => setDialog("versions")],
+                ["Smart Album", () => setDialog("album")],
+                ["Layout suggestions", () => setDialog("assist")],
+              ] as const).map(([label, action]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    setMobileMore(false);
+                    action();
+                  }}
+                  className="flex h-9 items-center justify-between border-b border-[var(--workspace-line)] px-1 text-left text-[11px] text-ink/65 last:border-0"
+                >
+                  {label}
+                  <ArrowUpRight className="size-3.5 text-ink/30" aria-hidden />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {mobilePanel ? (
-        <div className="fixed inset-x-0 bottom-0 top-14 z-50 flex flex-col border-t border-[var(--rule)] bg-[var(--paper)] shadow-2xl lg:hidden">
-          <div className="flex h-9 shrink-0 items-center justify-between border-b border-[var(--rule)] px-3">
-            <span className="font-meta text-[0.58rem] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
-              {mobilePanel === "inspector" ? "Inspector" : mobilePanel}
-            </span>
+        <div className="pointer-events-none fixed inset-0 z-[70] flex flex-col justify-end pb-[calc(3.35rem+env(safe-area-inset-bottom))] lg:hidden">
+          <div className="pointer-events-auto flex max-h-[min(72dvh,calc(100dvh-5rem))] flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-t border-[var(--workspace-line)] bg-[var(--surface-overlay)] shadow-[var(--shadow-sheet)]">
             <button
               type="button"
               onClick={() => setMobilePanel(null)}
-              className="font-meta text-[0.58rem] uppercase tracking-[0.1em] text-[var(--red)]"
+              aria-label="Close panel"
+              className="flex h-7 w-full items-center justify-center"
+            >
+              <span className="h-1 w-9 rounded-full bg-ink/25" />
+            </button>
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--workspace-line)] px-4 py-2.5">
+            <div>
+              <p className="section-label">{mobilePanel === "inspector" ? "Properties" : mobilePanel}</p>
+              <p className="mt-0.5 text-[10px] text-ink/45">
+                {mobilePanel === "inspector"
+                  ? "Contextual properties for the current selection."
+                  : "Tap an item to edit, or close to return to the canvas."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobilePanel(null)}
+              className="studio-action-button studio-action-button--quiet"
             >
               Close
             </button>
@@ -879,6 +1085,7 @@ function EditorWorkspace({
             ) : null}
             {mobilePanel === "inspector" ? inspectorNode : null}
           </div>
+        </div>
         </div>
       ) : null}
 

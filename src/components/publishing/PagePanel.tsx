@@ -65,9 +65,12 @@ export function PagePanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-1 border-b border-[var(--rule)] px-3 py-2">
-        <span className="font-meta text-[0.6rem] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
-          Pages · {document.pages.length}
+      <div className="flex items-center justify-between gap-1 border-b border-[var(--workspace-line)] px-3 py-2">
+        <span className="flex items-center gap-1.5 font-meta text-[0.55rem] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+          <span className="grid h-4 min-w-4 place-items-center rounded-full bg-[var(--surface-sunk)] px-1 text-[0.5rem] tabular-nums text-ink/60">
+            {document.pages.length}
+          </span>
+          pages
         </span>
         <div className="flex items-center gap-0.5">
           <Button
@@ -126,18 +129,19 @@ export function PagePanel({
                     type="button"
                     onClick={() => onActivate(pageId)}
                     className={cn(
-                      "group relative w-[128px] rounded-sm border bg-[var(--paper-light)] p-1.5 text-left transition-colors",
+                      "group relative rounded-[9px] border p-1.5 text-left transition-[border-color,box-shadow,transform] duration-150",
+                      document.facingPages ? "w-[104px]" : "w-[180px]",
                       active
-                        ? "border-[var(--red)] shadow-[0_0_0_1px_var(--red)]"
-                        : "border-[var(--rule)] hover:border-[color-mix(in_oklab,var(--ink-soft)_45%,transparent)]",
+                        ? "border-[var(--red)] bg-[color-mix(in_oklab,var(--red)_4%,var(--surface-card))] shadow-[0_0_0_1px_var(--red)]"
+                        : "border-[var(--workspace-line)] bg-[var(--surface-card)] hover:-translate-y-px hover:border-[var(--workspace-line-strong)] hover:shadow-[var(--shadow-xs)]",
                     )}
                     title={page.name || `Page ${index + 1}`}
                   >
-                    <div className="flex justify-center rounded-[1px] bg-[color-mix(in_oklab,var(--ink)_6%,transparent)] p-1">
+                    <div className="flex justify-center rounded-[5px] bg-[var(--surface-sunk)] p-1.5">
                       <PageThumb
                         page={page}
                         document={document}
-                        className="rounded-[1px] shadow-[0_0_0_0.5px_color-mix(in_oklab,var(--ink)_28%,transparent)]"
+                        className="h-auto w-full rounded-[2px] shadow-[0_0_0_0.5px_color-mix(in_oklab,var(--ink)_20%,transparent)]"
                       />
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-1">

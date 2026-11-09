@@ -929,6 +929,850 @@
   }
 }
 
+/* ------------------------------------------------------------------------- */
+/* LAMSA Creative Workspace                                                  */
+/* The shared chrome for Publishing Studio and Invitation Studio. Warm ivory, */
+/* restrained burgundy, hairline rules and one compact control language.     */
+/* ------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+  --workspace-bar: 60px;
+  --workspace-canvas: #e9e2d4;
+  --workspace-canvas-deep: #e2d9c9;
+  --workspace-rail: #f1ece2;
+  --workspace-panel: #fcf9f3;
+  --workspace-line: color-mix(in oklab, var(--ink) 9%, transparent);
+  --workspace-line-strong: color-mix(in oklab, var(--ink) 18%, transparent);
+  --workspace-shadow:
+    0 1px 1px rgba(26, 25, 23, 0.04),
+    0 16px 38px -30px rgba(26, 25, 23, 0.38);
+  --workspace-shadow-float:
+    0 2px 5px rgba(26, 25, 23, 0.05),
+    0 22px 54px -32px rgba(26, 25, 23, 0.42);
+}
+
+.studio-workspace {
+  display: flex;
+  height: 100dvh;
+  max-height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+/* ------------------------------------------------------------- application bar */
+.studio-topbar {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  height: var(--workspace-bar);
+  flex: 0 0 var(--workspace-bar);
+  align-items: center;
+  gap: 0.875rem;
+  border-bottom: 1px solid var(--workspace-line);
+  background: color-mix(in oklab, var(--surface-overlay) 94%, transparent);
+  padding-inline: 0.625rem;
+}
+
+@media (min-width: 640px) {
+  .studio-topbar {
+    padding-inline: 0.875rem;
+  }
+}
+
+.studio-topbar__identity {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.studio-topbar__center {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+@media (min-width: 1120px) {
+  .studio-topbar__center {
+    display: flex;
+  }
+}
+
+.studio-topbar__actions {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+
+.studio-back-button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: color-mix(in oklab, var(--ink) 58%, transparent);
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    border-color var(--dur-1) var(--ease-soft),
+    color var(--dur-1) var(--ease-soft);
+}
+
+.studio-back-button:hover {
+  border-color: var(--workspace-line);
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
+.studio-brand {
+  display: grid;
+  width: 1.75rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  transition: background-color var(--dur-1) var(--ease-soft);
+}
+
+.studio-brand:hover {
+  background: color-mix(in oklab, var(--red) 7%, transparent);
+}
+
+.studio-brand__symbol {
+  display: block;
+  width: auto;
+  height: 1.05rem;
+  user-select: none;
+}
+
+.studio-brand__rule {
+  display: none;
+  width: 1px;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  background: var(--workspace-line);
+}
+
+@media (min-width: 720px) {
+  .studio-brand__rule {
+    display: block;
+  }
+}
+
+.studio-context {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: hidden;
+  font-family: var(--font-meta);
+  font-size: 0.46rem;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: color-mix(in oklab, var(--ink) 38%, transparent);
+}
+
+.studio-context__slash {
+  color: color-mix(in oklab, var(--ink) 20%, transparent);
+}
+
+.studio-context__product {
+  color: var(--red);
+}
+
+.studio-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.08rem;
+}
+
+.studio-document-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 1.25vw, 1.12rem);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.005em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-title-input {
+  min-width: 4rem;
+  max-width: min(30vw, 22rem);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  padding: 0.08rem 0.2rem;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 1.25vw, 1.12rem);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.005em;
+  outline: none;
+  text-overflow: ellipsis;
+}
+
+.studio-title-input:hover {
+  border-color: var(--workspace-line);
+}
+
+.studio-title-input:focus {
+  border-color: var(--workspace-line-strong);
+  background: var(--surface-card);
+}
+
+.studio-meta-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.18rem;
+  overflow: hidden;
+  font-family: var(--font-meta);
+  font-size: 0.44rem;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: color-mix(in oklab, var(--ink) 42%, transparent);
+}
+
+.studio-meta-line > * {
+  flex-shrink: 0;
+}
+
+.studio-meta-separator {
+  width: 1px;
+  height: 0.6rem;
+  background: var(--workspace-line-strong);
+}
+
+.studio-save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 0.08rem 0.3rem;
+  font-family: var(--font-meta);
+  font-size: 0.44rem;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--ink) 52%, transparent);
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    border-color var(--dur-1) var(--ease-soft);
+}
+
+button.studio-save-state:hover {
+  border-color: var(--workspace-line);
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
+.studio-save-state__dot {
+  width: 0.32rem;
+  height: 0.32rem;
+  border-radius: 999px;
+}
+
+/* --------------------------------------------------------------- controls */
+.studio-toolgroup {
+  display: flex;
+  align-items: center;
+  gap: 0.06rem;
+  border: 1px solid var(--workspace-line);
+  border-radius: 10px;
+  background: var(--surface-card);
+  padding: 0.12rem;
+  box-shadow: var(--shadow-xs);
+}
+
+.studio-tool {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: color-mix(in oklab, var(--ink) 58%, transparent);
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    border-color var(--dur-1) var(--ease-soft),
+    color var(--dur-1) var(--ease-soft),
+    box-shadow var(--dur-2) var(--ease-soft);
+}
+
+.studio-tool:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+
+.studio-tool[data-active="true"] {
+  background: color-mix(in oklab, var(--red) 9%, transparent);
+  color: var(--red);
+}
+
+.studio-tool:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
+}
+
+.studio-tool--primary {
+  display: inline-flex;
+  width: auto;
+  gap: 0.4rem;
+  border-color: var(--red);
+  background: var(--red);
+  padding-inline: 0.7rem;
+  color: #fbf7ee;
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.studio-tool--primary:hover:not(:disabled) {
+  background: #86051b;
+  color: #fffaf2;
+}
+
+.studio-icon-button {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: color-mix(in oklab, var(--ink) 58%, transparent);
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    border-color var(--dur-1) var(--ease-soft),
+    color var(--dur-1) var(--ease-soft);
+}
+
+.studio-icon-button:hover:not(:disabled) {
+  border-color: var(--workspace-line);
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
+.studio-icon-button[data-active="true"] {
+  border-color: var(--workspace-line-strong);
+  background: var(--ink);
+  color: var(--paper-light);
+}
+
+.studio-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
+}
+
+.studio-action-button {
+  display: inline-flex;
+  height: 1.95rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  border: 1px solid var(--workspace-line);
+  border-radius: 8px;
+  background: var(--surface-card);
+  padding-inline: 0.62rem;
+  color: color-mix(in oklab, var(--ink) 76%, transparent);
+  font-family: var(--font-ui);
+  font-size: 0.59rem;
+  font-weight: 600;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-xs);
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    border-color var(--dur-1) var(--ease-soft),
+    color var(--dur-1) var(--ease-soft),
+    box-shadow var(--dur-2) var(--ease-soft);
+}
+
+.studio-action-button:hover:not(:disabled) {
+  border-color: var(--workspace-line-strong);
+  background: var(--surface-overlay);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
+
+.studio-action-button--quiet {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.studio-action-button--primary {
+  border-color: var(--red);
+  background: var(--red);
+  color: #fbf7ee;
+  box-shadow: 0 1px 1px rgba(26, 25, 23, 0.12);
+}
+
+.studio-action-button--primary:hover:not(:disabled) {
+  border-color: #86051b;
+  background: #86051b;
+  color: #fffaf2;
+}
+
+.studio-segmented {
+  display: flex;
+  align-items: center;
+  gap: 0.08rem;
+  border: 1px solid var(--workspace-line);
+  border-radius: 9px;
+  background: var(--surface-sunk);
+  padding: 0.12rem;
+}
+
+.studio-segmented__item {
+  display: inline-flex;
+  height: 1.6rem;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 6px;
+  padding-inline: 0.5rem;
+  color: color-mix(in oklab, var(--ink) 52%, transparent);
+  font-family: var(--font-meta);
+  font-size: 0.48rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    color var(--dur-1) var(--ease-soft),
+    box-shadow var(--dur-1) var(--ease-soft);
+}
+
+.studio-segmented__item[data-active="true"] {
+  background: var(--surface-card);
+  color: var(--ink);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ------------------------------------------------------------- workspace shell */
+.studio-workspace [data-slot="button"] {
+  border-radius: 8px;
+}
+
+.studio-workspace__body {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.studio-sidebar {
+  display: flex;
+  min-height: 0;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--workspace-line);
+  background: var(--workspace-panel);
+}
+
+.studio-panel-rail {
+  display: flex;
+  width: 3rem;
+  flex: 0 0 3rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  border-right: 1px solid var(--workspace-line);
+  background: color-mix(in oklab, var(--workspace-rail) 88%, transparent);
+  padding: 0.5rem 0;
+}
+
+.studio-panel-rail__items {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18rem;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.studio-panel-rail__items::-webkit-scrollbar {
+  display: none;
+}
+
+.studio-panel-rail__button {
+  position: relative;
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: color-mix(in oklab, var(--ink) 44%, transparent);
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    border-color var(--dur-1) var(--ease-soft),
+    color var(--dur-1) var(--ease-soft),
+    box-shadow var(--dur-2) var(--ease-soft);
+}
+
+.studio-panel-rail__button:hover {
+  border-color: var(--workspace-line);
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
+.studio-panel-rail__button[data-active="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper-light);
+  box-shadow: var(--shadow-xs);
+}
+
+.studio-panel-rail__button[data-active="true"]:hover {
+  background: var(--ink);
+  color: var(--paper-light);
+}
+
+.studio-panel-rail__toggle {
+  margin-top: auto;
+  color: color-mix(in oklab, var(--ink) 38%, transparent);
+}
+
+.studio-panel-rail__tip {
+  pointer-events: none;
+  position: absolute;
+  left: calc(100% + 0.45rem);
+  top: 50%;
+  z-index: 60;
+  translate: -3px -50%;
+  border: 1px solid var(--workspace-line);
+  border-radius: 6px;
+  background: var(--surface-overlay);
+  padding: 0.24rem 0.5rem;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: var(--shadow-pill);
+  opacity: 0;
+  transition:
+    opacity var(--dur-1) var(--ease-soft),
+    translate var(--dur-2) var(--ease-soft);
+}
+
+.studio-panel-rail__button:hover .studio-panel-rail__tip,
+.studio-panel-rail__button:focus-visible .studio-panel-rail__tip {
+  opacity: 1;
+  translate: 0 -50%;
+}
+
+.studio-panel-column {
+  display: flex;
+  width: 15.5rem;
+  min-width: 0;
+  flex: 0 0 15.5rem;
+  flex-direction: column;
+  overflow: hidden;
+  transition:
+    width var(--dur-2) var(--ease-soft),
+    flex-basis var(--dur-2) var(--ease-soft);
+}
+
+.studio-panel-column[data-collapsed="true"] {
+  width: 0;
+  flex-basis: 0;
+}
+
+.studio-panel-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--workspace-line);
+  padding: 0.72rem 0.8rem 0.62rem;
+}
+
+.studio-panel-heading__note {
+  margin-top: 0.2rem;
+  color: color-mix(in oklab, var(--ink) 46%, transparent);
+  font-family: var(--font-ui);
+  font-size: 0.63rem;
+  line-height: 1.4;
+}
+
+.studio-inspector {
+  display: flex;
+  width: 19rem;
+  min-width: 0;
+  flex: 0 0 19rem;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--workspace-line);
+  background: var(--workspace-panel);
+}
+
+.studio-resizer {
+  position: relative;
+  z-index: 25;
+  width: 5px;
+  flex: 0 0 5px;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  outline: none;
+}
+
+.studio-resizer::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 2px;
+  width: 1px;
+  background: var(--workspace-line);
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    width var(--dur-1) var(--ease-soft);
+}
+
+.studio-resizer:hover::before,
+.studio-resizer:focus-visible::before,
+.studio-resizer[data-active="true"]::before {
+  width: 2px;
+  background: var(--gold);
+}
+
+.studio-resizer:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+@media (max-width: 1023px) {
+  .studio-resizer {
+    display: none;
+  }
+}
+
+.studio-canvas-column {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  background: var(--workspace-canvas);
+}
+
+.studio-canvas-stage {
+  background-color: var(--workspace-canvas);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklab, var(--ink) 6.5%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 20px 20px;
+}
+
+.studio-statusbar {
+  display: flex;
+  height: 1.9rem;
+  flex: 0 0 1.9rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px solid var(--workspace-line);
+  background: color-mix(in oklab, var(--surface-card) 88%, transparent);
+  padding-inline: 0.75rem;
+  color: color-mix(in oklab, var(--ink) 46%, transparent);
+  font-family: var(--font-meta);
+  font-size: 0.47rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* -------------------------------------------------------------- mobile dock */
+.studio-dock {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid var(--workspace-line);
+  background: color-mix(in oklab, var(--surface-overlay) 97%, transparent);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (min-width: 1024px) {
+  .studio-dock {
+    display: none;
+  }
+}
+
+.studio-dock__item {
+  position: relative;
+  display: flex;
+  min-height: 3.35rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  color: color-mix(in oklab, var(--ink) 48%, transparent);
+  font-family: var(--font-ui);
+  font-size: 0.51rem;
+  font-weight: 600;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+  transition:
+    background-color var(--dur-1) var(--ease-soft),
+    color var(--dur-1) var(--ease-soft);
+}
+
+.studio-dock__item[data-active="true"] {
+  background: color-mix(in oklab, var(--red) 6%, transparent);
+  color: var(--red);
+}
+
+.studio-dock__item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1.25rem;
+  height: 2px;
+  translate: -50% 0;
+  background: var(--red);
+}
+
+/* A bottom sheet that keeps the canvas visible and interactive behind it. */
+.studio-sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 70;
+  display: flex;
+  max-height: min(70dvh, calc(100dvh - 4rem));
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--workspace-line);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-sheet);
+}
+
+.studio-sheet__grab {
+  display: flex;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.studio-sheet__grab > span {
+  width: 2.25rem;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ink) 22%, transparent);
+}
+
+.studio-sheet__header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--workspace-line);
+  padding: 0.55rem 0.9rem;
+}
+
+/* --------------------------------------------------------- responsive rules */
+@media (max-width: 1119px) {
+  .studio-inspector {
+    width: 17.5rem;
+    flex-basis: 17.5rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .studio-sidebar {
+    position: absolute;
+    inset-block: var(--workspace-bar) 0;
+    left: 0;
+    z-index: 35;
+    box-shadow: var(--shadow-float);
+  }
+
+  .studio-sidebar[data-open="false"] .studio-panel-column {
+    width: 0;
+    flex-basis: 0;
+  }
+
+  .studio-inspector {
+    position: absolute;
+    inset-block: var(--workspace-bar) 0;
+    right: 0;
+    z-index: 35;
+    width: min(20rem, calc(100vw - 3rem));
+    flex-basis: auto;
+    box-shadow: var(--shadow-float);
+  }
+}
+
+@media (max-width: 639px) {
+  .studio-topbar {
+    gap: 0.35rem;
+  }
+
+  .studio-topbar__identity {
+    gap: 0.2rem;
+  }
+
+  .studio-brand,
+  .studio-brand__rule {
+    display: none;
+  }
+
+  .studio-context {
+    font-size: 0.42rem;
+    letter-spacing: 0.12em;
+  }
+
+  .studio-document-title,
+  .studio-title-input {
+    max-width: 38vw;
+    font-size: 1rem;
+  }
+
+  .studio-meta-line {
+    font-size: 0.41rem;
+  }
+
+  .studio-panel-column {
+    width: min(17rem, calc(100vw - 3rem));
+    flex-basis: min(17rem, calc(100vw - 3rem));
+  }
+}
+
 /* A legacy `rounded-none` on a button resolves to the pill control shape,
    never a square, so old panels match the current button language. */
 button[class*="rounded-none"] {
