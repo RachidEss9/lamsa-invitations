@@ -23,7 +23,7 @@ const ALLOWED = /^[\sMLCQZ0-9.+-]+$/;
 describe("Elements Library catalogue", () => {
   it("is a large, original collection rather than a stub", () => {
     expect(ASSET_META.length).toBeGreaterThanOrEqual(850);
-    expect(ASSET_META.length).toBe(900);
+    expect(ASSET_META.length).toBe(1620);
   });
 
   it("covers every category with a meaningful number of assets", () => {
@@ -34,6 +34,33 @@ describe("Elements Library catalogue", () => {
     expect(new Set(ASSET_META.map((asset) => asset.category)).size).toBe(
       LIBRARY_CATEGORY_IDS.length,
     );
+  });
+
+  it("adds the twelve expanded categories as full collections", () => {
+    const expanded: Array<[string, string]> = [
+      ["wedding", "altar"],
+      ["islamic", "girih"],
+      ["packaging", "dieline"],
+      ["fashion", "lookbook"],
+      ["architecture", "blueprint"],
+      ["hospitality", "cocktail"],
+      ["travel", "postcard"],
+      ["stationery", "postmark"],
+      ["education", "graduation"],
+      ["celestial", "zodiac"],
+      ["harvest", "citrus"],
+      ["emblems", "rosette"],
+    ];
+    for (const [id, probe] of expanded) {
+      const items = ASSET_META.filter((asset) => asset.category === id);
+      expect(items.length, id).toBe(60);
+      expect(new Set(items.map((item) => item.subcategory)).size, id).toBe(5);
+      expect(
+        filterAssets(ASSET_META, { query: probe }).some((asset) => asset.category === id),
+        `${id} should be searchable by “${probe}”`,
+      ).toBe(true);
+      expect(items.every((item) => item.tags.length > 2), id).toBe(true);
+    }
   });
 
   it("uses unique ids, names and tags", () => {

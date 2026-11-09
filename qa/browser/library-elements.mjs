@@ -142,9 +142,9 @@ try {
     await page.goto(`${BASE}/library`, { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "Elements", exact: true }).waitFor({ timeout: TIMEOUT });
     const sections = page.getByRole("navigation", { name: "Library sections" }).getByRole("button");
-    assert.equal(await sections.count(), 11);
+    assert.equal(await sections.count(), 23);
     await page.getByLabel("Search elements").waitFor({ timeout: TIMEOUT });
-    await page.getByText(/900 assets/).first().waitFor({ timeout: 5000 });
+    await page.getByText(/1,620 assets/).first().waitFor({ timeout: 5000 });
   });
 
   const nav = () => page.getByRole("navigation", { name: "Library sections" });
@@ -186,6 +186,49 @@ try {
       timeout: TIMEOUT,
     });
     assert.ok((await page.locator('button[aria-label="Remove from favorites"]').count()) > 0);
+  });
+
+  await check("an expanded category opens from the main Library", async () => {
+    await page.goto(`${BASE}/library?section=wedding`, { waitUntil: "domcontentloaded" });
+    await page
+      .getByRole("heading", { name: "Wedding & Celebration" })
+      .waitFor({ timeout: TIMEOUT });
+    await page.getByText(/60 assets/).first().waitFor({ timeout: 5000 });
+    await page.getByLabel("Search elements").fill("ceremony arch");
+    const card = page
+      .locator('section [role="button"]')
+      .filter({ hasText: "Floral ceremony arch" })
+      .first();
+    await card.waitFor({ timeout: TIMEOUT });
+    await card.click();
+    const dialog = page.getByRole("dialog");
+    await dialog
+      .getByRole("heading", { name: /floral ceremony arch/i })
+      .waitFor({ timeout: TIMEOUT });
+    await page.keyboard.press("Escape");
+  });
+
+  await check("a new-category element inserts as a native vector", async () => {
+    await openEditor();
+    await page.getByRole("button", { name: "Elements", exact: true }).click();
+    await page.getByLabel("Search elements").fill("award rosette");
+    const card = page
+      .locator("aside")
+      .first()
+      .locator('[role="button"]')
+      .filter({ hasText: "Award rosette" })
+      .first();
+    await card.waitFor({ timeout: TIMEOUT });
+    await card.click();
+    const dialog = page.getByRole("dialog");
+    await dialog
+      .getByRole("heading", { name: /award rosette/i })
+      .waitFor({ timeout: TIMEOUT });
+    await page.waitForTimeout(1400);
+    const before = await objectCount();
+    await dialog.getByRole("button", { name: /insert into page/i }).click();
+    await page.waitForTimeout(1200);
+    assert.equal(await objectCount(), before + 1, "the new element should add one native object");
   });
 
   await check("an upload joins My Uploads and can be removed", async () => {

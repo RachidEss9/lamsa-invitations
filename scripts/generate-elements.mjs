@@ -24,6 +24,18 @@ import { iconAssets } from "./lib/families/icons.mjs";
 import { frameAssets } from "./lib/families/frames.mjs";
 import { printAssets } from "./lib/families/print.mjs";
 import { textureAssets } from "./lib/families/textures.mjs";
+import { weddingAssets } from "./lib/families/wedding.mjs";
+import { islamicAssets } from "./lib/families/islamic.mjs";
+import { packagingAssets } from "./lib/families/packaging.mjs";
+import { fashionAssets } from "./lib/families/fashion.mjs";
+import { architectureAssets } from "./lib/families/architecture.mjs";
+import { hospitalityAssets } from "./lib/families/hospitality.mjs";
+import { travelAssets } from "./lib/families/travel.mjs";
+import { stationeryAssets } from "./lib/families/stationery.mjs";
+import { educationAssets } from "./lib/families/education.mjs";
+import { celestialAssets } from "./lib/families/celestial.mjs";
+import { harvestAssets } from "./lib/families/harvest.mjs";
+import { emblemsAssets } from "./lib/families/emblems.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = join(root, "src/lib/library/generated");
@@ -37,6 +49,18 @@ const CATEGORIES = [
   ["frames", "Photo Frames & Masks", "Instant, arch, collage and torn-paper picture frames.", frameAssets],
   ["print", "Print & Craft", "Tags, tickets, labels and stationery for print projects.", printAssets],
   ["textures", "Textures & Backgrounds", "Subtle vector surfaces to tint paper and imagery.", textureAssets],
+  ["wedding", "Wedding & Celebration", "Ceremony, floral, paper and party artwork for weddings and events.", weddingAssets],
+  ["islamic", "Islamic & Arabesque", "Arches, girih geometry, islimi ornament and mosque architecture.", islamicAssets],
+  ["packaging", "Packaging & Gift Design", "Dielines, vessels, labels and gift decoration for product work.", packagingAssets],
+  ["fashion", "Fashion & Beauty", "Garments, accessories, cosmetics and atelier tools for lookbooks.", fashionAssets],
+  ["architecture", "Architecture & Interiors", "Facades, openings, furniture, fixtures and plan details.", architectureAssets],
+  ["hospitality", "Food & Hospitality", "Dining, café, bar, kitchen and hotel service artwork.", hospitalityAssets],
+  ["travel", "Travel & Geography", "Landmarks, transport, maps, postcards and scenery.", travelAssets],
+  ["stationery", "Stationery & Correspondence", "Paper, writing tools, desk goods, letters and postal marks.", stationeryAssets],
+  ["education", "Education & Graduation", "School supplies, classrooms, science, graduation and campus art.", educationAssets],
+  ["celestial", "Celestial & Mystical", "Sun, moon, constellations, zodiac and mystical objects.", celestialAssets],
+  ["harvest", "Fruits & Agriculture", "Orchard and citrus fruit, berries, grain, farm and market.", harvestAssets],
+  ["emblems", "Badges, Ribbons & Emblems", "Prize ribbons, banners, crests, medals and brand emblems.", emblemsAssets],
 ];
 
 const CREATED_AT = "2026-11-09";
@@ -76,6 +100,7 @@ function assertPath(d, label) {
 
 const usedIds = new Set();
 const usedNames = new Set();
+const usedPaths = new Map();
 const records = [];
 const geometryByCategory = new Map(CATEGORIES.map(([id]) => [id, new Map()]));
 
@@ -86,6 +111,12 @@ for (const [category, label, , loader] of CATEGORIES) {
       throw new Error(`${category}: a family returned an asset without a path`);
     }
     assertPath(asset.d, `${category}/${asset.name}`);
+    const pathKey = asset.d.replace(/\s+/g, " ").trim();
+    const duplicate = usedPaths.get(pathKey);
+    if (duplicate) {
+      throw new Error(`${category}/${asset.name}: duplicates the geometry of ${duplicate}`);
+    }
+    usedPaths.set(pathKey, `${category}/${asset.name}`);
     let name = String(asset.name).trim();
     let suffix = 2;
     while (usedNames.has(name.toLowerCase())) {
@@ -142,10 +173,17 @@ const counts = CATEGORIES.map(([id, label]) => ({
 /* Serialise                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const metaLines = records.map((record) => {
+const metaLine = (record) => {
   const tags = record.tags.map((tag) => JSON.stringify(tag)).join(", ");
   return `  { id: ${JSON.stringify(record.id)}, name: ${JSON.stringify(record.name)}, category: ${JSON.stringify(record.category)}, subcategory: ${JSON.stringify(record.subcategory)}, tags: [${tags}], type: "vector", source: ${JSON.stringify(record.source)}, createdAt: ${JSON.stringify(record.createdAt)}, aspect: ${record.aspect}, ink: ${JSON.stringify(record.ink)}, strokeWidth: ${record.strokeWidth}, opacity: ${record.opacity} },`;
-});
+};
+
+// One typed array per category. A single 1,600-entry literal exceeds
+// TypeScript's union-complexity limit, and this keeps the metadata eager.
+const metaGroups = CATEGORIES.map(([id]) => {
+  const items = records.filter((record) => record.category === id);
+  return `const ${id.toUpperCase()}: LibraryAssetMeta[] = [\n${items.map(metaLine).join("\n")}\n];`;
+}).join("\n\n");
 
 const metaSource = `/**
  * GENERATED by scripts/generate-elements.mjs — do not edit by hand.
@@ -155,8 +193,10 @@ const metaSource = `/**
 
 import type { LibraryAssetMeta } from "../types";
 
+${metaGroups}
+
 export const ASSET_META: LibraryAssetMeta[] = [
-${metaLines.join("\n")}
+${CATEGORIES.map(([id]) => `  ...${id.toUpperCase()},`).join("\n")}
 ];
 `;
 

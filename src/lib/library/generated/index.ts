@@ -16,6 +16,18 @@ const LOADERS: Record<LibraryCategoryId, () => Promise<{ GEOMETRY: Record<string
   frames: () => import("./frames"),
   print: () => import("./print"),
   textures: () => import("./textures"),
+  wedding: () => import("./wedding"),
+  islamic: () => import("./islamic"),
+  packaging: () => import("./packaging"),
+  fashion: () => import("./fashion"),
+  architecture: () => import("./architecture"),
+  hospitality: () => import("./hospitality"),
+  travel: () => import("./travel"),
+  stationery: () => import("./stationery"),
+  education: () => import("./education"),
+  celestial: () => import("./celestial"),
+  harvest: () => import("./harvest"),
+  emblems: () => import("./emblems"),
 };
 
 export async function loadCategoryGeometry(category: LibraryCategoryId) {

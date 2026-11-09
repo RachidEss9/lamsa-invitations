@@ -17,6 +17,18 @@ export const LIBRARY_CATEGORY_IDS = [
   "frames",
   "print",
   "textures",
+  "wedding",
+  "islamic",
+  "packaging",
+  "fashion",
+  "architecture",
+  "hospitality",
+  "travel",
+  "stationery",
+  "education",
+  "celestial",
+  "harvest",
+  "emblems",
 ] as const;
 
 export type LibraryCategoryId = (typeof LIBRARY_CATEGORY_IDS)[number];
@@ -105,6 +117,66 @@ export const LIBRARY_CATEGORIES: readonly LibraryCategory[] = [
     id: "textures",
     label: "Textures & Backgrounds",
     blurb: "Subtle paper, linen, canvas, marble, watercolour and grain surfaces.",
+  },
+  {
+    id: "wedding",
+    label: "Wedding & Celebration",
+    blurb: "Ceremony pieces, florals, invitation paper and party decoration.",
+  },
+  {
+    id: "islamic",
+    label: "Islamic & Arabesque",
+    blurb: "Moorish arches, girih geometry, islimi ornament and mosque details.",
+  },
+  {
+    id: "packaging",
+    label: "Packaging & Gift Design",
+    blurb: "Dielines, vessels, labels, wraps and gift decoration for product work.",
+  },
+  {
+    id: "fashion",
+    label: "Fashion & Beauty",
+    blurb: "Garments, accessories, cosmetics and atelier tools for lookbooks.",
+  },
+  {
+    id: "architecture",
+    label: "Architecture & Interiors",
+    blurb: "Facades, windows, furniture, lighting and architectural drawing details.",
+  },
+  {
+    id: "hospitality",
+    label: "Food & Hospitality",
+    blurb: "Tableware, café and bar pieces, kitchen tools and hotel service art.",
+  },
+  {
+    id: "travel",
+    label: "Travel & Geography",
+    blurb: "Landmarks, transport, maps, postcards and destination scenery.",
+  },
+  {
+    id: "stationery",
+    label: "Stationery & Correspondence",
+    blurb: "Paper, writing tools, desk goods, letters and postal marks.",
+  },
+  {
+    id: "education",
+    label: "Education & Graduation",
+    blurb: "School supplies, classrooms, science, graduation and campus artwork.",
+  },
+  {
+    id: "celestial",
+    label: "Celestial & Mystical",
+    blurb: "Sun and moon, constellations, zodiac glyphs and mystical objects.",
+  },
+  {
+    id: "harvest",
+    label: "Fruits & Agriculture",
+    blurb: "Orchard and citrus fruit, berries, grain, farm and market pieces.",
+  },
+  {
+    id: "emblems",
+    label: "Badges, Ribbons & Emblems",
+    blurb: "Prize ribbons, banners, crests, medals and brand emblems.",
   },
 ];
 

@@ -130,7 +130,7 @@ export default function LibraryPage() {
 
       <div className="mx-auto grid w-full max-w-[1440px] flex-1 grid-cols-1 gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[208px_minmax(0,1fr)]">
         <aside className="lg:sticky lg:top-[64px] lg:h-[calc(100vh-84px)]">
-          <nav aria-label="Library sections" className="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible">
+          <nav aria-label="Library sections" className="flex gap-1 overflow-x-auto pb-2 lg:max-h-[calc(100vh-210px)] lg:flex-col lg:overflow-y-auto lg:pr-1">
             {LIBRARY_VIEWS.map((entry) => (
               <button
                 key={entry.id}
