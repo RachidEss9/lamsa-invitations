@@ -1,5 +1,6 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import { ArrowUpRight } from "lucide-react";
 
 import { usePublishingEditor } from "@/hooks/publishing/usePublishingEditor";
 import { spreadGeometry, spreadForPage } from "@/lib/publishing/spreads";
@@ -18,6 +19,8 @@ import { ExportDialog } from "@/components/publishing/ExportDialog";
 import { SmartAlbumDialog } from "@/components/publishing/SmartAlbumDialog";
 import { AssistDialog } from "@/components/publishing/AssistDialog";
 import { VersionsDialog } from "@/components/publishing/VersionsDialog";
+import { ElementsBrowser } from "@/components/library/ElementsBrowser";
+import { assetById, cachedGeometry } from "@/lib/library/catalog";
 import { Inspector } from "@/components/publishing/Inspector";
 import { ImageCropBar } from "@/components/publishing/ImageCropBar";
 import {
@@ -109,7 +112,7 @@ function EditorWorkspace({
   const [chrome, setChrome] = useState<PageChrome>(DEFAULT_CHROME);
   const [chromeBeforePreview, setChromeBeforePreview] = useState<PageChrome>(DEFAULT_CHROME);
   const [panel, setPanel] = useState<
-    "pages" | "layers" | "masters" | "assets" | "history" | "guides"
+    "pages" | "layers" | "masters" | "elements" | "assets" | "history" | "guides"
   >("pages");
   const [dialog, setDialog] = useState<
     "preflight" | "export" | "album" | "assist" | "versions" | null
@@ -135,6 +138,7 @@ function EditorWorkspace({
     | "pages"
     | "layers"
     | "masters"
+    | "elements"
     | "assets"
     | "history"
     | "guides"
@@ -336,6 +340,27 @@ function EditorWorkspace({
     />
   );
 
+  const elementsPanelNode = (
+    <div className="flex h-full min-h-0 flex-col">
+      <ElementsBrowser
+        mode="studio"
+        onInsert={(asset) => {
+          void editor.insertElement(asset);
+          setMobilePanel(null);
+        }}
+      />
+      <div className="shrink-0 border-t border-[var(--rule)] px-2 py-1.5">
+        <Link
+          to="/library?section=elements"
+          className="flex items-center justify-between font-meta text-[0.48rem] uppercase tracking-[0.1em] text-[var(--ink-soft)] hover:text-[var(--red)]"
+        >
+          Open the full library
+          <ArrowUpRight className="size-3" />
+        </Link>
+      </div>
+    </div>
+  );
+
   const mastersPanelNode = (
     <MastersPanel
       document={document}
@@ -460,12 +485,13 @@ function EditorWorkspace({
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[232px_minmax(0,1fr)_268px]">
         <aside className="hidden min-h-0 flex-col border-r border-[var(--rule)] bg-[var(--paper)] lg:flex">
-          <div className="grid grid-cols-3 border-b border-[var(--rule)]">
+          <div className="grid grid-cols-4 border-b border-[var(--rule)]">
             {(
               [
                 ["pages", "Pages"],
                 ["layers", "Layers"],
                 ["masters", "Masters"],
+                ["elements", "Elements"],
                 ["assets", "Assets"],
                 ["history", "History"],
                 ["guides", "Guides"],
@@ -515,6 +541,7 @@ function EditorWorkspace({
                 onPatchObject={(objectId, patch) => editor.patchObject(objectId, patch)}
               />
             ) : null}
+            {panel === "elements" ? elementsPanelNode : null}
             {panel === "assets" ? assetsPanelNode : null}
             {panel === "history" ? (
               <HistoryPanel
@@ -641,6 +668,15 @@ function EditorWorkspace({
               editor.setSelection([objectId]);
               setPanel("layers");
             }}
+            onDropElement={(assetId, pageId, point) => {
+              const meta = assetById(assetId);
+              const geometry = cachedGeometry(assetId);
+              if (!meta || !geometry) return;
+              void editor.insertElement(
+                { ...geometry, id: assetId, name: meta.name },
+                { pageId, x: point.x, y: point.y },
+              );
+            }}
             onSelect={editor.setSelection}
             onEditPage={editor.editPageObjects}
             onZoom={editor.setZoom}
@@ -729,6 +765,7 @@ function EditorWorkspace({
             ["pages", "Pages"],
             ["layers", "Layers"],
             ["masters", "Masters"],
+            ["elements", "Elements"],
             ["assets", "Assets"],
             ["history", "History"],
             ["guides", "Guides"],
@@ -809,6 +846,7 @@ function EditorWorkspace({
                 onPatchObject={(objectId, patch) => editor.patchObject(objectId, patch)}
               />
             ) : null}
+            {mobilePanel === "elements" ? elementsPanelNode : null}
             {mobilePanel === "assets" ? assetsPanelNode : null}
             {mobilePanel === "history" ? (
               <HistoryPanel

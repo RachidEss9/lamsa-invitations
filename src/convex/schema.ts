@@ -365,6 +365,30 @@ const schema = defineSchema(
       version: v.number(),
     }).index("by_version", ["versionId"]),
 
+    // Library workspace preferences. Only the *reference* to a catalogue
+    // asset is stored; built-in artwork lives in code and user uploads stay
+    // in `libraryItems`, so favouriting never creates a second copy of an
+    // asset or its file.
+    libraryAssetFavourites: defineTable({
+      ownerId: v.id("users"),
+      assetId: v.string(),
+      createdAt: v.number(),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_owner_asset", ["ownerId", "assetId"]),
+
+    // Most-recently-used order for the Elements browser. One row per asset and
+    // owner, updated in place, so the table grows with the library's breadth
+    // rather than with every insertion.
+    libraryAssetRecents: defineTable({
+      ownerId: v.id("users"),
+      assetId: v.string(),
+      usedAt: v.number(),
+      uses: v.number(),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_owner_asset", ["ownerId", "assetId"]),
+
     // Custom presets saved by an owner. Built-in presets live in the client
     // foundation and are never duplicated here.
     publicationPresets: defineTable({

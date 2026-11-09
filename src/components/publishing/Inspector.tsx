@@ -18,6 +18,8 @@ import {
 } from "@/lib/publishing/units";
 import { storyForFrame, objectKindLabel } from "@/lib/publishing/render";
 import { MARGIN_EDGES, marginProblem } from "@/lib/publishing/margins";
+import { flipShapePath } from "@/lib/publishing/elements";
+import { FlipHorizontal2, FlipVertical2 } from "lucide-react";
 import type { StudioAsset } from "./AssetsPanel";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -692,6 +694,40 @@ export function Inspector(props: InspectorProps) {
                       onPatchObject(single.id, { sides: Math.max(3, Math.round(value)) })
                     }
                   />
+                ) : null}
+                {single.shape === "path" && single.path ? (
+                  <FieldRow label="Flip">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label="Flip horizontally"
+                      className="h-6 flex-1 rounded-[3px] px-1 font-meta text-[0.5rem] uppercase tracking-[0.06em]"
+                      onClick={() =>
+                        onPatchObject(single.id, { path: flipShapePath(single, "x") })
+                      }
+                    >
+                      <FlipHorizontal2 className="mr-1 size-3" />
+                      Horizontal
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label="Flip vertically"
+                      className="h-6 flex-1 rounded-[3px] px-1 font-meta text-[0.5rem] uppercase tracking-[0.06em]"
+                      onClick={() =>
+                        onPatchObject(single.id, { path: flipShapePath(single, "y") })
+                      }
+                    >
+                      <FlipVertical2 className="mr-1 size-3" />
+                      Vertical
+                    </Button>
+                  </FieldRow>
+                ) : null}
+                {single.shape === "path" && single.path ? (
+                  <p className="text-[0.6rem] leading-4 text-[var(--ink-soft)]">
+                    A vector element. Fill, stroke, opacity, rotation and flip all stay editable;
+                    scaling never rasterises it.
+                  </p>
                 ) : null}
               </Section>
             ) : null}

@@ -86,6 +86,8 @@ import {
   type StructureSnapshot,
 } from "@/lib/publishing/session";
 import { applyMasterToPages, pageIndexOf } from "@/lib/publishing/operations";
+import { elementShape, type ElementAsset } from "@/lib/publishing/elements";
+import { elementSize } from "@/lib/library/catalog";
 import type { AlignKind } from "@/lib/arrange";
 import {
   addGuide as addGuideToList,
@@ -306,6 +308,11 @@ export interface UsePublishingEditorResult {
   insertText: () => Promise<void>;
   insertShape: (shape: "rectangle" | "ellipse") => Promise<void>;
   insertLine: () => Promise<void>;
+  /** Places a shared-library element as a native shape object. */
+  insertElement: (
+    asset: ElementAsset,
+    at?: { pageId?: string; x: number; y: number },
+  ) => Promise<void>;
   insertImage: (asset: StudioAssetRecord) => Promise<void>;
   replaceImage: (objectId: string, asset: StudioAssetRecord) => void;
   setImagePlacement: (
@@ -2199,6 +2206,48 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     apply(addObjectToPage(current, pageNow.id, object));
   }, [apply]);
 
+  const recordLibraryUse = useMutation(api.libraryAssets.recordUse);
+
+  const insertElement = useCallback(
+    async (asset: ElementAsset, at?: { pageId?: string; x: number; y: number }) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      const pageNow = at?.pageId
+        ? (sessionDocument(current).pages.find((entry) => entry.id === at.pageId) ??
+          activeSurface(current))
+        : activeSurface(current);
+      const layerId = activeLayerId(current);
+      if (!pageNow || !layerId) return;
+      const safe = safeBox(pageNow.spec, pageNow.side);
+      const size = elementSize(asset, safe);
+      const centeredX = safe.x + (safe.width - size.width) / 2;
+      const centeredY = safe.y + (safe.height - size.height) / 2;
+      const clamp = (value: number, min: number, max: number) =>
+        Math.max(min, Math.min(Math.max(min, max), value));
+      const frame = {
+        x:
+          at === undefined
+            ? centeredX
+            : clamp(at.x - size.width / 2, safe.x, safe.x + safe.width - size.width),
+        y:
+          at === undefined
+            ? centeredY
+            : clamp(at.y - size.height / 2, safe.y, safe.y + safe.height - size.height),
+        width: size.width,
+        height: size.height,
+        rotation: 0,
+      };
+      const object = elementShape({ layerId, frame, asset });
+      apply(setSelection(addObjectToPage(current, pageNow.id, object), [object.id]));
+      void recordLibraryUse({ assetId: asset.id }).catch(() => {
+        // Favourites and recents are conveniences; a failed write must never
+        // block placing artwork on a page.
+      });
+      toast.success(`${asset.name} added.`, IDLE_TOAST);
+    },
+    [apply, recordLibraryUse],
+  );
+
   const insertImage = useCallback(
     async (asset: StudioAssetRecord) => {
       const current = sessionRef.current;
@@ -2608,6 +2657,7 @@ export function usePublishingEditor(publicationId: string): UsePublishingEditorR
     insertText,
     insertShape,
     insertLine,
+    insertElement,
     insertImage,
     replaceImage,
     setImagePlacement,

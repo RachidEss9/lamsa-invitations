@@ -37,6 +37,7 @@ const ShapeMaker = lazy(() => import("./pages/ShapeMaker.tsx"));
 const Press = lazy(() => import("./pages/Press.tsx"));
 const PublishingLibrary = lazy(() => import("./pages/publishing/PublishingLibrary.tsx"));
 const PublishingEditor = lazy(() => import("./pages/publishing/PublishingEditor.tsx"));
+const LibraryPage = lazy(() => import("./pages/LibraryPage.tsx"));
 const InvitationPage = lazy(() => import("./pages/InvitationPage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -242,6 +243,14 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <StudioGate>
                     <PublishingEditor />
+                  </StudioGate>
+                }
+              />
+              <Route
+                path="/library"
+                element={
+                  <StudioGate>
+                    <LibraryPage />
                   </StudioGate>
                 }
               />

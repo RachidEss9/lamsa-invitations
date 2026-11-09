@@ -176,6 +176,14 @@ export default function PublishingLibrary() {
               Publishing Studio
             </h1>
           </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/library?section=elements"
+              className="hidden items-center gap-1 font-meta text-[0.54rem] uppercase tracking-[0.1em] text-[var(--ink-soft)] hover:text-[var(--red)] sm:flex"
+            >
+              <LayoutGrid className="size-3.5" />
+              Elements library
+            </Link>
           <Dialog open={open} onOpenChange={(next) => (setOpen(next), next || resetForm())}>
             <DialogTrigger asChild>
               <Button className="h-8 gap-1.5 rounded-[3px] bg-[var(--red)] px-3 font-meta text-[0.58rem] uppercase tracking-[0.1em] text-white hover:bg-[color-mix(in_oklab,var(--red)_88%,black)]">
@@ -301,6 +309,7 @@ export default function PublishingLibrary() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </header>
 

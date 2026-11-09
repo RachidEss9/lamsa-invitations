@@ -105,6 +105,8 @@ export interface EditorCanvasProps {
   cropPreview?: (ImageCropDraft & { objectId: string }) | null;
   onCropPan?: (dx: number, dy: number) => void;
   onDropAsset?: (objectId: string, assetId: string) => void;
+  /** Drops a shared-library element at a page point. */
+  onDropElement?: (assetId: string, pageId: string, point: Point) => void;
   onSelect: (ids: readonly string[]) => void;
   /** Commit a finished gesture as a single page edit (history + autosave). */
   onEditPage: (pageId: string, page: PublicationPage) => void;
@@ -139,6 +141,7 @@ export function EditorCanvas({
   cropPreview,
   onCropPan,
   onDropAsset,
+  onDropElement,
   onSelect,
   onEditPage,
   onZoom,
@@ -774,6 +777,13 @@ export function EditorCanvas({
 
   const onDragOver = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
+      if (event.dataTransfer.types.includes("application/x-lamsa-element")) {
+        if (!onDropElement) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDropTargetId(null);
+        return;
+      }
       if (!onDropAsset || !event.dataTransfer.types.includes("application/x-lamsa-asset")) {
         return;
       }
@@ -792,11 +802,24 @@ export function EditorCanvas({
       setDropTargetId(hit?.kind === "image-frame" ? hit.id : null);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onDropAsset],
+    [onDropAsset, onDropElement],
   );
 
   const onDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
+      const elementId = event.dataTransfer.getData("application/x-lamsa-element");
+      if (elementId) {
+        if (!onDropElement) return;
+        event.preventDefault();
+        setDropTargetId(null);
+        const pageId = pageIdAtClient(event.clientX, event.clientY);
+        const pointer = pageId
+          ? pagePointFromClient(event.clientX, event.clientY, pageId)
+          : null;
+        if (!pointer || !pageId) return;
+        onDropElement(elementId, pageId, pointer);
+        return;
+      }
       if (!onDropAsset) return;
       event.preventDefault();
       setDropTargetId(null);
@@ -811,7 +834,7 @@ export function EditorCanvas({
       if (hit?.kind === "image-frame") onDropAsset(hit.id, assetId);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onDropAsset],
+    [onDropAsset, onDropElement],
   );
 
   const cursor: string = cropPreview

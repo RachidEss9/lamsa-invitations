@@ -8,6 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "qa:browser": "bun qa/browser/publishing-smoke.mjs",
+    "qa:library": "bun qa/browser/library-elements.mjs",
+    "library:generate": "node scripts/generate-elements.mjs",
+    "library:check": "node scripts/generate-elements.mjs --check",
     "format": "prettier --write .",
     "preview": "vite preview"
   },
