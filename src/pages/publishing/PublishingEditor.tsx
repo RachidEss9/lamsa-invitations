@@ -165,12 +165,266 @@ function EditorWorkspace({
   >(null);
   const [guidesLocked, setGuidesLocked] = useState(false);
   const [fitSignal, setFitSignal] = useState(0);
+  const [mobileMore, setMobileMore] = useState(false);
+  const isMobile = useIsMobile();
+
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [leftWidth, setLeftWidth] = useState(248);
   const [rightWidth, setRightWidth] = useState(304);
-  const [mobileMore, setMobileMore] = useState(false);
-  const isMobile = useIsMobile();
+  const [storePrevious, setStorePrevious] = useState<{ leftOpen: boolean; rightOpen: boolean } | null>(null);
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const savedLeft = window.localStorage.getItem(
+          `lamsa.publishing.${publicationId}.panel.left.open`,
+        );
+        if (savedLeft !== null) {
+          setLeftOpen(savedLeft !== "0");
+        }
+        const savedRight = window.localStorage.getItem(
+          `lamsa.publishing.${publicationId}.panel.right.open`,
+        );
+        if (savedRight !== null) {
+          setRightOpen(savedRight !== "0");
+        }
+        const savedLeftWidth = window.localStorage.getItem(
+          `lamsa.publishing.${publicationId}.panel.left.width`,
+        );
+        if (savedLeftWidth !== null) {
+          const parsed = Number(savedLeftWidth);
+          if (Number.isFinite(parsed)) {
+            setLeftWidth(parsed);
+          }
+        }
+        const savedRightWidth = window.localStorage.getItem(
+          `lamsa.publishing.${publicationId}.panel.right.width`,
+        );
+        if (savedRightWidth !== null) {
+          const parsed = Number(savedRightWidth);
+          if (Number.isFinite(parsed)) {
+            setRightWidth(parsed);
+          }
+        }
+      }
+    } catch {
+      /* Best-effort persistent workspace state. */
+    }
+  }, [publicationId]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          `lamsa.publishing.${publicationId}.panel.left.open`,
+          String(leftOpen ? 1 : 0),
+        );
+        window.localStorage.setItem(
+          `lamsa.publishing.${publicationId}.panel.right.open`,
+          String(rightOpen ? 1 : 0),
+        );
+        window.localStorage.setItem(
+          `lamsa.publishing.${publicationId}.panel.left.width`,
+          String(leftWidth),
+        );
+        window.localStorage.setItem(
+          `lamsa.publishing.${publicationId}.panel.right.width`,
+          String(rightWidth),
+        );
+      }
+    } catch {
+      /* Best-effort persistent workspace state. */
+    }
+  }, [publicationId, leftOpen, rightOpen, leftWidth, rightWidth]);
+
+  const hideBoth = useCallback(() => {
+    setStorePrevious({ leftOpen, rightOpen });
+    setLeftOpen(false);
+    setRightOpen(false);
+  }, [leftOpen, rightOpen]);
+
+  const restoreBoth = useCallback(() => {
+    setRestored(true);
+    setStorePrevious(null);
+  }, []);
+
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+  const [leftWidth, setLeftWidth] = useState(248);
+  const [rightWidth, setRightWidth] = useState(304);
+  const [storePrevious, setStorePrevious] = useState<{ leftOpen: boolean; rightOpen: boolean } | null>(null);
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    const keyLeft = `lamsa.publishing.${publicationId}.panel.left.open`;
+    const keyRight = `lamsa.publishing.${publicationId}.panel.right.open`;
+    const keyLeftWidth = `lamsa.publishing.${publicationId}.panel.left.width`;
+    const keyRightWidth = `lamsa.publishing.${publicationId}.panel.right.width`;
+
+    try {
+      if (typeof window !== "undefined") {
+        const savedLeft = window.localStorage.getItem(keyLeft);
+        if (savedLeft !== null) {
+          setLeftOpen(savedLeft !== "0");
+        }
+        const savedRight = window.localStorage.getItem(keyRight);
+        if (savedRight !== null) {
+          setRightOpen(savedRight !== "0");
+        }
+        const savedLeftWidth = window.localStorage.getItem(keyLeftWidth);
+        if (savedLeftWidth !== null) {
+          const parsed = Number(savedLeftWidth);
+          if (Number.isFinite(parsed) && parsed >= 220 && parsed <= 380) {
+            setLeftWidth(parsed);
+          }
+        }
+        const savedRightWidth = window.localStorage.getItem(keyRightWidth);
+        if (savedRightWidth !== null) {
+          const parsed = Number(savedRightWidth);
+          if (Number.isFinite(parsed) && parsed >= 268 && parsed <= 420) {
+            setRightWidth(parsed);
+          }
+        }
+      }
+    } catch {
+      /* Best-effort persistent workspace state. */
+    }
+  }, [publicationId]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          `lamsa.publishing.${publicationId}.panel.left.open`,
+          String(leftOpen ? 1 : 0),
+        );
+        window.localStorage.setItem(
+          `lamsa.publishing.${publicationId}.panel.right.open`,
+          String(rightOpen ? 1 : 0),
+        );
+        window.localStorage.setItem(
+          `lamsa.publishing.${publicationId}.panel.left.width`,
+          String(leftWidth),
+        );
+        window.localStorage.setItem(
+          `lamsa.publishing.${publicationId}.panel.right.width`,
+          String(rightWidth),
+        );
+      }
+    } catch {
+      /* Best-effort persistent workspace state. */
+    }
+  }, [publicationId, leftOpen, rightOpen, leftWidth, rightWidth]);
+
+  const hideBoth = useCallback(() => {
+    setStorePrevious({ leftOpen, rightOpen });
+    setLeftOpen(false);
+    setRightOpen(false);
+  }, [leftOpen, rightOpen]);
+
+  const restoreBoth = useCallback(() => {
+    setRestored(true);
+    setStorePrevious(null);
+  }, []);
+
+  const storageKeyLeft = `lamsa.publishing.${publicationId}.panel.left.open`;
+  const storageKeyRight = `lamsa.publishing.${publicationId}.panel.right.open`;
+  const storageKeyLeftWidth = `lamsa.publishing.${publicationId}.panel.left.width`;
+  const storageKeyRightWidth = `lamsa.publishing.${publicationId}.panel.right.width`;
+
+  const [leftOpen, setLeftOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      return window.localStorage.getItem(storageKeyLeft) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const [rightOpen, setRightOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      return window.localStorage.getItem(storageKeyRight) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const [leftWidth, setLeftWidth] = useState(() => {
+    if (typeof window === "undefined") return 248;
+    try {
+      const saved = window.localStorage.getItem(storageKeyLeftWidth);
+      const value = typeof saved === "string" ? Number(saved) : NaN;
+      return Number.isFinite(value) ? value : 248;
+    } catch {
+      return 248;
+    }
+  });
+  const [rightWidth, setRightWidth] = useState(() => {
+    if (typeof window === "undefined") return 304;
+    try {
+      const saved = window.localStorage.getItem(storageKeyRightWidth);
+      const value = typeof saved === "string" ? Number(saved) : NaN;
+      return Number.isFinite(value) ? value : 304;
+    } catch {
+      return 304;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(storageKeyLeft, String(leftOpen ? 1 : 0));
+    } catch {
+      /* Persisting a workspace layout is best-effort. */
+    }
+  }, [storageKeyLeft, leftOpen]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(storageKeyRight, String(rightOpen ? 1 : 0));
+    } catch {
+      /* Persisting a workspace layout is best-effort. */
+    }
+  }, [storageKeyRight, rightOpen]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(storageKeyLeftWidth, String(leftWidth));
+    } catch {
+      /* Persisting a workspace layout is best-effort. */
+    }
+  }, [storageKeyLeftWidth, leftWidth]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(storageKeyRightWidth, String(rightWidth));
+    } catch {
+      /* Persisting a workspace layout is best-effort. */
+    }
+  }, [storageKeyRightWidth, rightWidth]);
+
+  const storePrevious = useRef<{ leftOpen: boolean; rightOpen: boolean } | null>(null);
+  const setRestoredRef = useRef(setRestored);
+  setRestoredRef.current = setRestored;
+
+  const hideBoth = useCallback(() => {
+    storePrevious.current = { leftOpen, rightOpen };
+    setLeftOpen(false);
+    setRightOpen(false);
+  }, [leftOpen, rightOpen]);
+
+  const restoreBoth = useCallback(() => {
+    setRestoredRef.current((previous) => {
+      if (previous) {
+        setLeftOpen(previous.leftOpen);
+        setRightOpen(previous.rightOpen);
+      } else {
+        setLeftOpen(true);
+        setRightOpen(true);
+      }
+      return null;
+    });
+  }, []);
   const [editing, setEditing] = useState<{
     pageId: string;
     objectId: string;
@@ -202,6 +456,7 @@ function EditorWorkspace({
   // Crossing the compact-layout breakpoint changes the available canvas width;
   // refit once so a phone never opens on the desktop zoom level.
   useEffect(() => {
+    void isMobile;
     setFitSignal((signal) => signal + 1);
   }, [isMobile]);
 
@@ -578,7 +833,7 @@ function EditorWorkspace({
                   ? "The document's spine. Select, add or reorder pages."
                   : panel === "layers"
                     ? "Objects on this page, in stacking order."
-                    : panel === "masters"
+                  : panel === "masters"
                       ? "Shared page furniture, managed once."
                       : panel === "elements"
                         ? "The shared LAMSA library, ready to place."
@@ -588,7 +843,6 @@ function EditorWorkspace({
                             ? "Every edit in this session, reversible."
                             : "Precise guides for this document."
               }
-            />
             <div className="min-h-0 flex-1 overflow-hidden">
             {panel === "pages" ? (
               <PagePanel
@@ -649,7 +903,23 @@ function EditorWorkspace({
                 }
               />
             ) : null}
-            </div>
+            {!leftOpen && (
+              <div className="studio-float-left" aria-hidden="true">
+                <button
+                  type="button"
+                  onClick={() => setLeftOpen(true)}
+                  aria-label="Show publication panels"
+                  title="Show publication panels"
+                  className="studio-float-button"
+                  data-active={false}
+                >
+                  <PanelLeft className="size-4" aria-hidden />
+                  <span className="studio-float-button__tip" aria-hidden>
+                    Show panels
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </aside>
 
@@ -663,6 +933,29 @@ function EditorWorkspace({
             label="Resize document panel"
           />
         ) : null}
+
+        {!leftOpen && (
+          <div
+            className={cn(
+              "studio-float-left hidden lg:flex",
+              "pointer-events-auto"
+            )}
+            aria-label="Show left panel"
+          >
+            <button
+              type="button"
+              onClick={() => setLeftOpen(true)}
+              aria-label="Show left panel"
+              title="Show publication panels"
+              className="studio-float-button"
+            >
+              <PanelLeftClose className="size-4" aria-hidden />
+              <span className="studio-float-button__tip" aria-hidden>
+                Show panels
+              </span>
+            </button>
+          </div>
+        )}
 
         <section
           className={cn(
