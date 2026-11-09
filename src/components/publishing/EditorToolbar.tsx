@@ -8,6 +8,7 @@ import {
   FileDown,
   BookOpen,
   Grid2x2,
+  History,
   Lightbulb,
   ShieldCheck,
   Sparkles,
@@ -100,6 +101,7 @@ export interface EditorToolbarProps {
   onOpenExport: () => void;
   onOpenSmartAlbum: () => void;
   onOpenAssist: () => void;
+  onOpenVersions: () => void;
   busy?: boolean;
   onBack: () => void;
 }
@@ -173,6 +175,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
     onOpenExport,
     onOpenSmartAlbum,
     onOpenAssist,
+    onOpenVersions,
     busy,
     onBack,
   } = props;
@@ -308,6 +311,9 @@ export function EditorToolbar(props: EditorToolbarProps) {
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={onOpenExport} className="gap-2 text-[0.78rem]">
               <FileDown className="size-3.5" /> Export PDF…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onOpenVersions} className="gap-2 text-[0.78rem]">
+              <History className="size-3.5" /> Named versions…
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onOpenSmartAlbum} className="gap-2 text-[0.78rem]">

@@ -1,6 +1,6 @@
 # LAMSA Publishing Studio — Final QA & Remediation
 
-**Date:** 8 November 2026  
+**Date:** 9 November 2026  
 **Scope:** Phases 1–3E, final browser QA and remediation only. No new phase started.  
 **Environment:** Local Vite dev server (`127.0.0.1:5173`), Convex dev deployment `oceanic-porpoise-708`, Chromium headless-shell 1248, desktop 1440×900 and mobile 390×844 / 360×800 / tablet 768×1024.  
 **Readiness:** **Conditionally ready for a controlled production pilot; not a full sign-off** for Arabic archival/search use or CMYK/PDF-X print workflows. See the limitations below.
@@ -11,10 +11,10 @@
 
 | Check | Result |
 |---|---|
-| Unit/integration suite | **1013 tests in 75 files passed**, 17.04 s |
-| Focused rerun after final fixes | **39 tests passed** (session, preflight, PDF) |
+| Unit/integration suite | **1019 tests in 76 files passed**, 19.49 s |
+| Browser regression suite | **14 checks passed** (`qa/browser/publishing-smoke.mjs`) |
 | TypeScript | `bunx tsc -b --noEmit` — **clean** |
-| ESLint | **0 errors**, 22 warnings (pre-existing hook/fast-refresh warnings) |
+| ESLint | **0 errors**, 34 warnings (pre-existing hook/fast-refresh warnings) |
 | Convex codegen | `bun convex dev --once` — **functions ready** |
 | Production build | `bun run build` — **succeeded**, 3,057 modules, 13.56 s |
 | Browser console | No page errors in final editor/auth/export runs |
@@ -22,7 +22,7 @@
 | Signed-out deep link | Editor content not rendered; auth gate shown; no content leakage |
 | Build output | `dist/` ≈ 3.1 MB; largest JS chunks 516 kB and 435 kB before gzip |
 
-The browser QA harness lived outside the repository because the root filesystem had under 4 MB free. `/dev/shm` was cleared between turns once; the harness was rebuilt and all final browser checks were re-run.
+The browser suite is now committed at `qa/browser/publishing-smoke.mjs` and run with `bun run qa:browser`. Its Chromium build lives in `/dev/shm` (`PLAYWRIGHT_BROWSERS_PATH=/dev/shm/pw`) because the root filesystem is small; the suite itself, the `playwright` devDependency and the assertions are in the repository.
 
 ---
 
@@ -35,6 +35,14 @@ The browser QA harness lived outside the repository because the root filesystem 
 **Remediation:** frames containing Arabic or mixed right-to-left runs are rasterized at approximately 300 dpi through the browser’s own shaping engine (`snapdom`) and embedded as transparent PNG overlays at the frame position. Latin-only frames remain selectable vector text. The whole mixed frame is rasterized, so Latin text inside a mixed frame is also non-selectable. Export/preflight copy now says exactly that, and rasterization failures are reported rather than silently omitted.
 
 **Verification:** page 1 custom export contains the Arabic/mixed overlay `1083×500` RGBA with opaque dark text pixels (`alpha bbox 2,17,1005,175`). The PDF’s extractable text contains the three Latin frames and intentionally contains no Arabic. This is disclosed in the UI and report.
+
+### High — Named versions had a backend but no interface
+
+**Root cause:** `createVersion` / `listVersions` / `getVersion` / `restoreVersion` existed in `src/convex/publishing/versions.ts` and the `publicationVersions` tables were migrated, but no studio component used them. Version history in the studio was the invitation-scoped `designVersions` panel from `Studio.tsx`, a different product.
+
+**Remediation:** added `VersionsDialog` and an entry in the Document menu of the publishing toolbar. It lists each version with number, creation date/time, page count and image count, creates a version from the current document (flushing pending autosave first), renames a version through a new `renameVersion` mutation that touches only the label, and restores behind an explicit confirmation that names what will be replaced. Restore reloads the editor into the restored snapshot instead of leaving a session built on stale document versions.
+
+**Verification:** browser suite checks 7–10 — create, rename, cancel restore, restore; the restored version remains listed after the reload. Renaming is label-only by design so it is safe on a version the current work was built on.
 
 ### High — Detaching a master could not be saved
 
@@ -90,6 +98,14 @@ The browser QA harness lived outside the repository because the root filesystem 
 
 **Verification:** backend tests cover the guard; browser deletion was exercised earlier in the QA session. There is no automated UI test for this panel yet.
 
+### Medium — Impossible page margins could be typed into the inspector
+
+**Root cause:** the margin `NumberField` clamped with `min={0}`, so `-5` silently became `0`, and oversized margins were committed until preflight (or the server) objected.
+
+**Remediation:** margins now validate before commit against the shared rule in `src/lib/publishing/margins.ts`: negative, non-finite, and margins that would leave no live area are refused. The field keeps the last valid value, marks `aria-invalid`, and explains the reason and the largest acceptable value in the document’s own unit (e.g. “Top margin must stay under 252 mm so the page keeps a live area”). Escape clears the message. The server still validates types only; preflight remains the guard for documents written by other clients.
+
+**Verification:** unit tests in `margins.test.ts` (6 cases) plus browser checks 4–6: `-5` is refused and reverts, `400` names the limit, and 15 mm survives a reload.
+
 ### Low — Page thumbnails claimed “IMAGE UNAVAILABLE”
 
 **Remediation:** compact thumbnails deliberately do not fetch images; the misleading label is suppressed via `ObjectArt placeholder="silent"`.
@@ -109,14 +125,14 @@ The browser QA harness lived outside the repository because the root filesystem 
 ## 3. Remaining limitations and gaps
 
 1. **Arabic/mixed text is not selectable or searchable** in exported PDFs. This is the deliberate visual-preservation trade-off, not silent omission. A future full-font embedding/subsetting strategy would be required for searchable Arabic.
-2. **Arabic shaping depends on the loaded Arabic webfont.** If the Amiri webfont is unavailable in the export browser, rasterization can fail; the export surfaces a warning rather than claiming success. Bundling the font locally would remove this network dependency.
-3. **Named publication versions have backend support (`src/convex/publishing/versions.ts`) but no Publishing Studio UI.** This is a functional gap against the broader versioning story, not implemented in this QA pass.
-4. **Invalid page margins are accepted by the inspector.** A 300 mm margin produced preflight errors and a server save error; restoring 15 mm returned the document to `SAVED`. The server protects data, but the field should clamp/validate earlier. Verified at 15 mm after reload.
+2. **Arabic shaping still depends on the Arabic webfont.** The export now checks that a declared Amiri (or Noto Naskh) face actually reached `status: "loaded"` before capture and aborts with a clear message otherwise, so a blocked webfont can no longer ship missing-glyph boxes. It cannot work offline; bundling the font locally would remove that dependency.
+3. **Server-side margin validation is type-only.** The inspector prevents impossible margins in the studio, but a document written by another client could still store one; preflight reports it as `page/invalid-margins` or `page/margins-collapse`. No database-level guard was added.
+4. **Named-version deletion does not exist.** Versions can be created, renamed and restored, not deleted. Repeated QA runs therefore leave version rows; there is no pruning UI.
 5. **PDF output is RGB with no colour management.** No CMYK or PDF/X claim is made, and the export dialog states this.
 6. **Page thumbnails intentionally show compact placeholders, not artwork.** This is a design choice; it should not be mistaken for failed image loading.
-7. **No browser-automation suite is committed to the repository.** The final Playwright checks are reproducible scripts but were kept outside the repo because of disk constraints. Stale-closure behavior and asset-deletion UI therefore lack automated regression coverage.
-8. **Cross-owner access was reviewed statically, not attempted with a second live account.** All publishing endpoint files call `requireUserId` / owned-publication/asset helpers, and existing Convex tests cover ownership. Storage-URL authorization was not independently penetration-tested.
-9. **PDF visual appearance was not inspected pixel-for-pixel.** PDF geometry, page count, text extraction and image/mask objects were inspected; page renders/screenshots were captured as evidence but the available file tool returns image bytes rather than a visual preview. Do not read “verified” as a visual design sign-off.
+7. **The browser suite covers the release-critical paths, not every workflow.** It signs in, checks the signed-out gate, editor load, margin refusal/reload, version create/rename/cancel/restore, Arabic export disclosure, export failure with a blocked font, and 390 px overflow. Master detach, crop history, Layout Assist and Smart Album were exercised manually in this pass but are not in the committed suite.
+8. **Cross-owner access was reviewed statically, not attempted with a second live account.** Creating a second verified account needs a real email round-trip, which this environment cannot do. All publishing endpoint files call `requireUserId` / owned-publication/asset helpers, and existing Convex tests cover ownership. Storage-URL authorization was not independently penetration-tested.
+9. **Visual design was not reviewed by eye.** The bundled screenshots and page renders were checked programmatically (not blank, ink bounds, Arabic-vs-baseline pixel difference confined to the headline block), but the available tooling returns image bytes rather than a rendered preview. Pixel-for-pixel layout, typography and mobile aesthetics still need a human or screenshot-capable review.
 10. **Git is unavailable in this environment.** All changes are present in the working tree but uncommitted and undeployed.
 
 ---
@@ -126,7 +142,8 @@ The browser QA harness lived outside the repository because the root filesystem 
 - **Problem observed:** a page with Latin and Arabic/mixed frames exported Latin text but omitted Arabic from the PDF.
 - **Options considered:** (a) leave text out with a warning — rejected; (b) embed a full Arabic font and hope built-in shaping/encoding works — not reliable; (c) preserve the browser’s rendered text as a high-resolution image overlay — selected; (d) preserve entire page as an image — rejected because it would needlessly rasterize Latin-only pages.
 - **Result:** Latin-only frames remain vector/selectable. Arabic and mixed frames are rendered at ≈300 dpi and embedded as transparent PNG overlays, with the frame’s placement and clipping preserved. Export and preflight disclose that those frames are images and their text cannot be selected or searched.
-- **Evidence:** `page1-custom.pdf`, `page1-custom.png`, `arabic-fallback-p1-render.png`, `baseline-page1-render.png`.
+- **Font availability:** before capture, the rasterizer waits for `document.fonts` to settle (capped at 6 s) and then requires a *declared face* for `Amiri` or `Noto Naskh Arabic` with `status === "loaded"`. `FontFaceSet.check()` alone was rejected because it returns true for an unknown family. A missing face throws `ArabicFontUnavailableError`, which the export dialog shows instead of writing a PDF.
+- **Evidence:** `page1-custom.pdf`, `page1-custom.png`, `arabic-fallback-p1-render.png`, `baseline-page1-render.png`. Browser checks 11–12 prove the normal path (image-text disclosure present) and the blocked-webfont path (export stops, no PDF reported).
 
 ---
 
@@ -178,6 +195,19 @@ The production bundle contains 516 kB and 435 kB raw JS chunks (gzip ≈180 kB a
 - Layout suggestions: apply full-bleed changed the image frame, undo restored it, redo re-applied; suggestions display deterministic copy and apply closings without errors.
 - Smart Album variants/preview: 3 chosen photos produced 3 pages initially; 4-per-page produced 2 pages; Mosaic/Editorial previews updated; created a real 2-page album.
 - Auth gate and return-to-requested-URL flow.
+- Named versions: create, rename, cancel restore, restore with reload (committed suite).
+- Margin refusal: negative value, page-covering value, value retained after reload (committed suite).
+- Arabic export with webfont blocked: clear failure message, no PDF (committed suite).
+
+### Committed browser suite
+
+`qa/browser/publishing-smoke.mjs` drives Chromium through `playwright` against the running dev server. It prints one PASS/FAIL line per check and exits non-zero on failure.
+
+```
+PLAYWRIGHT_BROWSERS_PATH=/dev/shm/pw bun run qa:browser
+```
+
+Overridable with `QA_BASE_URL`, `QA_PUBLICATION_ID`, `QA_EMAIL`, `QA_PIN`. The QA account and publication are throwaway non-production records.
 
 ---
 
@@ -204,6 +234,13 @@ The production bundle contains 516 kB and 435 kB raw JS chunks (gzip ≈180 kB a
 - `src/components/publishing/ImagePanel.tsx`
 - `src/components/publishing/Inspector.tsx`
 - `src/components/ui/slider.tsx`
+- `src/components/publishing/VersionsDialog.tsx` *(new)*
+- `src/components/publishing/EditorToolbar.tsx`
+- `src/convex/publishing/versions.ts` (added `renameVersion`)
+- `src/lib/publishing/margins.ts` *(new)*
+- `src/lib/publishing/margins.test.ts` *(new)*
+- `qa/browser/publishing-smoke.mjs` *(new)*
+- `package.json` (added `playwright` devDependency and `qa:browser` script)
 
 ---
 
@@ -211,4 +248,6 @@ The production bundle contains 516 kB and 435 kB raw JS chunks (gzip ≈180 kB a
 
 **Conditional go for a controlled pilot.** Core editing, masters, layers, page structure, preflight, export, undo, Smart Album and authentication all work in the tested environment. The Arabic PDF is no longer silently lossy: it is visually preserved and the selectable-text limitation is disclosed.
 
-**Do not represent this as fully production-ready** until the named-version UI is exposed (or intentionally deferred), Arabic search/selectability requirements are accepted, margin validation is tightened, and a visual pass of exported PDFs and the mobile layout is completed by a person or a screenshot-capable reviewer. Git/deployment remains outstanding because version control is managed outside this session.
+The named-version UI and margin validation that previously blocked the pilot are in place, and the Arabic export can no longer fail silently: it either preserves the text as an image with an explicit disclosure or stops with a readable error.
+
+**Do not represent this as fully production-ready** until a human visual pass of exported PDFs, the desktop studio and the mobile layout is completed, and until someone accepts that Arabic is image text rather than searchable text. CMYK/PDF-X is still out of scope. Cross-account access remains verified statically rather than with a second live account. Git/deployment remains outstanding because version control is managed outside this session.

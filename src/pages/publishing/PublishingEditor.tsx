@@ -17,6 +17,7 @@ import { PreflightDialog } from "@/components/publishing/PreflightDialog";
 import { ExportDialog } from "@/components/publishing/ExportDialog";
 import { SmartAlbumDialog } from "@/components/publishing/SmartAlbumDialog";
 import { AssistDialog } from "@/components/publishing/AssistDialog";
+import { VersionsDialog } from "@/components/publishing/VersionsDialog";
 import { Inspector } from "@/components/publishing/Inspector";
 import { ImageCropBar } from "@/components/publishing/ImageCropBar";
 import {
@@ -111,7 +112,7 @@ function EditorWorkspace({
     "pages" | "layers" | "masters" | "assets" | "history" | "guides"
   >("pages");
   const [dialog, setDialog] = useState<
-    "preflight" | "export" | "album" | "assist" | null
+    "preflight" | "export" | "album" | "assist" | "versions" | null
   >(null);
   const [guidesLocked, setGuidesLocked] = useState(false);
   const [fitSignal, setFitSignal] = useState(0);
@@ -433,6 +434,7 @@ function EditorWorkspace({
         onOpenExport={() => setDialog("export")}
         onOpenSmartAlbum={() => setDialog("album")}
         onOpenAssist={() => setDialog("assist")}
+        onOpenVersions={() => setDialog("versions")}
         busy={editor.busy}
         onBack={() => {
           void editor.flush();
@@ -868,6 +870,14 @@ function EditorWorkspace({
           setDialog(null);
           navigate(editorHref(createdId));
         }}
+      />
+      <VersionsDialog
+        open={dialog === "versions"}
+        onOpenChange={(open) => setDialog(open ? "versions" : null)}
+        publicationId={publicationId}
+        pageCount={editor.pageCount}
+        onBeforeSnapshot={editor.flush}
+        onRestored={() => window.location.reload()}
       />
       <AssistDialog
         open={dialog === "assist"}

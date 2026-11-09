@@ -164,6 +164,32 @@ export const createVersion = mutation({
   },
 });
 
+export const renameVersion = mutation({
+  args: {
+    publicationId: v.id("publications"),
+    versionId: v.id("publicationVersions"),
+    label: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const publication = await requireOwnedPublication(ctx, args.publicationId, userId);
+    const version = await ctx.db.get(args.versionId);
+    // Only the label changes. The snapshot rows are untouched, so renaming is
+    // safe on a version that current work was built on.
+    if (
+      !version ||
+      version.ownerId !== userId ||
+      version.publicationId !== publication._id
+    ) {
+      throw new Error("Version not found.");
+    }
+    const label = args.label.trim().slice(0, 120);
+    if (!label) throw new Error("Give this version a name.");
+    await ctx.db.patch(version._id, { label });
+    return { versionId: version._id, label };
+  },
+});
+
 export const listVersions = query({
   args: { publicationId: v.id("publications") },
   handler: async (ctx, args) => {

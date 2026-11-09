@@ -17,6 +17,7 @@ import {
   type LengthUnit,
 } from "@/lib/publishing/units";
 import { storyForFrame, objectKindLabel } from "@/lib/publishing/render";
+import { MARGIN_EDGES, marginProblem } from "@/lib/publishing/margins";
 import type { StudioAsset } from "./AssetsPanel";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import {
   type TypographyEditor,
 } from "./TypographyPanel";
 import { ImagePanel } from "./ImagePanel";
+import { cn } from "@/lib/utils";
 
 /**
  * The inspector. Selection first, then page.
@@ -116,6 +118,7 @@ function NumberField({
   unit,
   step = 1,
   min,
+  validate,
   onCommit,
 }: {
   label: string;
@@ -124,25 +127,43 @@ function NumberField({
   unit: string;
   step?: number;
   min?: number;
+  /**
+   * Optional rule applied to the typed value before it is committed. Returning
+   * a message blocks the edit, keeps the last committed value and explains why:
+   * the document is never put into a state the server would have to refuse.
+   */
+  validate?: (value: number) => string | null;
   onCommit: (value: number) => void;
 }) {
   const formatted = roundTo(value, 2).toFixed(2).replace(/\.?0+$/, "");
   const [draft, setDraft] = useState(formatted);
   const [synced, setSynced] = useState(formatted);
+  const [error, setError] = useState<string | null>(null);
   // Derived state, adjusted during render: an edit from the canvas, an undo or
   // a page switch re-seeds the field without an effect round-trip.
   if (synced !== formatted) {
     setSynced(formatted);
     setDraft(formatted);
+    setError(null);
   }
 
   const commit = () => {
     const parsed = Number.parseFloat(draft.replace(",", "."));
     if (!Number.isFinite(parsed)) {
       setDraft(formatted);
+      setError("Enter a number.");
+      return;
+    }
+    // Reject an impossible value before clamping, so typing "-5" cannot
+    // silently become a valid 0 and look saved when it is not.
+    const problem = validate?.(parsed) ?? null;
+    if (problem) {
+      setDraft(formatted);
+      setError(problem);
       return;
     }
     const clamped = min === undefined ? parsed : Math.max(min, parsed);
+    setError(null);
     if (Math.abs(clamped - value) < 1e-6) {
       setDraft(formatted);
       return;
@@ -151,30 +172,49 @@ function NumberField({
   };
 
   return (
-    <FieldRow label={label}>
-      <span className="relative flex-1">
-        <Input
-          value={draft}
-          inputMode="decimal"
-          step={step}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-            }
-            if (event.key === "Escape") {
-              setDraft(formatted);
-              event.currentTarget.blur();
-            }
-          }}
-          className="h-7 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] pr-7 text-right font-meta text-[0.7rem] tabular-nums shadow-none"
-        />
-        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-meta text-[0.55rem] text-[var(--ink-soft)]">
-          {unit}
+    <div className="min-w-0">
+      <FieldRow label={label}>
+        <span className="relative flex-1">
+          <Input
+            value={draft}
+            inputMode="decimal"
+            step={step}
+            aria-invalid={error ? true : undefined}
+            aria-label={`${label} (${unit})`}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              if (error) setError(null);
+            }}
+            onBlur={commit}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+              if (event.key === "Escape") {
+                setDraft(formatted);
+                setError(null);
+                event.currentTarget.blur();
+              }
+            }}
+            className={cn(
+              "h-7 rounded-[3px] border-[var(--rule)] bg-[var(--paper)] pr-7 text-right font-meta text-[0.7rem] tabular-nums shadow-none",
+              error && "border-[var(--red)] text-[var(--red)]",
+            )}
+          />
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-meta text-[0.55rem] text-[var(--ink-soft)]">
+            {unit}
+          </span>
         </span>
-      </span>
-    </FieldRow>
+      </FieldRow>
+      {error ? (
+        <p
+          role="alert"
+          className="mt-1 pl-16 text-[0.6rem] leading-snug text-[var(--red)]"
+        >
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -387,13 +427,17 @@ export function Inspector(props: InspectorProps) {
 
             <Section title={`Margins · ${unitLabel}`}>
               <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
-                {(["top", "right", "bottom", "left"] as const).map((edge) => (
+                {MARGIN_EDGES.map((edge) => (
                   <NumberField
                     key={edge}
                     label={edge}
                     unit={unitLabel}
                     value={display(page.spec.margins[edge])}
-                    min={0}
+                    validate={(value) =>
+                      marginProblem(page, edge, points(value), (limit) =>
+                        `${display(limit)} ${unitLabel}`,
+                      )
+                    }
                     onCommit={(value) =>
                       onPatchPage({
                         spec: {
