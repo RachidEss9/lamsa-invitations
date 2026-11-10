@@ -1,6 +1,15 @@
 import { brand } from "@/lib/brand";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeft,
+  Maximize2,
+  Minimize2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  type LucideIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -176,43 +185,190 @@ export function StudioPanelRail<T extends string>({
       <button
         type="button"
         onClick={onToggle}
-        aria-expanded={expanded}
-        title={expanded ? "Collapse panel" : "Expand panel"}
+        title={`Hide ${label}`}
         className="studio-panel-rail__button studio-panel-rail__toggle"
       >
-        {expanded ? (
-          <PanelLeftClose aria-hidden size={16} strokeWidth={1.7} />
-        ) : (
-          <PanelLeftOpen aria-hidden size={16} strokeWidth={1.7} />
-        )}
-        <span className="sr-only">
-          {expanded ? `Collapse ${label}` : `Expand ${label}`}
-        </span>
+        <PanelLeftClose aria-hidden size={16} strokeWidth={1.7} />
+        <span className="sr-only">{`Hide ${label}`}</span>
+        <span aria-hidden className="studio-panel-rail__tip">{`Hide ${label}`}</span>
       </button>
     </nav>
   );
 }
 
-/** The heading that opens every studio panel. */
+/**
+ * The heading that opens every studio panel. When a `collapse` handler is
+ * supplied it also carries the panel's own show/hide control, so the column can
+ * be folded away without losing the tool rail beside it.
+ */
 export function StudioPanelHeading({
   title,
   note,
   actions,
+  collapse,
 }: {
   title: string;
   note?: string;
   actions?: ReactNode;
+  collapse?: {
+    open: boolean;
+    onToggle: () => void;
+    label: string;
+    side?: "left" | "right";
+  };
 }) {
+  const CollapseIcon =
+    collapse?.side === "right"
+      ? collapse.open
+        ? PanelRightClose
+        : PanelRightOpen
+      : collapse?.open
+        ? PanelLeftClose
+        : PanelLeftOpen;
+
   return (
     <div className="studio-panel-heading">
       <div className="min-w-0">
         <p className="section-label">{title}</p>
         {note ? <p className="studio-panel-heading__note">{note}</p> : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
+      <div className="flex shrink-0 items-center gap-1">
+        {actions}
+        {collapse ? (
+          <button
+            type="button"
+            onClick={collapse.onToggle}
+            aria-expanded={collapse.open}
+            aria-label={
+              collapse.open ? `Hide ${collapse.label}` : `Show ${collapse.label}`
+            }
+            title={
+              collapse.open ? `Hide ${collapse.label}` : `Show ${collapse.label}`
+            }
+            className="studio-icon-button"
+          >
+            <CollapseIcon className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
+
+/**
+ * The control pair every studio header carries: fold the left panel, fold the
+ * inspector, or give the canvas the whole window in one press.
+ *
+ * These are desktop affordances only — the compact layout keeps its dock.
+ */
+export function StudioPaneControls({
+  leftOpen,
+  rightOpen,
+  leftLabel = "left panel",
+  rightLabel = "inspector",
+  onToggleLeft,
+  onToggleRight,
+  onToggleBoth,
+}: {
+  leftOpen: boolean;
+  rightOpen: boolean;
+  leftLabel?: string;
+  rightLabel?: string;
+  onToggleLeft: () => void;
+  onToggleRight: () => void;
+  onToggleBoth: () => void;
+}) {
+  const bothHidden = !leftOpen && !rightOpen;
+  return (
+    <div className="studio-pane-controls">
+      <button
+        type="button"
+        onClick={onToggleLeft}
+        aria-pressed={leftOpen}
+        aria-label={leftOpen ? `Hide ${leftLabel}` : `Show ${leftLabel}`}
+        title={
+          leftOpen ? `Hide ${leftLabel} (Alt+[)` : `Show ${leftLabel} (Alt+[)`
+        }
+        className="studio-icon-button"
+      >
+        {leftOpen ? (
+          <PanelLeftClose className="size-4" aria-hidden />
+        ) : (
+          <PanelLeftOpen className="size-4" aria-hidden />
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onToggleBoth}
+        aria-pressed={bothHidden}
+        aria-label={bothHidden ? "Restore side panels" : "Maximize canvas"}
+        title={
+          bothHidden
+            ? "Restore side panels (Alt+\\)"
+            : "Maximize canvas — hide both panels (Alt+\\)"
+        }
+        className="studio-icon-button studio-pane-controls__both"
+        data-active={bothHidden}
+      >
+        {bothHidden ? (
+          <Minimize2 className="size-4" aria-hidden />
+        ) : (
+          <Maximize2 className="size-4" aria-hidden />
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onToggleRight}
+        aria-pressed={rightOpen}
+        aria-label={rightOpen ? `Hide ${rightLabel}` : `Show ${rightLabel}`}
+        title={
+          rightOpen ? `Hide ${rightLabel} (Alt+])` : `Show ${rightLabel} (Alt+])`
+        }
+        className="studio-icon-button"
+      >
+        {rightOpen ? (
+          <PanelRightClose className="size-4" aria-hidden />
+        ) : (
+          <PanelRightOpen className="size-4" aria-hidden />
+        )}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The persistent edge control that brings a hidden panel back. It sits against
+ * the canvas edge, never over the artwork, and is anchored for screen readers.
+ */
+export function StudioReopenHandle({
+  side,
+  label,
+  onOpen,
+}: {
+  side: "left" | "right";
+  label: string;
+  onOpen: () => void;
+}) {
+  const Icon = side === "left" ? PanelLeftOpen : PanelRightOpen;
+  return (
+    <div className={side === "left" ? "studio-float-left" : "studio-float-right"}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={label}
+        title={label}
+        className="studio-float-button"
+      >
+        <Icon className="size-4" aria-hidden />
+        <span className="studio-float-button__tip" aria-hidden>
+          {label}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+
 
 export interface StudioDockItem {
   id: string;

@@ -1,4 +1,12 @@
-import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import {
   ArrowUpRight,
@@ -39,8 +47,10 @@ import {
   StudioDock,
   StudioPanelHeading,
   StudioPanelRail,
+  StudioReopenHandle,
   type StudioPanelItem,
 } from "@/components/workspace/StudioChrome";
+import { useStudioPaneShortcuts } from "@/components/workspace/useStudioPaneShortcuts";
 import { PanelResizer } from "@/components/workspace/PanelResizer";
 import {
   ConflictBanner,
@@ -168,168 +178,12 @@ function EditorWorkspace({
   const [mobileMore, setMobileMore] = useState(false);
   const isMobile = useIsMobile();
 
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
-  const [leftWidth, setLeftWidth] = useState(248);
-  const [rightWidth, setRightWidth] = useState(304);
-  const [storePrevious, setStorePrevious] = useState<{ leftOpen: boolean; rightOpen: boolean } | null>(null);
-  const [restored, setRestored] = useState(false);
 
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const savedLeft = window.localStorage.getItem(
-          `lamsa.publishing.${publicationId}.panel.left.open`,
-        );
-        if (savedLeft !== null) {
-          setLeftOpen(savedLeft !== "0");
-        }
-        const savedRight = window.localStorage.getItem(
-          `lamsa.publishing.${publicationId}.panel.right.open`,
-        );
-        if (savedRight !== null) {
-          setRightOpen(savedRight !== "0");
-        }
-        const savedLeftWidth = window.localStorage.getItem(
-          `lamsa.publishing.${publicationId}.panel.left.width`,
-        );
-        if (savedLeftWidth !== null) {
-          const parsed = Number(savedLeftWidth);
-          if (Number.isFinite(parsed)) {
-            setLeftWidth(parsed);
-          }
-        }
-        const savedRightWidth = window.localStorage.getItem(
-          `lamsa.publishing.${publicationId}.panel.right.width`,
-        );
-        if (savedRightWidth !== null) {
-          const parsed = Number(savedRightWidth);
-          if (Number.isFinite(parsed)) {
-            setRightWidth(parsed);
-          }
-        }
-      }
-    } catch {
-      /* Best-effort persistent workspace state. */
-    }
-  }, [publicationId]);
 
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          `lamsa.publishing.${publicationId}.panel.left.open`,
-          String(leftOpen ? 1 : 0),
-        );
-        window.localStorage.setItem(
-          `lamsa.publishing.${publicationId}.panel.right.open`,
-          String(rightOpen ? 1 : 0),
-        );
-        window.localStorage.setItem(
-          `lamsa.publishing.${publicationId}.panel.left.width`,
-          String(leftWidth),
-        );
-        window.localStorage.setItem(
-          `lamsa.publishing.${publicationId}.panel.right.width`,
-          String(rightWidth),
-        );
-      }
-    } catch {
-      /* Best-effort persistent workspace state. */
-    }
-  }, [publicationId, leftOpen, rightOpen, leftWidth, rightWidth]);
 
-  const hideBoth = useCallback(() => {
-    setStorePrevious({ leftOpen, rightOpen });
-    setLeftOpen(false);
-    setRightOpen(false);
-  }, [leftOpen, rightOpen]);
-
-  const restoreBoth = useCallback(() => {
-    setRestored(true);
-    setStorePrevious(null);
-  }, []);
-
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
-  const [leftWidth, setLeftWidth] = useState(248);
-  const [rightWidth, setRightWidth] = useState(304);
-  const [storePrevious, setStorePrevious] = useState<{ leftOpen: boolean; rightOpen: boolean } | null>(null);
-  const [restored, setRestored] = useState(false);
-
-  useEffect(() => {
-    const keyLeft = `lamsa.publishing.${publicationId}.panel.left.open`;
-    const keyRight = `lamsa.publishing.${publicationId}.panel.right.open`;
-    const keyLeftWidth = `lamsa.publishing.${publicationId}.panel.left.width`;
-    const keyRightWidth = `lamsa.publishing.${publicationId}.panel.right.width`;
-
-    try {
-      if (typeof window !== "undefined") {
-        const savedLeft = window.localStorage.getItem(keyLeft);
-        if (savedLeft !== null) {
-          setLeftOpen(savedLeft !== "0");
-        }
-        const savedRight = window.localStorage.getItem(keyRight);
-        if (savedRight !== null) {
-          setRightOpen(savedRight !== "0");
-        }
-        const savedLeftWidth = window.localStorage.getItem(keyLeftWidth);
-        if (savedLeftWidth !== null) {
-          const parsed = Number(savedLeftWidth);
-          if (Number.isFinite(parsed) && parsed >= 220 && parsed <= 380) {
-            setLeftWidth(parsed);
-          }
-        }
-        const savedRightWidth = window.localStorage.getItem(keyRightWidth);
-        if (savedRightWidth !== null) {
-          const parsed = Number(savedRightWidth);
-          if (Number.isFinite(parsed) && parsed >= 268 && parsed <= 420) {
-            setRightWidth(parsed);
-          }
-        }
-      }
-    } catch {
-      /* Best-effort persistent workspace state. */
-    }
-  }, [publicationId]);
-
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          `lamsa.publishing.${publicationId}.panel.left.open`,
-          String(leftOpen ? 1 : 0),
-        );
-        window.localStorage.setItem(
-          `lamsa.publishing.${publicationId}.panel.right.open`,
-          String(rightOpen ? 1 : 0),
-        );
-        window.localStorage.setItem(
-          `lamsa.publishing.${publicationId}.panel.left.width`,
-          String(leftWidth),
-        );
-        window.localStorage.setItem(
-          `lamsa.publishing.${publicationId}.panel.right.width`,
-          String(rightWidth),
-        );
-      }
-    } catch {
-      /* Best-effort persistent workspace state. */
-    }
-  }, [publicationId, leftOpen, rightOpen, leftWidth, rightWidth]);
-
-  const hideBoth = useCallback(() => {
-    setStorePrevious({ leftOpen, rightOpen });
-    setLeftOpen(false);
-    setRightOpen(false);
-  }, [leftOpen, rightOpen]);
-
-  const restoreBoth = useCallback(() => {
-    setRestored(true);
-    setStorePrevious(null);
-  }, []);
 
   const storageKeyLeft = `lamsa.publishing.${publicationId}.panel.left.open`;
+  const storageKeyLeftPanel = `lamsa.publishing.${publicationId}.panel.left.column`;
   const storageKeyRight = `lamsa.publishing.${publicationId}.panel.right.open`;
   const storageKeyLeftWidth = `lamsa.publishing.${publicationId}.panel.left.width`;
   const storageKeyRightWidth = `lamsa.publishing.${publicationId}.panel.right.width`;
@@ -338,6 +192,14 @@ function EditorWorkspace({
     if (typeof window === "undefined") return true;
     try {
       return window.localStorage.getItem(storageKeyLeft) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const [leftPanelOpen, setLeftPanelOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      return window.localStorage.getItem(storageKeyLeftPanel) !== "0";
     } catch {
       return true;
     }
@@ -381,6 +243,14 @@ function EditorWorkspace({
 
   useEffect(() => {
     try {
+      window.localStorage.setItem(storageKeyLeftPanel, String(leftPanelOpen ? 1 : 0));
+    } catch {
+      /* Persisting a workspace layout is best-effort. */
+    }
+  }, [storageKeyLeftPanel, leftPanelOpen]);
+
+  useEffect(() => {
+    try {
       window.localStorage.setItem(storageKeyRight, String(rightOpen ? 1 : 0));
     } catch {
       /* Persisting a workspace layout is best-effort. */
@@ -403,28 +273,34 @@ function EditorWorkspace({
     }
   }, [storageKeyRightWidth, rightWidth]);
 
-  const storePrevious = useRef<{ leftOpen: boolean; rightOpen: boolean } | null>(null);
-  const setRestoredRef = useRef(setRestored);
-  setRestoredRef.current = setRestored;
+  const previousLayout = useRef<{ leftOpen: boolean; rightOpen: boolean } | null>(null);
 
   const hideBoth = useCallback(() => {
-    storePrevious.current = { leftOpen, rightOpen };
+    previousLayout.current = { leftOpen, rightOpen };
     setLeftOpen(false);
     setRightOpen(false);
   }, [leftOpen, rightOpen]);
 
   const restoreBoth = useCallback(() => {
-    setRestoredRef.current((previous) => {
-      if (previous) {
-        setLeftOpen(previous.leftOpen);
-        setRightOpen(previous.rightOpen);
-      } else {
-        setLeftOpen(true);
-        setRightOpen(true);
-      }
-      return null;
-    });
+    const previous = previousLayout.current;
+    previousLayout.current = null;
+    setLeftOpen(previous?.leftOpen ?? true);
+    setRightOpen(previous?.rightOpen ?? true);
   }, []);
+
+  const bothHidden = !leftOpen && !rightOpen;
+
+  const toggleBoth = useCallback(() => {
+    if (bothHidden) restoreBoth();
+    else hideBoth();
+  }, [bothHidden, hideBoth, restoreBoth]);
+
+  useStudioPaneShortcuts({
+    onToggleLeft: () => setLeftOpen((value) => !value),
+    onToggleRight: () => setRightOpen((value) => !value),
+    onToggleBoth: toggleBoth,
+  });
+
   const [editing, setEditing] = useState<{
     pageId: string;
     objectId: string;
@@ -453,12 +329,12 @@ function EditorWorkspace({
   >(null);
   const navigate = useNavigate();
 
-  // Crossing the compact-layout breakpoint changes the available canvas width;
-  // refit once so a phone never opens on the desktop zoom level.
-  useEffect(() => {
-    void isMobile;
-    setFitSignal((signal) => signal + 1);
-  }, [isMobile]);
+  // Crossing the compact-layout breakpoint changes the available canvas width,
+  // so the canvas refits without remounting. Panel toggles keep the zoom level.
+  const canvasFitSignal = useMemo(
+    () => fitSignal + (isMobile ? 0.5 : 0),
+    [fitSignal, isMobile],
+  );
 
   const document = editor.document;
   const page = editor.page;
@@ -782,6 +658,7 @@ function EditorWorkspace({
         rightOpen={rightOpen}
         onToggleLeft={() => setLeftOpen((value) => !value)}
         onToggleRight={() => setRightOpen((value) => !value)}
+        onToggleBoth={toggleBoth}
       />
 
       {editor.saveStatus === "conflict" ? (
@@ -805,26 +682,30 @@ function EditorWorkspace({
           className="studio-sidebar hidden lg:flex"
           data-open={leftOpen}
           aria-label="Publication panels"
+          aria-hidden={!leftOpen}
+          inert={!leftOpen}
         >
           <StudioPanelRail
             label="Publication panels"
             items={PANEL_ITEMS}
             active={panel}
-            expanded={leftOpen}
+            expanded={leftPanelOpen}
             onSelect={(id) => {
-              if (id === panel && leftOpen) {
-                setLeftOpen(false);
+              if (id === panel && leftPanelOpen) {
+                setLeftPanelOpen(false);
                 return;
               }
               setPanel(id);
-              setLeftOpen(true);
+              setLeftPanelOpen(true);
             }}
-            onToggle={() => setLeftOpen((value) => !value)}
+            onToggle={() => setLeftOpen(false)}
           />
           <div
             className="studio-panel-column"
-            data-collapsed={!leftOpen}
-            style={leftOpen ? { width: leftWidth, flexBasis: leftWidth } : undefined}
+            data-collapsed={!leftPanelOpen}
+            style={
+              leftPanelOpen ? { width: leftWidth, flexBasis: leftWidth } : undefined
+            }
           >
             <StudioPanelHeading
               title={PANEL_TITLES[panel]}
@@ -833,7 +714,7 @@ function EditorWorkspace({
                   ? "The document's spine. Select, add or reorder pages."
                   : panel === "layers"
                     ? "Objects on this page, in stacking order."
-                  : panel === "masters"
+                    : panel === "masters"
                       ? "Shared page furniture, managed once."
                       : panel === "elements"
                         ? "The shared LAMSA library, ready to place."
@@ -843,6 +724,12 @@ function EditorWorkspace({
                             ? "Every edit in this session, reversible."
                             : "Precise guides for this document."
               }
+              collapse={{
+                open: leftPanelOpen,
+                onToggle: () => setLeftPanelOpen((value) => !value),
+                label: `${PANEL_TITLES[panel]} panel`,
+              }}
+            />
             <div className="min-h-0 flex-1 overflow-hidden">
             {panel === "pages" ? (
               <PagePanel
@@ -903,27 +790,19 @@ function EditorWorkspace({
                 }
               />
             ) : null}
-            {!leftOpen && (
-              <div className="studio-float-left" aria-hidden="true">
-                <button
-                  type="button"
-                  onClick={() => setLeftOpen(true)}
-                  aria-label="Show publication panels"
-                  title="Show publication panels"
-                  className="studio-float-button"
-                  data-active={false}
-                >
-                  <PanelLeft className="size-4" aria-hidden />
-                  <span className="studio-float-button__tip" aria-hidden>
-                    Show panels
-                  </span>
-                </button>
-              </div>
-            )}
+            </div>
           </div>
         </aside>
 
-        {leftOpen ? (
+        {!leftOpen ? (
+          <StudioReopenHandle
+            side="left"
+            label="Show publication panels"
+            onOpen={() => setLeftOpen(true)}
+          />
+        ) : null}
+
+        {leftOpen && leftPanelOpen ? (
           <PanelResizer
             side="left"
             value={leftWidth}
@@ -933,29 +812,6 @@ function EditorWorkspace({
             label="Resize document panel"
           />
         ) : null}
-
-        {!leftOpen && (
-          <div
-            className={cn(
-              "studio-float-left hidden lg:flex",
-              "pointer-events-auto"
-            )}
-            aria-label="Show left panel"
-          >
-            <button
-              type="button"
-              onClick={() => setLeftOpen(true)}
-              aria-label="Show left panel"
-              title="Show publication panels"
-              className="studio-float-button"
-            >
-              <PanelLeftClose className="size-4" aria-hidden />
-              <span className="studio-float-button__tip" aria-hidden>
-                Show panels
-              </span>
-            </button>
-          </div>
-        )}
 
         <section
           className={cn(
@@ -1062,7 +918,7 @@ function EditorWorkspace({
             onSelect={editor.setSelection}
             onEditPage={editor.editPageObjects}
             onZoom={editor.setZoom}
-            fitSignal={fitSignal}
+            fitSignal={canvasFitSignal}
             showRulers={chrome.guides && !editor.preview}
             unit={document.displayUnit}
             onAddGuide={(axis, position) => {
@@ -1147,35 +1003,39 @@ function EditorWorkspace({
           />
         ) : null}
 
-        {rightOpen ? (
-          <aside
-            className="studio-inspector hidden lg:flex"
-            aria-label="Inspector"
-            style={{ width: rightWidth, flexBasis: rightWidth }}
-          >
-            <StudioPanelHeading
-              title="Properties"
-              note={
-                editor.selection.length > 0
-                  ? `${editor.selection.length} object${editor.selection.length === 1 ? "" : "s"} selected`
-                  : "Nothing selected — showing page setup"
-              }
-              actions={
-                <button
-                  type="button"
-                  onClick={() => setRightOpen(false)}
-                  className="studio-icon-button"
-                  aria-label="Hide inspector"
-                  title="Hide inspector"
-                >
-                  <SlidersHorizontal className="size-3.5" aria-hidden />
-                </button>
-              }
-            />
-            <div className="scroll-slim min-h-0 flex-1 overflow-y-auto">
-              {inspectorNode}
-            </div>
-          </aside>
+        <aside
+          className="studio-inspector hidden lg:flex"
+          data-open={rightOpen}
+          aria-label="Inspector"
+          aria-hidden={!rightOpen}
+          inert={!rightOpen}
+          style={rightOpen ? { width: rightWidth, flexBasis: rightWidth } : undefined}
+        >
+          <StudioPanelHeading
+            title="Properties"
+            note={
+              editor.selection.length > 0
+                ? `${editor.selection.length} object${editor.selection.length === 1 ? "" : "s"} selected`
+                : "Nothing selected — showing page setup"
+            }
+            collapse={{
+              open: rightOpen,
+              onToggle: () => setRightOpen((value) => !value),
+              label: "inspector",
+              side: "right",
+            }}
+          />
+          <div className="scroll-slim min-h-0 flex-1 overflow-y-auto">
+            {inspectorNode}
+          </div>
+        </aside>
+
+        {!rightOpen ? (
+          <StudioReopenHandle
+            side="right"
+            label="Show inspector"
+            onOpen={() => setRightOpen(true)}
+          />
         ) : null}
       </div>
 

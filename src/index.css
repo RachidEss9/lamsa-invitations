@@ -1752,26 +1752,32 @@ button.studio-save-state:hover {
     pointer-events: none;
   }
 
+}
+
+/* The persistent way back for a hidden panel. These edge controls belong to the
+   wide layout only — the compact workspace keeps its dock and sheets. */
+.studio-float-left,
+.studio-float-right {
+  position: absolute;
+  top: 0.5rem;
+  z-index: 45;
+  display: none;
+}
+
+.studio-float-left {
+  left: 0.5rem;
+}
+
+.studio-float-right {
+  right: 0.5rem;
+}
+
+@media (min-width: 1024px) {
   .studio-float-left,
   .studio-float-right {
-    pointer-events: none;
-    z-index: 45;
+    display: block;
   }
-
-  .studio-float-left button,
-  .studio-float-right button {
-    pointer-events: auto;
-  }
-
-  .studio-float-left {
-    top: calc(var(--workspace-bar) + 0.5rem);
-    left: 0.5rem;
-  }
-
-  .studio-float-right {
-    top: calc(var(--workspace-bar) + 0.5rem);
-    right: 0.5rem;
-  }
+}
 
 .studio-float-button {
   display: inline-grid;
@@ -1832,8 +1838,16 @@ button.studio-save-state:hover {
     translate var(--dur-2) var(--ease-soft);
 }
 
+.studio-float-right .studio-float-button__tip {
+  left: auto;
+  right: calc(100% + 0.5rem);
+  translate: -4px -50%;
+}
+
 .studio-float-button:hover .studio-float-button__tip,
-.studio-float-button:focus-visible .studio-float-button__tip {
+.studio-float-button:focus-visible .studio-float-button__tip,
+.studio-float-right .studio-float-button:hover .studio-float-button__tip,
+.studio-float-right .studio-float-button:focus-visible .studio-float-button__tip {
   opacity: 1;
   translate: 0 -50%;
 }
@@ -1865,6 +1879,36 @@ button.studio-save-state:hover {
   .studio-inspector[data-collapsed="true"] {
     box-shadow: none;
   }
+
+  /* A hidden panel gives its space back to the canvas immediately; the canvas
+     column is the flex remainder and re-centres on the next frame. */
+  .studio-sidebar[data-open="false"],
+  .studio-inspector[data-open="false"] {
+    width: 0;
+    flex-basis: 0;
+    overflow: hidden;
+    border-color: transparent;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* Header control group: fold left, maximize, fold right. */
+.studio-pane-controls {
+  display: none;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+@media (min-width: 1024px) {
+  .studio-pane-controls {
+    display: flex;
+  }
+}
+
+.studio-pane-controls__both[data-active="true"] {
+  border-color: var(--red);
+  color: var(--red);
 }
 
 @media (max-width: 639px) {

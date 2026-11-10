@@ -10,10 +10,14 @@ import { Wordmark } from "@/components/brand/Wordmark";
 import {
   StudioDock,
   StudioHeader,
+  StudioPanelHeading,
   StudioPanelRail,
+  StudioPaneControls,
+  StudioReopenHandle,
   StudioSaveState,
   type StudioPanelItem,
 } from "@/components/workspace/StudioChrome";
+import { useStudioPaneShortcuts } from "@/components/workspace/useStudioPaneShortcuts";
 import { PanelResizer } from "@/components/workspace/PanelResizer";
 
 import { ColourPanel } from "@/components/studio/ColourPanel";
@@ -209,7 +213,6 @@ import {
   Monitor,
   MoreHorizontal,
   Palette,
-  PanelLeft,
   PanelRight,
   Play,
   Plus,
@@ -255,19 +258,6 @@ function messageOf(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
-function PanelHeading({ title, note }: { title: string; note?: string }) {
-  return (
-    <div className="border-b border-[var(--edge)] px-4 py-3">
-      <p className="section-label">{title}</p>
-      {note && (
-        <p className="mt-1 font-ui text-[0.68rem] leading-relaxed text-ink/50">
-          {note}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function AddButton({
   icon: Icon,
   label,
@@ -298,6 +288,45 @@ function AddButton({
       </span>
     </button>
   );
+}
+
+/* Panel visibility and widths are workspace preferences, not design data. They
+   live in this browser only, keyed by the invitation being edited. */
+function readStudioPref(key: string, fallback: boolean): boolean {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const saved = window.localStorage.getItem(key);
+    return saved === null ? fallback : saved !== "0";
+  } catch {
+    return fallback;
+  }
+}
+
+function readStudioWidth(key: string, fallback: number): number {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const saved = window.localStorage.getItem(key);
+    const value = typeof saved === "string" ? Number(saved) : NaN;
+    return Number.isFinite(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStudioPref(key: string, value: boolean) {
+  try {
+    window.localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    /* Persisting a workspace layout is best-effort. */
+  }
+}
+
+function writeStudioWidth(key: string, value: number) {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    /* Persisting a workspace layout is best-effort. */
+  }
 }
 
 export default function Studio() {
@@ -476,10 +505,64 @@ export default function Studio() {
   const [showHidden, setShowHidden] = useState(false);
   const [revealPreview, setRevealPreview] = useState<Set<string>>(new Set());
   const [leftPanel, setLeftPanel] = useState<LeftPanel>("add");
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
-  const [leftWidth, setLeftWidth] = useState(248);
-  const [rightWidth, setRightWidth] = useState(304);
+  const [leftOpen, setLeftOpen] = useState(() =>
+    readStudioPref(`lamsa.invitation.${invitationId}.panel.left.open`, true),
+  );
+  const [leftPanelOpen, setLeftPanelOpen] = useState(() =>
+    readStudioPref(`lamsa.invitation.${invitationId}.panel.left.column`, true),
+  );
+  const [rightOpen, setRightOpen] = useState(() =>
+    readStudioPref(`lamsa.invitation.${invitationId}.panel.right.open`, true),
+  );
+  const [leftWidth, setLeftWidth] = useState(() =>
+    readStudioWidth(`lamsa.invitation.${invitationId}.panel.left.width`, 248),
+  );
+  const [rightWidth, setRightWidth] = useState(() =>
+    readStudioWidth(`lamsa.invitation.${invitationId}.panel.right.width`, 304),
+  );
+
+  // The workspace arrangement is a per-document, per-browser preference: it is
+  // remembered locally and never travels to the design record.
+  useEffect(() => {
+    writeStudioPref(`lamsa.invitation.${invitationId}.panel.left.open`, leftOpen);
+    writeStudioPref(
+      `lamsa.invitation.${invitationId}.panel.left.column`,
+      leftPanelOpen,
+    );
+    writeStudioPref(`lamsa.invitation.${invitationId}.panel.right.open`, rightOpen);
+    writeStudioWidth(`lamsa.invitation.${invitationId}.panel.left.width`, leftWidth);
+    writeStudioWidth(`lamsa.invitation.${invitationId}.panel.right.width`, rightWidth);
+  }, [invitationId, leftOpen, leftPanelOpen, leftWidth, rightOpen, rightWidth]);
+
+  const previousLayout = useRef<{ leftOpen: boolean; rightOpen: boolean } | null>(
+    null,
+  );
+
+  const hideBoth = useCallback(() => {
+    previousLayout.current = { leftOpen, rightOpen };
+    setLeftOpen(false);
+    setRightOpen(false);
+  }, [leftOpen, rightOpen]);
+
+  const restoreBoth = useCallback(() => {
+    const previous = previousLayout.current;
+    previousLayout.current = null;
+    setLeftOpen(previous?.leftOpen ?? true);
+    setRightOpen(previous?.rightOpen ?? true);
+  }, []);
+
+  const bothHidden = !leftOpen && !rightOpen;
+
+  const toggleBoth = useCallback(() => {
+    if (bothHidden) restoreBoth();
+    else hideBoth();
+  }, [bothHidden, hideBoth, restoreBoth]);
+
+  useStudioPaneShortcuts({
+    onToggleLeft: () => setLeftOpen((value) => !value),
+    onToggleRight: () => setRightOpen((value) => !value),
+    onToggleBoth: toggleBoth,
+  });
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [pixelsPerSecond, setPixelsPerSecond] = useState(80);
   const [librariesOpen, setLibrariesOpen] = useState(false);
@@ -2804,11 +2887,27 @@ export default function Studio() {
 
   const pickImageFile = () => imageFileRef.current?.click();
 
+  /**
+   * Every tool panel opens with the same heading, carrying the control that
+   * folds the column away without taking the tool rail with it.
+   */
+  const leftPanelHeading = (title: string, note?: string) => (
+    <StudioPanelHeading
+      title={title}
+      note={note}
+      collapse={{
+        open: leftPanelOpen,
+        onToggle: () => setLeftPanelOpen((value) => !value),
+        label: `${title} panel`,
+      }}
+    />
+  );
+
   const renderLeftPanel = () => {
     if (leftPanel === "add") {
       return (
         <>
-          <PanelHeading title="Add" note="Every addition is a real, animatable layer." />
+          {leftPanelHeading("Add", "Every addition is a real, animatable layer.")}
           <div className="grid gap-1.5 p-3">
             <AddButton icon={Type} label="Heading" note="Large display names" onClick={() => addText("heading")} />
             <AddButton icon={Type} label="Body text" note="A line of invitation copy" onClick={() => addText("body")} />
@@ -2922,10 +3021,10 @@ export default function Studio() {
       const designSections = design.sections ?? [];
       return (
         <>
-          <PanelHeading
-            title="Sections"
-            note="Chapters of the document. Pages belong to exactly one section."
-          />
+          {leftPanelHeading(
+            "Sections",
+            "Chapters of the document. Pages belong to exactly one section.",
+          )}
           <div className="space-y-1.5 p-3">
           {designSections.map((section, index) => {
             const pageCount = design.pages.filter(
@@ -3009,43 +3108,49 @@ export default function Studio() {
 
     if (leftPanel === "colour") {
       return (
-        <ColourPanel
-          page={page}
-          selected={selected}
-          onPatch={patchElement}
-          onPagePatch={patchPage}
-          onApplyPalette={applyPalette}
-        />
+        <>
+          {leftPanelHeading("Colour", "Palette, fills and paper for this page.")}
+          <ColourPanel
+            page={page}
+            selected={selected}
+            onPatch={patchElement}
+            onPagePatch={patchPage}
+            onApplyPalette={applyPalette}
+          />
+        </>
       );
     }
 
     if (leftPanel === "layers") {
       return (
-        <LayersPanel
-          page={page}
-          selectedIds={selectedIds}
-          imageUrls={imageUrls}
-          onSelect={(ids) => {
-            setSelectedIds(ids);
-            setAnimating(false);
-            setPlaying(false);
-          }}
-          onPicked={mobileSheet === "layers" ? () => setMobileSheet(null) : undefined}
-          onRename={renameLayer}
-          onDuplicate={duplicateLayer}
-          onDelete={deleteLayer}
-          onToggleHidden={toggleLayerHidden}
-          onToggleLocked={toggleLayerLocked}
-          onNudge={nudgeLayer}
-          onPlace={placeLayer}
-          onGroup={groupSelection}
-          onUngroup={ungroupSelection}
-          deleteHint={
-            canvasEditing
-              ? "Finish editing the text before deleting a layer."
-              : undefined
-          }
-        />
+        <>
+          {leftPanelHeading("Layers", "Every object on this page, in stacking order.")}
+          <LayersPanel
+            page={page}
+            selectedIds={selectedIds}
+            imageUrls={imageUrls}
+            onSelect={(ids) => {
+              setSelectedIds(ids);
+              setAnimating(false);
+              setPlaying(false);
+            }}
+            onPicked={mobileSheet === "layers" ? () => setMobileSheet(null) : undefined}
+            onRename={renameLayer}
+            onDuplicate={duplicateLayer}
+            onDelete={deleteLayer}
+            onToggleHidden={toggleLayerHidden}
+            onToggleLocked={toggleLayerLocked}
+            onNudge={nudgeLayer}
+            onPlace={placeLayer}
+            onGroup={groupSelection}
+            onUngroup={ungroupSelection}
+            deleteHint={
+              canvasEditing
+                ? "Finish editing the text before deleting a layer."
+                : undefined
+            }
+          />
+        </>
       );
     }
 
@@ -3259,14 +3364,12 @@ export default function Studio() {
         </div>
         )}
 
-        <PanelHeading
-          title="Pages"
-          note={
-            design.suite && currentPiece
-              ? `Sides and pages of “${currentPiece.name}”.`
-              : "Reorder, duplicate, hide, or remove sections of the invitation."
-          }
-        />
+        {leftPanelHeading(
+          "Pages",
+          design.suite && currentPiece
+            ? `Sides and pages of “${currentPiece.name}”.`
+            : "Reorder, duplicate, hide, or remove sections of the invitation.",
+        )}
         <div className="space-y-1 p-2">
           {(design.suite && currentPiece
             ? piecePages(design, currentPiece).map((candidate) => ({
@@ -3566,30 +3669,19 @@ export default function Studio() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <button
-              type="button"
-              onClick={() => setLeftOpen((value) => !value)}
-              aria-label={leftOpen ? "Hide tool panel" : "Show tool panel"}
-              aria-pressed={leftOpen}
-              title={leftOpen ? "Hide tool panel" : "Show tool panel"}
-              className="studio-icon-button"
-            >
-              <PanelLeft className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() => setRightOpen((value) => !value)}
-              aria-label={rightOpen ? "Hide inspector" : "Show inspector"}
-              aria-pressed={rightOpen}
-              title={rightOpen ? "Hide inspector" : "Show inspector"}
-              className="studio-icon-button"
-            >
-              <PanelRight className="size-4" aria-hidden />
-            </button>
           </>
         }
         actions={
           <>
+            <StudioPaneControls
+              leftOpen={leftOpen}
+              rightOpen={rightOpen}
+              leftLabel="tool panel"
+              rightLabel="inspector"
+              onToggleLeft={() => setLeftOpen((value) => !value)}
+              onToggleRight={() => setRightOpen((value) => !value)}
+              onToggleBoth={toggleBoth}
+            />
             <button
               type="button"
               onClick={() => setLibrariesOpen(true)}
@@ -3749,7 +3841,13 @@ export default function Studio() {
       </Dialog>
 
       <div className="studio-workspace__body">
-        <aside className="studio-sidebar hidden lg:flex" aria-label="Invitation tools">
+        <aside
+          className="studio-sidebar hidden lg:flex"
+          data-open={leftOpen}
+          aria-label="Invitation tools"
+          aria-hidden={!leftOpen}
+          inert={!leftOpen}
+        >
           <StudioPanelRail
             label="Invitation tools"
             items={[
@@ -3760,27 +3858,37 @@ export default function Studio() {
               { id: "sections", label: "Sections", icon: BookOpen },
             ] satisfies readonly StudioPanelItem<LeftPanel>[]}
             active={leftPanel}
-            expanded={leftOpen}
+            expanded={leftPanelOpen}
             onSelect={(id) => {
-              if (id === leftPanel && leftOpen) {
-                setLeftOpen(false);
+              if (id === leftPanel && leftPanelOpen) {
+                setLeftPanelOpen(false);
                 return;
               }
               setLeftPanel(id);
-              setLeftOpen(true);
+              setLeftPanelOpen(true);
             }}
-            onToggle={() => setLeftOpen((value) => !value)}
+            onToggle={() => setLeftOpen(false)}
           />
           <div
             className="studio-panel-column"
-            data-collapsed={!leftOpen}
-            style={leftOpen ? { width: leftWidth, flexBasis: leftWidth } : undefined}
+            data-collapsed={!leftPanelOpen}
+            style={
+              leftPanelOpen ? { width: leftWidth, flexBasis: leftWidth } : undefined
+            }
           >
             <div className="h-full overflow-y-auto scroll-slim">{renderLeftPanel()}</div>
           </div>
         </aside>
 
-        {leftOpen ? (
+        {!leftOpen ? (
+          <StudioReopenHandle
+            side="left"
+            label="Show tool panel"
+            onOpen={() => setLeftOpen(true)}
+          />
+        ) : null}
+
+        {leftOpen && leftPanelOpen ? (
           <PanelResizer
             side="left"
             value={leftWidth}
@@ -4177,31 +4285,28 @@ export default function Studio() {
             label="Resize inspector"
           />
         ) : null}
-        {rightOpen ? (
         <aside
           className="studio-inspector hidden lg:flex"
+          data-open={rightOpen}
           aria-label="Inspector"
-          style={{ width: rightWidth, flexBasis: rightWidth }}
+          aria-hidden={!rightOpen}
+          inert={!rightOpen}
+          style={rightOpen ? { width: rightWidth, flexBasis: rightWidth } : undefined}
         >
-          <div className="studio-panel-heading">
-            <div className="min-w-0">
-              <p className="section-label">Properties</p>
-              <p className="studio-panel-heading__note">
-                {selected.length > 0
-                  ? `${selected.length} layer${selected.length === 1 ? "" : "s"} selected`
-                  : "Nothing selected — showing page setup"}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setRightOpen(false)}
-              className="studio-icon-button"
-              aria-label="Hide inspector"
-              title="Hide inspector"
-            >
-              <PanelRight className="size-3.5" aria-hidden />
-            </button>
-          </div>
+          <StudioPanelHeading
+            title="Properties"
+            note={
+              selected.length > 0
+                ? `${selected.length} layer${selected.length === 1 ? "" : "s"} selected`
+                : "Nothing selected — showing page setup"
+            }
+            collapse={{
+              open: rightOpen,
+              onToggle: () => setRightOpen((value) => !value),
+              label: "inspector",
+              side: "right",
+            }}
+          />
           <div className="scroll-slim min-h-0 flex-1 overflow-y-auto">
           <Inspector
             page={page}
@@ -4237,6 +4342,13 @@ export default function Studio() {
           />
           </div>
         </aside>
+
+        {!rightOpen ? (
+          <StudioReopenHandle
+            side="right"
+            label="Show inspector"
+            onOpen={() => setRightOpen(true)}
+          />
         ) : null}
       </div>
 

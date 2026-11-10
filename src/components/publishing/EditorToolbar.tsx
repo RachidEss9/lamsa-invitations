@@ -14,8 +14,6 @@ import {
   Lightbulb,
   Maximize2,
   Minus,
-  PanelLeft,
-  PanelRight,
   Plus,
   Redo2,
   Ruler,
@@ -39,7 +37,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { StudioHeader, StudioSaveState } from "@/components/workspace/StudioChrome";
+import {
+  StudioHeader,
+  StudioPaneControls,
+  StudioSaveState,
+} from "@/components/workspace/StudioChrome";
 import { zoomPercent } from "@/lib/publishing/viewport";
 import { cn } from "@/lib/utils";
 
@@ -112,6 +114,7 @@ export interface EditorToolbarProps {
   rightOpen?: boolean;
   onToggleLeft?: () => void;
   onToggleRight?: () => void;
+  onToggleBoth?: () => void;
 }
 
 function ToolButton({
@@ -186,6 +189,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
     rightOpen = true,
     onToggleLeft,
     onToggleRight,
+    onToggleBoth,
   } = props;
 
   const chromeItems: Array<[keyof PageChrome, string, ReactNode]> = [
@@ -282,29 +286,16 @@ export function EditorToolbar(props: EditorToolbarProps) {
       }
       actions={
         <>
-          {onToggleLeft ? (
-            <button
-              type="button"
-              onClick={onToggleLeft}
-              aria-label={leftOpen ? "Hide left panel" : "Show left panel"}
-              aria-pressed={leftOpen}
-              title={leftOpen ? "Hide left panel" : "Show left panel"}
-              className="studio-icon-button hidden lg:grid"
-            >
-              <PanelLeft className="size-4" aria-hidden />
-            </button>
-          ) : null}
-          {onToggleRight ? (
-            <button
-              type="button"
-              onClick={onToggleRight}
-              aria-label={rightOpen ? "Hide inspector" : "Show inspector"}
-              aria-pressed={rightOpen}
-              title={rightOpen ? "Hide inspector" : "Show inspector"}
-              className="studio-icon-button hidden lg:grid"
-            >
-              <PanelRight className="size-4" aria-hidden />
-            </button>
+          {onToggleLeft && onToggleRight && onToggleBoth ? (
+            <StudioPaneControls
+              leftOpen={leftOpen}
+              rightOpen={rightOpen}
+              leftLabel="left panel"
+              rightLabel="inspector"
+              onToggleLeft={onToggleLeft}
+              onToggleRight={onToggleRight}
+              onToggleBoth={onToggleBoth}
+            />
           ) : null}
           <span aria-hidden className="mx-0.5 hidden h-5 w-px bg-[var(--workspace-line)] lg:block" />
 
